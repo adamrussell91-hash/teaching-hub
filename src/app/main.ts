@@ -10,6 +10,10 @@ import {
 import { fetchCurriculum, renderCurriculumNav, type CurriculumResponse } from '@/teacher/nav';
 import { renderTeacherHome as renderHomeCanvas } from '@/teacher/home';
 import { mountLessonEditor, type LessonEditorHandle } from '@/teacher/lesson-editor';
+import {
+  mountStudentLessonView,
+  type StudentLessonViewHandle
+} from '@/student/lesson-view';
 import { navigate, start, type RouteMatch } from './router';
 
 const root = document.querySelector('#app');
@@ -34,11 +38,20 @@ let curriculumPromise: Promise<CurriculumResponse> | null = null;
 // best-effort save flush) whenever the route changes.
 let lessonEditorHandle: LessonEditorHandle | null = null;
 
+// The student lesson view mounted for the current public route, if any.
+let studentLessonViewHandle: StudentLessonViewHandle | null = null;
+
 function teardownLessonEditor(): void {
   if (!lessonEditorHandle) return;
   lessonEditorHandle.flush();
   lessonEditorHandle.dispose();
   lessonEditorHandle = null;
+}
+
+function teardownStudentLessonView(): void {
+  if (!studentLessonViewHandle) return;
+  studentLessonViewHandle.dispose();
+  studentLessonViewHandle = null;
 }
 
 function getCurriculum(): Promise<CurriculumResponse> {
@@ -103,29 +116,12 @@ function renderTeacherLessonRoute(lessonId: string, token: number): void {
   void loadNavAndHandleErrors(refs, token, lessonId, () => {});
 }
 
-function renderStudentLesson(lessonId: string): void {
-  appRoot.replaceChildren();
-
-  const surface = document.createElement('div');
-  surface.className = 'student-surface';
-
-  const header = document.createElement('header');
-  header.className = 'student-surface__header';
-  header.textContent = 'Teaching Hub';
-
-  const content = document.createElement('div');
-  content.className = 'student-surface__content';
-
-  const title = document.createElement('h1');
-  title.className = 'student-surface__title';
-  title.textContent = 'Student lesson';
-
-  const detail = document.createElement('p');
-  detail.textContent = `${lessonId} (placeholder until Task 16)`;
-
-  content.append(title, detail);
-  surface.append(header, content);
-  appRoot.append(surface);
+function renderStudentLessonRoute(lessonId: string, token: number): void {
+  studentLessonViewHandle = mountStudentLessonView({
+    root: appRoot,
+    lessonId,
+    isStale: () => token !== renderToken
+  });
 }
 
 function renderRoute(match: RouteMatch, token: number): void {
@@ -137,7 +133,7 @@ function renderRoute(match: RouteMatch, token: number): void {
       renderTeacherLessonRoute(match.params.lessonId, token);
       break;
     case 'student-lesson':
-      renderStudentLesson(match.params.lessonId);
+      renderStudentLessonRoute(match.params.lessonId, token);
       break;
     default:
       break;
@@ -151,6 +147,7 @@ async function handleRoute(match: RouteMatch): Promise<void> {
   // Every route change navigates away from whatever was previously mounted,
   // so flush any pending lesson edits before tearing it down.
   teardownLessonEditor();
+  teardownStudentLessonView();
 
   if (match.requiresAuth && !session.authenticated) {
     navigate('/sign-in', { replace: true });
