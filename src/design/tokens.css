@@ -1,1 +1,24 @@
-/* Design tokens — populated in Task 3 */
+/* Clinical Glass / Life Hub design tokens */
+:root {
+  color-scheme: light;
+  --warm-white: #FAF8F2;
+  --depth: #0A1536;
+  --marine: #142B51;
+  --orca: #424860;
+  --shallow: #A7ABB9;
+  --wave: #376FB7;
+  --high-sea: #F68620;
+  --shore: #EAE7DA;
+  --sand: #F0CFAC;
+  --ink: #13213d;
+  --muted: #657086;
+  --line: rgba(20, 43, 81, 0.12);
+  --glass: rgba(255, 255, 255, 0.72);
+  --shadow: 0 1.4rem 3.5rem rgba(31, 53, 91, 0.09);
+  --radius-lg: 1.5rem;
+  --radius-md: 1.05rem;
+  --rail-width: 15rem;
+  --font-ui: "Source Sans 3", ui-sans-serif, sans-serif;
+  font-family: "Source Serif 4", "Iowan Old Style", "Palatino Linotype", Palatino, serif;
+  font-synthesis: none;
+}

@@ -1,1 +1,347 @@
-/* App styles — populated in Task 3 */
+/* Teaching Hub — base layout chrome (Clinical Glass) */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  color: var(--ink);
+  background-color: var(--warm-white);
+  background-image:
+    radial-gradient(ellipse 120% 80% at 0% 0%, rgba(234, 231, 218, 0.55), transparent 55%),
+    radial-gradient(ellipse 90% 60% at 100% 100%, rgba(240, 207, 172, 0.22), transparent 50%),
+    linear-gradient(165deg, var(--warm-white) 0%, #f5f2ea 48%, var(--shore) 100%);
+  line-height: 1.55;
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--wave);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.15em;
+}
+
+a:hover {
+  color: var(--marine);
+}
+
+/* ── Glass surface recipe ─────────────────────────────────────────────── */
+
+.glass-panel {
+  background: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* ── Sign-in ──────────────────────────────────────────────────────────── */
+
+.sign-in {
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  padding: 2rem 1.25rem;
+}
+
+.sign-in__card {
+  width: min(100%, 24rem);
+  padding: 2rem 1.75rem;
+  display: grid;
+  gap: 1.25rem;
+}
+
+.sign-in__brand {
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sign-in__title {
+  font-family: var(--font-ui);
+  font-size: 1.65rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--depth);
+}
+
+.sign-in__field {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.sign-in__label {
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--orca);
+}
+
+.sign-in__input {
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  font: inherit;
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius-md) * 0.65);
+}
+
+.sign-in__input::placeholder {
+  color: var(--shallow);
+}
+
+/* ── Teacher workspace grid ───────────────────────────────────────────── */
+
+.teacher-layout {
+  display: grid;
+  grid-template-columns: var(--rail-width) minmax(0, 1fr);
+  min-height: 100dvh;
+}
+
+.teacher-layout__rail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 1.25rem 0.85rem;
+  background: linear-gradient(180deg, var(--depth) 0%, var(--marine) 100%);
+  color: rgba(255, 255, 255, 0.92);
+  font-family: var(--font-ui);
+}
+
+.teacher-layout__rail-brand {
+  padding: 0.35rem 0.65rem 1rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.teacher-layout__main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 100dvh;
+}
+
+.teacher-layout__context-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1.35rem;
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.teacher-layout__canvas {
+  flex: 1;
+  padding: 1.75rem clamp(1.25rem, 3vw, 2.5rem) 2.5rem;
+  background: var(--warm-white);
+}
+
+/* ── Student reading surface ──────────────────────────────────────────── */
+
+.student-surface {
+  min-height: 100dvh;
+  background: var(--warm-white);
+  color: var(--ink);
+}
+
+.student-surface__header {
+  padding: 0.85rem 1.25rem;
+  font-family: var(--font-ui);
+  font-size: 0.88rem;
+  color: rgba(255, 255, 255, 0.92);
+  background: var(--depth);
+}
+
+.student-surface__header a {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.student-surface__content {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 3rem;
+}
+
+.student-surface__title {
+  font-family: var(--font-ui);
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--depth);
+  margin-bottom: 1.25rem;
+}
+
+/* ── Navigation items ─────────────────────────────────────────────────── */
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  font-family: var(--font-ui);
+  font-size: 0.88rem;
+  font-weight: 500;
+  line-height: 1.3;
+  color: rgba(255, 255, 255, 0.78);
+  text-align: left;
+  text-decoration: none;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius-md) * 0.55);
+  cursor: pointer;
+}
+
+.nav-item:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.nav-item--selected {
+  color: #fff;
+  background: rgba(55, 111, 183, 0.28);
+  border-color: rgba(55, 111, 183, 0.45);
+}
+
+.nav-item--nested {
+  padding-left: 1.35rem;
+  font-size: 0.84rem;
+  font-weight: 400;
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.55rem 1rem;
+  font-family: var(--font-ui);
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius-md) * 0.65);
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.btn--primary {
+  color: #fff;
+  background: var(--wave);
+  border-color: var(--wave);
+}
+
+.btn--primary:hover {
+  background: var(--marine);
+  border-color: var(--marine);
+}
+
+.btn--secondary {
+  color: var(--marine);
+  background: rgba(255, 255, 255, 0.55);
+  border-color: var(--line);
+}
+
+.btn--secondary:hover {
+  background: rgba(255, 255, 255, 0.82);
+  border-color: rgba(20, 43, 81, 0.2);
+}
+
+.btn--decisive {
+  color: #fff;
+  background: var(--high-sea);
+  border-color: var(--high-sea);
+}
+
+.btn--decisive:hover {
+  background: #e07818;
+  border-color: #e07818;
+}
+
+.btn--ghost {
+  color: var(--orca);
+  background: transparent;
+  border-color: transparent;
+}
+
+.btn--ghost:hover {
+  color: var(--marine);
+  background: rgba(20, 43, 81, 0.05);
+}
+
+/* ── Focus (High Sea used sparingly) ──────────────────────────────────── */
+
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--high-sea);
+  outline-offset: 2px;
+}
+
+.nav-item:focus-visible,
+.btn:focus-visible,
+.sign-in__input:focus-visible {
+  outline-color: var(--high-sea);
+}
+
+/* ── Reduced motion ───────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Responsive teacher rail ──────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  .teacher-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .teacher-layout__rail {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 0.75rem;
+  }
+
+  .teacher-layout__rail-brand {
+    padding: 0.25rem 0.5rem;
+  }
+}
