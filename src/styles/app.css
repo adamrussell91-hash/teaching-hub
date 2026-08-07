@@ -42,7 +42,8 @@ a:hover {
 
 /* ── Glass surface recipe ─────────────────────────────────────────────── */
 
-.glass-panel {
+.glass-panel,
+.sign-in__card {
   background: var(--glass);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
@@ -225,8 +226,8 @@ a:hover {
 
 .nav-item--selected {
   color: #fff;
-  background: rgba(55, 111, 183, 0.28);
-  border-color: rgba(55, 111, 183, 0.45);
+  background: color-mix(in srgb, var(--wave) 28%, transparent);
+  border-color: color-mix(in srgb, var(--wave) 45%, transparent);
 }
 
 .nav-item--nested {
@@ -298,21 +299,15 @@ a:hover {
   background: rgba(20, 43, 81, 0.05);
 }
 
-/* ── Focus (High Sea used sparingly) ──────────────────────────────────── */
+/* ── Focus (Wave for keyboard; High Sea reserved for decisive actions) ── */
 
 :focus {
   outline: none;
 }
 
 :focus-visible {
-  outline: 2px solid var(--high-sea);
+  outline: 2px solid var(--wave);
   outline-offset: 2px;
-}
-
-.nav-item:focus-visible,
-.btn:focus-visible,
-.sign-in__input:focus-visible {
-  outline-color: var(--high-sea);
 }
 
 /* ── Reduced motion ───────────────────────────────────────────────────── */
