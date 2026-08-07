@@ -7,3 +7,6 @@ dist/
 .DS_Store
 .netlify/
 *.log
+
+test-results/
+playwright-report/
