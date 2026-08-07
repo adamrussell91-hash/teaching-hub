@@ -1,6 +1,11 @@
 /**
  * Production API origin is committed in-repo (same pattern as Life Hub).
  * It is not a secret — only Netlify env vars (passphrase hash, session secret) are sensitive.
+ *
+ * Replace `YOUR_NETLIFY_SITE` with the real site name after the first deploy
+ * of `netlify/functions/*.mts` (see `netlify.toml`). Before the site has any
+ * content, run `npm run seed:blobs` once against that site's Blob store —
+ * see `scripts/seed-blobs.mjs` for required env vars.
  */
 const PRODUCTION_API_BASE_URL = 'https://YOUR_NETLIFY_SITE.netlify.app';
 

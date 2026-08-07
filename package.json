@@ -10,7 +10,8 @@
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
     "test:browser": "playwright test",
-    "generate:auth": "node scripts/generate-auth-secrets.mjs"
+    "generate:auth": "node scripts/generate-auth-secrets.mjs",
+    "seed:blobs": "node scripts/seed-blobs.mjs"
   },
   "engines": {
     "node": ">=22"

@@ -13,6 +13,14 @@ export function jsonResponse(status: number, body: unknown, headers: Record<stri
 }
 
 /**
+ * Mirrors the `ApiSuccess` shape consumed by `src/api/client.ts`
+ * (`{ ok: true, data }`).
+ */
+export function okResponse(status: number, data: unknown, headers: Record<string, string> = {}): Response {
+  return jsonResponse(status, { ok: true, data }, headers);
+}
+
+/**
  * Mirrors the `ApiFailure` shape consumed by `src/api/client.ts`
  * (`{ ok: false, error: { code, message, details? } }`).
  */
