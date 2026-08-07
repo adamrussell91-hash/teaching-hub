@@ -1,0 +1,178 @@
+import type { Block } from '@/schemas/block';
+
+export type BlockChangeHandler<T extends Block = Block> = (block: T) => void;
+
+const VISIBILITY_OPTIONS = [
+  { value: 'student_teacher', label: 'Students & teacher' },
+  { value: 'teacher_only', label: 'Teacher only' }
+] as const;
+
+export function createVisibilitySelect<T extends Block>(
+  block: T,
+  onChange: BlockChangeHandler<T>
+): HTMLSelectElement {
+  const select = document.createElement('select');
+  select.className = 'block-editor__visibility';
+  select.setAttribute('aria-label', 'Visibility');
+
+  for (const option of VISIBILITY_OPTIONS) {
+    const opt = document.createElement('option');
+    opt.value = option.value;
+    opt.textContent = option.label;
+    opt.selected = block.visibility === option.value;
+    select.append(opt);
+  }
+
+  select.addEventListener('change', () => {
+    onChange({
+      ...block,
+      visibility: select.value as Block['visibility']
+    });
+  });
+
+  return select;
+}
+
+function editorShell<T extends Block>(
+  block: T,
+  onChange: BlockChangeHandler<T>,
+  fields: HTMLElement
+): HTMLElement {
+  const shell = document.createElement('div');
+  shell.className = 'block-editor';
+  shell.dataset.blockId = block.id;
+  shell.dataset.blockType = block.block_type;
+  shell.append(createVisibilitySelect(block, onChange), fields);
+  return shell;
+}
+
+export function createRichTextEditor(
+  block: Extract<Block, { block_type: 'rich_text' }>,
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'rich_text' }>>
+): HTMLElement {
+  const textarea = document.createElement('textarea');
+  textarea.className = 'block-editor__html';
+  textarea.value = block.content.html;
+  textarea.rows = 6;
+  textarea.setAttribute('aria-label', 'Rich text HTML');
+
+  textarea.addEventListener('input', () => {
+    onChange({
+      ...block,
+      content: { html: textarea.value }
+    });
+  });
+
+  return editorShell(block, onChange, textarea);
+}
+
+export function createHeadingEditor(
+  block: Extract<Block, { block_type: 'heading' }>,
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'heading' }>>
+): HTMLElement {
+  const fields = document.createElement('div');
+  fields.className = 'block-editor__fields';
+
+  const textInput = document.createElement('input');
+  textInput.type = 'text';
+  textInput.className = 'block-editor__heading-text';
+  textInput.value = block.content.text;
+  textInput.setAttribute('aria-label', 'Heading text');
+
+  const variantSelect = document.createElement('select');
+  variantSelect.className = 'block-editor__heading-variant';
+  variantSelect.setAttribute('aria-label', 'Heading level');
+
+  for (const variant of ['page', 'section', 'subsection'] as const) {
+    const opt = document.createElement('option');
+    opt.value = variant;
+    opt.textContent = variant;
+    opt.selected = block.variant === variant;
+    variantSelect.append(opt);
+  }
+
+  const emitChange = () => {
+    onChange({
+      ...block,
+      variant: variantSelect.value as typeof block.variant,
+      content: { text: textInput.value }
+    });
+  };
+
+  textInput.addEventListener('input', emitChange);
+  variantSelect.addEventListener('change', emitChange);
+
+  fields.append(textInput, variantSelect);
+  return editorShell(block, onChange, fields);
+}
+
+export function createCalloutEditor(
+  block: Extract<Block, { block_type: 'callout' }>,
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'callout' }>>
+): HTMLElement {
+  const fields = document.createElement('div');
+  fields.className = 'block-editor__fields';
+
+  const styleSelect = document.createElement('select');
+  styleSelect.className = 'block-editor__callout-style';
+  styleSelect.setAttribute('aria-label', 'Callout style');
+
+  for (const style of [
+    'information',
+    'important',
+    'warning',
+    'extension',
+    'scaffold',
+    'example',
+    'remember',
+    'teacher'
+  ] as const) {
+    const opt = document.createElement('option');
+    opt.value = style;
+    opt.textContent = style;
+    opt.selected = block.content.style === style;
+    styleSelect.append(opt);
+  }
+
+  const titleInput = document.createElement('input');
+  titleInput.type = 'text';
+  titleInput.className = 'block-editor__callout-title';
+  titleInput.value = block.content.title ?? '';
+  titleInput.setAttribute('aria-label', 'Callout title');
+
+  const bodyInput = document.createElement('textarea');
+  bodyInput.className = 'block-editor__callout-body';
+  bodyInput.value = block.content.body;
+  bodyInput.rows = 4;
+  bodyInput.setAttribute('aria-label', 'Callout body');
+
+  const emitChange = () => {
+    const title = titleInput.value.trim();
+    onChange({
+      ...block,
+      content: {
+        style: styleSelect.value as typeof block.content.style,
+        title: title.length > 0 ? title : undefined,
+        body: bodyInput.value
+      }
+    });
+  };
+
+  styleSelect.addEventListener('change', emitChange);
+  titleInput.addEventListener('input', emitChange);
+  bodyInput.addEventListener('input', emitChange);
+
+  fields.append(styleSelect, titleInput, bodyInput);
+  return editorShell(block, onChange, fields);
+}
+
+export function createBlockEditor(block: Block, onChange: BlockChangeHandler): HTMLElement {
+  switch (block.block_type) {
+    case 'rich_text':
+      return createRichTextEditor(block, onChange);
+    case 'heading':
+      return createHeadingEditor(block, onChange);
+    case 'callout':
+      return createCalloutEditor(block, onChange);
+  }
+}

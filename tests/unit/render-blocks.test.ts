@@ -1,0 +1,239 @@
+import { describe, it, expect, vi } from 'vitest';
+import { CALLOUT_STYLE_CLASS, renderBlock } from '@/blocks/render';
+import {
+  createBlockEditor,
+  createCalloutEditor,
+  createHeadingEditor,
+  createRichTextEditor
+} from '@/blocks/editors';
+import { blockRegistry } from '@/blocks/registry';
+import type { Block } from '@/schemas/block';
+
+const timestamps = {
+  created_at: '2026-01-01T00:00:00.000Z',
+  updated_at: '2026-01-01T00:00:00.000Z'
+};
+
+const baseBlock = {
+  id: 'block_001',
+  type: 'block' as const,
+  variant: 'medium',
+  visibility: 'student_teacher' as const,
+  layout: {},
+  print: {},
+  settings: {},
+  ...timestamps,
+  schema_version: 1 as const
+};
+
+describe('renderBlock', () => {
+  it('renders rich_text with sanitised HTML only', () => {
+    const block: Block = {
+      ...baseBlock,
+      block_type: 'rich_text',
+      content: { html: '<p>Hi</p><script>alert(1)</script>' }
+    };
+
+    const el = renderBlock(block, 'student');
+    const richText = el.querySelector('.block-rich-text');
+
+    expect(richText?.innerHTML).toBe('<p>Hi</p>');
+    expect(el.querySelector('script')).toBeNull();
+  });
+
+  it('maps heading variants to h1, h2, and h3', () => {
+    const cases = [
+      { variant: 'page', tag: 'H1' },
+      { variant: 'section', tag: 'H2' },
+      { variant: 'subsection', tag: 'H3' }
+    ] as const;
+
+    for (const { variant, tag } of cases) {
+      const block: Block = {
+        ...baseBlock,
+        id: `heading_${variant}`,
+        block_type: 'heading',
+        variant,
+        content: { text: `${variant} title` }
+      };
+
+      const el = renderBlock(block, 'student');
+      const heading = el.querySelector('.block-heading');
+
+      expect(heading?.tagName).toBe(tag);
+      expect(heading?.textContent).toBe(`${variant} title`);
+      expect(heading?.classList.contains(`block-heading--${variant}`)).toBe(true);
+    }
+  });
+
+  it('maps callout styles to semantic token accent classes', () => {
+    const block: Block = {
+      ...baseBlock,
+      block_type: 'callout',
+      content: {
+        style: 'extension',
+        title: 'Extension',
+        body: 'Go further.'
+      }
+    };
+
+    const el = renderBlock(block, 'student');
+    const callout = el.querySelector('.callout');
+
+    expect(callout?.classList.contains('callout--sand')).toBe(true);
+    expect(el.querySelector('.callout__title')?.textContent).toBe('Extension');
+    expect(el.querySelector('.callout__body')?.textContent).toBe('Go further.');
+  });
+
+  it('uses High Sea accent sparingly for important and warning callouts', () => {
+    for (const style of ['important', 'warning'] as const) {
+      const block: Block = {
+        ...baseBlock,
+        id: `callout_${style}`,
+        block_type: 'callout',
+        content: { style, body: 'Note.' }
+      };
+
+      const el = renderBlock(block, 'student');
+      expect(el.querySelector('.callout')?.classList.contains('callout--high-sea')).toBe(true);
+    }
+  });
+
+  it('marks teacher_only blocks in teacher mode', () => {
+    const block: Block = {
+      ...baseBlock,
+      block_type: 'rich_text',
+      visibility: 'teacher_only',
+      content: { html: '<p>Notes</p>' }
+    };
+
+    const teacherEl = renderBlock(block, 'teacher');
+    const studentEl = renderBlock(block, 'student');
+
+    expect(teacherEl.classList.contains('block--teacher-only')).toBe(true);
+    expect(studentEl.classList.contains('block--teacher-only')).toBe(false);
+  });
+});
+
+describe('CALLOUT_STYLE_CLASS', () => {
+  it('covers every callout style from the schema', () => {
+    const styles = [
+      'information',
+      'important',
+      'warning',
+      'extension',
+      'scaffold',
+      'example',
+      'remember',
+      'teacher'
+    ] as const;
+
+    for (const style of styles) {
+      expect(CALLOUT_STYLE_CLASS[style]).toMatch(/^callout--/);
+    }
+  });
+});
+
+describe('block editors', () => {
+  it('createRichTextEditor calls back when HTML changes', () => {
+    const block: Block = {
+      ...baseBlock,
+      block_type: 'rich_text',
+      content: { html: '<p>Start</p>' }
+    };
+    const onChange = vi.fn();
+
+    const editor = createRichTextEditor(block, onChange);
+    const textarea = editor.querySelector<HTMLTextAreaElement>('.block-editor__html')!;
+
+    textarea.value = '<p>Updated</p>';
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(onChange).toHaveBeenCalledWith({
+      ...block,
+      content: { html: '<p>Updated</p>' }
+    });
+  });
+
+  it('createHeadingEditor calls back when text or variant changes', () => {
+    const block: Block = {
+      ...baseBlock,
+      block_type: 'heading',
+      variant: 'section',
+      content: { text: 'Before' }
+    };
+    const onChange = vi.fn();
+
+    const editor = createHeadingEditor(block, onChange);
+    const textInput = editor.querySelector<HTMLInputElement>('.block-editor__heading-text')!;
+    const variantSelect = editor.querySelector<HTMLSelectElement>('.block-editor__heading-variant')!;
+
+    textInput.value = 'After';
+    textInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(onChange).toHaveBeenLastCalledWith({
+      ...block,
+      content: { text: 'After' }
+    });
+
+    variantSelect.value = 'subsection';
+    variantSelect.dispatchEvent(new Event('change', { bubbles: true }));
+
+    expect(onChange).toHaveBeenLastCalledWith({
+      ...block,
+      variant: 'subsection',
+      content: { text: 'After' }
+    });
+  });
+
+  it('createCalloutEditor calls back when fields change', () => {
+    const block: Block = {
+      ...baseBlock,
+      block_type: 'callout',
+      content: { style: 'information', title: 'Info', body: 'Body' }
+    };
+    const onChange = vi.fn();
+
+    const editor = createCalloutEditor(block, onChange);
+    const bodyInput = editor.querySelector<HTMLTextAreaElement>('.block-editor__callout-body')!;
+
+    bodyInput.value = 'New body';
+    bodyInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(onChange).toHaveBeenLastCalledWith({
+      ...block,
+      content: { style: 'information', title: 'Info', body: 'New body' }
+    });
+  });
+
+  it('includes a visibility select on every editor', () => {
+    const onChange = vi.fn();
+    const richText: Block = {
+      ...baseBlock,
+      block_type: 'rich_text',
+      content: { html: '<p>x</p>' }
+    };
+
+    const editor = createBlockEditor(richText, onChange);
+    const visibility = editor.querySelector<HTMLSelectElement>('.block-editor__visibility')!;
+
+    visibility.value = 'teacher_only';
+    visibility.dispatchEvent(new Event('change', { bubbles: true }));
+
+    expect(onChange).toHaveBeenCalledWith({
+      ...richText,
+      visibility: 'teacher_only'
+    });
+  });
+});
+
+describe('blockRegistry', () => {
+  it('maps every block_type to render and editor helpers', () => {
+    expect(Object.keys(blockRegistry).sort()).toEqual(['callout', 'heading', 'rich_text']);
+
+    for (const key of Object.keys(blockRegistry) as Array<Block['block_type']>) {
+      expect(typeof blockRegistry[key].render).toBe('function');
+      expect(typeof blockRegistry[key].createEditor).toBe('function');
+    }
+  });
+});
