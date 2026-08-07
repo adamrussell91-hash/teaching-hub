@@ -113,6 +113,22 @@ a:hover {
   color: var(--shallow);
 }
 
+.sign-in__form {
+  display: grid;
+  gap: 1rem;
+}
+
+.sign-in__submit {
+  width: 100%;
+}
+
+.sign-in__error {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  color: var(--high-sea);
+}
+
 /* ── Teacher workspace grid ───────────────────────────────────────────── */
 
 .teacher-layout {
