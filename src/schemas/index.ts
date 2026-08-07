@@ -6,3 +6,24 @@ export {
 export { YearSchema, type Year } from './year';
 export { SubjectSchema, type Subject } from './subject';
 export { UnitSchema, type Unit } from './unit';
+export {
+  VisibilitySchema,
+  BlockTypeSchema,
+  HeadingVariantSchema,
+  CalloutStyleSchema,
+  RichTextBlockSchema,
+  HeadingBlockSchema,
+  CalloutBlockSchema,
+  BlockSchema,
+  type Block
+} from './block';
+export {
+  LessonSchema,
+  PublishableLessonSchema,
+  type Lesson
+} from './lesson';
+export {
+  PublishedLessonSchema,
+  toPublishedLesson,
+  type PublishedLesson
+} from './published-lesson';
