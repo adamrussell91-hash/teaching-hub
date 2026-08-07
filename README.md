@@ -23,6 +23,12 @@ npm run build
 
 Output is written to `dist/`.
 
+## GitHub Pages
+
+The `.github/workflows/pages.yml` workflow builds and deploys `dist/` on push to `main`.
+
+Vite `base` is `/` (user or org site, or a custom domain). For a **project** site at `https://<user>.github.io/<repo>/`, set `base: '/Teaching-Hub/'` in `vite.config.ts` before building.
+
 ## Tests
 
 ```bash
