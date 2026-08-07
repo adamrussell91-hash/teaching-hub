@@ -213,6 +213,199 @@ a:hover {
   color: var(--muted);
 }
 
+.teacher-layout__context-bar-save-slot[data-save-state='saving'] {
+  color: var(--wave);
+}
+
+.teacher-layout__context-bar-save-slot[data-save-state='save_failed'] {
+  color: var(--high-sea);
+  font-weight: 600;
+}
+
+.teacher-layout__context-bar-save-slot[data-save-state='published'] {
+  color: var(--marine);
+  font-weight: 600;
+}
+
+.context-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+/* ── Lesson editor ────────────────────────────────────────────────────── */
+
+.lesson-editor__title-field {
+  display: grid;
+  gap: 0.4rem;
+  margin-bottom: 1.5rem;
+  max-width: 36rem;
+}
+
+.lesson-editor__title-label {
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--orca);
+}
+
+.lesson-editor__title-input {
+  width: 100%;
+  padding: 0.6rem 0.85rem;
+  font: inherit;
+  font-family: var(--font-ui);
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--depth);
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius-md) * 0.65);
+}
+
+.lesson-editor__blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-bottom: 1.25rem;
+}
+
+.lesson-editor__block-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+.lesson-editor__block-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex-shrink: 0;
+  padding-top: 0.3rem;
+}
+
+.lesson-editor__reorder {
+  padding: 0.25rem 0.5rem;
+  line-height: 1;
+}
+
+.lesson-editor__reorder:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.lesson-editor__add-block {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.9rem 1rem;
+  background: var(--glass);
+  border: 1px dashed var(--line);
+  border-radius: calc(var(--radius-md) * 0.65);
+}
+
+.lesson-editor__add-block-label {
+  font-family: var(--font-ui);
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: var(--orca);
+}
+
+.lesson-editor__add-block-select {
+  padding: 0.4rem 0.6rem;
+  font: inherit;
+  font-family: var(--font-ui);
+  font-size: 0.88rem;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius-md) * 0.5);
+}
+
+.lesson-editor__publish-panel {
+  margin-bottom: 1.25rem;
+  padding: 0.9rem 1.1rem;
+  font-family: var(--font-ui);
+  font-size: 0.88rem;
+  border-radius: calc(var(--radius-md) * 0.65);
+}
+
+.lesson-editor__publish-panel--success {
+  color: var(--marine);
+  background: color-mix(in srgb, var(--wave) 12%, var(--glass));
+  border: 1px solid color-mix(in srgb, var(--wave) 35%, transparent);
+}
+
+.lesson-editor__publish-panel--error {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--high-sea) 10%, var(--glass));
+  border: 1px solid color-mix(in srgb, var(--high-sea) 35%, transparent);
+}
+
+.lesson-editor__publish-link {
+  font-weight: 600;
+}
+
+.lesson-editor__publish-issues {
+  margin: 0.5rem 0 0;
+  padding-left: 1.2rem;
+}
+
+/* ── Block editors (Task 14 editor shell, styled here) ───────────────── */
+
+.block-editor {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.9rem 1rem;
+  background: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius-md) * 0.65);
+}
+
+.block-editor__visibility {
+  justify-self: start;
+  padding: 0.3rem 0.55rem;
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius-md) * 0.5);
+}
+
+.block-editor__html,
+.block-editor__callout-body {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  font: inherit;
+  font-family: var(--font-ui);
+  font-size: 0.92rem;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius-md) * 0.5);
+  resize: vertical;
+}
+
+.block-editor__fields {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.block-editor__heading-text,
+.block-editor__heading-variant,
+.block-editor__callout-style,
+.block-editor__callout-title {
+  padding: 0.55rem 0.75rem;
+  font: inherit;
+  font-family: var(--font-ui);
+  font-size: 0.92rem;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius-md) * 0.5);
+}
+
 /* ── Student reading surface ──────────────────────────────────────────── */
 
 .student-surface {

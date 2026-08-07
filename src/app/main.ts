@@ -9,6 +9,7 @@ import {
 } from '@/teacher/shell';
 import { fetchCurriculum, renderCurriculumNav, type CurriculumResponse } from '@/teacher/nav';
 import { renderTeacherHome as renderHomeCanvas } from '@/teacher/home';
+import { mountLessonEditor, type LessonEditorHandle } from '@/teacher/lesson-editor';
 import { navigate, start, type RouteMatch } from './router';
 
 const root = document.querySelector('#app');
@@ -28,6 +29,17 @@ let renderToken = 0;
 // workspace visit only needs to fetch it once; a fresh fetch is triggered on
 // the next render whenever a previous attempt failed.
 let curriculumPromise: Promise<CurriculumResponse> | null = null;
+
+// The lesson editor mounted for the current route, if any. Torn down (with a
+// best-effort save flush) whenever the route changes.
+let lessonEditorHandle: LessonEditorHandle | null = null;
+
+function teardownLessonEditor(): void {
+  if (!lessonEditorHandle) return;
+  lessonEditorHandle.flush();
+  lessonEditorHandle.dispose();
+  lessonEditorHandle = null;
+}
 
 function getCurriculum(): Promise<CurriculumResponse> {
   if (!curriculumPromise) {
@@ -77,18 +89,18 @@ function renderTeacherHomeRoute(token: number): void {
 
 function renderTeacherLessonRoute(lessonId: string, token: number): void {
   const refs = renderTeacherShell(appRoot);
-  renderContextBar(refs, { title: 'Untitled lesson' });
   renderRailStatus(refs.railNav, 'Loading curriculum…');
 
-  const placeholder = document.createElement('p');
-  placeholder.className = 'teacher-layout__canvas-status';
-  placeholder.textContent = 'Lesson editor coming in Task 15.';
-  refs.canvas.append(placeholder);
-
-  void loadNavAndHandleErrors(refs, token, lessonId, (curriculum) => {
-    const summary = curriculum.lessons.find((lesson) => lesson.id === lessonId);
-    renderContextBar(refs, { title: summary?.title ?? lessonId });
+  // The lesson editor owns the context bar title (and Save/Publish controls)
+  // once the draft loads, so the curriculum load below is only used to
+  // populate and highlight the rail nav.
+  lessonEditorHandle = mountLessonEditor({
+    refs,
+    lessonId,
+    isStale: () => token !== renderToken
   });
+
+  void loadNavAndHandleErrors(refs, token, lessonId, () => {});
 }
 
 function renderStudentLesson(lessonId: string): void {
@@ -136,6 +148,10 @@ async function handleRoute(match: RouteMatch): Promise<void> {
   renderToken += 1;
   const token = renderToken;
 
+  // Every route change navigates away from whatever was previously mounted,
+  // so flush any pending lesson edits before tearing it down.
+  teardownLessonEditor();
+
   if (match.requiresAuth && !session.authenticated) {
     navigate('/sign-in', { replace: true });
     return;
@@ -165,6 +181,10 @@ async function init(): Promise<void> {
   } catch {
     session = { authenticated: false };
   }
+
+  window.addEventListener('beforeunload', () => {
+    lessonEditorHandle?.flush();
+  });
 
   start((match) => {
     void handleRoute(match);
