@@ -10,6 +10,7 @@ export default defineConfig({
   build: { outDir: 'dist', emptyOutDir: true },
   server: { port: 5173 },
   test: {
-    include: ['tests/**/*.test.ts']
+    include: ['tests/**/*.test.ts'],
+    environment: 'happy-dom'
   }
 });
