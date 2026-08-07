@@ -205,7 +205,7 @@ describe('SaveController', () => {
     expect(controller.getState()).toBe('saved');
   });
 
-  it('flush cancels the pending timer and saves immediately only if there are unsaved edits', async () => {
+  it('flush cancels the pending timer and, awaited, saves immediately only if there are unsaved edits', async () => {
     apiPutMock.mockResolvedValue(lesson);
     const controller = new SaveController({
       lessonId: lesson.id,
@@ -213,12 +213,11 @@ describe('SaveController', () => {
       hasPublishedVersion: false
     });
 
-    controller.flush();
+    await controller.flush();
     expect(apiPutMock).not.toHaveBeenCalled();
 
     controller.notifyChange();
-    controller.flush();
-    await vi.advanceTimersByTimeAsync(0);
+    await controller.flush();
     expect(apiPutMock).toHaveBeenCalledTimes(1);
 
     // The debounce timer should have been cancelled by flush, so no second
@@ -253,6 +252,144 @@ describe('SaveController', () => {
     await vi.advanceTimersByTimeAsync(0);
 
     expect(apiPutMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('flush resolves only once a resave queued behind an in-flight save has also completed', async () => {
+    let resolveFirst!: (value: Lesson) => void;
+    apiPutMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveFirst = resolve;
+        })
+    );
+    apiPutMock.mockResolvedValueOnce(lesson);
+
+    const controller = new SaveController({
+      lessonId: lesson.id,
+      getLesson: () => lesson,
+      hasPublishedVersion: false
+    });
+
+    // Start a save that will stay in flight...
+    const inFlight = controller.saveNow();
+    expect(apiPutMock).toHaveBeenCalledTimes(1);
+
+    // ...then an edit arrives, queuing a resave behind it.
+    controller.notifyChange();
+
+    // Simulate route teardown: flush (not the raw debounce) is what
+    // `LessonEditorHandle.flush`/`teardownLessonEditor` calls before
+    // disposing. It must not resolve until the queued resave has also run.
+    const flushed = controller.flush();
+
+    resolveFirst(lesson);
+    await inFlight;
+    await flushed;
+
+    expect(apiPutMock).toHaveBeenCalledTimes(2);
+    expect(controller.getState()).toBe('saved');
+  });
+
+  it('does not drop a resave queued behind an in-flight save even if dispose() follows flush() with no await in between', async () => {
+    // This reproduces the historical bug in `teardownLessonEditor`, which
+    // called `flush()` then `dispose()` back to back with no `await`
+    // between them at all.
+    let resolveFirst!: (value: Lesson) => void;
+    apiPutMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveFirst = resolve;
+        })
+    );
+    apiPutMock.mockResolvedValueOnce(lesson);
+
+    const controller = new SaveController({
+      lessonId: lesson.id,
+      getLesson: () => lesson,
+      hasPublishedVersion: false
+    });
+
+    // A save is in flight...
+    void controller.saveNow();
+    expect(apiPutMock).toHaveBeenCalledTimes(1);
+
+    // ...a second edit arrives, queuing a resave behind it...
+    controller.notifyChange();
+
+    // ...and teardown fires flush + dispose synchronously, with no await.
+    controller.flush();
+    controller.dispose();
+
+    // Only once the in-flight request resolves does the queued resave get
+    // a chance to run.
+    resolveFirst(lesson);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(apiPutMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('publish flushes the pending debounced edit before POSTing, so it never publishes a stale draft', async () => {
+    apiPutMock.mockResolvedValue(lesson);
+    apiPostMock.mockResolvedValue({ student_path: '/s/lessons/lesson_001' });
+
+    const callOrder: string[] = [];
+    apiPutMock.mockImplementation(async () => {
+      callOrder.push('put');
+      return lesson;
+    });
+    apiPostMock.mockImplementation(async () => {
+      callOrder.push('post');
+      return { student_path: '/s/lessons/lesson_001' };
+    });
+
+    const controller = new SaveController({
+      lessonId: lesson.id,
+      getLesson: () => lesson,
+      hasPublishedVersion: false
+    });
+
+    // An edit lands and is still sitting in the 600ms debounce window when
+    // Publish is clicked.
+    controller.notifyChange();
+    const outcome = await controller.publish();
+
+    expect(apiPutMock).toHaveBeenCalledTimes(1);
+    expect(apiPostMock).toHaveBeenCalledTimes(1);
+    expect(callOrder).toEqual(['put', 'post']);
+    expect(outcome).toEqual({ ok: true, studentPath: '/s/lessons/lesson_001' });
+  });
+
+  it('publish does not call the publish endpoint at all if there is nothing to save', async () => {
+    apiPostMock.mockResolvedValue({ student_path: '/s/lessons/lesson_001' });
+    const controller = new SaveController({
+      lessonId: lesson.id,
+      getLesson: () => lesson,
+      hasPublishedVersion: false
+    });
+
+    await controller.publish();
+
+    expect(apiPutMock).not.toHaveBeenCalled();
+    expect(apiPostMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('publish skips the publish request and reports a failure if the pre-publish save fails', async () => {
+    apiPutMock.mockRejectedValue(new Error('network down'));
+    apiPostMock.mockResolvedValue({ student_path: '/s/lessons/lesson_001' });
+
+    const controller = new SaveController({
+      lessonId: lesson.id,
+      getLesson: () => lesson,
+      hasPublishedVersion: false
+    });
+
+    controller.notifyChange();
+    const outcome = await controller.publish();
+
+    expect(apiPutMock).toHaveBeenCalledTimes(1);
+    expect(apiPostMock).not.toHaveBeenCalled();
+    expect(outcome.ok).toBe(false);
+    expect(controller.getState()).toBe('save_failed');
   });
 
   it('publish resolves with the student path and moves to "published" on success', async () => {

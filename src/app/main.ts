@@ -41,11 +41,20 @@ let lessonEditorHandle: LessonEditorHandle | null = null;
 // The student lesson view mounted for the current public route, if any.
 let studentLessonViewHandle: StudentLessonViewHandle | null = null;
 
-function teardownLessonEditor(): void {
-  if (!lessonEditorHandle) return;
-  lessonEditorHandle.flush();
-  lessonEditorHandle.dispose();
+/**
+ * Flushes any pending/in-flight autosave for the current lesson editor and
+ * only disposes it once that flush has fully settled. Awaiting this (rather
+ * than firing-and-forgetting `flush()`) matters: if a save is already in
+ * flight when the user navigates away, a follow-up edit can be queued as a
+ * resave behind it — disposing before that resave completes would silently
+ * drop it.
+ */
+async function teardownLessonEditor(): Promise<void> {
+  const handle = lessonEditorHandle;
+  if (!handle) return;
   lessonEditorHandle = null;
+  await handle.flush();
+  handle.dispose();
 }
 
 function teardownStudentLessonView(): void {
@@ -145,8 +154,9 @@ async function handleRoute(match: RouteMatch): Promise<void> {
   const token = renderToken;
 
   // Every route change navigates away from whatever was previously mounted,
-  // so flush any pending lesson edits before tearing it down.
-  teardownLessonEditor();
+  // so flush any pending lesson edits — and wait for that flush to settle —
+  // before tearing the editor down.
+  await teardownLessonEditor();
   teardownStudentLessonView();
 
   if (match.requiresAuth && !session.authenticated) {
@@ -180,7 +190,10 @@ async function init(): Promise<void> {
   }
 
   window.addEventListener('beforeunload', () => {
-    lessonEditorHandle?.flush();
+    // Browsers don't support awaiting async work in `beforeunload`, so this
+    // remains a best-effort attempt for an actual tab close/reload; the
+    // awaited flush in `teardownLessonEditor` covers in-app navigation.
+    void lessonEditorHandle?.flush();
   });
 
   start((match) => {

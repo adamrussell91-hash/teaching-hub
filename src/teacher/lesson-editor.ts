@@ -47,9 +47,14 @@ function createBlock(type: NewBlockType, id: string): Block {
 }
 
 export interface LessonEditorHandle {
-  /** Cancels any pending autosave debounce and fires an immediate save attempt if there are unsaved edits. */
-  flush(): void;
-  /** Tears down subscriptions/timers. Safe to call after `flush`. */
+  /**
+   * Cancels any pending autosave debounce and, if there are unsaved (or
+   * in-flight) edits, returns a promise that resolves once the draft has
+   * been fully persisted. Callers must await this before calling `dispose`
+   * — disposing while a flush is still pending can drop a queued resave.
+   */
+  flush(): Promise<void>;
+  /** Tears down subscriptions/timers. Only call after awaiting `flush`. */
   dispose(): void;
 }
 
@@ -292,7 +297,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
 
   return {
     flush() {
-      saveController?.flush();
+      return saveController?.flush() ?? Promise.resolve();
     },
     dispose() {
       disposed = true;

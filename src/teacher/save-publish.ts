@@ -71,7 +71,12 @@ export class SaveController {
   private state: SaveState;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private dirty = false;
-  private inFlight = false;
+  /**
+   * The in-flight save chain, if any. A single promise that only resolves
+   * once every queued round (including resaves requested while a request
+   * was already in flight) has settled — see `saveNow`/`performSave`.
+   */
+  private savePromise: Promise<void> | null = null;
   private resaveRequested = false;
   private disposed = false;
 
@@ -107,27 +112,50 @@ export class SaveController {
     }, this.debounceMs);
   }
 
-  /** Cancels any pending debounce timer and, if there are unsaved edits, fires an immediate save attempt. */
-  flush(): void {
-    if (this.disposed) return;
+  /**
+   * Cancels any pending debounce timer. If there are unsaved edits, or a
+   * save is already in flight, returns a promise that resolves only once
+   * the draft has been fully persisted — including any additional edits
+   * that arrive while the request is in flight. Callers (e.g. route
+   * teardown before navigating away) must await this rather than treating
+   * it as fire-and-forget, otherwise a queued resave can be dropped if the
+   * controller is disposed before it runs.
+   */
+  flush(): Promise<void> {
+    if (this.disposed) return Promise.resolve();
     this.clearTimer();
-    if (this.dirty) {
-      void this.saveNow();
+    if (!this.dirty && !this.savePromise) {
+      return Promise.resolve();
     }
+    return this.saveNow();
   }
 
-  /** Saves immediately, bypassing the debounce. Safe to call while a save is already in flight. */
-  async saveNow(): Promise<void> {
-    if (this.disposed) return;
+  /**
+   * Saves immediately, bypassing the debounce. Safe to call while a save is
+   * already in flight: the call coalesces into the current save chain and
+   * the returned promise resolves once that entire chain (including any
+   * resulting resave) has settled.
+   */
+  saveNow(): Promise<void> {
+    if (this.disposed) return Promise.resolve();
     this.clearTimer();
 
-    if (this.inFlight) {
+    if (this.savePromise) {
       this.resaveRequested = true;
-      return;
+      return this.savePromise;
     }
 
+    const promise = this.performSave();
+    this.savePromise = promise;
+    return promise.finally(() => {
+      if (this.savePromise === promise) {
+        this.savePromise = null;
+      }
+    });
+  }
+
+  private async performSave(): Promise<void> {
     this.dirty = false;
-    this.inFlight = true;
     this.setState('saving');
 
     try {
@@ -136,17 +164,33 @@ export class SaveController {
     } catch {
       this.dirty = true;
       this.setState('save_failed');
-    } finally {
-      this.inFlight = false;
-      if (this.resaveRequested) {
-        this.resaveRequested = false;
-        void this.saveNow();
-      }
+    }
+
+    if (this.resaveRequested) {
+      this.resaveRequested = false;
+      // Chained inside the same save cycle, so the outer promise (and
+      // therefore `saveNow`/`flush` callers) don't resolve until this
+      // follow-up round has also settled.
+      await this.performSave();
     }
   }
 
-  /** Publishes the current draft. Resolves with a checklist of issues on validation failure instead of throwing. */
+  /**
+   * Publishes the current draft. Always flushes any unsaved/in-flight edits
+   * first, so publish never snapshots a stale server-side draft. Resolves
+   * with a checklist of issues (rather than throwing) on a pre-publish save
+   * failure or a 400 validation error from the publish endpoint.
+   */
   async publish(): Promise<PublishOutcome> {
+    await this.flush();
+
+    if (this.state === 'save_failed') {
+      return {
+        ok: false,
+        issues: ['Unable to save your latest changes. Please retry before publishing.']
+      };
+    }
+
     try {
       const result = await apiPost<PublishResponse>(`/api/lessons/${this.lessonId}/publish`);
       this.hasPublishedVersion = true;

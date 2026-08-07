@@ -185,7 +185,7 @@ describe('mountLessonEditor', () => {
     expect(issues).toEqual(['title: Title is required to publish']);
   });
 
-  it('flush() saves immediately without waiting for the autosave debounce', async () => {
+  it('flush() saves immediately, and awaiting it confirms the save completed, without waiting for the autosave debounce', async () => {
     apiGetMock.mockResolvedValue(makeLesson());
     apiPutMock.mockResolvedValue(makeLesson());
     const handle = mountLessonEditor({ refs, lessonId: 'lesson_001', isStale: () => false });
@@ -195,13 +195,57 @@ describe('mountLessonEditor', () => {
     titleInput.value = 'Updated title';
     titleInput.dispatchEvent(new Event('input', { bubbles: true }));
 
-    handle.flush();
-    await tick();
+    await handle.flush();
 
     expect(apiPutMock).toHaveBeenCalledTimes(1);
     expect(apiPutMock).toHaveBeenCalledWith(
       '/api/lessons/lesson_001',
       expect.objectContaining({ title: 'Updated title' })
+    );
+  });
+
+  it('awaiting flush() before dispose() preserves an edit queued behind an in-flight autosave (route teardown)', async () => {
+    apiGetMock.mockResolvedValue(makeLesson());
+
+    let resolveFirstPut!: (value: Lesson) => void;
+    apiPutMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveFirstPut = resolve;
+        })
+    );
+    apiPutMock.mockResolvedValueOnce(makeLesson());
+
+    const handle = mountLessonEditor({ refs, lessonId: 'lesson_001', isStale: () => false });
+    await tick();
+
+    const titleInput = refs.canvas.querySelector<HTMLInputElement>('.lesson-editor__title-input')!;
+
+    titleInput.value = 'First edit';
+    titleInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+    // Kicks off the first (slow) autosave, which is still pending.
+    const firstFlush = handle.flush();
+    await tick();
+    expect(apiPutMock).toHaveBeenCalledTimes(1);
+
+    // A second edit arrives while that save is still in flight.
+    titleInput.value = 'Second edit';
+    titleInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+    // This mirrors `teardownLessonEditor`: await flush (which must wait for
+    // the queued resave too) before disposing.
+    const teardownFlush = handle.flush();
+
+    resolveFirstPut(makeLesson());
+    await firstFlush;
+    await teardownFlush;
+    handle.dispose();
+
+    expect(apiPutMock).toHaveBeenCalledTimes(2);
+    expect(apiPutMock).toHaveBeenLastCalledWith(
+      '/api/lessons/lesson_001',
+      expect.objectContaining({ title: 'Second edit' })
     );
   });
 });
