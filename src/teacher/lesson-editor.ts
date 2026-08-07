@@ -242,6 +242,9 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     renderBlocksList();
 
     function showPublishSuccess(studentPath: string): void {
+      const publishedAt = new Date().toISOString();
+      lesson.published_at = publishedAt;
+
       publishPanel.replaceChildren();
       publishPanel.hidden = false;
       publishPanel.classList.remove('lesson-editor__publish-panel--error');

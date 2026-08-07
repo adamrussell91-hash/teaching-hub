@@ -64,6 +64,11 @@ describe('publish flow', () => {
     const publishBody = await publishRes.json();
     expect(publishBody.data.student_path).toBe(`/s/lessons/${LESSON_ID}`);
 
+    const draftAfterPublish = await (
+      await api.request('GET', `/api/lessons/${LESSON_ID}`, { cookie })
+    ).json();
+    expect(draftAfterPublish.data.published_at).toBeTruthy();
+
     const studentRes = await api.request(
       'GET',
       `/api/published/lessons/${LESSON_ID}`

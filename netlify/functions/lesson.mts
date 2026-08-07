@@ -1,6 +1,6 @@
 import { draftLessonKey, getContentStore, getJSON, setJSON } from './_shared/blobs.mts';
 import { getTeacherSession } from './_shared/session.mts';
-import { validateLessonDraft } from './_shared/validate.mts';
+import { validateLessonDraft, type Lesson } from './_shared/validate.mts';
 import {
   errorResponse,
   guardRequestOrigin,
@@ -55,10 +55,18 @@ export default async function handler(request: Request, context: FunctionContext
     return withCors(errorResponse(400, 'validation_error', 'Request body must be a JSON object'), request, env);
   }
 
+  const bodyRecord = body as Record<string, unknown>;
+  const existing = await getJSON<Lesson>(store, draftLessonKey(id));
   const candidate = {
-    ...(body as Record<string, unknown>),
+    ...bodyRecord,
     id,
-    updated_at: new Date().toISOString()
+    updated_at: new Date().toISOString(),
+    published_at:
+      bodyRecord.published_at !== undefined
+        ? bodyRecord.published_at
+        : existing && typeof existing === 'object' && 'published_at' in existing
+          ? (existing as Lesson).published_at
+          : undefined
   };
 
   const validated = validateLessonDraft(candidate);

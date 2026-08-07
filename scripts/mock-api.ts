@@ -336,10 +336,17 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       return errorResponse(400, 'validation_error', 'Request body must be a JSON object');
     }
 
+    const existing = store.getJSON<Lesson>(draftLessonKey(id));
+    const bodyRecord = body as Record<string, unknown>;
     const candidate = {
-      ...(body as Record<string, unknown>),
+      ...bodyRecord,
       id,
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
+      // Preserve publish timestamp unless the client explicitly sends one.
+      published_at:
+        bodyRecord.published_at !== undefined
+          ? bodyRecord.published_at
+          : existing?.published_at
     };
 
     const parsed = LessonSchema.safeParse(candidate);
@@ -396,6 +403,12 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     });
 
     store.setJSON(publishedLessonKey(id), studentSnapshot);
+    // Persist publish timestamp on the draft so reload shows Published / Unpublished changes.
+    store.setJSON(draftLessonKey(id), {
+      ...parsed.data,
+      published_at: publishedAt,
+      updated_at: publishedAt
+    });
     return okResponse(200, { student_path: `/s/lessons/${id}` });
   }
 

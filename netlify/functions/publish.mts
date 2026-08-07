@@ -80,6 +80,12 @@ export default async function handler(request: Request, context: FunctionContext
   const studentSnapshot = PublishedLessonSchema.parse({ ...fullSnapshot, blocks: studentBlocks });
 
   await setJSON(store, publishedLessonKey(id), studentSnapshot);
+  // Persist publish timestamp on the draft so reload shows Published / Unpublished changes.
+  await setJSON(store, draftLessonKey(id), {
+    ...validated.data,
+    published_at: publishedAt,
+    updated_at: publishedAt
+  });
   return withCors(okResponse(200, { student_path: `/s/lessons/${id}` }), request, env);
 }
 
