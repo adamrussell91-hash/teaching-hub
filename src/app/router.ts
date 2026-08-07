@@ -1,0 +1,134 @@
+export type RouteName =
+  | 'teacher-home'
+  | 'teacher-lesson'
+  | 'student-lesson'
+  | 'sign-in';
+
+export type RouteParams = {
+  'teacher-home': Record<string, never>;
+  'teacher-lesson': { lessonId: string };
+  'student-lesson': { lessonId: string };
+  'sign-in': Record<string, never>;
+};
+
+export type RouteMatch<N extends RouteName = RouteName> = {
+  name: N;
+  params: RouteParams[N];
+  requiresAuth: boolean;
+  path: string;
+};
+
+export type RouteHandler = (match: RouteMatch) => void;
+
+const listeners = new Set<RouteHandler>();
+let popStateBound = false;
+
+function normalizePath(path: string): string {
+  let pathname = path;
+
+  if (/^https?:\/\//i.test(path)) {
+    pathname = new URL(path).pathname;
+  } else {
+    pathname = path.split('?')[0]?.split('#')[0] ?? path;
+  }
+
+  if (!pathname.startsWith('/')) {
+    pathname = `/${pathname}`;
+  }
+
+  if (pathname.length > 1 && pathname.endsWith('/')) {
+    pathname = pathname.slice(0, -1);
+  }
+
+  return pathname;
+}
+
+export function match(pathname: string): RouteMatch | null {
+  const path = normalizePath(pathname);
+
+  if (path === '/') {
+    return {
+      name: 'teacher-home',
+      params: {},
+      requiresAuth: true,
+      path: '/'
+    };
+  }
+
+  if (path === '/sign-in') {
+    return {
+      name: 'sign-in',
+      params: {},
+      requiresAuth: false,
+      path: '/sign-in'
+    };
+  }
+
+  const studentLesson = path.match(/^\/s\/lessons\/([^/]+)$/);
+  if (studentLesson) {
+    return {
+      name: 'student-lesson',
+      params: { lessonId: studentLesson[1] },
+      requiresAuth: false,
+      path
+    };
+  }
+
+  const teacherLesson = path.match(/^\/lessons\/([^/]+)$/);
+  if (teacherLesson) {
+    return {
+      name: 'teacher-lesson',
+      params: { lessonId: teacherLesson[1] },
+      requiresAuth: true,
+      path
+    };
+  }
+
+  return null;
+}
+
+function notify(pathname: string): void {
+  const result = match(pathname);
+  if (!result) {
+    return;
+  }
+
+  for (const listener of listeners) {
+    listener(result);
+  }
+}
+
+function bindPopState(): void {
+  if (popStateBound) {
+    return;
+  }
+
+  window.addEventListener('popstate', () => {
+    notify(window.location.pathname);
+  });
+  popStateBound = true;
+}
+
+export function navigate(path: string, options?: { replace?: boolean }): void {
+  const normalized = normalizePath(path);
+
+  if (options?.replace) {
+    history.replaceState(null, '', normalized);
+  } else {
+    history.pushState(null, '', normalized);
+  }
+
+  notify(normalized);
+}
+
+export function start(onRoute: RouteHandler): () => void {
+  bindPopState();
+  listeners.add(onRoute);
+  notify(window.location.pathname);
+
+  return () => {
+    listeners.delete(onRoute);
+  };
+}
+
+export const mount = start;
