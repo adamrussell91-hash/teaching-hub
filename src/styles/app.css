@@ -179,6 +179,40 @@ a:hover {
   background: var(--warm-white);
 }
 
+.teacher-layout__rail-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  overflow-y: auto;
+}
+
+.teacher-layout__rail-status {
+  padding: 0.5rem 0.65rem;
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.teacher-layout__canvas-status {
+  font-family: var(--font-ui);
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+
+.teacher-layout__context-bar-title {
+  font-family: var(--font-ui);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--depth);
+}
+
+.teacher-layout__context-bar-save-slot {
+  margin-left: auto;
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
 /* ── Student reading surface ──────────────────────────────────────────── */
 
 .student-surface {
@@ -250,6 +284,103 @@ a:hover {
   padding-left: 1.35rem;
   font-size: 0.84rem;
   font-weight: 400;
+}
+
+.nav-item--nested-2 {
+  padding-left: 2.05rem;
+  font-size: 0.84rem;
+  font-weight: 400;
+}
+
+.nav-item--nested-3 {
+  padding-left: 2.75rem;
+  font-size: 0.82rem;
+  font-weight: 400;
+}
+
+.nav-item--toggle {
+  font: inherit;
+}
+
+.nav-item__caret {
+  flex-shrink: 0;
+  width: 0.9rem;
+  font-size: 0.7rem;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.nav-item__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.curriculum-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.curriculum-nav__children {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+/* ── Home canvas: lesson list ────────────────────────────────────────── */
+
+.home-heading {
+  font-family: var(--font-ui);
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--depth);
+  margin-bottom: 1.25rem;
+}
+
+.lesson-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.lesson-list__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1.1rem;
+  background: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius-md) * 0.65);
+}
+
+.lesson-list__info {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.lesson-list__title {
+  font-family: var(--font-ui);
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.lesson-list__meta {
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.lesson-list__open {
+  flex-shrink: 0;
 }
 
 /* ── Buttons ──────────────────────────────────────────────────────────── */

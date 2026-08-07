@@ -1,4 +1,14 @@
+import { ApiClientError } from '@/api/client';
 import { fetchSession, renderSignIn, type SessionInfo } from '@/auth/gate';
+import {
+  renderCanvasStatus,
+  renderContextBar,
+  renderRailStatus,
+  renderTeacherShell,
+  type TeacherShellRefs
+} from '@/teacher/shell';
+import { fetchCurriculum, renderCurriculumNav, type CurriculumResponse } from '@/teacher/nav';
+import { renderTeacherHome as renderHomeCanvas } from '@/teacher/home';
 import { navigate, start, type RouteMatch } from './router';
 
 const root = document.querySelector('#app');
@@ -10,22 +20,75 @@ const appRoot = root;
 
 let session: SessionInfo = { authenticated: false };
 
-function renderTeacherHome(): void {
-  appRoot.replaceChildren();
+// Guards against stale async work (e.g. a slow curriculum fetch) clobbering
+// the DOM after the user has already navigated to a different route.
+let renderToken = 0;
 
-  const heading = document.createElement('h1');
-  heading.textContent = 'Teacher workspace';
-  appRoot.append(heading);
+// The seed curriculum doesn't change during a session, so a single teacher
+// workspace visit only needs to fetch it once; a fresh fetch is triggered on
+// the next render whenever a previous attempt failed.
+let curriculumPromise: Promise<CurriculumResponse> | null = null;
+
+function getCurriculum(): Promise<CurriculumResponse> {
+  if (!curriculumPromise) {
+    curriculumPromise = fetchCurriculum().catch((error: unknown) => {
+      curriculumPromise = null;
+      throw error;
+    });
+  }
+  return curriculumPromise;
 }
 
-function renderTeacherLesson(lessonId: string): void {
-  appRoot.replaceChildren();
+async function loadNavAndHandleErrors(
+  refs: TeacherShellRefs,
+  token: number,
+  activeLessonId: string | undefined,
+  onLoaded: (curriculum: CurriculumResponse) => void
+): Promise<void> {
+  try {
+    const curriculum = await getCurriculum();
+    if (token !== renderToken) return;
+    renderCurriculumNav(refs.railNav, curriculum, { activeLessonId });
+    onLoaded(curriculum);
+  } catch (error) {
+    if (token !== renderToken) return;
 
-  const heading = document.createElement('h1');
-  heading.textContent = 'Lesson editor';
-  const detail = document.createElement('p');
-  detail.textContent = lessonId;
-  appRoot.append(heading, detail);
+    if (error instanceof ApiClientError && error.code === 'unauthorized') {
+      session = { authenticated: false };
+      navigate('/sign-in', { replace: true });
+      return;
+    }
+
+    renderRailStatus(refs.railNav, 'Unable to load curriculum.');
+    renderCanvasStatus(refs.canvas, 'Unable to load curriculum. Please refresh to try again.');
+  }
+}
+
+function renderTeacherHomeRoute(token: number): void {
+  const refs = renderTeacherShell(appRoot);
+  renderContextBar(refs, { title: 'Teacher workspace' });
+  renderRailStatus(refs.railNav, 'Loading curriculum…');
+  renderCanvasStatus(refs.canvas, 'Loading lessons…');
+
+  void loadNavAndHandleErrors(refs, token, undefined, (curriculum) => {
+    renderHomeCanvas(refs.canvas, curriculum);
+  });
+}
+
+function renderTeacherLessonRoute(lessonId: string, token: number): void {
+  const refs = renderTeacherShell(appRoot);
+  renderContextBar(refs, { title: 'Untitled lesson' });
+  renderRailStatus(refs.railNav, 'Loading curriculum…');
+
+  const placeholder = document.createElement('p');
+  placeholder.className = 'teacher-layout__canvas-status';
+  placeholder.textContent = 'Lesson editor coming in Task 15.';
+  refs.canvas.append(placeholder);
+
+  void loadNavAndHandleErrors(refs, token, lessonId, (curriculum) => {
+    const summary = curriculum.lessons.find((lesson) => lesson.id === lessonId);
+    renderContextBar(refs, { title: summary?.title ?? lessonId });
+  });
 }
 
 function renderStudentLesson(lessonId: string): void {
@@ -53,13 +116,13 @@ function renderStudentLesson(lessonId: string): void {
   appRoot.append(surface);
 }
 
-function renderRoute(match: RouteMatch): void {
+function renderRoute(match: RouteMatch, token: number): void {
   switch (match.name) {
     case 'teacher-home':
-      renderTeacherHome();
+      renderTeacherHomeRoute(token);
       break;
     case 'teacher-lesson':
-      renderTeacherLesson(match.params.lessonId);
+      renderTeacherLessonRoute(match.params.lessonId, token);
       break;
     case 'student-lesson':
       renderStudentLesson(match.params.lessonId);
@@ -70,6 +133,9 @@ function renderRoute(match: RouteMatch): void {
 }
 
 async function handleRoute(match: RouteMatch): Promise<void> {
+  renderToken += 1;
+  const token = renderToken;
+
   if (match.requiresAuth && !session.authenticated) {
     navigate('/sign-in', { replace: true });
     return;
@@ -90,7 +156,7 @@ async function handleRoute(match: RouteMatch): Promise<void> {
     return;
   }
 
-  renderRoute(match);
+  renderRoute(match, token);
 }
 
 async function init(): Promise<void> {

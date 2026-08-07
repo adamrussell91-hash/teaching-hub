@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from 'vitest';
 import { match, navigate, start, mount, type RouteMatch } from '@/app/router';
 
 describe('router match', () => {
@@ -68,8 +68,8 @@ describe('router match', () => {
 });
 
 describe('router navigation', () => {
-  let pushState: ReturnType<typeof vi.spyOn<History, 'pushState'>>;
-  let replaceState: ReturnType<typeof vi.spyOn<History, 'replaceState'>>;
+  let pushState: MockInstance<History['pushState']>;
+  let replaceState: MockInstance<History['replaceState']>;
 
   beforeEach(() => {
     window.history.replaceState(null, '', '/');

@@ -116,7 +116,7 @@ describe('api client', () => {
       json: async () => {
         throw new Error('not json');
       }
-    } as Response);
+    } as unknown as Response);
 
     await expect(apiGet('/api/session')).rejects.toMatchObject({
       code: 'invalid_response',
