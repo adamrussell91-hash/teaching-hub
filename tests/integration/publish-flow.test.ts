@@ -167,6 +167,54 @@ describe('publish flow', () => {
     expect(body.error.code).toBe('validation_error');
   });
 
+  it('sanitises html blocks on publish', async () => {
+    const api = freshApi();
+    const cookie = await signIn(api);
+
+    const draftBody = await (
+      await api.request('GET', `/api/lessons/${LESSON_ID}`, { cookie })
+    ).json();
+    const lesson = draftBody.data;
+    const now = '2026-08-08T00:00:00.000Z';
+    lesson.blocks.push({
+      id: 'block_l008_html',
+      type: 'block',
+      block_type: 'html',
+      variant: 'medium',
+      visibility: 'student_teacher',
+      content: { html: '<p>Safe</p><script>alert(1)</script>' },
+      layout: {},
+      print: {},
+      settings: {},
+      created_at: now,
+      updated_at: now,
+      schema_version: 1
+    });
+
+    const putRes = await api.request('PUT', `/api/lessons/${LESSON_ID}`, {
+      cookie,
+      body: lesson
+    });
+    expect(putRes.status).toBe(200);
+
+    const publishRes = await api.request(
+      'POST',
+      `/api/lessons/${LESSON_ID}/publish`,
+      { cookie }
+    );
+    expect(publishRes.status).toBe(200);
+
+    const studentBody = await (
+      await api.request('GET', `/api/published/lessons/${LESSON_ID}`)
+    ).json();
+    const htmlBlock = studentBody.data.blocks.find(
+      (b: { block_type: string }) => b.block_type === 'html'
+    );
+    expect(htmlBlock).toBeTruthy();
+    expect(htmlBlock.content.html).not.toContain('<script>');
+    expect(htmlBlock.content.html).toContain('Safe');
+  });
+
   it('never returns teacher_only blocks from the published endpoint', async () => {
     const api = freshApi();
     const cookie = await signIn(api);

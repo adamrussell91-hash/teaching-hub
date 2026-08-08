@@ -72,7 +72,7 @@ export default async function handler(request: Request, context: FunctionContext
   const publishedAt = new Date().toISOString();
   const fullSnapshot = toPublishedLesson(validated.data, publishedAt);
   const studentBlocks = filterBlocksForStudent(fullSnapshot.blocks).map((block) => {
-    if (block.block_type === 'rich_text') {
+    if (block.block_type === 'rich_text' || block.block_type === 'html') {
       return { ...block, content: { html: sanitizeRichTextHtml(block.content.html) } };
     }
     return block;

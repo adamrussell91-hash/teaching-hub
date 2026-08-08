@@ -306,6 +306,40 @@ describe('POST /api/lessons/:id/publish', () => {
     expect(richText?.content.html).not.toContain('<script>');
     expect(richText?.content.html).toContain('Safe text');
   });
+
+  it('sanitises html blocks on publish', async () => {
+    fakeStore.seed(
+      draftLessonKey('lesson_aotfw_008'),
+      draftLesson({
+        blocks: [
+          block({
+            id: 'block_l008_001',
+            block_type: 'heading',
+            variant: 'page',
+            content: { text: 'Memory, Identity and Ono' }
+          }),
+          block({
+            id: 'block_l008_html',
+            block_type: 'html',
+            content: { html: '<p>Safe html</p><script>alert(1)</script>' }
+          })
+        ]
+      })
+    );
+
+    const response = await publishHandler(
+      request('/api/lessons/lesson_aotfw_008/publish', { method: 'POST', cookie: sessionCookieHeader() }),
+      { params: { id: 'lesson_aotfw_008' } }
+    );
+    expect(response.status).toBe(200);
+
+    const snapshot = fakeStore.raw(publishedLessonKey('lesson_aotfw_008')) as {
+      blocks: Array<{ block_type: string; content: { html?: string } }>;
+    };
+    const htmlBlock = snapshot.blocks.find((b) => b.block_type === 'html');
+    expect(htmlBlock?.content.html).not.toContain('<script>');
+    expect(htmlBlock?.content.html).toContain('Safe html');
+  });
 });
 
 describe('GET /api/published/lessons/:id', () => {
