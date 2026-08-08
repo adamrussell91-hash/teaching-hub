@@ -320,10 +320,15 @@ function renderTeacherLessonRoute(lessonId: string, token: number): void {
   void loadNavAndHandleErrors(refs, token, 'lessons', lessonId, () => {});
 }
 
-function renderStudentLessonRoute(lessonId: string, token: number): void {
+function renderStudentLessonRoute(
+  lessonId: string,
+  token: number,
+  classId?: string
+): void {
   studentLessonViewHandle = mountStudentLessonView({
     root: appRoot,
     lessonId,
+    classId,
     isStale: () => token !== renderToken
   });
 }
@@ -378,6 +383,9 @@ function renderRoute(match: RouteMatch, token: number): void {
       break;
     case 'student-lesson':
       renderStudentLessonRoute(match.params.lessonId, token);
+      break;
+    case 'student-class-lesson':
+      renderStudentLessonRoute(match.params.lessonId, token, match.params.classId);
       break;
     case 'student-unit':
       renderStudentUnitRoute(match.params.unitId, token);
