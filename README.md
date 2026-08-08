@@ -92,16 +92,14 @@ SESSION_SECRET=<from generate:auth>
 SITE_ORIGIN=https://teaching-hub.adam-russell.com
 ```
 
-4. Trigger a Netlify deploy. Note the Functions host, e.g. `https://<site>.netlify.app`.
+4. Add a same-site API hostname (required for the session cookie — same as Life Hub’s `api.adam-russell.com`):
+   - Cloudflare CNAME `teaching-api` → your `*.netlify.app` site (**DNS only**)
+   - Netlify Domain management → add `teaching-api.adam-russell.com` → wait for HTTPS
+5. Trigger a Netlify deploy after env vars / domain changes.
 
-### 3. Point the Pages app at Netlify
+### 3. Point the Pages app at the API
 
-Either:
-
-- Set a GitHub Actions secret / variable `VITE_API_BASE_URL` to that Netlify origin and rebuild Pages, **or**
-- Edit the placeholder in `src/api/config.ts`, commit, and push `main` so Pages rebuilds.
-
-That URL is not a secret.
+`src/api/config.ts` should use `https://teaching-api.adam-russell.com` (sibling of the Pages site under `adam-russell.com`). That URL is not a secret. Push `main` so Pages rebuilds.
 
 ### 4. Seed curriculum into Blobs
 

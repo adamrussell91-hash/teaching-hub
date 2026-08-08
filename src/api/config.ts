@@ -1,13 +1,14 @@
 /**
  * Production API origin (not a secret). Prefer build-time
  * `VITE_API_BASE_URL` (e.g. in CI) so you don't need a code edit after the
- * first Netlify deploy; otherwise fall back to the committed placeholder.
+ * first Netlify deploy; otherwise fall back to the committed default.
  *
- * Sensitive values stay on Netlify only: passphrase hash, session secret.
- * After Functions are live, set SITE_ORIGIN to the Pages origin and run
- * `npm run seed:blobs` once — see README Deploy.
+ * The API must share the adam-russell.com registrable domain with the Pages
+ * site (teaching-hub.adam-russell.com) so the session cookie is same-site —
+ * same pattern as Life Hub (api.adam-russell.com). Sensitive values stay on
+ * Netlify only: passphrase hash, session secret.
  */
-const PLACEHOLDER_API_BASE_URL = 'https://arteaching-hub.netlify.app';
+const PLACEHOLDER_API_BASE_URL = 'https://teaching-api.adam-russell.com';
 
 function readViteApiBaseUrl(): string | undefined {
   if (typeof import.meta === 'undefined') return undefined;
