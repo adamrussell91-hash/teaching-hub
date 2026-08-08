@@ -12,7 +12,9 @@ const curriculum: CurriculumResponse = {
   years: [],
   subjects: [],
   units: [],
-  lessons: []
+  lessons: [],
+  schedule: [],
+  schedule_anchor_date: '2026-08-12'
 };
 
 describe('renderTeacherRail', () => {

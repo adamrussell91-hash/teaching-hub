@@ -104,9 +104,11 @@ const curriculum: CurriculumResponse = {
   subjects: [subjectEngAdv, subjectEngStd],
   units: [unitAotfw],
   lessons: [
-    { id: 'lesson_001', title: 'Introduction', slug: 'introduction', unit_id: 'unit_aotfw', sequence: 1, status: 'active', published: false },
-    { id: 'lesson_002', title: 'Follow-up', slug: 'follow_up', unit_id: 'unit_aotfw', sequence: 2, status: 'active', published: true }
-  ]
+    { id: 'lesson_001', title: 'Introduction', slug: 'introduction', unit_id: 'unit_aotfw', sequence: 1, status: 'active', published: false, updated_at: ISO },
+    { id: 'lesson_002', title: 'Follow-up', slug: 'follow_up', unit_id: 'unit_aotfw', sequence: 2, status: 'active', published: true, updated_at: ISO }
+  ],
+  schedule: [],
+  schedule_anchor_date: '2026-08-12'
 };
 
 function toggleButtons(container: HTMLElement): HTMLButtonElement[] {

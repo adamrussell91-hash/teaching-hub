@@ -35,9 +35,12 @@ const curriculum: CurriculumResponse = {
       unit_id: 'unit_aotfw',
       sequence: 1,
       status: 'active',
-      published: false
+      published: false,
+      updated_at: ISO
     }
-  ]
+  ],
+  schedule: [],
+  schedule_anchor_date: '2026-08-12'
 };
 
 describe('lessons index', () => {

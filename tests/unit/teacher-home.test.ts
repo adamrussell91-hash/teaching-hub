@@ -28,9 +28,11 @@ const curriculum: CurriculumResponse = {
   subjects: [],
   units: [unit],
   lessons: [
-    { id: 'lesson_002', title: 'Follow-up', slug: 'follow_up', unit_id: 'unit_aotfw', sequence: 2, status: 'active', published: true },
-    { id: 'lesson_001', title: 'Introduction', slug: 'introduction', unit_id: 'unit_aotfw', sequence: 1, status: 'active', published: false }
-  ]
+    { id: 'lesson_002', title: 'Follow-up', slug: 'follow_up', unit_id: 'unit_aotfw', sequence: 2, status: 'active', published: true, updated_at: ISO },
+    { id: 'lesson_001', title: 'Introduction', slug: 'introduction', unit_id: 'unit_aotfw', sequence: 1, status: 'active', published: false, updated_at: ISO }
+  ],
+  schedule: [],
+  schedule_anchor_date: '2026-08-12'
 };
 
 describe('teacher home canvas', () => {
@@ -65,7 +67,7 @@ describe('teacher home canvas', () => {
   });
 
   it('shows an empty state when there are no lessons', () => {
-    renderTeacherHome(canvas, { years: [], subjects: [], units: [], lessons: [] });
+    renderTeacherHome(canvas, { years: [], subjects: [], units: [], lessons: [], schedule: [], schedule_anchor_date: '2026-08-12' });
 
     expect(canvas.querySelector('.lesson-list')).toBeNull();
     expect(canvas.textContent).toContain('No lessons yet.');

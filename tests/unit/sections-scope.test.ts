@@ -53,7 +53,9 @@ const curriculum: CurriculumResponse = {
   years: [year],
   subjects: [engAdv, engStd],
   units: [],
-  lessons: []
+  lessons: [],
+  schedule: [],
+  schedule_anchor_date: '2026-08-12'
 };
 
 describe('scope & sequences', () => {

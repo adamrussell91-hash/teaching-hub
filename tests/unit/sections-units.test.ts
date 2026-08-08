@@ -64,7 +64,8 @@ const curriculum: CurriculumResponse = {
       unit_id: 'unit_aotfw',
       sequence: 1,
       status: 'active',
-      published: false
+      published: false,
+      updated_at: ISO
     },
     {
       id: 'lesson_002',
@@ -73,9 +74,12 @@ const curriculum: CurriculumResponse = {
       unit_id: 'unit_aotfw',
       sequence: 2,
       status: 'active',
-      published: true
+      published: true,
+      updated_at: ISO
     }
-  ]
+  ],
+  schedule: [],
+  schedule_anchor_date: '2026-08-12'
 };
 
 describe('units', () => {
