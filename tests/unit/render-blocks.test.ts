@@ -289,7 +289,15 @@ describe('block editors', () => {
 
 describe('blockRegistry', () => {
   it('maps every block_type to render and editor helpers', () => {
-    expect(Object.keys(blockRegistry).sort()).toEqual(['callout', 'heading', 'rich_text']);
+    expect(Object.keys(blockRegistry).sort()).toEqual([
+      'callout',
+      'embed',
+      'heading',
+      'html',
+      'image',
+      'rich_text',
+      'video'
+    ]);
 
     for (const key of Object.keys(blockRegistry) as Array<Block['block_type']>) {
       expect(typeof blockRegistry[key].render).toBe('function');
