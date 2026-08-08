@@ -534,7 +534,7 @@ Also add a publish case rejecting `javascript:` image URLs:
   });
 ```
 
-Remove unused `HttpUrlString` from `block.ts` if it was only for draft schemas — publish uses `isHttpUrl` in `lesson.ts` only.
+If existing tests assert the old `.refine` API for title-only failures, update them for `superRefine`.
 
 - [ ] **Step 5: Run tests + tsc — expect PASS**
 
