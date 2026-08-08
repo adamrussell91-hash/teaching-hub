@@ -15,8 +15,11 @@ export const LessonSchema = z.object({
 function publishBlockIssues(blocks: z.infer<typeof BlockSchema>[]): string | null {
   for (const block of blocks) {
     if (block.block_type === 'image') {
-      if (!isHttpUrl(block.content.url) || block.content.alt_text.trim().length === 0) {
-        return 'Image blocks need a valid URL and alt text to publish';
+      if (!isHttpUrl(block.content.url)) {
+        return 'Image blocks need a valid http(s) URL to publish';
+      }
+      if (block.content.alt_text.trim().length === 0) {
+        return 'Image blocks need alt text to publish';
       }
     }
     if (block.block_type === 'video') {

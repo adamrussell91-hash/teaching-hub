@@ -178,32 +178,37 @@ export function createImageEditor(
   url.type = 'url';
   url.className = 'block-editor__image-url';
   url.value = block.content.url;
-  url.placeholder = 'https://…';
+  url.placeholder = 'Image URL (https://…)';
   url.setAttribute('aria-label', 'Image URL');
-  url.addEventListener('input', () => {
-    onChange({ ...block, content: { ...block.content, url: url.value } });
-  });
 
   const alt = document.createElement('input');
   alt.type = 'text';
   alt.className = 'block-editor__image-alt';
   alt.value = block.content.alt_text;
+  alt.placeholder = 'Alt text (required to publish)';
   alt.setAttribute('aria-label', 'Alt text');
-  alt.addEventListener('input', () => {
-    onChange({ ...block, content: { ...block.content, alt_text: alt.value } });
-  });
 
   const caption = document.createElement('input');
   caption.type = 'text';
   caption.className = 'block-editor__image-caption';
   caption.value = block.content.caption ?? '';
+  caption.placeholder = 'Caption (optional)';
   caption.setAttribute('aria-label', 'Caption');
-  caption.addEventListener('input', () => {
+
+  const emitChange = () => {
     onChange({
       ...block,
-      content: { ...block.content, caption: caption.value || undefined }
+      content: {
+        url: url.value,
+        alt_text: alt.value,
+        caption: caption.value || undefined
+      }
     });
-  });
+  };
+
+  url.addEventListener('input', emitChange);
+  alt.addEventListener('input', emitChange);
+  caption.addEventListener('input', emitChange);
 
   fields.append(url, alt, caption);
   return editorShell(block, onChange, fields);
@@ -229,7 +234,13 @@ export function createVideoEditor(
     ? `${block.content.provider}: ${block.content.external_id}`
     : 'Paste a YouTube or Vimeo link';
 
-  url.addEventListener('input', () => {
+  const title = document.createElement('input');
+  title.type = 'text';
+  title.className = 'block-editor__video-title';
+  title.value = block.content.title ?? '';
+  title.setAttribute('aria-label', 'Video title');
+
+  const emitChange = () => {
     const parsed = parseVideoInput(url.value);
     if (parsed) {
       status.textContent = `${parsed.provider}: ${parsed.external_id}`;
@@ -239,26 +250,26 @@ export function createVideoEditor(
           ...block.content,
           provider: parsed.provider,
           external_id: parsed.external_id,
-          url: url.value
+          url: url.value,
+          title: title.value || undefined
         }
       });
     } else {
       status.textContent = 'Unrecognised video link';
       onChange({
         ...block,
-        content: { ...block.content, external_id: '', url: url.value }
+        content: {
+          ...block.content,
+          external_id: '',
+          url: url.value,
+          title: title.value || undefined
+        }
       });
     }
-  });
+  };
 
-  const title = document.createElement('input');
-  title.type = 'text';
-  title.className = 'block-editor__video-title';
-  title.value = block.content.title ?? '';
-  title.setAttribute('aria-label', 'Video title');
-  title.addEventListener('input', () => {
-    onChange({ ...block, content: { ...block.content, title: title.value || undefined } });
-  });
+  url.addEventListener('input', emitChange);
+  title.addEventListener('input', emitChange);
 
   fields.append(url, status, title);
   return editorShell(block, onChange, fields);
@@ -276,18 +287,26 @@ export function createEmbedEditor(
   url.className = 'block-editor__embed-url';
   url.value = block.content.url;
   url.setAttribute('aria-label', 'Embed URL');
-  url.addEventListener('input', () => {
-    onChange({ ...block, content: { ...block.content, url: url.value } });
-  });
 
   const title = document.createElement('input');
   title.type = 'text';
   title.className = 'block-editor__embed-title';
   title.value = block.content.title ?? '';
   title.setAttribute('aria-label', 'Embed title');
-  title.addEventListener('input', () => {
-    onChange({ ...block, content: { ...block.content, title: title.value || undefined } });
-  });
+
+  const emitChange = () => {
+    onChange({
+      ...block,
+      content: {
+        ...block.content,
+        url: url.value,
+        title: title.value || undefined
+      }
+    });
+  };
+
+  url.addEventListener('input', emitChange);
+  title.addEventListener('input', emitChange);
 
   fields.append(url, title);
   return editorShell(block, onChange, fields);
