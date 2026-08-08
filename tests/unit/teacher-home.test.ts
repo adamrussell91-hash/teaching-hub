@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('@/app/router', () => ({ navigate: vi.fn() }));
 
@@ -87,42 +87,68 @@ const curriculum: CurriculumResponse = {
 
 describe('teacher home dashboard', () => {
   let canvas: HTMLElement;
+  let dispose: (() => void) | undefined;
 
   beforeEach(() => {
     vi.clearAllMocks();
     canvas = document.createElement('div');
+    dispose = undefined;
   });
 
-  it('renders Today and This week from the seed schedule', () => {
-    renderTeacherHome(canvas, curriculum);
-    expect(canvas.textContent).toContain('Today');
-    expect(canvas.textContent).toContain('2026-08-12');
-    expect(canvas.textContent).toContain('This week');
-    expect(canvas.textContent).toContain('12ENGADV1');
-    expect(canvas.textContent).toContain('Memory');
-    expect(canvas.textContent).toContain('Intro');
+  afterEach(() => {
+    dispose?.();
   });
 
-  it('lists unpublished changes and recently edited', () => {
-    renderTeacherHome(canvas, curriculum);
-    expect(canvas.textContent).toContain('Unpublished changes');
-    expect(canvas.textContent).toContain('Recently edited');
-    const unpublished = canvas.querySelector('[data-home-panel="unpublished"]');
-    expect(unpublished?.textContent).toContain('Memory');
+  it('renders Clinical Glass structure with clock, signals, week, and classes', () => {
+    const result = renderTeacherHome(canvas, curriculum);
+    dispose = result.dispose;
+
+    expect(
+      canvas.querySelector('[data-home-hero-clock], .home-dashboard__hero-time')
+    ).not.toBeNull();
+    expect(canvas.querySelector('[data-home-panel="signals"]')).not.toBeNull();
+    expect(canvas.querySelector('[data-home-panel="week"]')).not.toBeNull();
+    expect(canvas.querySelector('[data-home-panel="classes"]')).not.toBeNull();
+    expect(canvas.textContent).toContain('Teaching Dashboard');
+    expect(canvas.textContent).toMatch(/\b\d{1,2}\b/);
   });
 
-  it('opens a scheduled lesson via the client-side router', () => {
-    renderTeacherHome(canvas, curriculum);
-    const open = canvas.querySelector<HTMLAnchorElement>(
-      '[data-home-panel="today"] .home-schedule__open'
+  it('shows weekday day numbers in week columns and lesson links', () => {
+    const result = renderTeacherHome(canvas, curriculum);
+    dispose = result.dispose;
+
+    const dayNumbers = [
+      ...canvas.querySelectorAll('.home-week__day-number')
+    ].map((el) => el.textContent);
+    expect(dayNumbers).toEqual(['10', '11', '12', '13', '14']);
+
+    const lessonLink = canvas.querySelector<HTMLAnchorElement>(
+      'a.home-week__card[href="/lessons/lesson_aotfw_008"]'
     );
-    expect(open?.getAttribute('href')).toBe('/lessons/lesson_aotfw_008');
-    open?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    expect(lessonLink).not.toBeNull();
+    expect(lessonLink?.textContent).toContain('Memory');
+
+    lessonLink?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     expect(navigate).toHaveBeenCalledWith('/lessons/lesson_aotfw_008');
   });
 
-  it('does not render the old flat all-lessons list', () => {
-    renderTeacherHome(canvas, curriculum);
-    expect(canvas.querySelector('.lesson-list')).toBeNull();
+  it('links class tiles to /classes/:id', () => {
+    const result = renderTeacherHome(canvas, curriculum);
+    dispose = result.dispose;
+
+    const classTile = canvas.querySelector<HTMLAnchorElement>(
+      'a.home-class-tile[href="/classes/class_2026_12engadv1"]'
+    );
+    expect(classTile).not.toBeNull();
+    classTile?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    expect(navigate).toHaveBeenCalledWith('/classes/class_2026_12engadv1');
+  });
+
+  it('dispose clears the clock interval without throwing', () => {
+    const clearSpy = vi.spyOn(window, 'clearInterval');
+    const result = renderTeacherHome(canvas, curriculum);
+    expect(() => result.dispose()).not.toThrow();
+    expect(clearSpy).toHaveBeenCalled();
+    clearSpy.mockRestore();
   });
 });

@@ -1,212 +1,465 @@
 import { navigate } from '@/app/router';
 import type { Class, ScheduledLesson } from '@/schemas';
 import { resolveScheduleToday } from '@/schedule/today';
+import { mountCreateControl } from '@/teacher/create/control';
+import type { CreateKind } from '@/teacher/create/types';
+import { mountHomeClock } from '@/teacher/home-clock';
 import type { CurriculumLessonSummary, CurriculumResponse } from './nav';
 import {
-  groupWeekSchedule,
-  selectRecentlyEdited,
   selectTodaySchedule,
   selectUnpublishedChanges
 } from './home-model';
 
+export interface TeacherHomeOptions {
+  onCreated?: (kind: CreateKind, id: string) => void | Promise<void>;
+}
+
 /**
- * Teacher Home dashboard: Today → This week → Unpublished | Recently edited.
- * Full lesson list lives on the Lessons section only.
+ * Clinical Glass Home: hero clock, signal tiles, dated week calendar, class tiles.
  */
-export function renderTeacherHome(canvas: HTMLElement, curriculum: CurriculumResponse): void {
+export function renderTeacherHome(
+  canvas: HTMLElement,
+  curriculum: CurriculumResponse,
+  options: TeacherHomeOptions = {}
+): { dispose: () => void } {
   canvas.replaceChildren();
 
   const lessonsById = new Map(curriculum.lessons.map((lesson) => [lesson.id, lesson]));
   const classesById = new Map(curriculum.classes.map((cls) => [cls.id, cls]));
-  const anchorDate = resolveScheduleToday(curriculum.schedule_anchor_date);
-  const todayEntries = selectTodaySchedule(curriculum.scheduled_lessons, anchorDate);
-  const weekDays = groupWeekSchedule(curriculum.scheduled_lessons, anchorDate);
+  const scheduleToday = resolveScheduleToday(curriculum.schedule_anchor_date);
+  const todayEntries = selectTodaySchedule(curriculum.scheduled_lessons, scheduleToday);
   const unpublished = selectUnpublishedChanges(curriculum.lessons);
-  const recentlyEdited = selectRecentlyEdited(curriculum.lessons);
+
+  let weekOffset = 0;
+  const disposers: Array<() => void> = [];
 
   const root = document.createElement('div');
   root.className = 'home-dashboard';
 
+  const createHost = document.createElement('div');
+  createHost.className = 'home-dashboard__create create-control';
+  createHost.dataset.createHost = '';
+
+  const openHomeCreate = (): void => {
+    createHost.querySelector<HTMLButtonElement>('[data-create-trigger]')?.click();
+  };
+
+  const header = document.createElement('header');
+  header.className = 'home-dashboard__header';
+
+  const hero = document.createElement('div');
+  hero.className = 'home-dashboard__hero';
+
+  const clockHost = document.createElement('div');
+  clockHost.className = 'home-dashboard__clock';
+  disposers.push(mountHomeClock(clockHost));
+
+  const title = document.createElement('h1');
+  title.className = 'home-dashboard__title';
+  title.textContent = 'Teaching Dashboard';
+
+  hero.append(clockHost, title);
+  header.append(hero, createHost);
+
+  const createControl = mountCreateControl(createHost, {
+    context: 'home',
+    curriculum,
+    onCreated: options.onCreated ?? (() => undefined)
+  });
+  disposers.push(createControl.dispose);
+
+  const weekMount = document.createElement('div');
+  weekMount.className = 'home-dashboard__week-mount';
+
+  const renderWeek = (): void => {
+    weekMount.replaceChildren(
+      buildWeekPanel({
+        curriculum,
+        lessonsById,
+        classesById,
+        scheduleToday,
+        weekOffset,
+        onOffsetChange: (next) => {
+          weekOffset = next;
+          renderWeek();
+        },
+        onCreate: openHomeCreate
+      })
+    );
+  };
+  renderWeek();
+
   root.append(
-    buildTodayPanel(todayEntries, lessonsById, classesById, anchorDate),
-    buildWeekPanel(weekDays, lessonsById, classesById),
-    buildAttentionGrid(unpublished, recentlyEdited)
+    header,
+    buildSignalsPanel(todayEntries.length, unpublished.length, openHomeCreate),
+    weekMount,
+    buildClassesPanel(curriculum.classes, curriculum, openHomeCreate)
   );
 
   canvas.append(root);
+
+  return {
+    dispose: () => {
+      for (const dispose of disposers) dispose();
+      disposers.length = 0;
+    }
+  };
 }
 
-function buildTodayPanel(
-  entries: ScheduledLesson[],
-  lessonsById: Map<string, CurriculumLessonSummary>,
-  classesById: Map<string, Class>,
-  anchorDate: string
+function buildSignalsPanel(
+  todayCount: number,
+  unpublishedCount: number,
+  onCreate: () => void
 ): HTMLElement {
   const panel = document.createElement('section');
-  panel.className = 'home-dashboard__panel';
-  panel.dataset.homePanel = 'today';
+  panel.className = 'home-dashboard__signals';
+  panel.dataset.homePanel = 'signals';
 
-  const heading = document.createElement('h2');
-  heading.className = 'home-dashboard__heading';
-  heading.textContent = `Today · ${anchorDate}`;
-  panel.append(heading);
-
-  if (entries.length === 0) {
-    panel.append(emptyCopy('Nothing scheduled for today.'));
-    return panel;
-  }
-
-  panel.append(buildScheduleList(entries, lessonsById, classesById));
-  return panel;
-}
-
-function buildWeekPanel(
-  weekDays: { date: string; entries: ScheduledLesson[] }[],
-  lessonsById: Map<string, CurriculumLessonSummary>,
-  classesById: Map<string, Class>
-): HTMLElement {
-  const panel = document.createElement('section');
-  panel.className = 'home-dashboard__panel';
-  panel.dataset.homePanel = 'week';
-
-  const heading = document.createElement('h2');
-  heading.className = 'home-dashboard__heading';
-  heading.textContent = 'This week';
-  panel.append(heading);
-
-  if (weekDays.length === 0) {
-    panel.append(emptyCopy('Nothing scheduled this week.'));
-    return panel;
-  }
-
-  for (const day of weekDays) {
-    const dayBlock = document.createElement('div');
-    dayBlock.className = 'home-schedule__day';
-
-    const dayHeading = document.createElement('h3');
-    dayHeading.className = 'home-schedule__day-heading';
-    dayHeading.textContent = formatWeekdayDate(day.date);
-    dayBlock.append(dayHeading, buildScheduleList(day.entries, lessonsById, classesById));
-    panel.append(dayBlock);
-  }
-
-  return panel;
-}
-
-function buildAttentionGrid(
-  unpublished: CurriculumLessonSummary[],
-  recentlyEdited: CurriculumLessonSummary[]
-): HTMLElement {
-  const grid = document.createElement('div');
-  grid.className = 'home-dashboard__attention';
-
-  grid.append(
-    buildAttentionPanel('unpublished', 'Unpublished changes', unpublished),
-    buildAttentionPanel('recent', 'Recently edited', recentlyEdited)
+  panel.append(
+    buildSignalTile('Today', String(todayCount)),
+    buildSignalTile('Unpublished', String(unpublishedCount), {
+      emphasize: unpublishedCount > 0
+    })
   );
 
-  return grid;
-}
+  const createTile = document.createElement('button');
+  createTile.type = 'button';
+  createTile.className = 'glass-tile home-signal home-signal--create';
+  createTile.textContent = '+ Create new';
+  createTile.addEventListener('click', onCreate);
+  panel.append(createTile);
 
-function buildAttentionPanel(
-  panelKey: 'unpublished' | 'recent',
-  title: string,
-  lessons: CurriculumLessonSummary[]
-): HTMLElement {
-  const panel = document.createElement('section');
-  panel.className = 'home-dashboard__panel';
-  panel.dataset.homePanel = panelKey;
-
-  const heading = document.createElement('h2');
-  heading.className = 'home-dashboard__heading';
-  heading.textContent = title;
-  panel.append(heading);
-
-  if (lessons.length === 0) {
-    panel.append(emptyCopy('None right now.'));
-    return panel;
-  }
-
-  const list = document.createElement('ul');
-  list.className = 'home-attention';
-
-  for (const lesson of lessons) {
-    const item = document.createElement('li');
-    item.className = 'home-attention__item';
-
-    const titleEl = document.createElement('p');
-    titleEl.className = 'home-attention__title';
-    titleEl.textContent = lesson.title;
-
-    item.append(titleEl, openLink(lesson.id, 'home-attention__open'));
-    list.append(item);
-  }
-
-  panel.append(list);
   return panel;
 }
 
-function buildScheduleList(
-  entries: ScheduledLesson[],
-  lessonsById: Map<string, CurriculumLessonSummary>,
-  classesById: Map<string, Class>
-): HTMLUListElement {
-  const list = document.createElement('ul');
-  list.className = 'home-schedule';
+function buildSignalTile(
+  label: string,
+  value: string,
+  options: { emphasize?: boolean } = {}
+): HTMLElement {
+  const tile = document.createElement('div');
+  tile.className = 'glass-tile home-signal';
+  if (options.emphasize) tile.classList.add('home-signal--emphasis');
 
-  for (const entry of entries) {
-    const lesson = lessonsById.get(entry.lesson_id);
-    const cls = classesById.get(entry.class_id);
-    const item = document.createElement('li');
-    item.className = 'home-schedule__item';
+  const valueEl = document.createElement('p');
+  valueEl.className = 'home-signal__value';
+  valueEl.textContent = value;
 
-    const info = document.createElement('div');
-    info.className = 'home-schedule__info';
+  const labelEl = document.createElement('p');
+  labelEl.className = 'home-signal__label';
+  labelEl.textContent = label;
 
-    const meta = document.createElement('p');
-    meta.className = 'home-schedule__meta';
-    const classLabel = cls?.code ?? cls?.title ?? entry.class_id;
-    const lessonTitle = lesson?.title ?? entry.lesson_id;
-    const publishState = lesson?.published ? 'Published' : 'Draft';
-    meta.textContent = `${classLabel} · ${lessonTitle} · ${publishState}`;
-
-    info.append(meta);
-    item.append(info, openLink(entry.lesson_id, 'home-schedule__open'));
-    list.append(item);
-  }
-
-  return list;
+  tile.append(valueEl, labelEl);
+  return tile;
 }
 
-function openLink(lessonId: string, className: string): HTMLAnchorElement {
-  const path = `/lessons/${lessonId}`;
-  const open = document.createElement('a');
-  open.className = `btn btn--secondary ${className}`;
-  open.href = path;
-  open.textContent = 'Open';
-  open.addEventListener('click', (event) => {
+function buildWeekPanel(args: {
+  curriculum: CurriculumResponse;
+  lessonsById: Map<string, CurriculumLessonSummary>;
+  classesById: Map<string, Class>;
+  scheduleToday: string;
+  weekOffset: number;
+  onOffsetChange: (offset: number) => void;
+  onCreate: () => void;
+}): HTMLElement {
+  const {
+    curriculum,
+    lessonsById,
+    classesById,
+    scheduleToday,
+    weekOffset,
+    onOffsetChange,
+    onCreate
+  } = args;
+
+  const panel = document.createElement('section');
+  panel.className = 'glass-tile home-dashboard__week';
+  panel.dataset.homePanel = 'week';
+
+  const viewAnchor = addDaysYmd(scheduleToday, weekOffset * 7);
+  const monday = startOfWeekMondayYmd(viewAnchor);
+  const days = Array.from({ length: 5 }, (_, i) => {
+    const date = addDaysYmd(monday, i);
+    return {
+      date,
+      entries: curriculum.scheduled_lessons
+        .filter((entry) => entry.date === date)
+        .sort((a, b) => a.schedule_order - b.schedule_order)
+    };
+  });
+
+  const header = document.createElement('div');
+  header.className = 'home-week__header';
+
+  const monthLabel = document.createElement('h2');
+  monthLabel.className = 'home-week__month';
+  monthLabel.textContent = formatMonthLabel(monday);
+
+  const nav = document.createElement('div');
+  nav.className = 'home-week__nav';
+
+  const prevBtn = document.createElement('button');
+  prevBtn.type = 'button';
+  prevBtn.className = 'btn btn--secondary home-week__nav-btn';
+  prevBtn.textContent = 'Previous';
+  prevBtn.addEventListener('click', () => onOffsetChange(weekOffset - 1));
+
+  const todayBtn = document.createElement('button');
+  todayBtn.type = 'button';
+  todayBtn.className = 'btn btn--secondary home-week__nav-btn';
+  todayBtn.textContent = 'Today';
+  todayBtn.addEventListener('click', () => onOffsetChange(0));
+
+  const nextBtn = document.createElement('button');
+  nextBtn.type = 'button';
+  nextBtn.className = 'btn btn--secondary home-week__nav-btn';
+  nextBtn.textContent = 'Next';
+  nextBtn.addEventListener('click', () => onOffsetChange(weekOffset + 1));
+
+  nav.append(prevBtn, todayBtn, nextBtn);
+
+  const tabs = document.createElement('div');
+  tabs.className = 'section-tabs home-week__tabs';
+  tabs.setAttribute('role', 'tablist');
+
+  for (const [id, label, selected] of [
+    ['week', 'Week', true],
+    ['month', 'Month', false],
+    ['timeline', 'Timeline', false]
+  ] as const) {
+    const tab = document.createElement('button');
+    tab.type = 'button';
+    tab.className = 'section-tabs__tab';
+    tab.setAttribute('role', 'tab');
+    tab.dataset.homeWeekTab = id;
+    tab.setAttribute('aria-selected', selected ? 'true' : 'false');
+    if (selected) tab.classList.add('is-selected');
+    tab.textContent = label;
+    if (!selected) {
+      tab.disabled = true;
+      tab.title = 'Coming soon';
+    }
+    tabs.append(tab);
+  }
+
+  header.append(monthLabel, nav, tabs);
+
+  const columns = document.createElement('div');
+  columns.className = 'home-week__columns';
+
+  for (const day of days) {
+    columns.append(
+      buildDayColumn(day, scheduleToday, lessonsById, classesById, onCreate)
+    );
+  }
+
+  panel.append(header, columns);
+  return panel;
+}
+
+function buildDayColumn(
+  day: { date: string; entries: ScheduledLesson[] },
+  scheduleToday: string,
+  lessonsById: Map<string, CurriculumLessonSummary>,
+  classesById: Map<string, Class>,
+  onCreate: () => void
+): HTMLElement {
+  const column = document.createElement('div');
+  column.className = 'home-week__day';
+  column.dataset.homeWeekDate = day.date;
+  if (day.date === scheduleToday) {
+    column.classList.add('home-week__day--today');
+  }
+
+  const heading = document.createElement('div');
+  heading.className = 'home-week__day-heading';
+
+  const weekday = document.createElement('span');
+  weekday.className = 'home-week__weekday';
+  weekday.textContent = formatWeekdayShort(day.date);
+
+  const dayNum = document.createElement('span');
+  dayNum.className = 'home-week__day-number';
+  dayNum.textContent = String(dayNumber(day.date));
+
+  heading.append(weekday, dayNum);
+
+  const addBtn = document.createElement('button');
+  addBtn.type = 'button';
+  addBtn.className = 'home-week__add';
+  addBtn.setAttribute('aria-label', `Create for ${day.date}`);
+  addBtn.textContent = '+';
+  addBtn.addEventListener('click', onCreate);
+
+  column.append(heading, addBtn);
+
+  if (day.entries.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'home-week__empty';
+    empty.textContent = 'No lessons';
+    column.append(empty);
+  } else {
+    for (const entry of day.entries) {
+      column.append(buildLessonCard(entry, lessonsById, classesById));
+    }
+  }
+
+  return column;
+}
+
+function buildLessonCard(
+  entry: ScheduledLesson,
+  lessonsById: Map<string, CurriculumLessonSummary>,
+  classesById: Map<string, Class>
+): HTMLAnchorElement {
+  const lesson = lessonsById.get(entry.lesson_id);
+  const cls = classesById.get(entry.class_id);
+  const path = `/lessons/${entry.lesson_id}`;
+
+  const card = document.createElement('a');
+  card.className = 'home-week__card';
+  card.href = path;
+  card.dataset.homeLessonId = entry.lesson_id;
+  card.addEventListener('click', (event) => {
     event.preventDefault();
     navigate(path);
   });
-  return open;
+
+  const meta = document.createElement('p');
+  meta.className = 'home-week__card-meta';
+  meta.textContent = cls?.code ?? cls?.title ?? entry.class_id;
+
+  const titleEl = document.createElement('p');
+  titleEl.className = 'home-week__card-title';
+  titleEl.textContent = lesson?.title ?? entry.lesson_id;
+
+  card.append(meta, titleEl);
+  return card;
 }
 
-function emptyCopy(text: string): HTMLParagraphElement {
-  const empty = document.createElement('p');
-  empty.className = 'home-dashboard__empty';
-  empty.textContent = text;
-  return empty;
+function buildClassesPanel(
+  classes: Class[],
+  curriculum: CurriculumResponse,
+  onCreate: () => void
+): HTMLElement {
+  const panel = document.createElement('section');
+  panel.className = 'home-dashboard__classes';
+  panel.dataset.homePanel = 'classes';
+
+  const heading = document.createElement('h2');
+  heading.className = 'home-dashboard__heading';
+  heading.textContent = 'Your classes';
+  panel.append(heading);
+
+  const grid = document.createElement('div');
+  grid.className = 'home-classes';
+
+  const subjectsById = new Map(curriculum.subjects.map((s) => [s.id, s]));
+  const sorted = [...classes].sort((a, b) => a.code.localeCompare(b.code));
+
+  if (sorted.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'home-dashboard__empty';
+    empty.textContent = 'No classes yet. Create one to get started.';
+    grid.append(empty);
+  } else {
+    for (const cls of sorted) {
+      const path = `/classes/${cls.id}`;
+      const tile = document.createElement('a');
+      tile.className = 'glass-tile home-class-tile';
+      tile.href = path;
+      tile.dataset.homeClassId = cls.id;
+      tile.addEventListener('click', (event) => {
+        event.preventDefault();
+        navigate(path);
+      });
+
+      const eyebrow = document.createElement('p');
+      eyebrow.className = 'home-class-tile__eyebrow';
+      const subject = subjectsById.get(cls.subject_id);
+      eyebrow.textContent = [String(cls.academic_year), subject?.title]
+        .filter(Boolean)
+        .join(' · ');
+
+      const name = document.createElement('p');
+      name.className = 'home-class-tile__title';
+      name.textContent = cls.code || cls.title;
+
+      tile.append(eyebrow, name);
+      grid.append(tile);
+    }
+  }
+
+  const newClass = document.createElement('button');
+  newClass.type = 'button';
+  newClass.className = 'glass-tile home-class-tile home-class-tile--create';
+  newClass.textContent = '+ New class';
+  newClass.addEventListener('click', onCreate);
+  grid.append(newClass);
+
+  panel.append(grid);
+  return panel;
 }
 
-/** Human-readable weekday + date from YYYY-MM-DD using UTC. */
-function formatWeekdayDate(ymd: string): string {
+function parseYmd(ymd: string): Date {
   const [y, m, d] = ymd.split('-').map(Number);
-  const date = new Date(Date.UTC(y, m - 1, d));
-  return date.toLocaleDateString('en-AU', {
-    weekday: 'long',
-    day: 'numeric',
+  return new Date(Date.UTC(y, m - 1, d));
+}
+
+function formatYmd(date: Date): string {
+  const y = date.getUTCFullYear();
+  const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(date.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function addDaysYmd(ymd: string, days: number): string {
+  const date = parseYmd(ymd);
+  date.setUTCDate(date.getUTCDate() + days);
+  return formatYmd(date);
+}
+
+function startOfWeekMondayYmd(ymd: string): string {
+  const date = parseYmd(ymd);
+  const day = date.getUTCDay();
+  const offset = day === 0 ? -6 : 1 - day;
+  date.setUTCDate(date.getUTCDate() + offset);
+  return formatYmd(date);
+}
+
+function dayNumber(ymd: string): number {
+  return Number(ymd.slice(8, 10));
+}
+
+function formatWeekdayShort(ymd: string): string {
+  return parseYmd(ymd).toLocaleDateString('en-AU', {
+    weekday: 'short',
+    timeZone: 'UTC'
+  });
+}
+
+function formatMonthLabel(mondayYmd: string): string {
+  const monday = parseYmd(mondayYmd);
+  const friday = parseYmd(addDaysYmd(mondayYmd, 4));
+  if (
+    monday.getUTCFullYear() === friday.getUTCFullYear() &&
+    monday.getUTCMonth() === friday.getUTCMonth()
+  ) {
+    return monday.toLocaleDateString('en-AU', {
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'UTC'
+    });
+  }
+  const start = monday.toLocaleDateString('en-AU', {
     month: 'short',
     year: 'numeric',
     timeZone: 'UTC'
   });
+  const end = friday.toLocaleDateString('en-AU', {
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC'
+  });
+  return `${start} – ${end}`;
 }

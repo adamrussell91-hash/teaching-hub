@@ -10,6 +10,7 @@ import {
 import { fetchCurriculum, type CurriculumResponse } from '@/teacher/nav';
 import { renderTeacherRail } from '@/teacher/rail';
 import { renderTeacherHome as renderHomeCanvas } from '@/teacher/home';
+import type { CreateKind } from '@/teacher/create/types';
 import { mountLessonEditor, type LessonEditorHandle } from '@/teacher/lesson-editor';
 import type { TeacherSection } from '@/teacher/section';
 import { renderResourcesIndex } from '@/teacher/sections/resources';
@@ -66,6 +67,9 @@ let studentUnitViewHandle: StudentUnitViewHandle | null = null;
 // The student class view mounted for the current public route, if any.
 let studentClassViewHandle: StudentClassViewHandle | null = null;
 
+// Home dashboard handle (clock interval + create control), if mounted.
+let homeHandle: { dispose: () => void } | null = null;
+
 /**
  * Flushes any pending/in-flight autosave for the current lesson editor and
  * only disposes it once that flush has fully settled. Awaiting this (rather
@@ -98,6 +102,31 @@ function teardownStudentClassView(): void {
   if (!studentClassViewHandle) return;
   studentClassViewHandle.dispose();
   studentClassViewHandle = null;
+}
+
+function teardownTeacherHome(): void {
+  if (!homeHandle) return;
+  homeHandle.dispose();
+  homeHandle = null;
+}
+
+function pathForCreatedEntity(
+  kind: CreateKind,
+  id: string,
+  curriculum: CurriculumResponse
+): string {
+  switch (kind) {
+    case 'class':
+      return `/classes/${id}`;
+    case 'unit':
+      return `/units/${id}`;
+    case 'lesson':
+      return `/lessons/${id}`;
+    case 'scope_sequence': {
+      const subject = curriculum.subjects.find((entry) => entry.scope_id === id);
+      return subject ? `/scope-sequences/${subject.id}` : '/scope-sequences';
+    }
+  }
 }
 
 function getCurriculum(): Promise<CurriculumResponse> {
@@ -159,7 +188,28 @@ function renderTeacherHomeRoute(token: number): void {
   renderCanvasStatus(refs.canvas, 'Loading home…');
 
   void loadNavAndHandleErrors(refs, token, 'home', undefined, (curriculum) => {
-    renderHomeCanvas(refs.canvas, curriculum);
+    teardownTeacherHome();
+    homeHandle = renderHomeCanvas(refs.canvas, curriculum, {
+      onCreated: async (kind, id) => {
+        curriculumPromise = null;
+        try {
+          const refreshed = await getCurriculum();
+          if (token !== renderToken) return;
+          navigate(pathForCreatedEntity(kind, id, refreshed));
+        } catch (error) {
+          if (token !== renderToken) return;
+          if (error instanceof ApiClientError && error.code === 'unauthorized') {
+            session = { authenticated: false };
+            navigate('/sign-in', { replace: true });
+            return;
+          }
+          renderCanvasStatus(
+            refs.canvas,
+            'Created, but unable to refresh. Please reload to open the new item.'
+          );
+        }
+      }
+    });
   });
 }
 
@@ -409,6 +459,7 @@ async function handleRoute(match: RouteMatch): Promise<void> {
   // so flush any pending lesson edits — and wait for that flush to settle —
   // before tearing the editor down.
   await teardownLessonEditor();
+  teardownTeacherHome();
   teardownStudentLessonView();
   teardownStudentUnitView();
   teardownStudentClassView();
