@@ -18,6 +18,7 @@ import {
   renderScopeSequenceStub
 } from '@/teacher/sections/scope-sequences';
 import { renderClassesIndex, renderClassPage, type ClassPageOptions } from '@/teacher/sections/classes';
+import { openScheduleUnitModal } from '@/teacher/sections/schedule-unit-modal';
 import { renderUnitsIndex, renderUnitStub } from '@/teacher/sections/units';
 import { renderLessonsIndex } from '@/teacher/sections/lessons';
 import {
@@ -166,6 +167,7 @@ function renderTeacherClassRoute(classId: string, token: number): void {
   renderRailStatus(refs.railNav, 'Loading curriculum…');
   renderCanvasStatus(refs.canvas, 'Loading…');
 
+  let currentCurriculum: CurriculumResponse | undefined;
   let classPageOptions: ClassPageOptions;
 
   const refreshAfterScheduleMutation = async (): Promise<void> => {
@@ -173,6 +175,7 @@ function renderTeacherClassRoute(classId: string, token: number): void {
     try {
       const curriculum = await getCurriculum();
       if (token !== renderToken) return;
+      currentCurriculum = curriculum;
       renderTeacherRail(refs.railNav, curriculum, { activeSection: 'classes', activeLessonId: undefined });
       const cls = curriculum.classes.find((entry) => entry.id === classId);
       if (cls) {
@@ -193,10 +196,19 @@ function renderTeacherClassRoute(classId: string, token: number): void {
   };
 
   classPageOptions = {
-    onScheduleMutated: refreshAfterScheduleMutation
+    onScheduleMutated: refreshAfterScheduleMutation,
+    onScheduleUnit: () => {
+      if (!currentCurriculum) return;
+      openScheduleUnitModal({
+        curriculum: currentCurriculum,
+        classId,
+        onSuccess: refreshAfterScheduleMutation
+      });
+    }
   };
 
   void loadNavAndHandleErrors(refs, token, 'classes', undefined, (curriculum) => {
+    currentCurriculum = curriculum;
     const cls = curriculum.classes.find((entry) => entry.id === classId);
     if (cls) {
       renderContextBar(refs, { title: cls.code || cls.title });
