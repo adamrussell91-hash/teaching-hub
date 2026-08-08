@@ -545,6 +545,36 @@ a:hover {
   white-space: nowrap;
 }
 
+.primary-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.primary-nav__link {
+  display: block;
+  padding: 0.45rem 0.55rem;
+  font-family: var(--font-ui);
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--ink);
+  text-decoration: none;
+  border-radius: calc(var(--radius-md) * 0.5);
+}
+
+.primary-nav__link:hover {
+  background: var(--glass);
+}
+
+.primary-nav__link[aria-current='page'] {
+  background: color-mix(in srgb, var(--marine) 18%, transparent);
+  color: var(--depth);
+  font-weight: 600;
+}
+
 .curriculum-nav {
   display: flex;
   flex-direction: column;
