@@ -2,6 +2,12 @@ import { ApiClientError } from '@/api/client';
 import { navigate } from '@/app/router';
 import type { Class, ScheduledLesson } from '@/schemas';
 import type { CurriculumLessonSummary, CurriculumResponse } from '@/teacher/nav';
+import {
+  mountHomepageEditor,
+  normalizeHomepage,
+  renderHomepageRegionsView,
+  type HomepageEditorHandle
+} from '@/teacher/sections/homepage-editor';
 import { patchClass, patchScheduledLesson } from '@/teacher/schedule-api';
 
 export interface ClassPageOptions {
@@ -100,9 +106,7 @@ export function renderClassPage(
     buildCurrentLessonSection(cls, curriculum, lessonsById),
     buildScheduleSection(cls, curriculum, lessonsById, options),
     buildUnitsSection(cls, unitsById),
-    buildPlaceholderSection('Announcements', 'announcements'),
-    buildPlaceholderSection('Resources', 'resources'),
-    buildPlaceholderSection('Custom blocks', 'custom-blocks')
+    buildHomepageSection(cls, options)
   );
 
   canvas.append(root);
@@ -425,20 +429,62 @@ function buildUnitsSection(
   return section;
 }
 
-function buildPlaceholderSection(title: string, key: string): HTMLElement {
-  const section = document.createElement('section');
-  section.className = 'class-page__section class-page__section--placeholder';
-  section.dataset.classSection = key;
+function buildHomepageSection(cls: Class, options: ClassPageOptions): HTMLElement {
+  const section = document.createElement('div');
+  section.className = 'class-page__homepage';
+  section.dataset.classSection = 'homepage';
 
-  const heading = document.createElement('h2');
-  heading.className = 'class-page__heading';
-  heading.textContent = title;
+  const toolbar = document.createElement('div');
+  toolbar.className = 'class-page__homepage-toolbar';
 
-  const body = document.createElement('p');
-  body.className = 'class-page__placeholder';
-  body.textContent = 'Coming next.';
+  const editButton = document.createElement('button');
+  editButton.type = 'button';
+  editButton.className = 'btn btn--secondary class-page__edit-homepage';
+  editButton.textContent = 'Edit homepage';
 
-  section.append(heading, body);
+  const viewAsStudent = document.createElement('a');
+  viewAsStudent.className = 'btn btn--ghost class-page__view-as-student';
+  viewAsStudent.href = `/s/classes/${cls.id}`;
+  viewAsStudent.textContent = 'View as student';
+  viewAsStudent.addEventListener('click', (event) => {
+    event.preventDefault();
+    navigate(`/s/classes/${cls.id}`);
+  });
+
+  toolbar.append(editButton, viewAsStudent);
+
+  const regionsContainer = document.createElement('div');
+  regionsContainer.className = 'class-page__homepage-regions';
+
+  let editorHandle: HomepageEditorHandle | null = null;
+
+  function showViewMode(): void {
+    editorHandle?.destroy();
+    editorHandle = null;
+    editButton.hidden = false;
+    renderHomepageRegionsView(regionsContainer, normalizeHomepage(cls.homepage));
+  }
+
+  function showEditMode(): void {
+    editButton.hidden = true;
+    editorHandle?.destroy();
+    editorHandle = mountHomepageEditor(regionsContainer, normalizeHomepage(cls.homepage), {
+      onSave: async (homepage) => {
+        await patchClass(cls.id, { homepage });
+        await options.onScheduleMutated?.();
+      },
+      onCancel: () => {
+        showViewMode();
+      }
+    });
+  }
+
+  editButton.addEventListener('click', () => {
+    showEditMode();
+  });
+
+  showViewMode();
+  section.append(toolbar, regionsContainer);
   return section;
 }
 

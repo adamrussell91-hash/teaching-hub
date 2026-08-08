@@ -11,9 +11,25 @@ import { navigate } from '@/app/router';
 import { patchClass, patchScheduledLesson } from '@/teacher/schedule-api';
 import { renderClassesIndex, renderClassPage } from '@/teacher/sections/classes';
 import type { CurriculumResponse } from '@/teacher/nav';
+import type { Block } from '@/schemas/block';
 import type { Class, ScheduledLesson, Subject, Unit, Year } from '@/schemas';
 
 const ISO = '2026-01-01T00:00:00.000Z';
+
+const announcementBlock: Block = {
+  id: 'block_homepage_announcements_1',
+  type: 'block',
+  block_type: 'heading',
+  variant: 'section',
+  visibility: 'student_teacher',
+  content: { text: 'Campus closed Monday' },
+  layout: {},
+  print: {},
+  settings: {},
+  created_at: ISO,
+  updated_at: ISO,
+  schema_version: 1
+};
 
 const year: Year = {
   id: 'year_12',
@@ -174,7 +190,9 @@ describe('classes section', () => {
     expect(canvas.textContent).toMatch(/Announcements/i);
     expect(canvas.textContent).toMatch(/Resources/i);
     expect(canvas.textContent).toMatch(/Custom blocks/i);
-    expect(canvas.textContent).toMatch(/Coming next/i);
+    expect(canvas.textContent).toContain('No announcements yet.');
+    expect(canvas.querySelector('.class-page__edit-homepage')).not.toBeNull();
+    expect(canvas.querySelector('.class-page__view-as-student')).not.toBeNull();
 
     const unitLink = canvas.querySelector<HTMLAnchorElement>('a[href="/units/unit_aotfw"]');
     expect(unitLink).not.toBeNull();
@@ -288,5 +306,83 @@ describe('classes section', () => {
       expect(canvas.querySelector('.class-page__error')?.textContent).toBe('Date update failed');
     });
     expect(onScheduleMutated).not.toHaveBeenCalled();
+  });
+
+  it('shows Edit homepage and renders announcement blocks in view mode', () => {
+    const withHomepage: CurriculumResponse = {
+      ...curriculum,
+      classes: [
+        {
+          ...classRow,
+          homepage: {
+            announcements: [announcementBlock],
+            resources: [],
+            custom: []
+          }
+        }
+      ]
+    };
+
+    renderClassPage(canvas, withHomepage, 'class_2026_12engadv1');
+
+    expect(canvas.querySelector('.class-page__edit-homepage')?.textContent).toBe('Edit homepage');
+    const announcements = canvas.querySelector('[data-homepage-region="announcements"]');
+    expect(announcements?.querySelector('.block[data-block-type="heading"]')).not.toBeNull();
+    expect(announcements?.textContent).toContain('Campus closed Monday');
+  });
+
+  it('navigates to the student class page from View as student', () => {
+    renderClassPage(canvas, curriculum, 'class_2026_12engadv1');
+    const link = canvas.querySelector<HTMLAnchorElement>('.class-page__view-as-student');
+    expect(link?.getAttribute('href')).toBe('/s/classes/class_2026_12engadv1');
+    link?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    expect(navigate).toHaveBeenCalledWith('/s/classes/class_2026_12engadv1');
+  });
+
+  it('enters edit mode and Save calls patchClass with homepage', async () => {
+    const onScheduleMutated = vi.fn().mockResolvedValue(undefined);
+    renderClassPage(canvas, curriculum, 'class_2026_12engadv1', { onScheduleMutated });
+
+    canvas.querySelector<HTMLButtonElement>('.class-page__edit-homepage')?.click();
+    expect(canvas.querySelector('.homepage-editor__save')).not.toBeNull();
+
+    const region = canvas.querySelector('[data-homepage-region="announcements"]');
+    const select = region?.querySelector<HTMLSelectElement>('.homepage-editor__add-block-select');
+    select!.value = 'heading';
+    region?.querySelector<HTMLButtonElement>('.homepage-editor__add-block-button')?.click();
+
+    canvas.querySelector<HTMLButtonElement>('.homepage-editor__save')?.click();
+
+    await vi.waitFor(() => {
+      expect(patchClass).toHaveBeenCalledWith(
+        'class_2026_12engadv1',
+        expect.objectContaining({
+          homepage: expect.objectContaining({
+            announcements: expect.arrayContaining([
+              expect.objectContaining({ block_type: 'heading' })
+            ])
+          })
+        })
+      );
+      expect(onScheduleMutated).toHaveBeenCalled();
+    });
+  });
+
+  it('Cancel restores prior homepage without PATCH', () => {
+    renderClassPage(canvas, curriculum, 'class_2026_12engadv1');
+
+    canvas.querySelector<HTMLButtonElement>('.class-page__edit-homepage')?.click();
+
+    const region = canvas.querySelector('[data-homepage-region="announcements"]');
+    const select = region?.querySelector<HTMLSelectElement>('.homepage-editor__add-block-select');
+    select!.value = 'heading';
+    region?.querySelector<HTMLButtonElement>('.homepage-editor__add-block-button')?.click();
+
+    canvas.querySelector<HTMLButtonElement>('.homepage-editor__cancel')?.click();
+
+    expect(patchClass).not.toHaveBeenCalled();
+    expect(canvas.querySelector('.homepage-editor')).toBeNull();
+    expect(canvas.textContent).toContain('No announcements yet.');
+    expect(canvas.querySelector('.class-page__edit-homepage')).not.toBeNull();
   });
 });

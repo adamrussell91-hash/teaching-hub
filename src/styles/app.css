@@ -840,6 +840,122 @@ a:hover {
   font-size: 0.8rem;
 }
 
+/* ── Class homepage regions / editor ──────────────────────────────────── */
+
+.class-page__homepage {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.class-page__homepage-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.homepage-regions__section + .homepage-regions__section {
+  margin-top: 0.25rem;
+}
+
+.homepage-regions__blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.homepage-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.homepage-editor__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.homepage-editor__regions {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.homepage-editor__region {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1rem 1.1rem;
+  background: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius-md) * 0.65);
+}
+
+.homepage-editor__region-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.homepage-editor__add-block {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.homepage-editor__add-block-label {
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.homepage-editor__add-block-select {
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius-md) * 0.45);
+  background: rgba(255, 255, 255, 0.65);
+  color: var(--ink);
+}
+
+.homepage-editor__blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.homepage-editor__block-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.65rem;
+  align-items: start;
+}
+
+.homepage-editor__block-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.homepage-editor__reorder,
+.homepage-editor__delete {
+  padding: 0.35rem 0.5rem;
+  font-size: 0.78rem;
+}
+
+.homepage-editor__reorder:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* ── Schedule unit modal ──────────────────────────────────────────────── */
 
 .schedule-modal {
