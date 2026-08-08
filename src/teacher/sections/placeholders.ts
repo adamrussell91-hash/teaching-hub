@@ -9,10 +9,6 @@ function renderPlaceholder(canvas: HTMLElement, title: string, message: string):
   canvas.append(heading, body);
 }
 
-export function renderClassesPlaceholder(canvas: HTMLElement): void {
-  renderPlaceholder(canvas, 'Classes', 'Classes are coming next.');
-}
-
 export function renderResourcesPlaceholder(canvas: HTMLElement): void {
   renderPlaceholder(canvas, 'Resource Library', 'Resource Library is coming next.');
 }
