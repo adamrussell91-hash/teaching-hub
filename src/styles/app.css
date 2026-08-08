@@ -478,10 +478,46 @@ a:hover {
   text-decoration: underline;
 }
 
+.student-surface__header-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  justify-content: flex-end;
+}
+
 .student-surface__content {
   max-width: 42rem;
   margin: 0 auto;
   padding: 2rem 1.25rem 3rem;
+}
+
+.student-lesson__nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 2rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid rgba(28, 25, 23, 0.12);
+}
+
+.student-lesson__nav a {
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  color: var(--depth);
+  text-decoration: none;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-lesson__nav a:hover {
+  text-decoration: underline;
+}
+
+.student-lesson__nav-next {
+  margin-left: auto;
+  text-align: right;
 }
 
 .student-surface__title {
