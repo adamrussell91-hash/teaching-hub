@@ -67,6 +67,7 @@ const lessonHandler = (await import('../../netlify/functions/lesson.mts')).defau
 const publishHandler = (await import('../../netlify/functions/publish.mts')).default;
 const publishedLessonHandler = (await import('../../netlify/functions/published-lesson.mts')).default;
 const publishedUnitHandler = (await import('../../netlify/functions/published-unit.mts')).default;
+const publishedClassHandler = (await import('../../netlify/functions/published-class.mts')).default;
 const scheduleUnitHandler = (await import('../../netlify/functions/schedule-unit.mts')).default;
 const scheduledLessonHandler = (await import('../../netlify/functions/scheduled-lesson.mts')).default;
 const classHandler = (await import('../../netlify/functions/class.mts')).default;
@@ -517,6 +518,140 @@ describe('GET /api/published/units/:id', () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.data.lessons).toEqual([]);
+  });
+});
+
+describe('GET /api/published/classes/:id', () => {
+  it('returns 404 when the class blob is missing', async () => {
+    const response = await publishedClassHandler(
+      request('/api/published/classes/class_missing'),
+      { params: { id: 'class_missing' } }
+    );
+    expect(response.status).toBe(404);
+  });
+
+  it('is public and returns schedule ordered with resolved titles', async () => {
+    fakeStore.seed(classKey('class_2026_12engadv1'), {
+      id: 'class_2026_12engadv1',
+      type: 'class',
+      code: '12ENGADV1',
+      title: 'Year 12 English Advanced',
+      slug: '12engadv1',
+      display_name: '12ENGADV1',
+      academic_year: 2026,
+      year_id: 'year_12',
+      subject_id: 'subject_y12_engadv',
+      active_unit_ids: ['unit_aotfw'],
+      current_unit_id: 'unit_aotfw',
+      current_scheduled_lesson_id: 'scheduled_b',
+      status: 'active',
+      ...timestamps,
+      schema_version: 1
+    });
+    fakeStore.seed(unitKey('unit_aotfw'), {
+      id: 'unit_aotfw',
+      type: 'unit',
+      title: 'Artist of the Floating World',
+      slug: 'aotfw',
+      status: 'active',
+      year_id: 'year_12',
+      subject_id: 'subject_y12_engadv',
+      lesson_ids: ['lesson_a', 'lesson_b'],
+      ...timestamps,
+      schema_version: 1
+    });
+    fakeStore.seed(draftLessonKey('lesson_a'), {
+      id: 'lesson_a',
+      type: 'lesson',
+      title: 'Lesson A',
+      slug: 'lesson-a',
+      unit_id: 'unit_aotfw',
+      sequence: 1,
+      blocks: [],
+      status: 'active',
+      ...timestamps,
+      schema_version: 1
+    });
+    fakeStore.seed(draftLessonKey('lesson_b'), {
+      id: 'lesson_b',
+      type: 'lesson',
+      title: 'Lesson B',
+      slug: 'lesson-b',
+      unit_id: 'unit_aotfw',
+      sequence: 2,
+      blocks: [],
+      status: 'active',
+      ...timestamps,
+      schema_version: 1
+    });
+    fakeStore.seed(scheduledLessonKey('scheduled_a'), {
+      id: 'scheduled_a',
+      type: 'scheduled_lesson',
+      class_id: 'class_2026_12engadv1',
+      unit_id: 'unit_aotfw',
+      lesson_id: 'lesson_a',
+      date: '2026-08-11',
+      schedule_order: 1,
+      delivery_status: 'planned',
+      ...timestamps,
+      schema_version: 1
+    });
+    fakeStore.seed(scheduledLessonKey('scheduled_b'), {
+      id: 'scheduled_b',
+      type: 'scheduled_lesson',
+      class_id: 'class_2026_12engadv1',
+      unit_id: 'unit_aotfw',
+      lesson_id: 'lesson_b',
+      date: '2026-08-12',
+      schedule_order: 2,
+      delivery_status: 'current',
+      ...timestamps,
+      schema_version: 1
+    });
+    fakeStore.seed(publishedLessonKey('lesson_a'), {
+      lesson_id: 'lesson_a',
+      title: 'Lesson A',
+      unit_id: 'unit_aotfw',
+      blocks: [],
+      published_at: '2026-02-01T12:00:00.000Z',
+      schema_version: 1
+    });
+
+    const response = await publishedClassHandler(
+      request('/api/published/classes/class_2026_12engadv1'),
+      { params: { id: 'class_2026_12engadv1' } }
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.code).toBe('12ENGADV1');
+    expect(body.data.homepage).toEqual({
+      announcements: [],
+      resources: [],
+      custom: []
+    });
+    expect(body.data.current_lesson).toEqual({
+      id: 'scheduled_b',
+      title: 'Lesson B',
+      lesson_id: 'lesson_b'
+    });
+    expect(body.data.schedule).toEqual([
+      {
+        id: 'scheduled_a',
+        date: '2026-08-11',
+        schedule_order: 1,
+        lesson_id: 'lesson_a',
+        title: 'Lesson A',
+        published: true
+      },
+      {
+        id: 'scheduled_b',
+        date: '2026-08-12',
+        schedule_order: 2,
+        lesson_id: 'lesson_b',
+        title: 'Lesson B',
+        published: false
+      }
+    ]);
   });
 });
 

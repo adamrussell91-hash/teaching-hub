@@ -31,6 +31,7 @@ import { filterBlocksForStudent } from '../src/blocks/visibility';
 import { sanitizeRichTextHtml } from '../src/blocks/sanitize';
 import { applyScheduleUnit } from '../src/schedule/schedule-unit';
 import { reorderScheduledLesson } from '../src/schedule/reorder';
+import { buildPublishedClass } from '../src/schedule/build-published-class';
 
 export const SESSION_COOKIE_NAME = 'teaching_hub_session';
 
@@ -456,6 +457,61 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     return okResponse(200, snapshot);
   }
 
+  function handleGetPublishedClass(classId: string): MockResponse {
+    const rawClass = store.getJSON(classKey(classId));
+    if (!rawClass) return notFoundResponse('Class not found');
+
+    const classParsed = ClassSchema.safeParse(rawClass);
+    if (!classParsed.success || classParsed.data.status !== 'active') {
+      return notFoundResponse('Class not found');
+    }
+
+    const cls = classParsed.data;
+
+    const scheduled = store
+      .listKeys('scheduled_lessons/')
+      .map((key) => store.getJSON<ScheduledLesson>(key))
+      .filter((row): row is ScheduledLesson => row != null && row.class_id === classId);
+
+    const unitIds = new Set<string>(cls.active_unit_ids);
+    for (const row of scheduled) {
+      unitIds.add(row.unit_id);
+    }
+    if (cls.current_unit_id) {
+      unitIds.add(cls.current_unit_id);
+    }
+
+    const units = [...unitIds]
+      .map((unitId) => UnitSchema.safeParse(store.getJSON(unitKey(unitId))))
+      .filter((parsed) => parsed.success)
+      .map((parsed) => parsed.data);
+
+    const lessonIds = new Set(scheduled.map((row) => row.lesson_id));
+    const lessons: Array<{ id: string; title: string }> = [];
+    for (const lessonId of lessonIds) {
+      const draft = store.getJSON<{ title?: string }>(draftLessonKey(lessonId));
+      if (draft && typeof draft.title === 'string' && draft.title) {
+        lessons.push({ id: lessonId, title: draft.title });
+      }
+    }
+
+    const publishedLessonIds = new Set(
+      store
+        .listKeys('published/lessons/')
+        .map((key) => key.slice('published/lessons/'.length))
+        .filter(Boolean)
+    );
+
+    const dto = buildPublishedClass({
+      cls,
+      units,
+      lessons,
+      scheduled,
+      publishedLessonIds
+    });
+    return okResponse(200, dto);
+  }
+
   function handleGetPublishedUnit(id: string): MockResponse {
     const unit = store.getJSON<{ title?: string; lesson_ids?: string[] }>(
       unitKey(id)
@@ -820,6 +876,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
   const LESSON_PUBLISH_RE = /^\/api\/lessons\/([^/]+)\/publish$/;
   const PUBLISHED_LESSON_RE = /^\/api\/published\/lessons\/([^/]+)$/;
   const PUBLISHED_UNIT_RE = /^\/api\/published\/units\/([^/]+)$/;
+  const PUBLISHED_CLASS_RE = /^\/api\/published\/classes\/([^/]+)$/;
   const CLASS_PATCH_RE = /^\/api\/classes\/([^/]+)$/;
   const SCHEDULE_UNIT_RE = /^\/api\/classes\/([^/]+)\/schedule-unit$/;
   const SCHEDULED_LESSON_RE = /^\/api\/scheduled-lessons\/([^/]+)$/;
@@ -854,6 +911,11 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const publishedUnitMatch = PUBLISHED_UNIT_RE.exec(path);
     if (publishedUnitMatch && method === 'GET') {
       return handleGetPublishedUnit(publishedUnitMatch[1]);
+    }
+
+    const publishedClassMatch = PUBLISHED_CLASS_RE.exec(path);
+    if (publishedClassMatch && method === 'GET') {
+      return handleGetPublishedClass(publishedClassMatch[1]);
     }
 
     const scheduleUnitMatch = SCHEDULE_UNIT_RE.exec(path);
