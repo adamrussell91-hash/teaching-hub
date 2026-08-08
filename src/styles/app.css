@@ -686,6 +686,106 @@ a:hover {
   flex-shrink: 0;
 }
 
+/* ── Class list / page ────────────────────────────────────────────────── */
+
+.class-list {
+  margin-top: 0.25rem;
+}
+
+.class-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+.class-page__header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.class-page__header .home-heading {
+  margin-bottom: 0;
+}
+
+.class-page__title {
+  font-family: var(--font-ui);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+}
+
+.class-page__context {
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin: 0;
+}
+
+.class-page__section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.class-page__heading {
+  font-family: var(--font-ui);
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--depth);
+  margin: 0;
+}
+
+.class-page__empty,
+.class-page__placeholder {
+  font-family: var(--font-ui);
+  font-size: 0.92rem;
+  color: var(--muted);
+  margin: 0;
+}
+
+.class-page__link {
+  font-family: var(--font-ui);
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.class-page__link:hover {
+  color: var(--depth);
+}
+
+.class-page__current-lesson {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1.1rem;
+  background: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius-md) * 0.65);
+}
+
+.class-page__current-lesson-title {
+  font-family: var(--font-ui);
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+}
+
+.class-page__unit-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
 /* ── Home dashboard ───────────────────────────────────────────────────── */
 
 .home-dashboard {

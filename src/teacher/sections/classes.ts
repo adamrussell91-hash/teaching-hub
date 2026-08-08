@@ -1,0 +1,363 @@
+import { navigate } from '@/app/router';
+import type { Class, ScheduledLesson } from '@/schemas';
+import type { CurriculumLessonSummary, CurriculumResponse } from '@/teacher/nav';
+
+export function renderClassesIndex(canvas: HTMLElement, curriculum: CurriculumResponse): void {
+  canvas.replaceChildren();
+
+  const heading = document.createElement('h1');
+  heading.className = 'home-heading';
+  heading.textContent = 'Classes';
+  canvas.append(heading);
+
+  const subjectsById = new Map(curriculum.subjects.map((subject) => [subject.id, subject]));
+  const classes = [...curriculum.classes].sort((a, b) => a.code.localeCompare(b.code));
+
+  if (classes.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'teacher-layout__canvas-status';
+    empty.textContent = 'No classes yet.';
+    canvas.append(empty);
+    return;
+  }
+
+  const list = document.createElement('ul');
+  list.className = 'lesson-list class-list';
+
+  for (const cls of classes) {
+    const subject = subjectsById.get(cls.subject_id);
+    const item = document.createElement('li');
+    item.className = 'lesson-list__item';
+
+    const info = document.createElement('div');
+    info.className = 'lesson-list__info';
+
+    const title = document.createElement('p');
+    title.className = 'lesson-list__title';
+    title.textContent = cls.code;
+
+    const meta = document.createElement('p');
+    meta.className = 'lesson-list__meta';
+    meta.textContent = [cls.title, subject?.title].filter(Boolean).join(' · ');
+
+    info.append(title, meta);
+
+    const path = `/classes/${cls.id}`;
+    const open = document.createElement('a');
+    open.className = 'btn btn--secondary lesson-list__open class-list__open';
+    open.href = path;
+    open.textContent = 'Open';
+    open.addEventListener('click', (event) => {
+      event.preventDefault();
+      navigate(path);
+    });
+
+    item.append(info, open);
+    list.append(item);
+  }
+
+  canvas.append(list);
+}
+
+export function renderClassPage(
+  canvas: HTMLElement,
+  curriculum: CurriculumResponse,
+  classId: string
+): void {
+  canvas.replaceChildren();
+
+  const cls = curriculum.classes.find((entry) => entry.id === classId);
+  if (!cls) {
+    const status = document.createElement('p');
+    status.className = 'teacher-layout__canvas-status';
+    status.textContent = 'Class not found.';
+    canvas.append(status);
+    return;
+  }
+
+  const yearsById = new Map(curriculum.years.map((year) => [year.id, year]));
+  const subjectsById = new Map(curriculum.subjects.map((subject) => [subject.id, subject]));
+  const unitsById = new Map(curriculum.units.map((unit) => [unit.id, unit]));
+  const lessonsById = new Map(curriculum.lessons.map((lesson) => [lesson.id, lesson]));
+
+  const year = yearsById.get(cls.year_id);
+  const subject = subjectsById.get(cls.subject_id);
+
+  const root = document.createElement('div');
+  root.className = 'class-page';
+
+  root.append(
+    buildHeader(cls, year?.title, subject?.title),
+    buildCurrentUnitSection(cls, unitsById),
+    buildCurrentLessonSection(cls, curriculum, lessonsById),
+    buildScheduleSection(cls, curriculum, lessonsById),
+    buildUnitsSection(cls, unitsById),
+    buildPlaceholderSection('Announcements', 'announcements'),
+    buildPlaceholderSection('Resources', 'resources'),
+    buildPlaceholderSection('Custom blocks', 'custom-blocks')
+  );
+
+  canvas.append(root);
+}
+
+function buildHeader(cls: Class, yearTitle?: string, subjectTitle?: string): HTMLElement {
+  const section = document.createElement('header');
+  section.className = 'class-page__header';
+  section.dataset.classSection = 'header';
+
+  const heading = document.createElement('h1');
+  heading.className = 'home-heading';
+  heading.textContent = cls.code;
+
+  const title = document.createElement('p');
+  title.className = 'class-page__title';
+  title.textContent = cls.title;
+
+  const context = document.createElement('p');
+  context.className = 'class-page__context';
+  context.textContent = [yearTitle, subjectTitle].filter(Boolean).join(' · ');
+
+  section.append(heading, title);
+  if (context.textContent) {
+    section.append(context);
+  }
+  return section;
+}
+
+function buildCurrentUnitSection(
+  cls: Class,
+  unitsById: Map<string, { id: string; title: string }>
+): HTMLElement {
+  const section = document.createElement('section');
+  section.className = 'class-page__section';
+  section.dataset.classSection = 'current-unit';
+
+  const heading = document.createElement('h2');
+  heading.className = 'class-page__heading';
+  heading.textContent = 'Current unit';
+  section.append(heading);
+
+  const unitId = cls.current_unit_id;
+  const unit = unitId ? unitsById.get(unitId) : undefined;
+
+  if (!unit) {
+    section.append(emptyCopy('No current unit.'));
+    return section;
+  }
+
+  const path = `/units/${unit.id}`;
+  const link = document.createElement('a');
+  link.className = 'class-page__link';
+  link.href = path;
+  link.textContent = unit.title;
+  link.addEventListener('click', (event) => {
+    event.preventDefault();
+    navigate(path);
+  });
+  section.append(link);
+  return section;
+}
+
+function buildCurrentLessonSection(
+  cls: Class,
+  curriculum: CurriculumResponse,
+  lessonsById: Map<string, CurriculumLessonSummary>
+): HTMLElement {
+  const section = document.createElement('section');
+  section.className = 'class-page__section';
+  section.dataset.classSection = 'current-lesson';
+
+  const heading = document.createElement('h2');
+  heading.className = 'class-page__heading';
+  heading.textContent = 'Current lesson';
+  section.append(heading);
+
+  const scheduled = resolveCurrentScheduledLesson(cls, curriculum);
+  if (!scheduled) {
+    section.append(emptyCopy('No current lesson.'));
+    return section;
+  }
+
+  const lesson = lessonsById.get(scheduled.lesson_id);
+  const title = lesson?.title ?? scheduled.lesson_id;
+  const path = `/lessons/${scheduled.lesson_id}`;
+
+  const row = document.createElement('div');
+  row.className = 'class-page__current-lesson';
+
+  const label = document.createElement('p');
+  label.className = 'class-page__current-lesson-title';
+  label.textContent = title;
+
+  const open = document.createElement('a');
+  open.className = 'btn btn--secondary';
+  open.href = path;
+  open.textContent = 'Open';
+  open.addEventListener('click', (event) => {
+    event.preventDefault();
+    navigate(path);
+  });
+
+  row.append(label, open);
+  section.append(row);
+  return section;
+}
+
+function buildScheduleSection(
+  cls: Class,
+  curriculum: CurriculumResponse,
+  lessonsById: Map<string, CurriculumLessonSummary>
+): HTMLElement {
+  const section = document.createElement('section');
+  section.className = 'class-page__section';
+  section.dataset.classSection = 'schedule';
+
+  const heading = document.createElement('h2');
+  heading.className = 'class-page__heading';
+  heading.textContent = 'Schedule';
+  section.append(heading);
+
+  const entries = curriculum.scheduled_lessons
+    .filter((entry) => entry.class_id === cls.id)
+    .sort(compareScheduledLessons);
+
+  if (entries.length === 0) {
+    section.append(emptyCopy('No scheduled lessons.'));
+    return section;
+  }
+
+  const list = document.createElement('ul');
+  list.className = 'lesson-list class-schedule';
+
+  for (const entry of entries) {
+    const lesson = lessonsById.get(entry.lesson_id);
+    const item = document.createElement('li');
+    item.className = 'lesson-list__item';
+
+    const info = document.createElement('div');
+    info.className = 'lesson-list__info';
+
+    const title = document.createElement('p');
+    title.className = 'lesson-list__title';
+    title.textContent = lesson?.title ?? entry.lesson_id;
+
+    const meta = document.createElement('p');
+    meta.className = 'lesson-list__meta';
+    meta.textContent = `${entry.date} · ${entry.delivery_status}`;
+
+    info.append(title, meta);
+
+    const path = `/lessons/${entry.lesson_id}`;
+    const open = document.createElement('a');
+    open.className = 'btn btn--secondary lesson-list__open class-schedule__open';
+    open.href = path;
+    open.textContent = 'Open';
+    open.addEventListener('click', (event) => {
+      event.preventDefault();
+      navigate(path);
+    });
+
+    item.append(info, open);
+    list.append(item);
+  }
+
+  section.append(list);
+  return section;
+}
+
+function buildUnitsSection(
+  cls: Class,
+  unitsById: Map<string, { id: string; title: string }>
+): HTMLElement {
+  const section = document.createElement('section');
+  section.className = 'class-page__section';
+  section.dataset.classSection = 'units';
+
+  const heading = document.createElement('h2');
+  heading.className = 'class-page__heading';
+  heading.textContent = 'Units';
+  section.append(heading);
+
+  const units = cls.active_unit_ids
+    .map((id) => unitsById.get(id))
+    .filter((unit): unit is { id: string; title: string } => Boolean(unit));
+
+  if (units.length === 0) {
+    section.append(emptyCopy('No active units.'));
+    return section;
+  }
+
+  const list = document.createElement('ul');
+  list.className = 'class-page__unit-list';
+
+  for (const unit of units) {
+    const item = document.createElement('li');
+    const path = `/units/${unit.id}`;
+    const link = document.createElement('a');
+    link.className = 'class-page__link';
+    link.href = path;
+    link.textContent = unit.title;
+    link.addEventListener('click', (event) => {
+      event.preventDefault();
+      navigate(path);
+    });
+    item.append(link);
+    list.append(item);
+  }
+
+  section.append(list);
+  return section;
+}
+
+function buildPlaceholderSection(title: string, key: string): HTMLElement {
+  const section = document.createElement('section');
+  section.className = 'class-page__section class-page__section--placeholder';
+  section.dataset.classSection = key;
+
+  const heading = document.createElement('h2');
+  heading.className = 'class-page__heading';
+  heading.textContent = title;
+
+  const body = document.createElement('p');
+  body.className = 'class-page__placeholder';
+  body.textContent = 'Coming next.';
+
+  section.append(heading, body);
+  return section;
+}
+
+function resolveCurrentScheduledLesson(
+  cls: Class,
+  curriculum: CurriculumResponse
+): ScheduledLesson | undefined {
+  if (cls.current_scheduled_lesson_id) {
+    const pinned = curriculum.scheduled_lessons.find(
+      (entry) => entry.id === cls.current_scheduled_lesson_id && entry.class_id === cls.id
+    );
+    if (pinned) return pinned;
+  }
+
+  const anchor = curriculum.schedule_anchor_date;
+  const candidates = curriculum.scheduled_lessons
+    .filter((entry) => entry.class_id === cls.id && entry.date >= anchor)
+    .sort((a, b) => {
+      const byDate = a.date.localeCompare(b.date);
+      if (byDate !== 0) return byDate;
+      return a.schedule_order - b.schedule_order;
+    });
+
+  return candidates[0];
+}
+
+function compareScheduledLessons(a: ScheduledLesson, b: ScheduledLesson): number {
+  const byOrder = a.schedule_order - b.schedule_order;
+  if (byOrder !== 0) return byOrder;
+  return a.date.localeCompare(b.date);
+}
+
+function emptyCopy(text: string): HTMLElement {
+  const empty = document.createElement('p');
+  empty.className = 'class-page__empty';
+  empty.textContent = text;
+  return empty;
+}

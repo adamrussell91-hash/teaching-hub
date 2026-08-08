@@ -12,11 +12,12 @@ import { renderTeacherRail } from '@/teacher/rail';
 import { renderTeacherHome as renderHomeCanvas } from '@/teacher/home';
 import { mountLessonEditor, type LessonEditorHandle } from '@/teacher/lesson-editor';
 import type { TeacherSection } from '@/teacher/section';
-import { renderClassesPlaceholder, renderResourcesPlaceholder } from '@/teacher/sections/placeholders';
+import { renderResourcesPlaceholder } from '@/teacher/sections/placeholders';
 import {
   renderScopeSequencesIndex,
   renderScopeSequenceStub
 } from '@/teacher/sections/scope-sequences';
+import { renderClassesIndex, renderClassPage } from '@/teacher/sections/classes';
 import { renderUnitsIndex, renderUnitStub } from '@/teacher/sections/units';
 import { renderLessonsIndex } from '@/teacher/sections/lessons';
 import {
@@ -154,8 +155,23 @@ function renderTeacherClassesRoute(token: number): void {
   renderRailStatus(refs.railNav, 'Loading curriculum…');
   renderCanvasStatus(refs.canvas, 'Loading…');
 
-  void loadNavAndHandleErrors(refs, token, 'classes', undefined, () => {
-    renderClassesPlaceholder(refs.canvas);
+  void loadNavAndHandleErrors(refs, token, 'classes', undefined, (curriculum) => {
+    renderClassesIndex(refs.canvas, curriculum);
+  });
+}
+
+function renderTeacherClassRoute(classId: string, token: number): void {
+  const refs = mountTeacherShell();
+  renderContextBar(refs, { title: 'Classes' });
+  renderRailStatus(refs.railNav, 'Loading curriculum…');
+  renderCanvasStatus(refs.canvas, 'Loading…');
+
+  void loadNavAndHandleErrors(refs, token, 'classes', undefined, (curriculum) => {
+    const cls = curriculum.classes.find((entry) => entry.id === classId);
+    if (cls) {
+      renderContextBar(refs, { title: cls.code || cls.title });
+    }
+    renderClassPage(refs.canvas, curriculum, classId);
   });
 }
 
@@ -272,6 +288,9 @@ function renderRoute(match: RouteMatch, token: number): void {
       break;
     case 'teacher-classes':
       renderTeacherClassesRoute(token);
+      break;
+    case 'teacher-class':
+      renderTeacherClassRoute(match.params.classId, token);
       break;
     case 'teacher-resources':
       renderTeacherResourcesRoute(token);
