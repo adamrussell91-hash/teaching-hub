@@ -560,12 +560,16 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       return errorResponse(400, 'subject_mismatch', 'Unit subject does not match class subject');
     }
 
+    if (unitParsed.data.lesson_ids.length === 0) {
+      return errorResponse(400, 'no_lessons', 'Unit has no lessons');
+    }
+
     const meetingDays = meeting_days ?? classParsed.data.meeting_days ?? [1, 2, 3, 4, 5];
 
     const existing = store
       .listKeys('scheduled_lessons/')
       .map((key) => store.getJSON<ScheduledLesson>(key))
-      .filter((entry): entry is ScheduledLesson => Boolean(entry) && entry.class_id === classId);
+      .filter((entry): entry is ScheduledLesson => entry != null && entry.class_id === classId);
 
     const nowIso = new Date().toISOString();
     const idFactory = (lessonId: string) => `scheduled_${classId}_${lessonId}`;
@@ -658,7 +662,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       const classRows = store
         .listKeys('scheduled_lessons/')
         .map((key) => store.getJSON<ScheduledLesson>(key))
-        .filter((entry): entry is ScheduledLesson => Boolean(entry) && entry.class_id === existing.class_id)
+        .filter((entry): entry is ScheduledLesson => entry != null && entry.class_id === existing.class_id)
         .sort((a, b) => a.schedule_order - b.schedule_order);
 
       const withTarget = classRows.map((row) => (row.id === id ? result : row));

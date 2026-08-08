@@ -363,7 +363,7 @@ function renderStepPreview(
     item.className = 'schedule-modal__preview-item';
     const date = dates[index] ?? '—';
     const title = lessonsById.get(lessonId)?.title ?? lessonId;
-    item.textContent = `${date} · ${title}`;
+    item.textContent = `${date} · ${title} · ${index + 1}`;
     list.append(item);
   });
 

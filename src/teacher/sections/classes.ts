@@ -1,3 +1,4 @@
+import { ApiClientError } from '@/api/client';
 import { navigate } from '@/app/router';
 import type { Class, ScheduledLesson } from '@/schemas';
 import type { CurriculumLessonSummary, CurriculumResponse } from '@/teacher/nav';
@@ -238,6 +239,12 @@ function buildScheduleSection(
   header.append(heading, scheduleUnit);
   section.append(header);
 
+  const errorBanner = document.createElement('p');
+  errorBanner.className = 'class-page__error';
+  errorBanner.hidden = true;
+  errorBanner.setAttribute('role', 'alert');
+  section.append(errorBanner);
+
   const entries = curriculum.scheduled_lessons
     .filter((entry) => entry.class_id === cls.id)
     .sort(compareScheduledLessons);
@@ -272,11 +279,19 @@ function buildScheduleSection(
     dateInput.value = entry.date;
     dateInput.dataset.scheduleAction = 'date';
     dateInput.addEventListener('change', () => {
-      void runScheduleMutation(options, async () => {
-        if (dateInput.value && dateInput.value !== entry.date) {
-          await patchScheduledLesson(entry.id, { date: dateInput.value });
+      const previousDate = entry.date;
+      void runScheduleMutation(
+        options,
+        errorBanner,
+        async () => {
+          if (dateInput.value && dateInput.value !== previousDate) {
+            await patchScheduledLesson(entry.id, { date: dateInput.value });
+          }
+        },
+        () => {
+          dateInput.value = previousDate;
         }
-      });
+      );
     });
 
     const meta = document.createElement('p');
@@ -295,7 +310,9 @@ function buildScheduleSection(
     up.textContent = 'Up';
     up.dataset.scheduleAction = 'up';
     up.addEventListener('click', () => {
-      void runScheduleMutation(options, () => patchScheduledLesson(entry.id, { direction: 'up' }));
+      void runScheduleMutation(options, errorBanner, async () => {
+        await patchScheduledLesson(entry.id, { direction: 'up' });
+      });
     });
 
     const down = document.createElement('button');
@@ -304,7 +321,9 @@ function buildScheduleSection(
     down.textContent = 'Down';
     down.dataset.scheduleAction = 'down';
     down.addEventListener('click', () => {
-      void runScheduleMutation(options, () => patchScheduledLesson(entry.id, { direction: 'down' }));
+      void runScheduleMutation(options, errorBanner, async () => {
+        await patchScheduledLesson(entry.id, { direction: 'down' });
+      });
     });
 
     const setCurrent = document.createElement('button');
@@ -314,9 +333,9 @@ function buildScheduleSection(
     setCurrent.dataset.scheduleAction = 'set-current';
     setCurrent.disabled = isCurrent;
     setCurrent.addEventListener('click', () => {
-      void runScheduleMutation(options, () =>
-        patchClass(cls.id, { current_scheduled_lesson_id: entry.id })
-      );
+      void runScheduleMutation(options, errorBanner, async () => {
+        await patchClass(cls.id, { current_scheduled_lesson_id: entry.id });
+      });
     });
 
     const path = `/lessons/${entry.lesson_id}`;
@@ -340,10 +359,26 @@ function buildScheduleSection(
 
 async function runScheduleMutation(
   options: ClassPageOptions,
-  mutate: () => void | Promise<void>
+  errorBanner: HTMLElement,
+  mutate: () => void | Promise<void>,
+  onError?: () => void
 ): Promise<void> {
-  await mutate();
-  await options.onScheduleMutated?.();
+  errorBanner.hidden = true;
+  errorBanner.textContent = '';
+  try {
+    await mutate();
+    await options.onScheduleMutated?.();
+  } catch (error) {
+    const message =
+      error instanceof ApiClientError
+        ? error.message
+        : error instanceof Error
+          ? error.message
+          : 'Unable to update schedule.';
+    errorBanner.hidden = false;
+    errorBanner.textContent = message;
+    onError?.();
+  }
 }
 
 function buildUnitsSection(

@@ -243,6 +243,7 @@ describe('schedule unit modal', () => {
 
     expect(document.body.textContent).toContain('Preview schedule');
     expect(document.body.textContent).toContain('Lesson B');
+    expect(document.body.textContent).toMatch(/· Lesson B · 1/);
 
     document.querySelector<HTMLButtonElement>('[data-schedule-modal-action="confirm"]')?.click();
 

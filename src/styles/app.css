@@ -745,6 +745,17 @@ a:hover {
   margin: 0;
 }
 
+.class-page__error {
+  margin: 0 0 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid rgba(176, 52, 52, 0.35);
+  border-radius: calc(var(--radius-md) * 0.45);
+  background: rgba(176, 52, 52, 0.08);
+  color: #8a2424;
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+}
+
 .class-page__link {
   font-family: var(--font-ui);
   font-size: 0.98rem;

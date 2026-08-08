@@ -97,9 +97,8 @@ describe('PATCH /api/scheduled-lessons/:id (mock)', () => {
     const curriculum = await (
       await api.request('GET', '/api/curriculum', { cookie })
     ).json();
-    const byId = new Map(
-      curriculum.data.scheduled_lessons.map((row: ScheduledLesson) => [row.id, row])
-    );
+    const scheduledLessons = curriculum.data.scheduled_lessons as ScheduledLesson[];
+    const byId = new Map(scheduledLessons.map((row) => [row.id, row] as const));
     expect(byId.get(TARGET_ID)?.schedule_order).toBe(1);
     expect(byId.get('scheduled_aotfw_006')?.schedule_order).toBe(2);
   });

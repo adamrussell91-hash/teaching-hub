@@ -652,6 +652,22 @@ describe('POST /api/classes/:classId/schedule-unit', () => {
     const body = await response.json();
     expect(body.error.code).toBe('subject_mismatch');
   });
+
+  it('returns no_lessons when the unit has an empty lesson list', async () => {
+    seedClassAndUnit({ lessonIds: [] });
+
+    const response = await scheduleUnitHandler(
+      request('/api/classes/class_2026_12engadv1/schedule-unit', {
+        method: 'POST',
+        cookie: sessionCookieHeader(),
+        body: JSON.stringify({ unit_id: 'unit_schedule', start_date: '2026-09-01' })
+      }),
+      { params: { classId: 'class_2026_12engadv1' } }
+    );
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error.code).toBe('no_lessons');
+  });
 });
 
 function seedScheduledLessonsForClass() {

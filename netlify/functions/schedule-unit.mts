@@ -152,6 +152,10 @@ export default async function handler(request: Request, context: FunctionContext
     );
   }
 
+  if (unitParsed.data.lesson_ids.length === 0) {
+    return withCors(errorResponse(400, 'no_lessons', 'Unit has no lessons'), request, env);
+  }
+
   const meetingDays =
     parsed.meeting_days ?? classParsed.data.meeting_days ?? [1, 2, 3, 4, 5];
 

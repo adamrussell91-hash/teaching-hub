@@ -252,4 +252,41 @@ describe('classes section', () => {
       expect(onScheduleMutated).toHaveBeenCalled();
     });
   });
+
+  it('shows an error banner and skips refresh when a schedule mutation fails', async () => {
+    vi.mocked(patchScheduledLesson).mockRejectedValueOnce(new Error('Reorder failed'));
+    const onScheduleMutated = vi.fn().mockResolvedValue(undefined);
+    renderClassPage(canvas, curriculum, 'class_2026_12engadv1', { onScheduleMutated });
+
+    canvas.querySelector<HTMLButtonElement>('[data-schedule-action="up"]')?.click();
+
+    await vi.waitFor(() => {
+      const banner = canvas.querySelector('.class-page__error');
+      expect(banner?.textContent).toBe('Reorder failed');
+      expect(banner?.getAttribute('role')).toBe('alert');
+    });
+    expect(onScheduleMutated).not.toHaveBeenCalled();
+  });
+
+  it('reverts the date input when a date mutation fails', async () => {
+    vi.mocked(patchScheduledLesson).mockRejectedValueOnce(new Error('Date update failed'));
+    const onScheduleMutated = vi.fn().mockResolvedValue(undefined);
+    renderClassPage(canvas, curriculum, 'class_2026_12engadv1', { onScheduleMutated });
+
+    const dateInput = canvas.querySelector<HTMLInputElement>('[data-schedule-action="date"]');
+    expect(dateInput?.value).toBe('2026-08-12');
+    if (!dateInput) throw new Error('expected date input');
+
+    dateInput.value = '2026-09-01';
+    dateInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+    await vi.waitFor(() => {
+      expect(patchScheduledLesson).toHaveBeenCalledWith('scheduled_aotfw_008', {
+        date: '2026-09-01'
+      });
+      expect(dateInput.value).toBe('2026-08-12');
+      expect(canvas.querySelector('.class-page__error')?.textContent).toBe('Date update failed');
+    });
+    expect(onScheduleMutated).not.toHaveBeenCalled();
+  });
 });

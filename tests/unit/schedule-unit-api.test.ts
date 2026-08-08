@@ -179,6 +179,34 @@ describe('POST /api/classes/:classId/schedule-unit (mock)', () => {
     expect(body.error.code).toBe('subject_mismatch');
   });
 
+  it('returns no_lessons when the unit has an empty lesson list', async () => {
+    const seed = freshSeed();
+    seed.units.push({
+      id: 'unit_empty',
+      type: 'unit',
+      title: 'Empty Unit',
+      slug: 'empty-unit',
+      year_id: 'year_12',
+      subject_id: 'subject_y12_engadv',
+      lesson_ids: [],
+      status: 'active',
+      created_at: ISO,
+      updated_at: ISO,
+      schema_version: 1
+    });
+
+    const api = freshApi(seed);
+    const cookie = await signIn(api);
+
+    const res = await api.request('POST', PATH, {
+      cookie,
+      body: { unit_id: 'unit_empty', start_date: '2026-09-01' }
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error.code).toBe('no_lessons');
+  });
+
   it('returns 404 for unknown class', async () => {
     const api = freshApi();
     const cookie = await signIn(api);
