@@ -12,6 +12,7 @@ const seedFixture = JSON.parse(
 
 const PASSPHRASE = 'teaching-hub-local';
 const LESSON_ID = 'lesson_aotfw_008';
+const UNIT_ID = 'unit_aotfw';
 
 function freshSeed(): SeedData {
   return JSON.parse(JSON.stringify(seedFixture)) as SeedData;
@@ -278,5 +279,54 @@ describe('publish flow', () => {
     expect(logoutRes.status).toBe(200);
     const clearedCookie = logoutRes.headers.get('set-cookie');
     expect(clearedCookie).toContain('Max-Age=0');
+  });
+
+  it('published unit endpoint lists the lesson after publish', async () => {
+    const api = freshApi();
+    const cookie = await signIn(api);
+
+    const draftRes = await api.request('GET', `/api/lessons/${LESSON_ID}`, {
+      cookie
+    });
+    expect(draftRes.status).toBe(200);
+    const lesson = (await draftRes.json()).data;
+
+    const saveRes = await api.request('PUT', `/api/lessons/${LESSON_ID}`, {
+      cookie,
+      body: lesson
+    });
+    expect(saveRes.status).toBe(200);
+
+    const publishRes = await api.request(
+      'POST',
+      `/api/lessons/${LESSON_ID}/publish`,
+      { cookie }
+    );
+    expect(publishRes.status).toBe(200);
+
+    const unitRes = await api.request('GET', `/api/published/units/${UNIT_ID}`);
+    expect(unitRes.status).toBe(200);
+    const unitBody = await unitRes.json();
+    expect(unitBody.data.unit_id).toBe(UNIT_ID);
+    expect(unitBody.data.title).toBeTruthy();
+    expect(
+      unitBody.data.lessons.some(
+        (l: { lesson_id: string }) => l.lesson_id === LESSON_ID
+      )
+    ).toBe(true);
+    expect(
+      unitBody.data.lessons.some(
+        (l: { lesson_id: string }) => l.lesson_id === 'lesson_aotfw_001'
+      )
+    ).toBe(false);
+  });
+
+  it('returns 404 for an unknown published unit', async () => {
+    const api = freshApi();
+    const res = await api.request(
+      'GET',
+      '/api/published/units/unit_does_not_exist'
+    );
+    expect(res.status).toBe(404);
   });
 });

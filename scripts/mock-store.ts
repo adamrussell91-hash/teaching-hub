@@ -39,6 +39,10 @@ export class MockStore {
     this.set(key, JSON.stringify(value));
   }
 
+  listKeys(prefix = ''): string[] {
+    return [...this.blobs.keys()].filter((key) => key.startsWith(prefix));
+  }
+
   loadSeed(seed: SeedData): void {
     for (const year of seed.years) {
       const id = (year as { id: string }).id;

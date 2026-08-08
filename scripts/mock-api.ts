@@ -16,6 +16,7 @@ import {
   toPublishedLesson,
   type Lesson
 } from '../src/schemas';
+import { orderLessonsByUnitIds } from '../src/schemas/published-unit';
 import { filterBlocksForStudent } from '../src/blocks/visibility';
 import { sanitizeRichTextHtml } from '../src/blocks/sanitize';
 
@@ -418,9 +419,51 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     return okResponse(200, snapshot);
   }
 
+  function handleGetPublishedUnit(id: string): MockResponse {
+    const unit = store.getJSON<{ title?: string; lesson_ids?: string[] }>(
+      unitKey(id)
+    );
+    if (!unit || typeof unit.title !== 'string' || !unit.title) {
+      return notFoundResponse('Unit not found');
+    }
+
+    const matching: { lesson_id: string; title: string }[] = [];
+    for (const key of store.listKeys('published/lessons/')) {
+      const snapshot = store.getJSON<{
+        lesson_id?: string;
+        title?: string;
+        unit_id?: string;
+      }>(key);
+      if (
+        snapshot &&
+        snapshot.unit_id === id &&
+        typeof snapshot.lesson_id === 'string' &&
+        snapshot.lesson_id &&
+        typeof snapshot.title === 'string' &&
+        snapshot.title
+      ) {
+        matching.push({
+          lesson_id: snapshot.lesson_id,
+          title: snapshot.title
+        });
+      }
+    }
+
+    const lessons = orderLessonsByUnitIds(
+      Array.isArray(unit.lesson_ids) ? unit.lesson_ids : [],
+      matching
+    );
+    return okResponse(200, {
+      unit_id: id,
+      title: unit.title,
+      lessons
+    });
+  }
+
   const LESSON_ID_RE = /^\/api\/lessons\/([^/]+)$/;
   const LESSON_PUBLISH_RE = /^\/api\/lessons\/([^/]+)\/publish$/;
   const PUBLISHED_LESSON_RE = /^\/api\/published\/lessons\/([^/]+)$/;
+  const PUBLISHED_UNIT_RE = /^\/api\/published\/units\/([^/]+)$/;
 
   async function handle(
     method: string,
@@ -447,6 +490,11 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const publishedMatch = PUBLISHED_LESSON_RE.exec(path);
     if (publishedMatch && method === 'GET') {
       return handleGetPublishedLesson(publishedMatch[1]);
+    }
+
+    const publishedUnitMatch = PUBLISHED_UNIT_RE.exec(path);
+    if (publishedUnitMatch && method === 'GET') {
+      return handleGetPublishedUnit(publishedUnitMatch[1]);
     }
 
     return errorResponse(404, 'not_found', `No route for ${method} ${path}`);
