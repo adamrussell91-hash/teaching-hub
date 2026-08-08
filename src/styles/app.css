@@ -760,7 +760,7 @@ a:hover {
   min-height: 2.25rem;
   padding: 0.5rem 0.65rem;
   font-family: var(--font-ui);
-  font-size: 0.88rem;
+  font-size: var(--font-size-card);
   font-weight: 500;
   color: var(--ink);
   text-decoration: none;
@@ -844,7 +844,7 @@ a:hover {
 
 .lesson-list__title {
   font-family: var(--font-ui);
-  font-size: 0.98rem;
+  font-size: var(--font-size-body);
   font-weight: 600;
   color: var(--ink);
 }
@@ -1319,7 +1319,7 @@ a:hover {
 
 .home-dashboard__heading {
   font-family: var(--font-ui);
-  font-size: 1.15rem;
+  font-size: var(--font-size-section);
   font-weight: 600;
   color: var(--depth);
 }
@@ -1408,7 +1408,7 @@ a:hover {
   min-height: 2.5rem;
   padding: 0.55rem 1.05rem;
   font-family: var(--font-ui);
-  font-size: 0.88rem;
+  font-size: var(--font-size-card);
   font-weight: 600;
   line-height: 1.2;
   text-decoration: none;
@@ -1870,4 +1870,117 @@ input.scope-timeline__note-title:focus-visible {
   .teacher-layout__rail-brand-row {
     padding: 0.25rem 0.5rem;
   }
+}
+
+/* ── Content typography (serif for reading surfaces) ───────────────────── */
+
+.content-serif {
+  font-family: "Source Serif 4", "Iowan Old Style", "Palatino Linotype", Palatino, serif;
+}
+
+/* ── Clinical Glass shared chrome (Task 1) ────────────────────────────── */
+
+.glass-tile {
+  background: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 1.15rem 1.25rem;
+}
+
+.section-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.section-tabs__tab {
+  font-family: var(--font-ui);
+  font-size: var(--font-size-card);
+  font-weight: 600;
+  padding: 0.5rem 0.9rem;
+  border-radius: var(--tab-radius);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.62);
+  color: var(--orca);
+  cursor: pointer;
+}
+
+.section-tabs__tab[aria-selected='true'],
+.section-tabs__tab.is-selected {
+  background: var(--wave);
+  border-color: var(--wave);
+  color: #fff;
+}
+
+.create-control__menu {
+  position: absolute;
+  z-index: 20;
+  margin-top: 0.35rem;
+  min-width: 14rem;
+  padding: 0.4rem;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.create-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 21, 54, 0.35);
+  display: grid;
+  place-items: center;
+  z-index: 40;
+  padding: 1.25rem;
+}
+
+.create-modal {
+  width: min(100%, 28rem);
+  padding: 1.5rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.home-dashboard__hero-time {
+  font-size: var(--font-size-hero);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.05;
+  color: var(--depth);
+}
+
+.home-dashboard__hero-date {
+  font-size: var(--font-size-body);
+  color: var(--muted);
+  margin-top: 0.25rem;
+}
+
+.scope-overview__row {
+  display: grid;
+  grid-template-columns: 11.25rem 1fr;
+  gap: 1rem;
+  align-items: center;
+  min-height: 4rem;
+  margin-bottom: 1.25rem;
+}
+
+.scope-overview__track {
+  position: relative;
+  min-height: 4rem;
+  border-radius: var(--radius-md);
+  background: var(--warm-white);
+}
+
+.scope-overview__bar {
+  position: absolute;
+  top: 0.5rem;
+  bottom: 0.5rem;
+  border-radius: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  font-size: var(--font-size-card);
+  font-weight: 600;
+  overflow: hidden;
+  cursor: pointer;
+  border: 1px solid var(--line);
 }

@@ -19,6 +19,14 @@
   --radius-md: 1.05rem;
   --rail-width: 15rem;
   --font-ui: "Source Sans 3", ui-sans-serif, sans-serif;
-  font-family: "Source Serif 4", "Iowan Old Style", "Palatino Linotype", Palatino, serif;
+  --font-size-hero: 2.25rem;
+  --font-size-page: 1.75rem;
+  --font-size-section: 1.35rem;
+  --font-size-tile-value: 2rem;
+  --font-size-body: 1.05rem;
+  --font-size-card: 1rem;
+  --font-size-meta: 0.8125rem;
+  --tab-radius: 0.65rem;
+  font-family: var(--font-ui);
   font-synthesis: none;
 }
