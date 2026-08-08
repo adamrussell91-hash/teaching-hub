@@ -74,6 +74,11 @@ const scheduleUnitHandler = (await import('../../netlify/functions/schedule-unit
 const scheduledLessonHandler = (await import('../../netlify/functions/scheduled-lesson.mts')).default;
 const classHandler = (await import('../../netlify/functions/class.mts')).default;
 const scopeSequenceHandler = (await import('../../netlify/functions/scope-sequence.mts')).default;
+const classesCreateHandler = (await import('../../netlify/functions/classes.mts')).default;
+const unitsCreateHandler = (await import('../../netlify/functions/units.mts')).default;
+const lessonsCreateHandler = (await import('../../netlify/functions/lessons.mts')).default;
+const scopeSequencesCreateHandler = (await import('../../netlify/functions/scope-sequences.mts'))
+  .default;
 
 const SESSION_SECRET = 's'.repeat(32);
 const FUNCTION_ORIGIN = 'https://api.example.netlify.app';
@@ -1236,5 +1241,247 @@ describe('PATCH /api/scope-sequences/:id', () => {
     expect(response.status).toBe(400);
     const body = await response.json();
     expect(body.error.code).toBe('validation_error');
+  });
+});
+
+function seedCreateParents() {
+  fakeStore.seed(yearKey('year_12'), {
+    id: 'year_12',
+    type: 'year',
+    title: 'Year 12',
+    slug: 'year_12',
+    status: 'active',
+    ...timestamps,
+    schema_version: 1
+  });
+  fakeStore.seed(subjectKey('subject_y12_engadv'), {
+    id: 'subject_y12_engadv',
+    type: 'subject',
+    title: 'English Advanced',
+    slug: 'english_advanced',
+    display_title: 'English Advanced',
+    year_id: 'year_12',
+    unit_ids: ['unit_aotfw'],
+    outcome_ids: [],
+    class_ids: [],
+    status: 'active',
+    ...timestamps,
+    schema_version: 1
+  });
+  fakeStore.seed(subjectKey('subject_y12_engstd'), {
+    id: 'subject_y12_engstd',
+    type: 'subject',
+    title: 'English Standard',
+    slug: 'english_standard',
+    display_title: 'English Standard',
+    year_id: 'year_12',
+    unit_ids: [],
+    outcome_ids: [],
+    class_ids: [],
+    status: 'active',
+    ...timestamps,
+    schema_version: 1
+  });
+  fakeStore.seed(unitKey('unit_aotfw'), {
+    id: 'unit_aotfw',
+    type: 'unit',
+    title: 'Artist of the Floating World',
+    slug: 'aotfw',
+    year_id: 'year_12',
+    subject_id: 'subject_y12_engadv',
+    lesson_ids: ['lesson_aotfw_001'],
+    status: 'active',
+    ...timestamps,
+    schema_version: 1
+  });
+  fakeStore.seed(draftLessonKey('lesson_aotfw_001'), {
+    id: 'lesson_aotfw_001',
+    type: 'lesson',
+    title: 'Existing Lesson',
+    slug: 'existing_lesson',
+    unit_id: 'unit_aotfw',
+    sequence: 3,
+    blocks: [],
+    status: 'active',
+    ...timestamps,
+    schema_version: 1
+  });
+}
+
+describe('POST create endpoints (Netlify)', () => {
+  it('rejects unauthenticated POST /api/classes', async () => {
+    const response = await classesCreateHandler(
+      request('/api/classes', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: '12 Eng Std',
+          code: '12ENGSTD1',
+          academic_year: 2026,
+          year_id: 'year_12',
+          subject_id: 'subject_y12_engadv'
+        })
+      })
+    );
+    expect(response.status).toBe(401);
+    const body = await response.json();
+    expect(body.error.code).toBe('unauthorized');
+  });
+
+  it('POST /api/classes creates a class with empty homepage defaults', async () => {
+    seedCreateParents();
+
+    const response = await classesCreateHandler(
+      request('/api/classes', {
+        method: 'POST',
+        cookie: sessionCookieHeader(),
+        body: JSON.stringify({
+          title: '12 Eng Std',
+          code: '12ENGSTD1',
+          academic_year: 2026,
+          year_id: 'year_12',
+          subject_id: 'subject_y12_engadv'
+        })
+      })
+    );
+    expect(response.status).toBe(201);
+    const body = await response.json();
+    expect(body.ok).toBe(true);
+    expect(body.data.type).toBe('class');
+    expect(body.data.code).toBe('12ENGSTD1');
+    expect(body.data.title).toBe('12 Eng Std');
+    expect(body.data.slug).toBeTruthy();
+    expect(body.data.active_unit_ids).toEqual([]);
+    expect(body.data.homepage).toEqual({
+      announcements: [],
+      resources: [],
+      custom: []
+    });
+    expect(body.data.status).toBe('active');
+    expect(body.data.schema_version).toBe(1);
+
+    expect(fakeStore.raw(classKey(body.data.id))).toMatchObject({
+      code: '12ENGSTD1',
+      homepage: { announcements: [], resources: [], custom: [] }
+    });
+  });
+
+  it('POST /api/units creates a unit and appends to subject', async () => {
+    seedCreateParents();
+
+    const response = await unitsCreateHandler(
+      request('/api/units', {
+        method: 'POST',
+        cookie: sessionCookieHeader(),
+        body: JSON.stringify({
+          title: 'New Unit',
+          year_id: 'year_12',
+          subject_id: 'subject_y12_engadv'
+        })
+      })
+    );
+    expect(response.status).toBe(201);
+    const body = await response.json();
+    expect(body.ok).toBe(true);
+    expect(body.data.type).toBe('unit');
+    expect(body.data.lesson_ids).toEqual([]);
+    expect(body.data.title).toBe('New Unit');
+    expect(body.data.status).toBe('active');
+
+    expect(fakeStore.raw(unitKey(body.data.id))).toMatchObject({
+      title: 'New Unit',
+      lesson_ids: []
+    });
+    expect(fakeStore.raw(subjectKey('subject_y12_engadv'))).toMatchObject({
+      unit_ids: expect.arrayContaining(['unit_aotfw', body.data.id])
+    });
+  });
+
+  it('POST /api/lessons creates a draft lesson and appends to unit', async () => {
+    seedCreateParents();
+
+    const response = await lessonsCreateHandler(
+      request('/api/lessons', {
+        method: 'POST',
+        cookie: sessionCookieHeader(),
+        body: JSON.stringify({ title: 'New Lesson', unit_id: 'unit_aotfw' })
+      })
+    );
+    expect(response.status).toBe(201);
+    const body = await response.json();
+    expect(body.ok).toBe(true);
+    expect(body.data.type).toBe('lesson');
+    expect(body.data.blocks).toEqual([]);
+    expect(body.data.unit_id).toBe('unit_aotfw');
+    expect(body.data.sequence).toBe(4);
+    expect(body.data.status).toBe('active');
+
+    expect(fakeStore.raw(draftLessonKey(body.data.id))).toMatchObject({
+      title: 'New Lesson',
+      blocks: [],
+      sequence: 4
+    });
+    expect(fakeStore.raw(unitKey('unit_aotfw'))).toMatchObject({
+      lesson_ids: ['lesson_aotfw_001', body.data.id]
+    });
+  });
+
+  it('POST /api/scope-sequences creates scope and links subject.scope_id', async () => {
+    seedCreateParents();
+
+    const response = await scopeSequencesCreateHandler(
+      request('/api/scope-sequences', {
+        method: 'POST',
+        cookie: sessionCookieHeader(),
+        body: JSON.stringify({
+          title: 'Y12 Eng Std 2027',
+          subject_id: 'subject_y12_engstd',
+          academic_year: 2027
+        })
+      })
+    );
+    expect(response.status).toBe(201);
+    const body = await response.json();
+    expect(body.ok).toBe(true);
+    expect(body.data.type).toBe('scope_sequence');
+    expect(body.data.timeline_items).toEqual([]);
+    expect(body.data.week_count).toBe(40);
+    expect(body.data.terms).toHaveLength(4);
+    expect(body.data.terms[0]).toMatchObject({
+      term_number: 1,
+      start_week: 1,
+      end_week: 10
+    });
+    expect(body.data.terms[3]).toMatchObject({
+      term_number: 4,
+      start_week: 31,
+      end_week: 40
+    });
+
+    expect(fakeStore.raw(scopeSequenceKey(body.data.id))).toMatchObject({
+      week_count: 40,
+      timeline_items: []
+    });
+    expect(fakeStore.raw(subjectKey('subject_y12_engstd'))).toMatchObject({
+      scope_id: body.data.id
+    });
+  });
+
+  it('keeps GET/PUT /api/lessons/:id working alongside POST /api/lessons', async () => {
+    seedCreateParents();
+
+    const getRes = await lessonHandler(
+      request('/api/lessons/lesson_aotfw_001', { cookie: sessionCookieHeader() }),
+      { params: { id: 'lesson_aotfw_001' } }
+    );
+    expect(getRes.status).toBe(200);
+
+    const createRes = await lessonsCreateHandler(
+      request('/api/lessons', {
+        method: 'POST',
+        cookie: sessionCookieHeader(),
+        body: JSON.stringify({ title: 'Another Lesson', unit_id: 'unit_aotfw' })
+      })
+    );
+    expect(createRes.status).toBe(201);
   });
 });
