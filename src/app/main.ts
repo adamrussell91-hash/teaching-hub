@@ -29,6 +29,10 @@ import {
   mountStudentUnitView,
   type StudentUnitViewHandle
 } from '@/student/unit-view';
+import {
+  mountStudentClassView,
+  type StudentClassViewHandle
+} from '@/student/class-view';
 import { navigate, start, type RouteMatch } from './router';
 
 const root = document.querySelector('#app');
@@ -59,6 +63,9 @@ let studentLessonViewHandle: StudentLessonViewHandle | null = null;
 // The student unit view mounted for the current public route, if any.
 let studentUnitViewHandle: StudentUnitViewHandle | null = null;
 
+// The student class view mounted for the current public route, if any.
+let studentClassViewHandle: StudentClassViewHandle | null = null;
+
 /**
  * Flushes any pending/in-flight autosave for the current lesson editor and
  * only disposes it once that flush has fully settled. Awaiting this (rather
@@ -85,6 +92,12 @@ function teardownStudentUnitView(): void {
   if (!studentUnitViewHandle) return;
   studentUnitViewHandle.dispose();
   studentUnitViewHandle = null;
+}
+
+function teardownStudentClassView(): void {
+  if (!studentClassViewHandle) return;
+  studentClassViewHandle.dispose();
+  studentClassViewHandle = null;
 }
 
 function getCurriculum(): Promise<CurriculumResponse> {
@@ -323,6 +336,14 @@ function renderStudentUnitRoute(unitId: string, token: number): void {
   });
 }
 
+function renderStudentClassRoute(classId: string, token: number): void {
+  studentClassViewHandle = mountStudentClassView({
+    root: appRoot,
+    classId,
+    isStale: () => token !== renderToken
+  });
+}
+
 function renderRoute(match: RouteMatch, token: number): void {
   switch (match.name) {
     case 'teacher-home':
@@ -361,6 +382,9 @@ function renderRoute(match: RouteMatch, token: number): void {
     case 'student-unit':
       renderStudentUnitRoute(match.params.unitId, token);
       break;
+    case 'student-class':
+      renderStudentClassRoute(match.params.classId, token);
+      break;
     default:
       break;
   }
@@ -376,6 +400,7 @@ async function handleRoute(match: RouteMatch): Promise<void> {
   await teardownLessonEditor();
   teardownStudentLessonView();
   teardownStudentUnitView();
+  teardownStudentClassView();
 
   if (match.requiresAuth && !session.authenticated) {
     navigate('/sign-in', { replace: true });

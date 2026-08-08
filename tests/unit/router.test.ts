@@ -38,6 +38,15 @@ describe('router match', () => {
     });
   });
 
+  it('matches public student class view', () => {
+    expect(match('/s/classes/class_2026_12engadv1')).toEqual({
+      name: 'student-class',
+      params: { classId: 'class_2026_12engadv1' },
+      requiresAuth: false,
+      path: '/s/classes/class_2026_12engadv1'
+    });
+  });
+
   it('matches sign-in gate', () => {
     expect(match('/sign-in')).toEqual({
       name: 'sign-in',
@@ -60,6 +69,7 @@ describe('router match', () => {
     expect(match('/unknown')).toBeNull();
     expect(match('/s/lessons')).toBeNull();
     expect(match('/s/units')).toBeNull();
+    expect(match('/s/classes')).toBeNull();
   });
 
   it('matches teacher section list routes', () => {
@@ -132,6 +142,8 @@ describe('router match', () => {
       ['/lessons/lesson_aotfw_008', true],
       ['/units/unit_aotfw', true],
       ['/s/lessons/lesson_aotfw_008', false],
+      ['/s/units/unit_aotfw', false],
+      ['/s/classes/class_2026_12engadv1', false],
       ['/sign-in', false]
     ];
 
