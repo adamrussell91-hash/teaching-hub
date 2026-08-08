@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { API_BASE_URL, getApiBaseUrl } from '@/api/config';
-import { apiGet, apiPost, apiPut, ApiClientError } from '@/api/client';
+import { apiGet, apiPost, apiPut, apiPatch, ApiClientError } from '@/api/client';
 
 function mockFetchJson(body: unknown, status = 200): Response {
   return {
@@ -91,6 +91,29 @@ describe('api client', () => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ id: 'lesson_aotfw_008', title: 'Updated' }),
+      signal: undefined
+    });
+  });
+
+  it('apiPatch sends JSON body', async () => {
+    fetchMock.mockResolvedValue(
+      mockFetchJson({ ok: true, data: { id: 'lesson_aotfw_008', title: 'Patched' } })
+    );
+
+    const data = await apiPatch<{ id: string; title: string }>(
+      '/api/lessons/lesson_aotfw_008',
+      { title: 'Patched' }
+    );
+
+    expect(data.title).toBe('Patched');
+    expect(fetchMock).toHaveBeenCalledWith('/api/lessons/lesson_aotfw_008', {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ title: 'Patched' }),
       signal: undefined
     });
   });

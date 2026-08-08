@@ -103,3 +103,11 @@ export function apiPut<T>(
 ): Promise<T> {
   return apiRequest<T>('PUT', path, { ...options, body });
 }
+
+export function apiPatch<T>(
+  path: string,
+  body?: unknown,
+  options?: ApiRequestOptions
+): Promise<T> {
+  return apiRequest<T>('PATCH', path, { ...options, body });
+}
