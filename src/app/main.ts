@@ -12,7 +12,7 @@ import { renderTeacherRail } from '@/teacher/rail';
 import { renderTeacherHome as renderHomeCanvas } from '@/teacher/home';
 import { mountLessonEditor, type LessonEditorHandle } from '@/teacher/lesson-editor';
 import type { TeacherSection } from '@/teacher/section';
-import { renderResourcesPlaceholder } from '@/teacher/sections/placeholders';
+import { renderResourcesIndex } from '@/teacher/sections/resources';
 import {
   renderScopeSequencesIndex,
   renderScopeTimelineEditor
@@ -236,8 +236,8 @@ function renderTeacherResourcesRoute(token: number): void {
   renderRailStatus(refs.railNav, 'Loading curriculum…');
   renderCanvasStatus(refs.canvas, 'Loading…');
 
-  void loadNavAndHandleErrors(refs, token, 'resources', undefined, () => {
-    renderResourcesPlaceholder(refs.canvas);
+  void loadNavAndHandleErrors(refs, token, 'resources', undefined, (curriculum) => {
+    renderResourcesIndex(refs.canvas, curriculum);
   });
 }
 
