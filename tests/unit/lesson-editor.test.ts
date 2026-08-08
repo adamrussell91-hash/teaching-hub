@@ -127,6 +127,20 @@ describe('mountLessonEditor', () => {
     expect(row.dataset.blockId).toBe('block_lesson_001_1');
   });
 
+  it('Add Block can append an image block', async () => {
+    apiGetMock.mockResolvedValue(makeLesson({ blocks: [] }));
+    mountLessonEditor({ refs, lessonId: 'lesson_001', isStale: () => false });
+    await tick();
+
+    const select = refs.canvas.querySelector<HTMLSelectElement>('.lesson-editor__add-block-select')!;
+    select.value = 'image';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    refs.canvas.querySelector<HTMLButtonElement>('.lesson-editor__add-block-button')!.click();
+    await tick();
+
+    expect(refs.canvas.querySelector('.block-editor[data-block-type="image"]')).not.toBeNull();
+  });
+
   it('reorders blocks up and down and disables buttons at the boundaries', async () => {
     const second: Block = { ...richTextBlock, id: 'block_lesson_001_2' };
     apiGetMock.mockResolvedValue(makeLesson({ blocks: [richTextBlock, second] }));

@@ -5,13 +5,17 @@ import type { Lesson } from '@/schemas/lesson';
 import { renderContextBar, type TeacherShellRefs } from '@/teacher/shell';
 import { mountSavePublishControls, SaveController, type SavePublishHandle } from '@/teacher/save-publish';
 
-const NEW_BLOCK_TYPES = ['rich_text', 'heading', 'callout'] as const;
+const NEW_BLOCK_TYPES = ['rich_text', 'heading', 'callout', 'image', 'video', 'embed', 'html'] as const;
 type NewBlockType = (typeof NEW_BLOCK_TYPES)[number];
 
 const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   rich_text: 'Rich text',
   heading: 'Heading',
-  callout: 'Callout'
+  callout: 'Callout',
+  image: 'Image',
+  video: 'Video',
+  embed: 'Embed',
+  html: 'HTML'
 };
 
 function nowIso(): string {
@@ -42,6 +46,34 @@ function createBlock(type: NewBlockType, id: string): Block {
         block_type: 'callout',
         variant: 'medium',
         content: { style: 'information', body: '' }
+      };
+    case 'image':
+      return {
+        ...shared,
+        block_type: 'image',
+        variant: 'large',
+        content: { url: '', alt_text: '' }
+      };
+    case 'video':
+      return {
+        ...shared,
+        block_type: 'video',
+        variant: 'large',
+        content: { provider: 'youtube', external_id: '' }
+      };
+    case 'embed':
+      return {
+        ...shared,
+        block_type: 'embed',
+        variant: 'large',
+        content: { url: '' }
+      };
+    case 'html':
+      return {
+        ...shared,
+        block_type: 'html',
+        variant: 'medium',
+        content: { html: '' }
       };
   }
 }
