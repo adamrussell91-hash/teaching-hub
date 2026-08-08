@@ -13,6 +13,7 @@ import {
   scheduleAnchorKey
 } from '../src/storage/keys';
 import {
+  ClassHomepageSchema,
   ClassSchema,
   LessonSchema,
   PublishableLessonSchema,
@@ -21,6 +22,7 @@ import {
   UnitSchema,
   toPublishedLesson,
   type Class,
+  type ClassHomepage,
   type Lesson,
   type ScheduledLesson
 } from '../src/schemas';
@@ -710,12 +712,13 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const record = body as Record<string, unknown>;
     const hasMeetingDays = record.meeting_days !== undefined;
     const hasCurrent = record.current_scheduled_lesson_id !== undefined;
+    const hasHomepage = record.homepage !== undefined;
 
-    if (!hasMeetingDays && !hasCurrent) {
+    if (!hasMeetingDays && !hasCurrent && !hasHomepage) {
       return errorResponse(
         400,
         'validation_error',
-        'Provide meeting_days and/or current_scheduled_lesson_id'
+        'Provide meeting_days, current_scheduled_lesson_id, and/or homepage'
       );
     }
 
@@ -757,6 +760,15 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       }
     }
 
+    let homepage: ClassHomepage | undefined;
+    if (hasHomepage) {
+      const homepageParsed = ClassHomepageSchema.safeParse(record.homepage);
+      if (!homepageParsed.success) {
+        return errorResponse(400, 'validation_error', 'homepage is invalid');
+      }
+      homepage = homepageParsed.data;
+    }
+
     const rawClass = store.getJSON(classKey(classId));
     if (!rawClass) return notFoundResponse('Class not found');
     const classParsed = ClassSchema.safeParse(rawClass);
@@ -789,6 +801,10 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       } else {
         merged.current_scheduled_lesson_id = current_scheduled_lesson_id;
       }
+    }
+
+    if (homepage !== undefined) {
+      merged.homepage = homepage;
     }
 
     const validated = ClassSchema.safeParse(merged);

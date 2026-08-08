@@ -16,7 +16,12 @@ import {
   preflightResponse,
   withCors
 } from './_shared/http.mts';
-import { ClassSchema, ScheduledLessonSchema } from '../../src/schemas';
+import {
+  ClassHomepageSchema,
+  ClassSchema,
+  ScheduledLessonSchema,
+  type ClassHomepage
+} from '../../src/schemas';
 
 interface FunctionContext {
   params: Record<string, string | undefined>;
@@ -29,6 +34,7 @@ function parseBody(
       ok: true;
       meeting_days?: number[];
       current_scheduled_lesson_id?: string | null;
+      homepage?: ClassHomepage;
     }
   | { ok: false; code: string; message: string } {
   if (typeof body !== 'object' || body === null) {
@@ -38,12 +44,13 @@ function parseBody(
   const record = body as Record<string, unknown>;
   const hasMeetingDays = record.meeting_days !== undefined;
   const hasCurrent = record.current_scheduled_lesson_id !== undefined;
+  const hasHomepage = record.homepage !== undefined;
 
-  if (!hasMeetingDays && !hasCurrent) {
+  if (!hasMeetingDays && !hasCurrent && !hasHomepage) {
     return {
       ok: false,
       code: 'validation_error',
-      message: 'Provide meeting_days and/or current_scheduled_lesson_id'
+      message: 'Provide meeting_days, current_scheduled_lesson_id, and/or homepage'
     };
   }
 
@@ -86,7 +93,20 @@ function parseBody(
     }
   }
 
-  return { ok: true, meeting_days, current_scheduled_lesson_id };
+  let homepage: ClassHomepage | undefined;
+  if (hasHomepage) {
+    const homepageParsed = ClassHomepageSchema.safeParse(record.homepage);
+    if (!homepageParsed.success) {
+      return {
+        ok: false,
+        code: 'validation_error',
+        message: 'homepage is invalid'
+      };
+    }
+    homepage = homepageParsed.data;
+  }
+
+  return { ok: true, meeting_days, current_scheduled_lesson_id, homepage };
 }
 
 export default async function handler(request: Request, context: FunctionContext): Promise<Response> {
@@ -169,6 +189,10 @@ export default async function handler(request: Request, context: FunctionContext
     } else {
       merged.current_scheduled_lesson_id = parsed.current_scheduled_lesson_id;
     }
+  }
+
+  if (parsed.homepage !== undefined) {
+    merged.homepage = parsed.homepage;
   }
 
   const validated = ClassSchema.safeParse(merged);

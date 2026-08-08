@@ -15,6 +15,22 @@ const seedFixture = JSON.parse(
 const PASSPHRASE = 'teaching-hub-local';
 const CLASS_ID = 'class_2026_12engadv1';
 const PATH = `/api/classes/${CLASS_ID}`;
+const ISO = '2026-01-01T00:00:00.000Z';
+
+const validHeadingBlock = {
+  id: 'block_001',
+  type: 'block' as const,
+  block_type: 'heading' as const,
+  variant: 'section' as const,
+  visibility: 'student_teacher' as const,
+  content: { text: 'Welcome' },
+  layout: {},
+  print: {},
+  settings: {},
+  created_at: ISO,
+  updated_at: ISO,
+  schema_version: 1 as const
+};
 
 function freshSeed(): SeedData {
   return JSON.parse(JSON.stringify(seedFixture)) as SeedData;
@@ -110,6 +126,58 @@ describe('PATCH /api/classes/:id (mock)', () => {
     ).json();
     const cls = curriculum.data.classes.find((row: Class) => row.id === CLASS_ID);
     expect(cls.meeting_days).toEqual([2, 4]);
+  });
+
+  it('persists homepage on PATCH', async () => {
+    const api = freshApi();
+    const cookie = await signIn(api);
+
+    const homepage = {
+      announcements: [validHeadingBlock],
+      resources: [],
+      custom: []
+    };
+
+    const res = await api.request('PATCH', PATH, {
+      cookie,
+      body: { homepage }
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data.homepage.announcements).toHaveLength(1);
+    expect(body.data.homepage.announcements[0].block_type).toBe('heading');
+
+    const curriculum = await (
+      await api.request('GET', '/api/curriculum', { cookie })
+    ).json();
+    const cls = curriculum.data.classes.find((row: Class) => row.id === CLASS_ID);
+    expect(cls.homepage?.announcements).toHaveLength(1);
+    expect(cls.homepage?.announcements[0]?.content).toEqual({ text: 'Welcome' });
+  });
+
+  it('rejects invalid homepage blocks with 400', async () => {
+    const api = freshApi();
+    const cookie = await signIn(api);
+
+    const res = await api.request('PATCH', PATH, {
+      cookie,
+      body: {
+        homepage: {
+          announcements: [
+            {
+              ...validHeadingBlock,
+              block_type: 'quote',
+              content: { quote: 'test' }
+            }
+          ],
+          resources: [],
+          custom: []
+        }
+      }
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error.code).toBe('validation_error');
   });
 });
 
