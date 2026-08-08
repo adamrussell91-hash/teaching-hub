@@ -29,6 +29,15 @@ describe('router match', () => {
     });
   });
 
+  it('matches public student unit view', () => {
+    expect(match('/s/units/unit_aotfw')).toEqual({
+      name: 'student-unit',
+      params: { unitId: 'unit_aotfw' },
+      requiresAuth: false,
+      path: '/s/units/unit_aotfw'
+    });
+  });
+
   it('matches sign-in gate', () => {
     expect(match('/sign-in')).toEqual({
       name: 'sign-in',
@@ -50,6 +59,7 @@ describe('router match', () => {
   it('returns null for unknown paths', () => {
     expect(match('/unknown')).toBeNull();
     expect(match('/s/lessons')).toBeNull();
+    expect(match('/s/units')).toBeNull();
   });
 
   it('matches teacher section list routes', () => {
