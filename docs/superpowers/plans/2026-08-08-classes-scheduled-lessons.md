@@ -64,6 +64,7 @@ describe('ClassSchema', () => {
       type: 'class',
       code: '12ENGADV1',
       title: 'Year 12 English Advanced',
+      slug: '12engadv1',
       academic_year: 2026,
       year_id: 'year_12',
       subject_id: 'subject_y12_engadv',
