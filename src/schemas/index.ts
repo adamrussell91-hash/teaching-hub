@@ -45,3 +45,12 @@ export {
   type PublishedUnit,
   type PublishedUnitLessonSummary
 } from './published-unit';
+export {
+  ScopeTermSchema,
+  TimelineUnitItemSchema,
+  TimelineNoteItemSchema,
+  TimelineItemSchema,
+  ScopeSequenceSchema,
+  type ScopeSequence,
+  type TimelineItem
+} from './scope-sequence';
