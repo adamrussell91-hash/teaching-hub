@@ -13,19 +13,38 @@ export interface StudentLessonViewHandle {
   dispose(): void;
 }
 
-function createShell(): { surface: HTMLElement; content: HTMLElement } {
+function createShell(): { surface: HTMLElement; header: HTMLElement; content: HTMLElement } {
   const surface = document.createElement('div');
   surface.className = 'student-surface';
 
   const header = document.createElement('header');
   header.className = 'student-surface__header';
-  header.textContent = 'Teaching Hub';
+
+  const brand = document.createElement('span');
+  brand.className = 'student-surface__brand';
+  brand.textContent = 'Teaching Hub';
+  header.append(brand);
 
   const content = document.createElement('div');
   content.className = 'student-surface__content';
 
   surface.append(header, content);
-  return { surface, content };
+  return { surface, header, content };
+}
+
+function renderHeader(header: HTMLElement, unitId: string): void {
+  header.replaceChildren();
+
+  const brand = document.createElement('span');
+  brand.className = 'student-surface__brand';
+  brand.textContent = 'Teaching Hub';
+
+  const back = document.createElement('a');
+  back.className = 'student-surface__back';
+  back.href = `/s/units/${unitId}`;
+  back.textContent = 'Back to unit';
+
+  header.append(brand, back);
 }
 
 function renderStatus(content: HTMLElement, text: string): void {
@@ -60,7 +79,7 @@ export function mountStudentLessonView(
   let disposed = false;
 
   root.replaceChildren();
-  const { surface, content } = createShell();
+  const { surface, header, content } = createShell();
   root.append(surface);
 
   renderStatus(content, 'Loading lesson…');
@@ -68,6 +87,7 @@ export function mountStudentLessonView(
   void apiGet<PublishedLesson>(`/api/published/lessons/${lessonId}`)
     .then((lesson) => {
       if (disposed || isStale()) return;
+      renderHeader(header, lesson.unit_id);
       renderPublishedLesson(content, lesson);
     })
     .catch((error: unknown) => {
