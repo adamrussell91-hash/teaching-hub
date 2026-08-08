@@ -17,6 +17,7 @@ import {
   LessonSchema,
   PublishableLessonSchema,
   PublishedLessonSchema,
+  ScheduledLessonSchema,
   UnitSchema,
   toPublishedLesson,
   type Class,
@@ -27,6 +28,7 @@ import { orderLessonsByUnitIds } from '../src/schemas/published-unit';
 import { filterBlocksForStudent } from '../src/blocks/visibility';
 import { sanitizeRichTextHtml } from '../src/blocks/sanitize';
 import { applyScheduleUnit } from '../src/schedule/schedule-unit';
+import { reorderScheduledLesson } from '../src/schedule/reorder';
 
 export const SESSION_COOKIE_NAME = 'teaching_hub_session';
 
@@ -604,11 +606,97 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     });
   }
 
+  function handlePatchScheduledLesson(
+    cookie: string | null | undefined,
+    id: string,
+    body: unknown
+  ): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+
+    if (typeof body !== 'object' || body === null) {
+      return errorResponse(400, 'validation_error', 'Request body must be a JSON object');
+    }
+
+    const record = body as Record<string, unknown>;
+    const hasDate = record.date !== undefined;
+    const hasDirection = record.direction !== undefined;
+
+    if (!hasDate && !hasDirection) {
+      return errorResponse(400, 'validation_error', 'Provide date and/or direction');
+    }
+
+    let date: string | undefined;
+    if (hasDate) {
+      if (typeof record.date !== 'string' || !DATE_RE.test(record.date)) {
+        return errorResponse(400, 'validation_error', 'date must be YYYY-MM-DD');
+      }
+      date = record.date;
+    }
+
+    let direction: 'up' | 'down' | undefined;
+    if (hasDirection) {
+      if (record.direction !== 'up' && record.direction !== 'down') {
+        return errorResponse(400, 'validation_error', "direction must be 'up' or 'down'");
+      }
+      direction = record.direction;
+    }
+
+    const existing = store.getJSON<ScheduledLesson>(scheduledLessonKey(id));
+    if (!existing) return notFoundResponse('Scheduled lesson not found');
+
+    const nowIso = new Date().toISOString();
+    let result: ScheduledLesson = { ...existing };
+    const toPersist = new Map<string, ScheduledLesson>();
+
+    if (date !== undefined) {
+      result = { ...result, date, updated_at: nowIso };
+      toPersist.set(id, result);
+    }
+
+    if (direction !== undefined) {
+      const classRows = store
+        .listKeys('scheduled_lessons/')
+        .map((key) => store.getJSON<ScheduledLesson>(key))
+        .filter((entry): entry is ScheduledLesson => Boolean(entry) && entry.class_id === existing.class_id)
+        .sort((a, b) => a.schedule_order - b.schedule_order);
+
+      const withTarget = classRows.map((row) => (row.id === id ? result : row));
+      const reordered = reorderScheduledLesson(withTarget, id, direction);
+
+      for (const row of reordered) {
+        const before = withTarget.find((r) => r.id === row.id);
+        if (!before || before.schedule_order === row.schedule_order) continue;
+        const updated = { ...row, updated_at: nowIso };
+        toPersist.set(updated.id, updated);
+        if (updated.id === id) result = updated;
+      }
+    }
+
+    const validated = ScheduledLessonSchema.safeParse(result);
+    if (!validated.success) {
+      return errorResponse(400, 'validation_error', 'Scheduled lesson data is invalid');
+    }
+
+    toPersist.set(id, validated.data);
+
+    for (const row of toPersist.values()) {
+      const rowValidated = ScheduledLessonSchema.safeParse(row);
+      if (!rowValidated.success) {
+        return errorResponse(400, 'validation_error', 'Scheduled lesson data is invalid');
+      }
+      store.setJSON(scheduledLessonKey(rowValidated.data.id), rowValidated.data);
+    }
+
+    return okResponse(200, validated.data);
+  }
+
   const LESSON_ID_RE = /^\/api\/lessons\/([^/]+)$/;
   const LESSON_PUBLISH_RE = /^\/api\/lessons\/([^/]+)\/publish$/;
   const PUBLISHED_LESSON_RE = /^\/api\/published\/lessons\/([^/]+)$/;
   const PUBLISHED_UNIT_RE = /^\/api\/published\/units\/([^/]+)$/;
   const SCHEDULE_UNIT_RE = /^\/api\/classes\/([^/]+)\/schedule-unit$/;
+  const SCHEDULED_LESSON_RE = /^\/api\/scheduled-lessons\/([^/]+)$/;
 
   async function handle(
     method: string,
@@ -647,6 +735,11 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       return handleScheduleUnit(cookie, scheduleUnitMatch[1], body);
     }
 
+    const scheduledLessonMatch = SCHEDULED_LESSON_RE.exec(path);
+    if (scheduledLessonMatch && method === 'PATCH') {
+      return handlePatchScheduledLesson(cookie, scheduledLessonMatch[1], body);
+    }
+
     return errorResponse(404, 'not_found', `No route for ${method} ${path}`);
   }
 
@@ -680,7 +773,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const cookie = req.headers.cookie ?? null;
 
     let body: unknown;
-    if (method === 'PUT' || method === 'POST') {
+    if (method === 'PUT' || method === 'POST' || method === 'PATCH') {
       body = await readNodeRequestBody(req);
     }
 

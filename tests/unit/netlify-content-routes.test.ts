@@ -68,6 +68,7 @@ const publishHandler = (await import('../../netlify/functions/publish.mts')).def
 const publishedLessonHandler = (await import('../../netlify/functions/published-lesson.mts')).default;
 const publishedUnitHandler = (await import('../../netlify/functions/published-unit.mts')).default;
 const scheduleUnitHandler = (await import('../../netlify/functions/schedule-unit.mts')).default;
+const scheduledLessonHandler = (await import('../../netlify/functions/scheduled-lesson.mts')).default;
 
 const SESSION_SECRET = 's'.repeat(32);
 const FUNCTION_ORIGIN = 'https://api.example.netlify.app';
@@ -649,5 +650,113 @@ describe('POST /api/classes/:classId/schedule-unit', () => {
     expect(response.status).toBe(400);
     const body = await response.json();
     expect(body.error.code).toBe('subject_mismatch');
+  });
+});
+
+function seedScheduledLessonsForClass() {
+  const rows = [
+    {
+      id: 'scheduled_a',
+      lesson_id: 'lesson_a',
+      date: '2026-08-10',
+      schedule_order: 1
+    },
+    {
+      id: 'scheduled_b',
+      lesson_id: 'lesson_b',
+      date: '2026-08-11',
+      schedule_order: 2
+    },
+    {
+      id: 'scheduled_c',
+      lesson_id: 'lesson_c',
+      date: '2026-08-12',
+      schedule_order: 3
+    }
+  ];
+
+  for (const row of rows) {
+    fakeStore.seed(scheduledLessonKey(row.id), {
+      id: row.id,
+      type: 'scheduled_lesson',
+      class_id: 'class_2026_12engadv1',
+      unit_id: 'unit_schedule',
+      lesson_id: row.lesson_id,
+      date: row.date,
+      schedule_order: row.schedule_order,
+      delivery_status: 'planned',
+      ...timestamps,
+      schema_version: 1
+    });
+  }
+}
+
+describe('PATCH /api/scheduled-lessons/:id', () => {
+  it('rejects unauthenticated requests', async () => {
+    const response = await scheduledLessonHandler(
+      request('/api/scheduled-lessons/scheduled_b', {
+        method: 'PATCH',
+        body: JSON.stringify({ date: '2026-09-01' })
+      }),
+      { params: { id: 'scheduled_b' } }
+    );
+    expect(response.status).toBe(401);
+  });
+
+  it('returns 404 for unknown scheduled lesson', async () => {
+    const response = await scheduledLessonHandler(
+      request('/api/scheduled-lessons/scheduled_missing', {
+        method: 'PATCH',
+        cookie: sessionCookieHeader(),
+        body: JSON.stringify({ date: '2026-09-01' })
+      }),
+      { params: { id: 'scheduled_missing' } }
+    );
+    expect(response.status).toBe(404);
+  });
+
+  it('patches date and persists', async () => {
+    seedScheduledLessonsForClass();
+
+    const response = await scheduledLessonHandler(
+      request('/api/scheduled-lessons/scheduled_b', {
+        method: 'PATCH',
+        cookie: sessionCookieHeader(),
+        body: JSON.stringify({ date: '2026-09-15' })
+      }),
+      { params: { id: 'scheduled_b' } }
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.date).toBe('2026-09-15');
+    expect(body.data.schedule_order).toBe(2);
+
+    expect(fakeStore.raw(scheduledLessonKey('scheduled_b'))).toMatchObject({
+      date: '2026-09-15',
+      schedule_order: 2
+    });
+  });
+
+  it('reorders up and persists swapped schedule_order values', async () => {
+    seedScheduledLessonsForClass();
+
+    const response = await scheduledLessonHandler(
+      request('/api/scheduled-lessons/scheduled_b', {
+        method: 'PATCH',
+        cookie: sessionCookieHeader(),
+        body: JSON.stringify({ direction: 'up' })
+      }),
+      { params: { id: 'scheduled_b' } }
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.schedule_order).toBe(1);
+
+    expect(fakeStore.raw(scheduledLessonKey('scheduled_b'))).toMatchObject({
+      schedule_order: 1
+    });
+    expect(fakeStore.raw(scheduledLessonKey('scheduled_a'))).toMatchObject({
+      schedule_order: 2
+    });
   });
 });
