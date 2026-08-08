@@ -2,6 +2,8 @@ import { ApiClientError } from '@/api/client';
 import { navigate } from '@/app/router';
 import type { Class, ScheduledLesson } from '@/schemas';
 import { resolveScheduleToday } from '@/schedule/today';
+import { mountCreateControl } from '@/teacher/create/control';
+import type { CreateKind } from '@/teacher/create/types';
 import type { CurriculumLessonSummary, CurriculumResponse } from '@/teacher/nav';
 import {
   mountHomepageEditor,
@@ -11,66 +13,89 @@ import {
 } from '@/teacher/sections/homepage-editor';
 import { patchClass, patchScheduledLesson } from '@/teacher/schedule-api';
 
+export interface ClassesIndexOptions {
+  onCreated?: (kind: CreateKind, id: string) => void | Promise<void>;
+}
+
 export interface ClassPageOptions {
   onScheduleMutated?: () => void | Promise<void>;
   onScheduleUnit?: () => void;
 }
 
-export function renderClassesIndex(canvas: HTMLElement, curriculum: CurriculumResponse): void {
+export function renderClassesIndex(
+  canvas: HTMLElement,
+  curriculum: CurriculumResponse,
+  options: ClassesIndexOptions = {}
+): { dispose: () => void } {
   canvas.replaceChildren();
+
+  const disposers: Array<() => void> = [];
+
+  const header = document.createElement('header');
+  header.className = 'classes-index__header';
 
   const heading = document.createElement('h1');
   heading.className = 'home-heading';
   heading.textContent = 'Classes';
-  canvas.append(heading);
+
+  const createHost = document.createElement('div');
+  createHost.className = 'classes-index__create create-control';
+  createHost.dataset.createHost = '';
+
+  header.append(heading, createHost);
+
+  const createControl = mountCreateControl(createHost, {
+    context: 'classes',
+    curriculum,
+    onCreated: options.onCreated ?? (() => undefined)
+  });
+  disposers.push(createControl.dispose);
 
   const subjectsById = new Map(curriculum.subjects.map((subject) => [subject.id, subject]));
   const classes = [...curriculum.classes].sort((a, b) => a.code.localeCompare(b.code));
+
+  const grid = document.createElement('div');
+  grid.className = 'home-classes classes-index__grid';
 
   if (classes.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'teacher-layout__canvas-status';
     empty.textContent = 'No classes yet.';
-    canvas.append(empty);
-    return;
+    grid.append(empty);
+  } else {
+    for (const cls of classes) {
+      const subject = subjectsById.get(cls.subject_id);
+      const path = `/classes/${cls.id}`;
+
+      const tile = document.createElement('a');
+      tile.className = 'glass-tile home-class-tile';
+      tile.href = path;
+      tile.dataset.classId = cls.id;
+      tile.addEventListener('click', (event) => {
+        event.preventDefault();
+        navigate(path);
+      });
+
+      const eyebrow = document.createElement('p');
+      eyebrow.className = 'home-class-tile__eyebrow';
+      eyebrow.textContent = [String(cls.academic_year), subject?.title].filter(Boolean).join(' · ');
+
+      const title = document.createElement('p');
+      title.className = 'home-class-tile__title';
+      title.textContent = cls.code || cls.title;
+
+      tile.append(eyebrow, title);
+      grid.append(tile);
+    }
   }
 
-  const list = document.createElement('ul');
-  list.className = 'lesson-list class-list';
+  canvas.append(header, grid);
 
-  for (const cls of classes) {
-    const subject = subjectsById.get(cls.subject_id);
-    const item = document.createElement('li');
-    item.className = 'lesson-list__item';
-
-    const info = document.createElement('div');
-    info.className = 'lesson-list__info';
-
-    const title = document.createElement('p');
-    title.className = 'lesson-list__title';
-    title.textContent = cls.code;
-
-    const meta = document.createElement('p');
-    meta.className = 'lesson-list__meta';
-    meta.textContent = [cls.title, subject?.title].filter(Boolean).join(' · ');
-
-    info.append(title, meta);
-
-    const path = `/classes/${cls.id}`;
-    const open = document.createElement('a');
-    open.className = 'btn btn--secondary lesson-list__open class-list__open';
-    open.href = path;
-    open.textContent = 'Open';
-    open.addEventListener('click', (event) => {
-      event.preventDefault();
-      navigate(path);
-    });
-
-    item.append(info, open);
-    list.append(item);
-  }
-
-  canvas.append(list);
+  return {
+    dispose: () => {
+      for (const dispose of disposers.splice(0).reverse()) dispose();
+    }
+  };
 }
 
 export function renderClassPage(

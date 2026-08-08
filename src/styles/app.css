@@ -2215,7 +2215,10 @@ input.scope-timeline__note-title:focus-visible {
   text-overflow: ellipsis;
 }
 
-.scope-sequences-index__header {
+.scope-sequences-index__header,
+.classes-index__header,
+.units-index__header,
+.lessons-index__header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -2233,6 +2236,10 @@ input.scope-timeline__note-title:focus-visible {
   font-size: var(--font-size-meta, 0.8rem);
   font-weight: 600;
   color: var(--muted);
+}
+
+.classes-index__grid {
+  margin-top: 0.25rem;
 }
 
 .scope-overview {

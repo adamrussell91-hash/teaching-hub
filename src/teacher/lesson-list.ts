@@ -4,14 +4,16 @@ import type { CurriculumResponse } from '@/teacher/nav';
 export function renderLessonList(
   canvas: HTMLElement,
   curriculum: CurriculumResponse,
-  options: { heading: string }
+  options: { heading: string | null }
 ): void {
   canvas.replaceChildren();
 
-  const heading = document.createElement('h1');
-  heading.className = 'home-heading';
-  heading.textContent = options.heading;
-  canvas.append(heading);
+  if (options.heading) {
+    const heading = document.createElement('h1');
+    heading.className = 'home-heading';
+    heading.textContent = options.heading;
+    canvas.append(heading);
+  }
 
   if (curriculum.lessons.length === 0) {
     const empty = document.createElement('p');

@@ -10,6 +10,7 @@ import {
 import { fetchCurriculum, type CurriculumResponse } from '@/teacher/nav';
 import { renderTeacherRail } from '@/teacher/rail';
 import { renderTeacherHome as renderHomeCanvas } from '@/teacher/home';
+import { openCreateModal } from '@/teacher/create/modal';
 import type { CreateKind } from '@/teacher/create/types';
 import { mountLessonEditor, type LessonEditorHandle } from '@/teacher/lesson-editor';
 import type { TeacherSection } from '@/teacher/section';
@@ -73,6 +74,11 @@ let homeHandle: { dispose: () => void } | null = null;
 // Scope sequences index handle (create control), if mounted.
 let scopeIndexHandle: { dispose?: () => void } | null = null;
 
+// Section index handles (create controls), if mounted.
+let classesIndexHandle: { dispose?: () => void } | null = null;
+let unitsIndexHandle: { dispose?: () => void } | null = null;
+let lessonsIndexHandle: { dispose?: () => void } | null = null;
+
 /**
  * Flushes any pending/in-flight autosave for the current lesson editor and
  * only disposes it once that flush has fully settled. Awaiting this (rather
@@ -119,6 +125,24 @@ function teardownScopeIndex(): void {
   scopeIndexHandle = null;
 }
 
+function teardownClassesIndex(): void {
+  if (!classesIndexHandle) return;
+  classesIndexHandle.dispose?.();
+  classesIndexHandle = null;
+}
+
+function teardownUnitsIndex(): void {
+  if (!unitsIndexHandle) return;
+  unitsIndexHandle.dispose?.();
+  unitsIndexHandle = null;
+}
+
+function teardownLessonsIndex(): void {
+  if (!lessonsIndexHandle) return;
+  lessonsIndexHandle.dispose?.();
+  lessonsIndexHandle = null;
+}
+
 function pathForCreatedEntity(
   kind: CreateKind,
   id: string,
@@ -136,6 +160,45 @@ function pathForCreatedEntity(
       return subject ? `/scope-sequences/${subject.id}` : '/scope-sequences';
     }
   }
+}
+
+async function handleEntityCreated(
+  refs: TeacherShellRefs,
+  token: number,
+  kind: CreateKind,
+  id: string
+): Promise<void> {
+  curriculumPromise = null;
+  try {
+    const refreshed = await getCurriculum();
+    if (token !== renderToken) return;
+    navigate(pathForCreatedEntity(kind, id, refreshed));
+  } catch (error) {
+    if (token !== renderToken) return;
+    if (error instanceof ApiClientError && error.code === 'unauthorized') {
+      session = { authenticated: false };
+      navigate('/sign-in', { replace: true });
+      return;
+    }
+    renderCanvasStatus(
+      refs.canvas,
+      'Created, but unable to refresh. Please reload to open the new item.'
+    );
+  }
+}
+
+function railCreateClassHandler(
+  curriculum: CurriculumResponse,
+  refs: TeacherShellRefs,
+  token: number
+): () => void {
+  return () => {
+    openCreateModal({
+      kind: 'class',
+      curriculum,
+      onCreated: (kind, id) => handleEntityCreated(refs, token, kind, id)
+    });
+  };
 }
 
 function getCurriculum(): Promise<CurriculumResponse> {
@@ -174,7 +237,11 @@ async function loadNavAndHandleErrors(
   try {
     const curriculum = await getCurriculum();
     if (token !== renderToken) return;
-    renderTeacherRail(refs.railNav, curriculum, { activeSection, activeClassId });
+    renderTeacherRail(refs.railNav, curriculum, {
+      activeSection,
+      activeClassId,
+      onCreateClass: railCreateClassHandler(curriculum, refs, token)
+    });
     onLoaded(curriculum);
   } catch (error) {
     if (token !== renderToken) return;
@@ -199,25 +266,7 @@ function renderTeacherHomeRoute(token: number): void {
   void loadNavAndHandleErrors(refs, token, 'home', undefined, (curriculum) => {
     teardownTeacherHome();
     homeHandle = renderHomeCanvas(refs.canvas, curriculum, {
-      onCreated: async (kind, id) => {
-        curriculumPromise = null;
-        try {
-          const refreshed = await getCurriculum();
-          if (token !== renderToken) return;
-          navigate(pathForCreatedEntity(kind, id, refreshed));
-        } catch (error) {
-          if (token !== renderToken) return;
-          if (error instanceof ApiClientError && error.code === 'unauthorized') {
-            session = { authenticated: false };
-            navigate('/sign-in', { replace: true });
-            return;
-          }
-          renderCanvasStatus(
-            refs.canvas,
-            'Created, but unable to refresh. Please reload to open the new item.'
-          );
-        }
-      }
+      onCreated: (kind, id) => handleEntityCreated(refs, token, kind, id)
     });
   });
 }
@@ -229,7 +278,10 @@ function renderTeacherClassesRoute(token: number): void {
   renderCanvasStatus(refs.canvas, 'Loading…');
 
   void loadNavAndHandleErrors(refs, token, 'classes', undefined, (curriculum) => {
-    renderClassesIndex(refs.canvas, curriculum);
+    teardownClassesIndex();
+    classesIndexHandle = renderClassesIndex(refs.canvas, curriculum, {
+      onCreated: (kind, id) => handleEntityCreated(refs, token, kind, id)
+    });
   });
 }
 
@@ -250,7 +302,8 @@ function renderTeacherClassRoute(classId: string, token: number): void {
       currentCurriculum = curriculum;
       renderTeacherRail(refs.railNav, curriculum, {
         activeSection: 'classes',
-        activeClassId: classId
+        activeClassId: classId,
+        onCreateClass: railCreateClassHandler(curriculum, refs, token)
       });
       const cls = curriculum.classes.find((entry) => entry.id === classId);
       if (cls) {
@@ -312,25 +365,7 @@ function renderTeacherScopeSequencesRoute(token: number): void {
   void loadNavAndHandleErrors(refs, token, 'scope-sequences', undefined, (curriculum) => {
     teardownScopeIndex();
     scopeIndexHandle = renderScopeSequencesIndex(refs.canvas, curriculum, {
-      onCreated: async (kind, id) => {
-        curriculumPromise = null;
-        try {
-          const refreshed = await getCurriculum();
-          if (token !== renderToken) return;
-          navigate(pathForCreatedEntity(kind, id, refreshed));
-        } catch (error) {
-          if (token !== renderToken) return;
-          if (error instanceof ApiClientError && error.code === 'unauthorized') {
-            session = { authenticated: false };
-            navigate('/sign-in', { replace: true });
-            return;
-          }
-          renderCanvasStatus(
-            refs.canvas,
-            'Created, but unable to refresh. Please reload to open the new item.'
-          );
-        }
-      }
+      onCreated: (kind, id) => handleEntityCreated(refs, token, kind, id)
     });
   });
 }
@@ -362,7 +397,10 @@ function renderTeacherUnitsRoute(token: number): void {
   renderCanvasStatus(refs.canvas, 'Loading…');
 
   void loadNavAndHandleErrors(refs, token, 'units', undefined, (curriculum) => {
-    renderUnitsIndex(refs.canvas, curriculum);
+    teardownUnitsIndex();
+    unitsIndexHandle = renderUnitsIndex(refs.canvas, curriculum, {
+      onCreated: (kind, id) => handleEntityCreated(refs, token, kind, id)
+    });
   });
 }
 
@@ -388,7 +426,10 @@ function renderTeacherLessonsRoute(token: number): void {
   renderCanvasStatus(refs.canvas, 'Loading…');
 
   void loadNavAndHandleErrors(refs, token, 'lessons', undefined, (curriculum) => {
-    renderLessonsIndex(refs.canvas, curriculum);
+    teardownLessonsIndex();
+    lessonsIndexHandle = renderLessonsIndex(refs.canvas, curriculum, {
+      onCreated: (kind, id) => handleEntityCreated(refs, token, kind, id)
+    });
   });
 }
 
@@ -496,6 +537,9 @@ async function handleRoute(match: RouteMatch): Promise<void> {
   await teardownLessonEditor();
   teardownTeacherHome();
   teardownScopeIndex();
+  teardownClassesIndex();
+  teardownUnitsIndex();
+  teardownLessonsIndex();
   teardownStudentLessonView();
   teardownStudentUnitView();
   teardownStudentClassView();

@@ -1,13 +1,42 @@
 import { navigate } from '@/app/router';
+import { mountCreateControl } from '@/teacher/create/control';
+import type { CreateKind } from '@/teacher/create/types';
 import type { CurriculumResponse } from '@/teacher/nav';
 
-export function renderUnitsIndex(canvas: HTMLElement, curriculum: CurriculumResponse): void {
+export interface UnitsIndexOptions {
+  onCreated?: (kind: CreateKind, id: string) => void | Promise<void>;
+}
+
+export function renderUnitsIndex(
+  canvas: HTMLElement,
+  curriculum: CurriculumResponse,
+  options: UnitsIndexOptions = {}
+): { dispose: () => void } {
   canvas.replaceChildren();
+
+  const disposers: Array<() => void> = [];
+
+  const header = document.createElement('header');
+  header.className = 'units-index__header';
 
   const heading = document.createElement('h1');
   heading.className = 'home-heading';
   heading.textContent = 'Units';
-  canvas.append(heading);
+
+  const createHost = document.createElement('div');
+  createHost.className = 'units-index__create create-control';
+  createHost.dataset.createHost = '';
+
+  header.append(heading, createHost);
+
+  const createControl = mountCreateControl(createHost, {
+    context: 'units',
+    curriculum,
+    onCreated: options.onCreated ?? (() => undefined)
+  });
+  disposers.push(createControl.dispose);
+
+  canvas.append(header);
 
   const yearsById = new Map(curriculum.years.map((year) => [year.id, year]));
   const subjectsById = new Map(curriculum.subjects.map((subject) => [subject.id, subject]));
@@ -18,7 +47,11 @@ export function renderUnitsIndex(canvas: HTMLElement, curriculum: CurriculumResp
     empty.className = 'teacher-layout__canvas-status';
     empty.textContent = 'No units yet.';
     canvas.append(empty);
-    return;
+    return {
+      dispose: () => {
+        for (const dispose of disposers.splice(0).reverse()) dispose();
+      }
+    };
   }
 
   const list = document.createElement('ul');
@@ -58,6 +91,12 @@ export function renderUnitsIndex(canvas: HTMLElement, curriculum: CurriculumResp
   }
 
   canvas.append(list);
+
+  return {
+    dispose: () => {
+      for (const dispose of disposers.splice(0).reverse()) dispose();
+    }
+  };
 }
 
 export function renderUnitStub(

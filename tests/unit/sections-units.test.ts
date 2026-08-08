@@ -96,6 +96,7 @@ describe('units', () => {
   it('lists unit title with year and subject meta', () => {
     renderUnitsIndex(canvas, curriculum);
     expect(canvas.querySelector('.home-heading')?.textContent).toBe('Units');
+    expect(canvas.querySelector('[data-create-trigger]')?.textContent).toMatch(/unit/i);
     expect(canvas.querySelector('.lesson-list__title')?.textContent).toBe(
       'Artist of the Floating World'
     );

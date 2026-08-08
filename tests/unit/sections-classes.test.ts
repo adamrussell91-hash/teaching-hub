@@ -161,22 +161,26 @@ describe('classes section', () => {
     canvas = document.createElement('div');
   });
 
-  it('lists classes with Open to class page', () => {
+  it('renders glass class tiles that open the class page', () => {
     renderClassesIndex(canvas, curriculum);
     expect(canvas.querySelector('.home-heading')?.textContent).toBe('Classes');
+    expect(canvas.querySelector('[data-create-trigger]')?.textContent).toMatch(/class/i);
     expect(canvas.textContent).toContain('12ENGADV1');
-    expect(canvas.textContent).toContain('Year 12 English Advanced');
+    expect(canvas.textContent).toContain('2026');
     expect(canvas.textContent).toContain('English Advanced');
 
-    const open = canvas.querySelector<HTMLAnchorElement>('.class-list__open, .lesson-list__open');
-    expect(open?.getAttribute('href')).toBe('/classes/class_2026_12engadv1');
-    open?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    const tile = canvas.querySelector<HTMLAnchorElement>(
+      'a.home-class-tile[href="/classes/class_2026_12engadv1"]'
+    );
+    expect(tile).not.toBeNull();
+    tile?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     expect(navigate).toHaveBeenCalledWith('/classes/class_2026_12engadv1');
   });
 
   it('shows empty copy when there are no classes', () => {
     renderClassesIndex(canvas, { ...curriculum, classes: [] });
     expect(canvas.textContent).toContain('No classes yet.');
+    expect(canvas.querySelector('[data-create-trigger]')).not.toBeNull();
   });
 
   it('renders hybrid class page generated sections', () => {
