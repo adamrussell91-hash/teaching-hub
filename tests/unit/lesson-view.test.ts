@@ -225,4 +225,70 @@ describe('mountStudentLessonView', () => {
       expect(root.textContent).toContain('Lesson not found');
     });
   });
+
+  it('class-scoped shows Class not found when class API returns not_found', async () => {
+    vi.mocked(apiGet).mockImplementation(async (path: string) => {
+      if (path.includes('/published/classes/')) {
+        throw new ApiClientError({ code: 'not_found', message: 'missing class' });
+      }
+      if (path.includes('/published/lessons/')) return publishedLesson();
+      throw new Error(path);
+    });
+
+    const root = document.createElement('div');
+    document.body.append(root);
+    mountStudentLessonView({
+      root,
+      lessonId: 'lesson_aotfw_008',
+      classId: CLASS_ID
+    });
+
+    await vi.waitFor(() => {
+      expect(root.textContent).toContain('Class not found');
+    });
+  });
+
+  it('class-scoped shows Lesson not found when lesson API returns not_found', async () => {
+    vi.mocked(apiGet).mockImplementation(async (path: string) => {
+      if (path.includes('/published/classes/')) return publishedClass();
+      if (path.includes('/published/lessons/')) {
+        throw new ApiClientError({ code: 'not_found', message: 'missing lesson' });
+      }
+      throw new Error(path);
+    });
+
+    const root = document.createElement('div');
+    document.body.append(root);
+    mountStudentLessonView({
+      root,
+      lessonId: 'lesson_aotfw_008',
+      classId: CLASS_ID
+    });
+
+    await vi.waitFor(() => {
+      expect(root.textContent).toContain('Lesson not found');
+    });
+  });
+
+  it('class-scoped shows Unable to load class on non-404 class failure', async () => {
+    vi.mocked(apiGet).mockImplementation(async (path: string) => {
+      if (path.includes('/published/classes/')) {
+        throw new ApiClientError({ code: 'server_error', message: 'boom' });
+      }
+      if (path.includes('/published/lessons/')) return publishedLesson();
+      throw new Error(path);
+    });
+
+    const root = document.createElement('div');
+    document.body.append(root);
+    mountStudentLessonView({
+      root,
+      lessonId: 'lesson_aotfw_008',
+      classId: CLASS_ID
+    });
+
+    await vi.waitFor(() => {
+      expect(root.textContent).toContain('Unable to load class');
+    });
+  });
 });

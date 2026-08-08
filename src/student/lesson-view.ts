@@ -153,10 +153,12 @@ function isNotFound(error: unknown): boolean {
   return error instanceof ApiClientError && error.code === 'not_found';
 }
 
-function loadErrorMessage(error: unknown, notFoundMessage: string): string {
-  return isNotFound(error)
-    ? notFoundMessage
-    : 'Unable to load lesson. Please refresh to try again.';
+function loadErrorMessage(
+  error: unknown,
+  notFoundMessage: string,
+  genericMessage = 'Unable to load lesson. Please refresh to try again.'
+): string {
+  return isNotFound(error) ? notFoundMessage : genericMessage;
 }
 
 /**
@@ -184,12 +186,26 @@ export function mountStudentLessonView(
       if (disposed || isStale()) return;
 
       if (lessonResult.status === 'rejected') {
-        renderStatus(content, loadErrorMessage(lessonResult.reason, 'Lesson not found.'));
+        renderStatus(
+          content,
+          loadErrorMessage(
+            lessonResult.reason,
+            'Lesson not found.',
+            'Unable to load lesson. Please refresh to try again.'
+          )
+        );
         return;
       }
 
       if (classResult.status === 'rejected') {
-        renderStatus(content, loadErrorMessage(classResult.reason, 'Class not found.'));
+        renderStatus(
+          content,
+          loadErrorMessage(
+            classResult.reason,
+            'Class not found.',
+            'Unable to load class. Please refresh to try again.'
+          )
+        );
         return;
       }
 
