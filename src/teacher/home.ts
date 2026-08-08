@@ -2,6 +2,7 @@ import { navigate } from '@/app/router';
 import type { Class, ScheduledLesson } from '@/schemas';
 import { resolveScheduleToday } from '@/schedule/today';
 import { mountCreateControl } from '@/teacher/create/control';
+import { openCreateModal } from '@/teacher/create/modal';
 import type { CreateKind } from '@/teacher/create/types';
 import { mountHomeClock } from '@/teacher/home-clock';
 import type { CurriculumLessonSummary, CurriculumResponse } from './nav';
@@ -89,11 +90,19 @@ export function renderTeacherHome(
   };
   renderWeek();
 
+  const openCreateClass = (): void => {
+    openCreateModal({
+      kind: 'class',
+      curriculum,
+      onCreated: options.onCreated ?? (() => undefined)
+    });
+  };
+
   root.append(
     header,
     buildSignalsPanel(todayEntries.length, unpublished.length, openHomeCreate),
     weekMount,
-    buildClassesPanel(curriculum.classes, curriculum, openHomeCreate)
+    buildClassesPanel(curriculum.classes, curriculum, openCreateClass)
   );
 
   canvas.append(root);
