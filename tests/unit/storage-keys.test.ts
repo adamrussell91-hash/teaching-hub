@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   yearKey,
   subjectKey,
+  scopeSequenceKey,
   unitKey,
   draftLessonKey,
   publishedLessonKey,
@@ -38,6 +39,9 @@ describe('storage key helpers', () => {
       'subjects/subject_y12_engadv'
     );
     expect(unitKey('unit_aotfw')).toBe('units/unit_aotfw');
+    expect(scopeSequenceKey('scope_y12_engadv_2026')).toBe(
+      'scope_sequences/scope_y12_engadv_2026'
+    );
   });
 
   it('builds class and scheduled lesson keys', () => {
@@ -83,6 +87,10 @@ describe('MockStore', () => {
     });
     expect(store.getJSON(subjectKey('subject_y12_engadv'))).toMatchObject({
       id: 'subject_y12_engadv'
+    });
+    expect(store.getJSON(scopeSequenceKey('scope_y12_engadv_2026'))).toMatchObject({
+      id: 'scope_y12_engadv_2026',
+      subject_id: 'subject_y12_engadv'
     });
     expect(store.getJSON(unitKey('unit_aotfw'))).toMatchObject({
       id: 'unit_aotfw'

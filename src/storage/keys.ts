@@ -6,6 +6,10 @@ export function subjectKey(id: string): string {
   return `subjects/${id}`;
 }
 
+export function scopeSequenceKey(id: string): string {
+  return `scope_sequences/${id}`;
+}
+
 export function unitKey(id: string): string {
   return `units/${id}`;
 }

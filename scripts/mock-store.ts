@@ -1,6 +1,7 @@
 import {
   yearKey,
   subjectKey,
+  scopeSequenceKey,
   unitKey,
   draftLessonKey,
   classKey,
@@ -11,6 +12,7 @@ import {
 export type SeedData = {
   years: unknown[];
   subjects: unknown[];
+  scope_sequences: unknown[];
   units: unknown[];
   lessons: unknown[];
   classes: unknown[];
@@ -58,6 +60,11 @@ export class MockStore {
     for (const subject of seed.subjects) {
       const id = (subject as { id: string }).id;
       this.setJSON(subjectKey(id), subject);
+    }
+
+    for (const scope of seed.scope_sequences ?? []) {
+      const id = (scope as { id: string }).id;
+      this.setJSON(scopeSequenceKey(id), scope);
     }
 
     for (const unit of seed.units) {

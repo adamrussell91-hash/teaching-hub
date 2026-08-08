@@ -26,6 +26,7 @@ import { getStore } from '@netlify/blobs';
 import {
   yearKey,
   subjectKey,
+  scopeSequenceKey,
   unitKey,
   draftLessonKey,
   classKey,
@@ -67,6 +68,10 @@ export async function seedStore(store, seed) {
   }
   for (const subject of seed.subjects) {
     await store.setJSON(subjectKey(subject.id), subject);
+    written += 1;
+  }
+  for (const scope of seed.scope_sequences ?? []) {
+    await store.setJSON(scopeSequenceKey(scope.id), scope);
     written += 1;
   }
   for (const unit of seed.units) {

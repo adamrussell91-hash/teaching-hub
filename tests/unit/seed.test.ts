@@ -5,6 +5,7 @@ import { describe, it, expect } from 'vitest';
 import {
   YearSchema,
   SubjectSchema,
+  ScopeSequenceSchema,
   UnitSchema,
   LessonSchema,
   ClassSchema,
@@ -17,6 +18,7 @@ const seed = JSON.parse(
 ) as {
   years: unknown[];
   subjects: unknown[];
+  scope_sequences: unknown[];
   units: unknown[];
   lessons: unknown[];
   classes: unknown[];
@@ -37,6 +39,13 @@ describe('seed fixtures', () => {
       SubjectSchema.parse(subject);
     }
     expect(seed.subjects).toHaveLength(2);
+  });
+
+  it('parses all scope sequences through ScopeSequenceSchema', () => {
+    for (const scope of seed.scope_sequences) {
+      ScopeSequenceSchema.parse(scope);
+    }
+    expect(seed.scope_sequences).toHaveLength(1);
   });
 
   it('parses all units through UnitSchema', () => {
