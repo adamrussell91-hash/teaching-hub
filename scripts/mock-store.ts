@@ -3,25 +3,19 @@ import {
   subjectKey,
   unitKey,
   draftLessonKey,
-  homeScheduleKey
+  classKey,
+  scheduledLessonKey,
+  scheduleAnchorKey
 } from '../src/storage/keys';
-
-export type HomeScheduleSeed = {
-  anchor_date: string;
-  entries: Array<{
-    class_id: string;
-    class_title: string;
-    lesson_id: string;
-    scheduled_date: string;
-  }>;
-};
 
 export type SeedData = {
   years: unknown[];
   subjects: unknown[];
   units: unknown[];
   lessons: unknown[];
-  home_schedule: HomeScheduleSeed;
+  classes: unknown[];
+  scheduled_lessons: unknown[];
+  schedule_anchor_date: string;
 };
 
 export class MockStore {
@@ -76,6 +70,16 @@ export class MockStore {
       this.setJSON(draftLessonKey(id), lesson);
     }
 
-    this.setJSON(homeScheduleKey(), seed.home_schedule);
+    for (const cls of seed.classes) {
+      const id = (cls as { id: string }).id;
+      this.setJSON(classKey(id), cls);
+    }
+
+    for (const scheduled of seed.scheduled_lessons) {
+      const id = (scheduled as { id: string }).id;
+      this.setJSON(scheduledLessonKey(id), scheduled);
+    }
+
+    this.setJSON(scheduleAnchorKey(), { date: seed.schedule_anchor_date });
   }
 }

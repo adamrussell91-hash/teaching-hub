@@ -54,7 +54,8 @@ const curriculum: CurriculumResponse = {
   subjects: [engAdv, engStd],
   units: [],
   lessons: [],
-  schedule: [],
+  classes: [],
+  scheduled_lessons: [],
   schedule_anchor_date: '2026-08-12'
 };
 

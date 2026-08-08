@@ -51,8 +51,16 @@ vi.mock('../../netlify/functions/_shared/blobs.mts', async (importOriginal) => {
   return { ...actual, getContentStore: () => fakeStore };
 });
 
-const { yearKey, subjectKey, unitKey, draftLessonKey, publishedLessonKey, homeScheduleKey } =
-  await import('../../netlify/functions/_shared/blobs.mts');
+const {
+  yearKey,
+  subjectKey,
+  unitKey,
+  draftLessonKey,
+  publishedLessonKey,
+  classKey,
+  scheduledLessonKey,
+  scheduleAnchorKey
+} = await import('../../netlify/functions/_shared/blobs.mts');
 const { createSessionToken } = await import('../../netlify/functions/_shared/auth-security.mts');
 const curriculumHandler = (await import('../../netlify/functions/curriculum.mts')).default;
 const lessonHandler = (await import('../../netlify/functions/lesson.mts')).default;
@@ -158,7 +166,8 @@ describe('GET /api/curriculum', () => {
         subjects: [],
         units: [],
         lessons: [],
-        schedule: [],
+        classes: [],
+        scheduled_lessons: [],
         schedule_anchor_date: '2026-08-12'
       }
     });
@@ -170,17 +179,33 @@ describe('GET /api/curriculum', () => {
     fakeStore.seed(unitKey('unit_aotfw'), { id: 'unit_aotfw', title: 'Artist of the Floating World' });
     fakeStore.seed(draftLessonKey('lesson_aotfw_008'), draftLesson());
     fakeStore.seed(publishedLessonKey('lesson_aotfw_008'), { lesson_id: 'lesson_aotfw_008' });
-    fakeStore.seed(homeScheduleKey(), {
-      anchor_date: '2026-08-12',
-      entries: [
-        {
-          class_id: 'class_demo',
-          class_title: '12 Eng Adv — Period 3',
-          lesson_id: 'lesson_aotfw_008',
-          scheduled_date: '2026-08-12'
-        }
-      ]
+    fakeStore.seed(classKey('class_2026_12engadv1'), {
+      id: 'class_2026_12engadv1',
+      type: 'class',
+      code: '12ENGADV1',
+      title: 'Year 12 English Advanced',
+      slug: '12engadv1',
+      academic_year: 2026,
+      year_id: 'year_12',
+      subject_id: 'subject_engadv',
+      active_unit_ids: ['unit_aotfw'],
+      status: 'active',
+      ...timestamps,
+      schema_version: 1
     });
+    fakeStore.seed(scheduledLessonKey('scheduled_aotfw_008'), {
+      id: 'scheduled_aotfw_008',
+      type: 'scheduled_lesson',
+      class_id: 'class_2026_12engadv1',
+      unit_id: 'unit_aotfw',
+      lesson_id: 'lesson_aotfw_008',
+      date: '2026-08-12',
+      schedule_order: 1,
+      delivery_status: 'current',
+      ...timestamps,
+      schema_version: 1
+    });
+    fakeStore.seed(scheduleAnchorKey(), { date: '2026-08-12' });
 
     const response = await curriculumHandler(request('/api/curriculum', { cookie: sessionCookieHeader() }));
     const body = await response.json();
@@ -188,9 +213,13 @@ describe('GET /api/curriculum', () => {
     expect(body.data.years).toHaveLength(1);
     expect(body.data.subjects).toHaveLength(1);
     expect(body.data.units).toHaveLength(1);
-    expect(body.data.schedule).toEqual([
-      expect.objectContaining({ lesson_id: 'lesson_aotfw_008', scheduled_date: '2026-08-12' })
-    ]);
+    expect(body.data.classes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'class_2026_12engadv1', code: '12ENGADV1' })
+      ])
+    );
+    expect(body.data.scheduled_lessons.length).toBeGreaterThan(0);
+    expect(body.data.schedule).toBeUndefined();
     expect(body.data.schedule_anchor_date).toBe('2026-08-12');
     expect(body.data.lessons).toEqual([
       {

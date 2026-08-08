@@ -6,23 +6,56 @@ import { navigate } from '@/app/router';
 import { renderTeacherHome } from '@/teacher/home';
 import type { CurriculumResponse } from '@/teacher/nav';
 
+const ISO = '2026-01-01T00:00:00.000Z';
+
 const curriculum: CurriculumResponse = {
   years: [],
   subjects: [],
   units: [],
   schedule_anchor_date: '2026-08-12',
-  schedule: [
+  classes: [
     {
-      class_id: 'class_demo',
-      class_title: '12 Eng Adv — Period 3',
+      id: 'class_2026_12engadv1',
+      type: 'class',
+      code: '12ENGADV1',
+      title: 'Year 12 English Advanced',
+      slug: '12engadv1',
+      academic_year: 2026,
+      year_id: 'year_12',
+      subject_id: 'subject_y12_engadv',
+      active_unit_ids: ['unit_aotfw'],
+      status: 'active',
+      created_at: ISO,
+      updated_at: ISO,
+      schema_version: 1
+    }
+  ],
+  scheduled_lessons: [
+    {
+      id: 'scheduled_aotfw_008',
+      type: 'scheduled_lesson',
+      class_id: 'class_2026_12engadv1',
+      unit_id: 'unit_aotfw',
       lesson_id: 'lesson_aotfw_008',
-      scheduled_date: '2026-08-12'
+      date: '2026-08-12',
+      schedule_order: 1,
+      delivery_status: 'current',
+      created_at: ISO,
+      updated_at: ISO,
+      schema_version: 1
     },
     {
-      class_id: 'class_demo',
-      class_title: '12 Eng Adv — Period 3',
+      id: 'scheduled_aotfw_001',
+      type: 'scheduled_lesson',
+      class_id: 'class_2026_12engadv1',
+      unit_id: 'unit_aotfw',
       lesson_id: 'lesson_aotfw_001',
-      scheduled_date: '2026-08-13'
+      date: '2026-08-13',
+      schedule_order: 2,
+      delivery_status: 'planned',
+      created_at: ISO,
+      updated_at: ISO,
+      schema_version: 1
     }
   ],
   lessons: [
@@ -63,6 +96,7 @@ describe('teacher home dashboard', () => {
     expect(canvas.textContent).toContain('Today');
     expect(canvas.textContent).toContain('2026-08-12');
     expect(canvas.textContent).toContain('This week');
+    expect(canvas.textContent).toContain('12ENGADV1');
     expect(canvas.textContent).toContain('Memory');
     expect(canvas.textContent).toContain('Intro');
   });

@@ -26,7 +26,6 @@ export function scheduledLessonKey(id: string): string {
   return `scheduled_lessons/${id}`;
 }
 
-/** @deprecated Task 3 removes consumers */
-export function homeScheduleKey(): string {
-  return 'meta/home_schedule';
+export function scheduleAnchorKey(): string {
+  return 'meta/schedule_anchor_date';
 }

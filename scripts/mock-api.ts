@@ -8,14 +8,18 @@ import {
   yearKey,
   subjectKey,
   unitKey,
-  homeScheduleKey
+  classKey,
+  scheduledLessonKey,
+  scheduleAnchorKey
 } from '../src/storage/keys';
 import {
   LessonSchema,
   PublishableLessonSchema,
   PublishedLessonSchema,
   toPublishedLesson,
-  type Lesson
+  type Class,
+  type Lesson,
+  type ScheduledLesson
 } from '../src/schemas';
 import { orderLessonsByUnitIds } from '../src/schemas/published-unit';
 import { filterBlocksForStudent } from '../src/blocks/visibility';
@@ -188,13 +192,6 @@ function buildClearedSessionCookie(): string {
   return `${SESSION_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`;
 }
 
-interface ScheduleEntry {
-  class_id: string;
-  class_title: string;
-  lesson_id: string;
-  scheduled_date: string;
-}
-
 interface CurriculumLessonSummary {
   id: string;
   title: string;
@@ -220,7 +217,9 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     years: options.seed.years.map((y) => (y as { id: string }).id),
     subjects: options.seed.subjects.map((s) => (s as { id: string }).id),
     units: options.seed.units.map((u) => (u as { id: string }).id),
-    lessons: options.seed.lessons.map((l) => (l as { id: string }).id)
+    lessons: options.seed.lessons.map((l) => (l as { id: string }).id),
+    classes: options.seed.classes.map((c) => (c as { id: string }).id),
+    scheduled_lessons: options.seed.scheduled_lessons.map((s) => (s as { id: string }).id)
   };
 
   function sign(payload: string): string {
@@ -289,19 +288,23 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
         ...(lesson.published_at ? { published_at: lesson.published_at } : {})
       }));
 
-    const homeSchedule = store.getJSON<{
-      anchor_date: string;
-      entries: ScheduleEntry[];
-    }>(homeScheduleKey());
-    const schedule = homeSchedule?.entries ?? [];
+    const classes = seedIds.classes
+      .map((id) => store.getJSON<Class>(classKey(id)))
+      .filter((cls): cls is Class => Boolean(cls));
+    const scheduled_lessons = seedIds.scheduled_lessons
+      .map((id) => store.getJSON<ScheduledLesson>(scheduledLessonKey(id)))
+      .filter((entry): entry is ScheduledLesson => Boolean(entry));
+
+    const anchor = store.getJSON<{ date: string }>(scheduleAnchorKey());
 
     return {
       years,
       subjects,
       units,
       lessons,
-      schedule,
-      schedule_anchor_date: homeSchedule?.anchor_date ?? DEFAULT_SCHEDULE_ANCHOR_DATE
+      classes,
+      scheduled_lessons,
+      schedule_anchor_date: anchor?.date ?? DEFAULT_SCHEDULE_ANCHOR_DATE
     };
   }
 

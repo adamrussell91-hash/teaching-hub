@@ -6,7 +6,9 @@ import {
   YearSchema,
   SubjectSchema,
   UnitSchema,
-  LessonSchema
+  LessonSchema,
+  ClassSchema,
+  ScheduledLessonSchema
 } from '@/schemas';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -17,6 +19,9 @@ const seed = JSON.parse(
   subjects: unknown[];
   units: unknown[];
   lessons: unknown[];
+  classes: unknown[];
+  scheduled_lessons: unknown[];
+  schedule_anchor_date: string;
 };
 
 describe('seed fixtures', () => {
@@ -46,6 +51,21 @@ describe('seed fixtures', () => {
       LessonSchema.parse(lesson);
     }
     expect(seed.lessons.length).toBeGreaterThanOrEqual(8);
+  });
+
+  it('parses all classes through ClassSchema', () => {
+    for (const cls of seed.classes) {
+      ClassSchema.parse(cls);
+    }
+    expect(seed.classes).toHaveLength(1);
+  });
+
+  it('parses all scheduled lessons through ScheduledLessonSchema', () => {
+    for (const scheduled of seed.scheduled_lessons) {
+      ScheduledLessonSchema.parse(scheduled);
+    }
+    expect(seed.scheduled_lessons).toHaveLength(5);
+    expect(seed.schedule_anchor_date).toBe('2026-08-12');
   });
 
   it('keeps English Advanced and Standard as separate subjects', () => {

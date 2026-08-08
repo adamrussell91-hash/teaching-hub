@@ -9,7 +9,8 @@ import {
   draftLessonKey,
   publishedLessonKey,
   classKey,
-  scheduledLessonKey
+  scheduledLessonKey,
+  scheduleAnchorKey
 } from '@/storage/keys';
 import { MockStore } from '../../scripts/mock-store';
 
@@ -44,6 +45,10 @@ describe('storage key helpers', () => {
     expect(scheduledLessonKey('scheduled_aotfw_008')).toBe(
       'scheduled_lessons/scheduled_aotfw_008'
     );
+  });
+
+  it('builds schedule anchor key', () => {
+    expect(scheduleAnchorKey()).toBe('meta/schedule_anchor_date');
   });
 });
 
@@ -85,6 +90,15 @@ describe('MockStore', () => {
     expect(store.getJSON(draftLessonKey('lesson_aotfw_008'))).toMatchObject({
       id: 'lesson_aotfw_008'
     });
+    expect(store.getJSON(classKey('class_2026_12engadv1'))).toMatchObject({
+      id: 'class_2026_12engadv1',
+      code: '12ENGADV1'
+    });
+    expect(store.getJSON(scheduledLessonKey('scheduled_aotfw_008'))).toMatchObject({
+      id: 'scheduled_aotfw_008',
+      lesson_id: 'lesson_aotfw_008'
+    });
+    expect(store.getJSON(scheduleAnchorKey())).toEqual({ date: '2026-08-12' });
   });
 
   it('keeps draft and published lesson keys distinct', () => {

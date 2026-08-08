@@ -5,7 +5,9 @@ import {
   unitKey,
   draftLessonKey,
   publishedLessonKey,
-  homeScheduleKey
+  classKey,
+  scheduledLessonKey,
+  scheduleAnchorKey
 } from '../../../src/storage/keys';
 
 // Re-exported so function handlers have one place to import key builders from,
@@ -17,7 +19,9 @@ export {
   unitKey,
   draftLessonKey,
   publishedLessonKey,
-  homeScheduleKey
+  classKey,
+  scheduledLessonKey,
+  scheduleAnchorKey
 };
 
 const CONTENT_STORE_NAME = 'teaching-hub-content';

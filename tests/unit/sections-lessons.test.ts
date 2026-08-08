@@ -39,7 +39,8 @@ const curriculum: CurriculumResponse = {
       updated_at: ISO
     }
   ],
-  schedule: [],
+  classes: [],
+  scheduled_lessons: [],
   schedule_anchor_date: '2026-08-12'
 };
 

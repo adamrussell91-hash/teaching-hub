@@ -1,4 +1,5 @@
-import type { CurriculumLessonSummary, ScheduleEntry } from '@/teacher/nav';
+import type { ScheduledLesson } from '@/schemas';
+import type { CurriculumLessonSummary } from '@/teacher/nav';
 
 export const HOME_ATTENTION_LIMIT = 8;
 
@@ -26,20 +27,20 @@ export function selectRecentlyEdited(
 }
 
 export function selectTodaySchedule(
-  schedule: ScheduleEntry[],
+  scheduled: ScheduledLesson[],
   anchorDate: string
-): ScheduleEntry[] {
-  return schedule.filter((entry) => entry.scheduled_date === anchorDate);
+): ScheduledLesson[] {
+  return scheduled.filter((entry) => entry.date === anchorDate);
 }
 
 export interface WeekDayGroup {
   date: string;
-  entries: ScheduleEntry[];
+  entries: ScheduledLesson[];
 }
 
 /** Monday-start week containing `anchorDate` (YYYY-MM-DD). Omits empty days. */
 export function groupWeekSchedule(
-  schedule: ScheduleEntry[],
+  scheduled: ScheduledLesson[],
   anchorDate: string
 ): WeekDayGroup[] {
   const anchor = parseYmd(anchorDate);
@@ -49,7 +50,7 @@ export function groupWeekSchedule(
   for (let i = 0; i < 7; i += 1) {
     const d = addDays(monday, i);
     const ymd = formatYmd(d);
-    const entries = schedule.filter((e) => e.scheduled_date === ymd);
+    const entries = scheduled.filter((e) => e.date === ymd);
     if (entries.length > 0) {
       days.push({ date: ymd, entries });
     }

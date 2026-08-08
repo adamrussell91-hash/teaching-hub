@@ -1,4 +1,8 @@
-import { getContentStore, getJSON, homeScheduleKey } from './_shared/blobs.mts';
+import {
+  getContentStore,
+  getJSON,
+  scheduleAnchorKey
+} from './_shared/blobs.mts';
 import { getTeacherSession } from './_shared/session.mts';
 import type { Lesson } from './_shared/validate.mts';
 import {
@@ -11,13 +15,6 @@ import {
   preflightResponse,
   withCors
 } from './_shared/http.mts';
-
-interface ScheduleEntry {
-  class_id: string;
-  class_title: string;
-  lesson_id: string;
-  scheduled_date: string;
-}
 
 interface CurriculumLessonSummary {
   id: string;
@@ -49,14 +46,17 @@ async function listEntries<T>(store: ContentStore, prefix: string): Promise<T[]>
  * against a fresh site before the first curriculum GET.
  */
 async function buildCurriculum(store: ContentStore) {
-  const [years, subjects, units, lessons, publishedList, homeSchedule] = await Promise.all([
-    listEntries<Record<string, unknown>>(store, 'years/'),
-    listEntries<Record<string, unknown>>(store, 'subjects/'),
-    listEntries<Record<string, unknown>>(store, 'units/'),
-    listEntries<Lesson>(store, DRAFT_LESSON_PREFIX),
-    store.list({ prefix: PUBLISHED_LESSON_PREFIX }),
-    getJSON<{ anchor_date: string; entries: ScheduleEntry[] }>(store, homeScheduleKey())
-  ]);
+  const [years, subjects, units, lessons, publishedList, classes, scheduled_lessons, anchor] =
+    await Promise.all([
+      listEntries<Record<string, unknown>>(store, 'years/'),
+      listEntries<Record<string, unknown>>(store, 'subjects/'),
+      listEntries<Record<string, unknown>>(store, 'units/'),
+      listEntries<Lesson>(store, DRAFT_LESSON_PREFIX),
+      store.list({ prefix: PUBLISHED_LESSON_PREFIX }),
+      listEntries<Record<string, unknown>>(store, 'classes/'),
+      listEntries<Record<string, unknown>>(store, 'scheduled_lessons/'),
+      getJSON<{ date: string }>(store, scheduleAnchorKey())
+    ]);
 
   const publishedIds = new Set(publishedList.blobs.map((blob) => blob.key.slice(PUBLISHED_LESSON_PREFIX.length)));
 
@@ -77,8 +77,9 @@ async function buildCurriculum(store: ContentStore) {
     subjects,
     units,
     lessons: lessonSummaries,
-    schedule: homeSchedule?.entries ?? [],
-    schedule_anchor_date: homeSchedule?.anchor_date ?? DEFAULT_SCHEDULE_ANCHOR_DATE
+    classes,
+    scheduled_lessons,
+    schedule_anchor_date: anchor?.date ?? DEFAULT_SCHEDULE_ANCHOR_DATE
   };
 }
 

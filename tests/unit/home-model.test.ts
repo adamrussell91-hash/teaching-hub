@@ -6,7 +6,10 @@ import {
   groupWeekSchedule,
   HOME_ATTENTION_LIMIT
 } from '@/teacher/home-model';
-import type { CurriculumLessonSummary, ScheduleEntry } from '@/teacher/nav';
+import type { CurriculumLessonSummary } from '@/teacher/nav';
+import type { ScheduledLesson } from '@/schemas';
+
+const ISO = '2026-01-01T00:00:00.000Z';
 
 const lessons: CurriculumLessonSummary[] = [
   {
@@ -43,24 +46,45 @@ const lessons: CurriculumLessonSummary[] = [
   }
 ];
 
-const schedule: ScheduleEntry[] = [
+const scheduled: ScheduledLesson[] = [
   {
+    id: 'sched_1',
+    type: 'scheduled_lesson',
     class_id: 'class_demo',
-    class_title: '12 Eng Adv — Period 3',
+    unit_id: 'u',
     lesson_id: 'l1',
-    scheduled_date: '2026-08-12'
+    date: '2026-08-12',
+    schedule_order: 1,
+    delivery_status: 'planned',
+    created_at: ISO,
+    updated_at: ISO,
+    schema_version: 1
   },
   {
+    id: 'sched_2',
+    type: 'scheduled_lesson',
     class_id: 'class_demo',
-    class_title: '12 Eng Adv — Period 3',
+    unit_id: 'u',
     lesson_id: 'l2',
-    scheduled_date: '2026-08-13'
+    date: '2026-08-13',
+    schedule_order: 2,
+    delivery_status: 'planned',
+    created_at: ISO,
+    updated_at: ISO,
+    schema_version: 1
   },
   {
+    id: 'sched_3',
+    type: 'scheduled_lesson',
     class_id: 'class_demo',
-    class_title: '12 Eng Adv — Period 3',
+    unit_id: 'u',
     lesson_id: 'l3',
-    scheduled_date: '2026-08-10'
+    date: '2026-08-10',
+    schedule_order: 3,
+    delivery_status: 'planned',
+    created_at: ISO,
+    updated_at: ISO,
+    schema_version: 1
   }
 ];
 
@@ -81,7 +105,7 @@ describe('selectRecentlyEdited', () => {
 
 describe('selectTodaySchedule', () => {
   it('filters schedule to the anchor date', () => {
-    const rows = selectTodaySchedule(schedule, '2026-08-12');
+    const rows = selectTodaySchedule(scheduled, '2026-08-12');
     expect(rows).toHaveLength(1);
     expect(rows[0].lesson_id).toBe('l1');
   });
@@ -90,7 +114,7 @@ describe('selectTodaySchedule', () => {
 describe('groupWeekSchedule', () => {
   it('groups Mon–Sun for the week containing the anchor and omits empty days', () => {
     // 2026-08-12 is Wednesday; week Mon 10 – Sun 16
-    const groups = groupWeekSchedule(schedule, '2026-08-12');
+    const groups = groupWeekSchedule(scheduled, '2026-08-12');
     expect(groups.map((g) => g.date)).toEqual(['2026-08-10', '2026-08-12', '2026-08-13']);
     expect(groups[0].entries.map((e) => e.lesson_id)).toEqual(['l3']);
   });

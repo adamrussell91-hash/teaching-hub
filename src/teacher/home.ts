@@ -1,5 +1,6 @@
 import { navigate } from '@/app/router';
-import type { CurriculumLessonSummary, CurriculumResponse, ScheduleEntry } from './nav';
+import type { Class, ScheduledLesson } from '@/schemas';
+import type { CurriculumLessonSummary, CurriculumResponse } from './nav';
 import {
   groupWeekSchedule,
   selectRecentlyEdited,
@@ -15,9 +16,10 @@ export function renderTeacherHome(canvas: HTMLElement, curriculum: CurriculumRes
   canvas.replaceChildren();
 
   const lessonsById = new Map(curriculum.lessons.map((lesson) => [lesson.id, lesson]));
+  const classesById = new Map(curriculum.classes.map((cls) => [cls.id, cls]));
   const anchorDate = curriculum.schedule_anchor_date;
-  const todayEntries = selectTodaySchedule(curriculum.schedule, anchorDate);
-  const weekDays = groupWeekSchedule(curriculum.schedule, anchorDate);
+  const todayEntries = selectTodaySchedule(curriculum.scheduled_lessons, anchorDate);
+  const weekDays = groupWeekSchedule(curriculum.scheduled_lessons, anchorDate);
   const unpublished = selectUnpublishedChanges(curriculum.lessons);
   const recentlyEdited = selectRecentlyEdited(curriculum.lessons);
 
@@ -25,8 +27,8 @@ export function renderTeacherHome(canvas: HTMLElement, curriculum: CurriculumRes
   root.className = 'home-dashboard';
 
   root.append(
-    buildTodayPanel(todayEntries, lessonsById, anchorDate),
-    buildWeekPanel(weekDays, lessonsById),
+    buildTodayPanel(todayEntries, lessonsById, classesById, anchorDate),
+    buildWeekPanel(weekDays, lessonsById, classesById),
     buildAttentionGrid(unpublished, recentlyEdited)
   );
 
@@ -34,8 +36,9 @@ export function renderTeacherHome(canvas: HTMLElement, curriculum: CurriculumRes
 }
 
 function buildTodayPanel(
-  entries: ScheduleEntry[],
+  entries: ScheduledLesson[],
   lessonsById: Map<string, CurriculumLessonSummary>,
+  classesById: Map<string, Class>,
   anchorDate: string
 ): HTMLElement {
   const panel = document.createElement('section');
@@ -52,13 +55,14 @@ function buildTodayPanel(
     return panel;
   }
 
-  panel.append(buildScheduleList(entries, lessonsById));
+  panel.append(buildScheduleList(entries, lessonsById, classesById));
   return panel;
 }
 
 function buildWeekPanel(
-  weekDays: { date: string; entries: ScheduleEntry[] }[],
-  lessonsById: Map<string, CurriculumLessonSummary>
+  weekDays: { date: string; entries: ScheduledLesson[] }[],
+  lessonsById: Map<string, CurriculumLessonSummary>,
+  classesById: Map<string, Class>
 ): HTMLElement {
   const panel = document.createElement('section');
   panel.className = 'home-dashboard__panel';
@@ -81,7 +85,7 @@ function buildWeekPanel(
     const dayHeading = document.createElement('h3');
     dayHeading.className = 'home-schedule__day-heading';
     dayHeading.textContent = formatWeekdayDate(day.date);
-    dayBlock.append(dayHeading, buildScheduleList(day.entries, lessonsById));
+    dayBlock.append(dayHeading, buildScheduleList(day.entries, lessonsById, classesById));
     panel.append(dayBlock);
   }
 
@@ -142,14 +146,16 @@ function buildAttentionPanel(
 }
 
 function buildScheduleList(
-  entries: ScheduleEntry[],
-  lessonsById: Map<string, CurriculumLessonSummary>
+  entries: ScheduledLesson[],
+  lessonsById: Map<string, CurriculumLessonSummary>,
+  classesById: Map<string, Class>
 ): HTMLUListElement {
   const list = document.createElement('ul');
   list.className = 'home-schedule';
 
   for (const entry of entries) {
     const lesson = lessonsById.get(entry.lesson_id);
+    const cls = classesById.get(entry.class_id);
     const item = document.createElement('li');
     item.className = 'home-schedule__item';
 
@@ -158,9 +164,10 @@ function buildScheduleList(
 
     const meta = document.createElement('p');
     meta.className = 'home-schedule__meta';
+    const classLabel = cls?.code ?? cls?.title ?? entry.class_id;
     const lessonTitle = lesson?.title ?? entry.lesson_id;
     const publishState = lesson?.published ? 'Published' : 'Draft';
-    meta.textContent = `${entry.class_title} · ${lessonTitle} · ${publishState}`;
+    meta.textContent = `${classLabel} · ${lessonTitle} · ${publishState}`;
 
     info.append(meta);
     item.append(info, openLink(entry.lesson_id, 'home-schedule__open'));

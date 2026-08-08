@@ -107,7 +107,8 @@ const curriculum: CurriculumResponse = {
     { id: 'lesson_001', title: 'Introduction', slug: 'introduction', unit_id: 'unit_aotfw', sequence: 1, status: 'active', published: false, updated_at: ISO },
     { id: 'lesson_002', title: 'Follow-up', slug: 'follow_up', unit_id: 'unit_aotfw', sequence: 2, status: 'active', published: true, updated_at: ISO }
   ],
-  schedule: [],
+  classes: [],
+  scheduled_lessons: [],
   schedule_anchor_date: '2026-08-12'
 };
 
