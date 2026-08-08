@@ -85,6 +85,59 @@ describe('BlockSchema', () => {
       })
     ).toThrow();
   });
+
+  it('parses image, video, embed, and html blocks', () => {
+    expect(
+      BlockSchema.parse({
+        ...baseBlock,
+        block_type: 'image',
+        variant: 'large',
+        content: { url: 'https://example.com/a.png', alt_text: 'A painting', caption: 'Fig 1' }
+      }).block_type
+    ).toBe('image');
+
+    expect(
+      BlockSchema.parse({
+        ...baseBlock,
+        id: 'block_v',
+        block_type: 'video',
+        variant: 'large',
+        content: { provider: 'youtube', external_id: 'dQw4w9WgXcQ', url: 'https://youtu.be/dQw4w9WgXcQ' }
+      }).block_type
+    ).toBe('video');
+
+    expect(
+      BlockSchema.parse({
+        ...baseBlock,
+        id: 'block_e',
+        block_type: 'embed',
+        variant: 'large',
+        content: { url: 'https://example.com/page', title: 'Example' }
+      }).block_type
+    ).toBe('embed');
+
+    expect(
+      BlockSchema.parse({
+        ...baseBlock,
+        id: 'block_h',
+        block_type: 'html',
+        content: { html: '<p>Hi</p>' }
+      }).block_type
+    ).toBe('html');
+  });
+
+  it('allows empty image url in drafts', () => {
+    const block = BlockSchema.parse({
+      ...baseBlock,
+      block_type: 'image',
+      variant: 'large',
+      content: { url: '', alt_text: '' }
+    });
+    expect(block.block_type).toBe('image');
+    if (block.block_type === 'image') {
+      expect(block.content.url).toBe('');
+    }
+  });
 });
 
 describe('LessonSchema', () => {
@@ -173,15 +226,13 @@ describe('publish helper', () => {
   };
 
   it('rejects empty title on PublishableLessonSchema', () => {
-    expect(() =>
-      PublishableLessonSchema.parse({ ...validLesson, title: '' })
-    ).toThrow();
+    const result = PublishableLessonSchema.safeParse({ ...validLesson, title: '' });
+    expect(result.success).toBe(false);
   });
 
   it('rejects whitespace-only title on PublishableLessonSchema', () => {
-    expect(() =>
-      PublishableLessonSchema.parse({ ...validLesson, title: '   ' })
-    ).toThrow();
+    const result = PublishableLessonSchema.safeParse({ ...validLesson, title: '   ' });
+    expect(result.success).toBe(false);
   });
 
   it('builds published snapshot via toPublishedLesson', () => {
@@ -191,5 +242,103 @@ describe('publish helper', () => {
     expect(snapshot.title).toBe('Memory, Identity and Ono');
     expect(snapshot.published_at).toBe('2026-02-01T12:00:00.000Z');
     expect(snapshot.blocks).toHaveLength(1);
+  });
+});
+
+describe('PublishableLessonSchema media rules', () => {
+  const baseLesson = {
+    id: 'lesson_1',
+    type: 'lesson' as const,
+    title: 'Lesson',
+    slug: 'lesson',
+    status: 'active' as const,
+    unit_id: 'unit_aotfw',
+    sequence: 1,
+    created_at: '2026-01-01T00:00:00.000Z',
+    updated_at: '2026-01-01T00:00:00.000Z',
+    schema_version: 1 as const
+  };
+
+  const okImage = {
+    ...baseBlock,
+    block_type: 'image' as const,
+    variant: 'large',
+    content: { url: 'https://example.com/a.png', alt_text: 'Alt' }
+  };
+
+  it('rejects image missing alt_text on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [{ ...okImage, content: { url: 'https://example.com/a.png', alt_text: '   ' } }]
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects javascript image url on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [
+        {
+          ...baseBlock,
+          block_type: 'image',
+          variant: 'large',
+          content: { url: 'javascript:alert(1)', alt_text: 'x' }
+        }
+      ]
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects unrecognised video on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [
+        {
+          ...baseBlock,
+          block_type: 'video',
+          variant: 'large',
+          content: { provider: 'youtube', external_id: '' }
+        }
+      ]
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects empty html after trim on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [{ ...baseBlock, block_type: 'html', content: { html: '   ' } }]
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts valid image video embed html together', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [
+        okImage,
+        {
+          ...baseBlock,
+          id: 'b2',
+          block_type: 'video',
+          variant: 'large',
+          content: { provider: 'vimeo', external_id: '123456789' }
+        },
+        {
+          ...baseBlock,
+          id: 'b3',
+          block_type: 'embed',
+          variant: 'large',
+          content: { url: 'https://example.com' }
+        },
+        {
+          ...baseBlock,
+          id: 'b4',
+          block_type: 'html',
+          content: { html: '<p>Ok</p>' }
+        }
+      ]
+    });
+    expect(result.success).toBe(true);
   });
 });
