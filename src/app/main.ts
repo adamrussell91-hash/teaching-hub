@@ -23,6 +23,10 @@ import {
   mountStudentLessonView,
   type StudentLessonViewHandle
 } from '@/student/lesson-view';
+import {
+  mountStudentUnitView,
+  type StudentUnitViewHandle
+} from '@/student/unit-view';
 import { navigate, start, type RouteMatch } from './router';
 
 const root = document.querySelector('#app');
@@ -50,6 +54,9 @@ let lessonEditorHandle: LessonEditorHandle | null = null;
 // The student lesson view mounted for the current public route, if any.
 let studentLessonViewHandle: StudentLessonViewHandle | null = null;
 
+// The student unit view mounted for the current public route, if any.
+let studentUnitViewHandle: StudentUnitViewHandle | null = null;
+
 /**
  * Flushes any pending/in-flight autosave for the current lesson editor and
  * only disposes it once that flush has fully settled. Awaiting this (rather
@@ -70,6 +77,12 @@ function teardownStudentLessonView(): void {
   if (!studentLessonViewHandle) return;
   studentLessonViewHandle.dispose();
   studentLessonViewHandle = null;
+}
+
+function teardownStudentUnitView(): void {
+  if (!studentUnitViewHandle) return;
+  studentUnitViewHandle.dispose();
+  studentUnitViewHandle = null;
 }
 
 function getCurriculum(): Promise<CurriculumResponse> {
@@ -244,6 +257,14 @@ function renderStudentLessonRoute(lessonId: string, token: number): void {
   });
 }
 
+function renderStudentUnitRoute(unitId: string, token: number): void {
+  studentUnitViewHandle = mountStudentUnitView({
+    root: appRoot,
+    unitId,
+    isStale: () => token !== renderToken
+  });
+}
+
 function renderRoute(match: RouteMatch, token: number): void {
   switch (match.name) {
     case 'teacher-home':
@@ -276,6 +297,9 @@ function renderRoute(match: RouteMatch, token: number): void {
     case 'student-lesson':
       renderStudentLessonRoute(match.params.lessonId, token);
       break;
+    case 'student-unit':
+      renderStudentUnitRoute(match.params.unitId, token);
+      break;
     default:
       break;
   }
@@ -290,6 +314,7 @@ async function handleRoute(match: RouteMatch): Promise<void> {
   // before tearing the editor down.
   await teardownLessonEditor();
   teardownStudentLessonView();
+  teardownStudentUnitView();
 
   if (match.requiresAuth && !session.authenticated) {
     navigate('/sign-in', { replace: true });
