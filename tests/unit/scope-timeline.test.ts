@@ -1,11 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('@/app/router', () => ({ navigate: vi.fn() }));
+vi.mock('@/teacher/scope-api', () => ({
+  patchScopeSequence: vi.fn()
+}));
 
 import { navigate } from '@/app/router';
+import { patchScopeSequence } from '@/teacher/scope-api';
 import { renderScopeTimelineEditor } from '@/teacher/sections/scope-timeline';
 import type { CurriculumResponse } from '@/teacher/nav';
 import type { ScopeSequence, Subject, Unit, Year } from '@/schemas';
+
+const patchScopeSequenceMock = vi.mocked(patchScopeSequence);
 
 const ISO = '2026-01-01T00:00:00.000Z';
 
@@ -34,7 +40,7 @@ const engAdv: Subject = {
   schema_version: 1,
   year_id: 'year_12',
   scope_id: 'scope_y12_engadv_2026',
-  unit_ids: ['unit_aotfw'],
+  unit_ids: ['unit_aotfw', 'unit_hamlet'],
   outcome_ids: [],
   class_ids: []
 };
@@ -50,6 +56,34 @@ const unit: Unit = {
   schema_version: 1,
   year_id: 'year_12',
   subject_id: 'subject_y12_engadv',
+  lesson_ids: []
+};
+
+const unitOther: Unit = {
+  id: 'unit_hamlet',
+  type: 'unit',
+  title: 'Hamlet',
+  slug: 'hamlet',
+  status: 'active',
+  created_at: ISO,
+  updated_at: ISO,
+  schema_version: 1,
+  year_id: 'year_12',
+  subject_id: 'subject_y12_engadv',
+  lesson_ids: []
+};
+
+const unitOtherSubject: Unit = {
+  id: 'unit_math',
+  type: 'unit',
+  title: 'Math Unit',
+  slug: 'math_unit',
+  status: 'active',
+  created_at: ISO,
+  updated_at: ISO,
+  schema_version: 1,
+  year_id: 'year_12',
+  subject_id: 'subject_other',
   lesson_ids: []
 };
 
@@ -91,16 +125,25 @@ const scope: ScopeSequence = {
   ]
 };
 
-const curriculum: CurriculumResponse = {
-  years: [year],
-  subjects: [engAdv],
-  units: [unit],
-  lessons: [],
-  classes: [],
-  scheduled_lessons: [],
-  scope_sequences: [scope],
-  schedule_anchor_date: '2026-08-12'
-};
+function cloneScope(base: ScopeSequence = scope): ScopeSequence {
+  return structuredClone(base);
+}
+
+function makeCurriculum(overrides: Partial<CurriculumResponse> = {}): CurriculumResponse {
+  return {
+    years: [year],
+    subjects: [engAdv],
+    units: [unit, unitOther, unitOtherSubject],
+    lessons: [],
+    classes: [],
+    scheduled_lessons: [],
+    scope_sequences: [cloneScope()],
+    schedule_anchor_date: '2026-08-12',
+    ...overrides
+  };
+}
+
+const curriculum: CurriculumResponse = makeCurriculum();
 
 describe('scope timeline editor', () => {
   let canvas: HTMLElement;
@@ -179,8 +222,201 @@ describe('scope timeline editor', () => {
   });
 
   it('shows Unknown unit when the unit blob is missing', () => {
-    const noUnits: CurriculumResponse = { ...curriculum, units: [] };
+    const noUnits = makeCurriculum({ units: [] });
     renderScopeTimelineEditor(canvas, noUnits, 'subject_y12_engadv');
     expect(canvas.querySelector('.scope-timeline__item--unit')?.textContent).toBe('Unknown unit');
+  });
+
+  it('lists only subject units not already on the timeline in Add Unit modal', () => {
+    renderScopeTimelineEditor(canvas, makeCurriculum(), 'subject_y12_engadv');
+    canvas.querySelector<HTMLButtonElement>('.scope-timeline__add-unit')?.click();
+    const labels = [...document.querySelectorAll('.scope-timeline__picker-unit')].map(
+      (el) => el.textContent
+    );
+    expect(labels).toContain('Hamlet');
+    expect(labels).not.toContain('Artist of the Floating World');
+    expect(labels).not.toContain('Math Unit');
+    document.querySelector('.scope-timeline__picker')?.remove();
+  });
+
+  it('adds a unit via PATCH and refreshes the timeline', async () => {
+    const local = makeCurriculum();
+    const updated = cloneScope();
+    updated.timeline_items = [
+      ...updated.timeline_items,
+      {
+        id: 'ti_unit_hamlet',
+        kind: 'unit',
+        unit_id: 'unit_hamlet',
+        start_week: 1,
+        end_week: 4,
+        order: 3
+      }
+    ];
+    patchScopeSequenceMock.mockResolvedValue(updated);
+
+    renderScopeTimelineEditor(canvas, local, 'subject_y12_engadv');
+    canvas.querySelector<HTMLButtonElement>('.scope-timeline__add-unit')?.click();
+    document.querySelector<HTMLButtonElement>('.scope-timeline__picker-unit')?.click();
+
+    await vi.waitFor(() => {
+      expect(patchScopeSequenceMock).toHaveBeenCalledTimes(1);
+    });
+
+    const [id, body] = patchScopeSequenceMock.mock.calls[0]!;
+    expect(id).toBe('scope_y12_engadv_2026');
+    expect(body.timeline_items).toHaveLength(3);
+    const added = body.timeline_items.find(
+      (item) => item.kind === 'unit' && item.unit_id === 'unit_hamlet'
+    );
+    expect(added).toMatchObject({ kind: 'unit', unit_id: 'unit_hamlet', start_week: 1, end_week: 4 });
+
+    await vi.waitFor(() => {
+      const titles = [...canvas.querySelectorAll('.scope-timeline__item--unit')].map(
+        (el) => el.textContent
+      );
+      expect(titles).toContain('Hamlet');
+    });
+  });
+
+  it('shows a banner and aborts when there is no free span for a new unit', async () => {
+    const packed: ScopeSequence = {
+      ...cloneScope(),
+      week_count: 4,
+      terms: [{ id: 'term_t1', title: 'Term 1', term_number: 1, start_week: 1, end_week: 4 }],
+      timeline_items: [
+        {
+          id: 'ti_unit_aotfw',
+          kind: 'unit',
+          unit_id: 'unit_aotfw',
+          start_week: 1,
+          end_week: 4,
+          order: 1
+        }
+      ]
+    };
+    const local = makeCurriculum({ scope_sequences: [packed] });
+    renderScopeTimelineEditor(canvas, local, 'subject_y12_engadv');
+    canvas.querySelector<HTMLButtonElement>('.scope-timeline__add-unit')?.click();
+    document.querySelector<HTMLButtonElement>('.scope-timeline__picker-unit')?.click();
+
+    await vi.waitFor(() => {
+      const banner = canvas.querySelector('.scope-timeline__banner');
+      expect(banner?.hidden).toBe(false);
+      expect(banner?.textContent).toMatch(/No free span/i);
+    });
+    expect(patchScopeSequenceMock).not.toHaveBeenCalled();
+  });
+
+  it('adds a note at the selected item start week via PATCH', async () => {
+    const local = makeCurriculum();
+    const updated = cloneScope();
+    updated.timeline_items = [
+      ...updated.timeline_items,
+      {
+        id: 'ti_note_new',
+        kind: 'note',
+        title: 'Note',
+        start_week: 12,
+        end_week: 12,
+        order: 3
+      }
+    ];
+    patchScopeSequenceMock.mockResolvedValue(updated);
+
+    renderScopeTimelineEditor(canvas, local, 'subject_y12_engadv');
+    canvas
+      .querySelector<HTMLElement>('.scope-timeline__item--unit')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    canvas.querySelector<HTMLButtonElement>('.scope-timeline__add-note')?.click();
+
+    await vi.waitFor(() => {
+      expect(patchScopeSequenceMock).toHaveBeenCalledTimes(1);
+    });
+
+    const [, body] = patchScopeSequenceMock.mock.calls[0]!;
+    const note = body.timeline_items.find(
+      (item) => item.kind === 'note' && item.id !== 'ti_note_1'
+    );
+    expect(note).toMatchObject({
+      kind: 'note',
+      title: 'Note',
+      start_week: 12,
+      end_week: 12
+    });
+  });
+
+  it('edits a note title on blur and PATCHes', async () => {
+    const local = makeCurriculum();
+    const updated = cloneScope();
+    const note = updated.timeline_items.find((item) => item.id === 'ti_note_1');
+    if (note?.kind === 'note') note.title = 'Exam week';
+    patchScopeSequenceMock.mockResolvedValue(updated);
+
+    renderScopeTimelineEditor(canvas, local, 'subject_y12_engadv');
+    canvas
+      .querySelector<HTMLElement>('.scope-timeline__item--note')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const input = canvas.querySelector<HTMLInputElement>('.scope-timeline__note-title');
+    expect(input).toBeTruthy();
+    input!.value = 'Exam week';
+    input!.dispatchEvent(new Event('blur', { bubbles: true }));
+
+    await vi.waitFor(() => {
+      expect(patchScopeSequenceMock).toHaveBeenCalledTimes(1);
+    });
+    const [, body] = patchScopeSequenceMock.mock.calls[0]!;
+    expect(body.timeline_items.find((item) => item.id === 'ti_note_1')).toMatchObject({
+      kind: 'note',
+      title: 'Exam week'
+    });
+  });
+
+  it('deletes a note via PATCH', async () => {
+    const local = makeCurriculum();
+    const updated = cloneScope();
+    updated.timeline_items = updated.timeline_items.filter((item) => item.id !== 'ti_note_1');
+    patchScopeSequenceMock.mockResolvedValue(updated);
+
+    renderScopeTimelineEditor(canvas, local, 'subject_y12_engadv');
+    canvas
+      .querySelector<HTMLElement>('.scope-timeline__item--note')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    canvas.querySelector<HTMLButtonElement>('.scope-timeline__delete-note')?.click();
+
+    await vi.waitFor(() => {
+      expect(patchScopeSequenceMock).toHaveBeenCalledTimes(1);
+    });
+    const [, body] = patchScopeSequenceMock.mock.calls[0]!;
+    expect(body.timeline_items.some((item) => item.id === 'ti_note_1')).toBe(false);
+
+    await vi.waitFor(() => {
+      expect(canvas.querySelector('.scope-timeline__item--note')).toBeNull();
+    });
+  });
+
+  it('removes a unit from the timeline via PATCH without deleting the unit blob', async () => {
+    const local = makeCurriculum();
+    const updated = cloneScope();
+    updated.timeline_items = updated.timeline_items.filter((item) => item.id !== 'ti_unit_aotfw');
+    patchScopeSequenceMock.mockResolvedValue(updated);
+
+    renderScopeTimelineEditor(canvas, local, 'subject_y12_engadv');
+    canvas
+      .querySelector<HTMLElement>('.scope-timeline__item--unit')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    canvas.querySelector<HTMLButtonElement>('.scope-timeline__remove-unit')?.click();
+
+    await vi.waitFor(() => {
+      expect(patchScopeSequenceMock).toHaveBeenCalledTimes(1);
+    });
+    const [, body] = patchScopeSequenceMock.mock.calls[0]!;
+    expect(body.timeline_items.some((item) => item.id === 'ti_unit_aotfw')).toBe(false);
+    expect(local.units.some((entry) => entry.id === 'unit_aotfw')).toBe(true);
+
+    await vi.waitFor(() => {
+      expect(canvas.querySelector('.scope-timeline__item--unit')).toBeNull();
+    });
   });
 });

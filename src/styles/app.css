@@ -1671,13 +1671,28 @@ a:hover {
   color: var(--depth);
 }
 
+input.scope-timeline__note-title {
+  width: 100%;
+  margin: 0;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius-md) * 0.45);
+  background: rgba(255, 255, 255, 0.85);
+  font-family: var(--font-ui);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--depth);
+}
+
 .scope-timeline__inspector-weeks {
   font-family: var(--font-ui);
   font-size: 0.88rem;
   color: var(--orca, var(--muted));
 }
 
-.scope-timeline__open-unit {
+.scope-timeline__open-unit,
+.scope-timeline__delete-note,
+.scope-timeline__remove-unit {
   align-self: flex-start;
   margin-top: 0.35rem;
 }
