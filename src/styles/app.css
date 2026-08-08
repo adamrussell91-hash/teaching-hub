@@ -1604,8 +1604,70 @@ a:hover {
   text-align: left;
   white-space: nowrap;
   text-overflow: ellipsis;
-  cursor: pointer;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
   box-shadow: 0 1px 2px rgba(20, 43, 81, 0.08);
+}
+
+.scope-timeline__item-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.scope-timeline__handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0.45rem;
+  cursor: ew-resize;
+  z-index: 2;
+}
+
+.scope-timeline__handle--start {
+  left: 0;
+}
+
+.scope-timeline__handle--end {
+  right: 0;
+}
+
+.scope-timeline__handle::after {
+  content: '';
+  position: absolute;
+  top: 20%;
+  bottom: 20%;
+  width: 2px;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.55);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.scope-timeline__handle--start::after {
+  left: 2px;
+}
+
+.scope-timeline__handle--end::after {
+  right: 2px;
+}
+
+.scope-timeline__item:hover .scope-timeline__handle::after,
+.scope-timeline__item--selected .scope-timeline__handle::after {
+  opacity: 1;
+}
+
+.scope-timeline__item--note .scope-timeline__handle::after {
+  background: rgba(20, 43, 81, 0.35);
+}
+
+body.scope-timeline--dragging,
+body.scope-timeline--dragging * {
+  cursor: grabbing !important;
+  user-select: none !important;
 }
 
 .scope-timeline__item--unit {

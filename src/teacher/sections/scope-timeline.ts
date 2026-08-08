@@ -1,8 +1,21 @@
 import { navigate } from '@/app/router';
 import type { ScopeSequence, TimelineItem, Unit } from '@/schemas';
+import { applyDragDelta } from '@/scope/timeline-drag';
 import { findFirstFreeStart, weeksToLabel } from '@/scope/timeline-weeks';
 import type { CurriculumResponse } from '@/teacher/nav';
 import { patchScopeSequence } from '@/teacher/scope-api';
+
+type DragMode = 'move' | 'resize-start' | 'resize-end';
+
+interface ActiveDrag {
+  mode: DragMode;
+  itemId: string;
+  startX: number;
+  origin: { start_week: number; end_week: number };
+  current: { start_week: number; end_week: number };
+  moved: boolean;
+  el: HTMLElement;
+}
 
 export interface ScopeTimelineEditorOptions {
   onPatched?: (scope: ScopeSequence) => void;
@@ -178,6 +191,8 @@ export function renderScopeTimelineEditor(
   let scope: ScopeSequence = initial;
   let selectedId: string | null = null;
   let saving = false;
+  let activeDrag: ActiveDrag | null = null;
+  let suppressClick = false;
 
   const unitsById = new Map(curriculum.units.map((unit) => [unit.id, unit]));
 
@@ -365,6 +380,95 @@ export function renderScopeTimelineEditor(
     renderInspectorContent(item);
   };
 
+  const applyItemPosition = (
+    el: HTMLElement,
+    weeks: { start_week: number; end_week: number }
+  ): void => {
+    el.style.cssText = positionStyle(weeks.start_week, weeks.end_week, scope.week_count);
+  };
+
+  const endDrag = async (event: PointerEvent): Promise<void> => {
+    if (!activeDrag) return;
+    const drag = activeDrag;
+    activeDrag = null;
+    document.body.classList.remove('scope-timeline--dragging');
+    drag.el.removeEventListener('pointermove', onPointerMove);
+    drag.el.removeEventListener('pointerup', onPointerUp);
+    drag.el.removeEventListener('pointercancel', onPointerUp);
+
+    if (drag.el.hasPointerCapture?.(event.pointerId)) {
+      drag.el.releasePointerCapture(event.pointerId);
+    }
+
+    if (!drag.moved) return;
+    suppressClick = true;
+
+    const changed =
+      drag.current.start_week !== drag.origin.start_week ||
+      drag.current.end_week !== drag.origin.end_week;
+    if (!changed) return;
+
+    const items = scope.timeline_items.map((entry) =>
+      entry.id === drag.itemId
+        ? { ...entry, start_week: drag.current.start_week, end_week: drag.current.end_week }
+        : entry
+    );
+
+    const ok = await persistItems(items);
+    if (!ok) {
+      refreshItems();
+      setSelection(selectedId);
+    }
+  };
+
+  const onPointerMove = (event: PointerEvent): void => {
+    if (!activeDrag) return;
+    const trackWidth = track.getBoundingClientRect().width;
+    if (trackWidth <= 0) return;
+
+    const deltaWeeks = Math.round(
+      ((event.clientX - activeDrag.startX) / trackWidth) * scope.week_count
+    );
+    const next = applyDragDelta(
+      activeDrag.mode,
+      activeDrag.origin,
+      deltaWeeks,
+      scope.week_count
+    );
+    activeDrag.current = next;
+    if (deltaWeeks !== 0) activeDrag.moved = true;
+    applyItemPosition(activeDrag.el, next);
+  };
+
+  const onPointerUp = (event: PointerEvent): void => {
+    void endDrag(event);
+  };
+
+  const startDrag = (
+    event: PointerEvent,
+    item: TimelineItem,
+    mode: DragMode,
+    el: HTMLElement
+  ): void => {
+    if (event.button !== 0 || activeDrag || saving) return;
+    event.preventDefault();
+    setSelection(item.id);
+    activeDrag = {
+      mode,
+      itemId: item.id,
+      startX: event.clientX,
+      origin: { start_week: item.start_week, end_week: item.end_week },
+      current: { start_week: item.start_week, end_week: item.end_week },
+      moved: false,
+      el
+    };
+    document.body.classList.add('scope-timeline--dragging');
+    el.setPointerCapture?.(event.pointerId);
+    el.addEventListener('pointermove', onPointerMove);
+    el.addEventListener('pointerup', onPointerUp);
+    el.addEventListener('pointercancel', onPointerUp);
+  };
+
   const refreshItems = (): void => {
     itemsLayer.replaceChildren();
     const sortedItems = [...scope.timeline_items].sort(
@@ -378,16 +482,50 @@ export function renderScopeTimelineEditor(
       el.dataset.itemId = item.id;
       el.dataset.kind = item.kind;
       if (item.kind === 'unit') el.dataset.unitId = item.unit_id;
-      el.style.cssText = positionStyle(item.start_week, item.end_week, scope.week_count);
-      el.textContent = itemLabel(item, unitsById);
+      applyItemPosition(el, item);
       el.setAttribute('aria-label', itemLabel(item, unitsById));
 
-      el.addEventListener('click', () => {
+      const handleStart = document.createElement('span');
+      handleStart.className = 'scope-timeline__handle scope-timeline__handle--start';
+      handleStart.setAttribute('aria-hidden', 'true');
+
+      const label = document.createElement('span');
+      label.className = 'scope-timeline__item-label';
+      label.textContent = itemLabel(item, unitsById);
+
+      const handleEnd = document.createElement('span');
+      handleEnd.className = 'scope-timeline__handle scope-timeline__handle--end';
+      handleEnd.setAttribute('aria-hidden', 'true');
+
+      el.append(handleStart, label, handleEnd);
+
+      el.addEventListener('click', (event) => {
+        if (suppressClick) {
+          event.preventDefault();
+          suppressClick = false;
+          return;
+        }
         setSelection(item.id);
+      });
+
+      el.addEventListener('pointerdown', (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        if (target.closest('.scope-timeline__handle--start')) {
+          startDrag(event, item, 'resize-start', el);
+          return;
+        }
+        if (target.closest('.scope-timeline__handle--end')) {
+          startDrag(event, item, 'resize-end', el);
+          return;
+        }
+        if (target.closest('.scope-timeline__handle')) return;
+        startDrag(event, item, 'move', el);
       });
 
       if (item.kind === 'unit') {
         el.addEventListener('dblclick', () => {
+          if (suppressClick) return;
           navigate(`/units/${item.unit_id}`);
         });
       }
