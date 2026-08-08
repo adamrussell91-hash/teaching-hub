@@ -11,7 +11,8 @@ export const ClassSchema = z.object({
   subject_id: z.string().min(1),
   active_unit_ids: z.array(z.string().min(1)),
   current_unit_id: z.string().min(1).optional(),
-  current_scheduled_lesson_id: z.string().min(1).optional()
+  current_scheduled_lesson_id: z.string().min(1).optional(),
+  meeting_days: z.array(z.number().int().min(1).max(7)).optional()
 });
 
 export type Class = z.infer<typeof ClassSchema>;

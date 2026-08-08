@@ -26,6 +26,26 @@ describe('ClassSchema', () => {
     expect(cls.code).toBe('12ENGADV1');
   });
 
+  it('accepts meeting_days', () => {
+    const cls = ClassSchema.parse({
+      id: 'class_2026_12engadv1',
+      type: 'class',
+      code: '12ENGADV1',
+      title: 'Year 12 English Advanced',
+      slug: '12engadv1',
+      academic_year: 2026,
+      year_id: 'year_12',
+      subject_id: 'subject_y12_engadv',
+      active_unit_ids: ['unit_aotfw'],
+      meeting_days: [1, 3, 5],
+      status: 'active',
+      created_at: ISO,
+      updated_at: ISO,
+      schema_version: 1
+    });
+    expect(cls.meeting_days).toEqual([1, 3, 5]);
+  });
+
   it('rejects empty code', () => {
     expect(() =>
       ClassSchema.parse({
