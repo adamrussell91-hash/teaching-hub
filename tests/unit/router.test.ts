@@ -47,6 +47,23 @@ describe('router match', () => {
     });
   });
 
+  it('matches public student class-scoped lesson view', () => {
+    expect(match('/s/classes/class_2026_12engadv1/lessons/lesson_aotfw_008')).toEqual({
+      name: 'student-class-lesson',
+      params: {
+        classId: 'class_2026_12engadv1',
+        lessonId: 'lesson_aotfw_008'
+      },
+      requiresAuth: false,
+      path: '/s/classes/class_2026_12engadv1/lessons/lesson_aotfw_008'
+    });
+  });
+
+  it('still matches bare student class and bare lesson', () => {
+    expect(match('/s/classes/class_2026_12engadv1')?.name).toBe('student-class');
+    expect(match('/s/lessons/lesson_aotfw_008')?.name).toBe('student-lesson');
+  });
+
   it('matches sign-in gate', () => {
     expect(match('/sign-in')).toEqual({
       name: 'sign-in',
@@ -144,6 +161,7 @@ describe('router match', () => {
       ['/s/lessons/lesson_aotfw_008', false],
       ['/s/units/unit_aotfw', false],
       ['/s/classes/class_2026_12engadv1', false],
+      ['/s/classes/class_2026_12engadv1/lessons/lesson_aotfw_008', false],
       ['/sign-in', false]
     ];
 
