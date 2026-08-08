@@ -110,6 +110,7 @@ const curriculum: CurriculumResponse = {
   classes: [],
   scheduled_lessons: [],
   scope_sequences: [],
+  media: [],
   schedule_anchor_date: '2026-08-12'
 };
 

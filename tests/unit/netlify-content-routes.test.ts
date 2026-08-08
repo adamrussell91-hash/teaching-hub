@@ -60,7 +60,8 @@ const {
   classKey,
   scheduledLessonKey,
   scheduleAnchorKey,
-  scopeSequenceKey
+  scopeSequenceKey,
+  mediaKey
 } = await import('../../netlify/functions/_shared/blobs.mts');
 const { createSessionToken } = await import('../../netlify/functions/_shared/auth-security.mts');
 const curriculumHandler = (await import('../../netlify/functions/curriculum.mts')).default;
@@ -175,6 +176,7 @@ describe('GET /api/curriculum', () => {
         classes: [],
         scheduled_lessons: [],
         scope_sequences: [],
+        media: [],
         schedule_anchor_date: '2026-08-12'
       }
     });
@@ -213,6 +215,20 @@ describe('GET /api/curriculum', () => {
       schema_version: 1
     });
     fakeStore.seed(scheduleAnchorKey(), { date: '2026-08-12' });
+    fakeStore.seed(mediaKey('media_ono_extract'), {
+      id: 'media_ono_extract',
+      type: 'media',
+      title: 'Ono Extract (PDF)',
+      slug: 'ono_extract',
+      provider: 'external',
+      media_type: 'pdf',
+      mime_type: 'application/pdf',
+      file_name: 'ono-extract.pdf',
+      preview_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+      status: 'active',
+      ...timestamps,
+      schema_version: 1
+    });
     fakeStore.seed(scopeSequenceKey('scope_y12_engadv_2026'), {
       id: 'scope_y12_engadv_2026',
       type: 'scope_sequence',
@@ -261,6 +277,11 @@ describe('GET /api/curriculum', () => {
     );
     expect(body.data.schedule).toBeUndefined();
     expect(body.data.schedule_anchor_date).toBe('2026-08-12');
+    expect(body.data.media).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'media_ono_extract', media_type: 'pdf' })
+      ])
+    );
     expect(body.data.lessons).toEqual([
       {
         id: 'lesson_aotfw_008',

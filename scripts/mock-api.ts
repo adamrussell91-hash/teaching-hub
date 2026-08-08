@@ -11,7 +11,8 @@ import {
   classKey,
   scheduledLessonKey,
   scheduleAnchorKey,
-  scopeSequenceKey
+  scopeSequenceKey,
+  mediaKey
 } from '../src/storage/keys';
 import {
   ClassHomepageSchema,
@@ -21,6 +22,7 @@ import {
   PublishedLessonSchema,
   ScheduledLessonSchema,
   ScopeSequenceSchema,
+  MediaSchema,
   TimelineItemSchema,
   UnitSchema,
   toPublishedLesson,
@@ -29,6 +31,7 @@ import {
   type Lesson,
   type ScheduledLesson,
   type ScopeSequence,
+  type Media,
   type TimelineItem
 } from '../src/schemas';
 import { orderLessonsByUnitIds } from '../src/schemas/published-unit';
@@ -233,7 +236,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     lessons: options.seed.lessons.map((l) => (l as { id: string }).id),
     classes: options.seed.classes.map((c) => (c as { id: string }).id),
     scheduled_lessons: options.seed.scheduled_lessons.map((s) => (s as { id: string }).id),
-    scope_sequences: (options.seed.scope_sequences ?? []).map((s) => (s as { id: string }).id)
+    scope_sequences: (options.seed.scope_sequences ?? []).map((s) => (s as { id: string }).id),
+    media: (options.seed.media ?? []).map((m) => (m as { id: string }).id)
   };
 
   function sign(payload: string): string {
@@ -317,6 +321,15 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       })
       .filter((entry): entry is ScopeSequence => entry !== null);
 
+    const media = seedIds.media
+      .map((id) => {
+        const raw = store.getJSON(mediaKey(id));
+        if (!raw) return null;
+        const parsed = MediaSchema.safeParse(raw);
+        return parsed.success ? parsed.data : null;
+      })
+      .filter((entry): entry is Media => entry !== null && entry.status === 'active');
+
     const anchor = store.getJSON<{ date: string }>(scheduleAnchorKey());
 
     return {
@@ -327,6 +340,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       classes,
       scheduled_lessons,
       scope_sequences,
+      media,
       schedule_anchor_date: anchor?.date ?? DEFAULT_SCHEDULE_ANCHOR_DATE
     };
   }

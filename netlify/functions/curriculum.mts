@@ -1,3 +1,4 @@
+import { MediaSchema, type Media } from '../../src/schemas';
 import {
   getContentStore,
   getJSON,
@@ -46,7 +47,7 @@ async function listEntries<T>(store: ContentStore, prefix: string): Promise<T[]>
  * against a fresh site before the first curriculum GET.
  */
 async function buildCurriculum(store: ContentStore) {
-  const [years, subjects, units, lessons, publishedList, classes, scheduled_lessons, scope_sequences, anchor] =
+  const [years, subjects, units, lessons, publishedList, classes, scheduled_lessons, scope_sequences, mediaRaw, anchor] =
     await Promise.all([
       listEntries<Record<string, unknown>>(store, 'years/'),
       listEntries<Record<string, unknown>>(store, 'subjects/'),
@@ -56,8 +57,16 @@ async function buildCurriculum(store: ContentStore) {
       listEntries<Record<string, unknown>>(store, 'classes/'),
       listEntries<Record<string, unknown>>(store, 'scheduled_lessons/'),
       listEntries<Record<string, unknown>>(store, 'scope_sequences/'),
+      listEntries<Record<string, unknown>>(store, 'media/'),
       getJSON<{ date: string }>(store, scheduleAnchorKey())
     ]);
+
+  const media = mediaRaw
+    .map((raw) => {
+      const parsed = MediaSchema.safeParse(raw);
+      return parsed.success ? parsed.data : null;
+    })
+    .filter((entry): entry is Media => entry !== null && entry.status === 'active');
 
   const publishedIds = new Set(publishedList.blobs.map((blob) => blob.key.slice(PUBLISHED_LESSON_PREFIX.length)));
 
@@ -81,6 +90,7 @@ async function buildCurriculum(store: ContentStore) {
     classes,
     scheduled_lessons,
     scope_sequences,
+    media,
     schedule_anchor_date: anchor?.date ?? DEFAULT_SCHEDULE_ANCHOR_DATE
   };
 }

@@ -138,6 +138,7 @@ function makeCurriculum(overrides: Partial<CurriculumResponse> = {}): Curriculum
     classes: [],
     scheduled_lessons: [],
     scope_sequences: [cloneScope()],
+    media: [],
     schedule_anchor_date: '2026-08-12',
     ...overrides
   };
