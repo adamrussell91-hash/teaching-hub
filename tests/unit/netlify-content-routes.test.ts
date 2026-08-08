@@ -59,6 +59,7 @@ const curriculumHandler = (await import('../../netlify/functions/curriculum.mts'
 const lessonHandler = (await import('../../netlify/functions/lesson.mts')).default;
 const publishHandler = (await import('../../netlify/functions/publish.mts')).default;
 const publishedLessonHandler = (await import('../../netlify/functions/published-lesson.mts')).default;
+const publishedUnitHandler = (await import('../../netlify/functions/published-unit.mts')).default;
 
 const SESSION_SECRET = 's'.repeat(32);
 const FUNCTION_ORIGIN = 'https://api.example.netlify.app';
@@ -360,5 +361,85 @@ describe('GET /api/published/lessons/:id', () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.data.title).toBe('Published');
+  });
+});
+
+describe('GET /api/published/units/:id', () => {
+  it('returns 404 when the unit blob is missing', async () => {
+    const response = await publishedUnitHandler(
+      request('/api/published/units/unit_missing'),
+      { params: { id: 'unit_missing' } }
+    );
+    expect(response.status).toBe(404);
+  });
+
+  it('is public and returns only published lessons for that unit, in lesson_ids order', async () => {
+    fakeStore.seed(unitKey('unit_aotfw'), {
+      id: 'unit_aotfw',
+      type: 'unit',
+      title: 'AOTFW Unit',
+      slug: 'aotfw',
+      status: 'active',
+      year_id: 'year_12',
+      subject_id: 'subject_english',
+      lesson_ids: ['lesson_aotfw_001', 'lesson_aotfw_008'],
+      ...timestamps,
+      schema_version: 1
+    });
+    fakeStore.seed(publishedLessonKey('lesson_aotfw_008'), {
+      lesson_id: 'lesson_aotfw_008',
+      title: 'Memory',
+      unit_id: 'unit_aotfw',
+      blocks: [],
+      published_at: '2026-02-01T12:00:00.000Z',
+      schema_version: 1
+    });
+    fakeStore.seed(publishedLessonKey('lesson_other'), {
+      lesson_id: 'lesson_other',
+      title: 'Other unit lesson',
+      unit_id: 'unit_other',
+      blocks: [],
+      published_at: '2026-02-01T12:00:00.000Z',
+      schema_version: 1
+    });
+    fakeStore.seed(draftLessonKey('lesson_aotfw_001'), {
+      id: 'lesson_aotfw_001',
+      title: 'Draft only — must not appear',
+      unit_id: 'unit_aotfw'
+    });
+
+    const response = await publishedUnitHandler(
+      request('/api/published/units/unit_aotfw'),
+      { params: { id: 'unit_aotfw' } }
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.unit_id).toBe('unit_aotfw');
+    expect(body.data.title).toBe('AOTFW Unit');
+    expect(body.data.lessons).toEqual([
+      { lesson_id: 'lesson_aotfw_008', title: 'Memory' }
+    ]);
+  });
+
+  it('returns empty lessons array when unit exists but nothing is published', async () => {
+    fakeStore.seed(unitKey('unit_aotfw'), {
+      id: 'unit_aotfw',
+      type: 'unit',
+      title: 'AOTFW Unit',
+      slug: 'aotfw',
+      status: 'active',
+      year_id: 'year_12',
+      subject_id: 'subject_english',
+      lesson_ids: ['lesson_aotfw_001'],
+      ...timestamps,
+      schema_version: 1
+    });
+    const response = await publishedUnitHandler(
+      request('/api/published/units/unit_aotfw'),
+      { params: { id: 'unit_aotfw' } }
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.lessons).toEqual([]);
   });
 });
