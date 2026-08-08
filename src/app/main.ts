@@ -139,9 +139,9 @@ async function loadNavAndHandleErrors(
 
 function renderTeacherHomeRoute(token: number): void {
   const refs = mountTeacherShell();
-  renderContextBar(refs, { title: 'Teacher workspace' });
+  renderContextBar(refs, { title: 'Home' });
   renderRailStatus(refs.railNav, 'Loading curriculum…');
-  renderCanvasStatus(refs.canvas, 'Loading lessons…');
+  renderCanvasStatus(refs.canvas, 'Loading home…');
 
   void loadNavAndHandleErrors(refs, token, 'home', undefined, (curriculum) => {
     renderHomeCanvas(refs.canvas, curriculum);
