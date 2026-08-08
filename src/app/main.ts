@@ -7,9 +7,18 @@ import {
   renderTeacherShell,
   type TeacherShellRefs
 } from '@/teacher/shell';
-import { fetchCurriculum, renderCurriculumNav, type CurriculumResponse } from '@/teacher/nav';
+import { fetchCurriculum, type CurriculumResponse } from '@/teacher/nav';
+import { renderTeacherRail } from '@/teacher/rail';
 import { renderTeacherHome as renderHomeCanvas } from '@/teacher/home';
 import { mountLessonEditor, type LessonEditorHandle } from '@/teacher/lesson-editor';
+import type { TeacherSection } from '@/teacher/section';
+import { renderClassesPlaceholder, renderResourcesPlaceholder } from '@/teacher/sections/placeholders';
+import {
+  renderScopeSequencesIndex,
+  renderScopeSequenceStub
+} from '@/teacher/sections/scope-sequences';
+import { renderUnitsIndex, renderUnitStub } from '@/teacher/sections/units';
+import { renderLessonsIndex } from '@/teacher/sections/lessons';
 import {
   mountStudentLessonView,
   type StudentLessonViewHandle
@@ -92,13 +101,14 @@ function mountTeacherShell(): TeacherShellRefs {
 async function loadNavAndHandleErrors(
   refs: TeacherShellRefs,
   token: number,
+  activeSection: TeacherSection,
   activeLessonId: string | undefined,
   onLoaded: (curriculum: CurriculumResponse) => void
 ): Promise<void> {
   try {
     const curriculum = await getCurriculum();
     if (token !== renderToken) return;
-    renderCurriculumNav(refs.railNav, curriculum, { activeLessonId });
+    renderTeacherRail(refs.railNav, curriculum, { activeSection, activeLessonId });
     onLoaded(curriculum);
   } catch (error) {
     if (token !== renderToken) return;
@@ -120,8 +130,93 @@ function renderTeacherHomeRoute(token: number): void {
   renderRailStatus(refs.railNav, 'Loading curriculum…');
   renderCanvasStatus(refs.canvas, 'Loading lessons…');
 
-  void loadNavAndHandleErrors(refs, token, undefined, (curriculum) => {
+  void loadNavAndHandleErrors(refs, token, 'home', undefined, (curriculum) => {
     renderHomeCanvas(refs.canvas, curriculum);
+  });
+}
+
+function renderTeacherClassesRoute(token: number): void {
+  const refs = mountTeacherShell();
+  renderContextBar(refs, { title: 'Classes' });
+  renderRailStatus(refs.railNav, 'Loading curriculum…');
+  renderCanvasStatus(refs.canvas, 'Loading…');
+
+  void loadNavAndHandleErrors(refs, token, 'classes', undefined, () => {
+    renderClassesPlaceholder(refs.canvas);
+  });
+}
+
+function renderTeacherResourcesRoute(token: number): void {
+  const refs = mountTeacherShell();
+  renderContextBar(refs, { title: 'Resource Library' });
+  renderRailStatus(refs.railNav, 'Loading curriculum…');
+  renderCanvasStatus(refs.canvas, 'Loading…');
+
+  void loadNavAndHandleErrors(refs, token, 'resources', undefined, () => {
+    renderResourcesPlaceholder(refs.canvas);
+  });
+}
+
+function renderTeacherScopeSequencesRoute(token: number): void {
+  const refs = mountTeacherShell();
+  renderContextBar(refs, { title: 'Scope & Sequences' });
+  renderRailStatus(refs.railNav, 'Loading curriculum…');
+  renderCanvasStatus(refs.canvas, 'Loading…');
+
+  void loadNavAndHandleErrors(refs, token, 'scope-sequences', undefined, (curriculum) => {
+    renderScopeSequencesIndex(refs.canvas, curriculum);
+  });
+}
+
+function renderTeacherScopeSequenceRoute(subjectId: string, token: number): void {
+  const refs = mountTeacherShell();
+  renderContextBar(refs, { title: 'Scope & Sequence' });
+  renderRailStatus(refs.railNav, 'Loading curriculum…');
+  renderCanvasStatus(refs.canvas, 'Loading…');
+
+  void loadNavAndHandleErrors(refs, token, 'scope-sequences', undefined, (curriculum) => {
+    const subject = curriculum.subjects.find((entry) => entry.id === subjectId);
+    if (subject) {
+      renderContextBar(refs, { title: subject.title });
+    }
+    renderScopeSequenceStub(refs.canvas, curriculum, subjectId);
+  });
+}
+
+function renderTeacherUnitsRoute(token: number): void {
+  const refs = mountTeacherShell();
+  renderContextBar(refs, { title: 'Units' });
+  renderRailStatus(refs.railNav, 'Loading curriculum…');
+  renderCanvasStatus(refs.canvas, 'Loading…');
+
+  void loadNavAndHandleErrors(refs, token, 'units', undefined, (curriculum) => {
+    renderUnitsIndex(refs.canvas, curriculum);
+  });
+}
+
+function renderTeacherUnitRoute(unitId: string, token: number): void {
+  const refs = mountTeacherShell();
+  renderContextBar(refs, { title: 'Units' });
+  renderRailStatus(refs.railNav, 'Loading curriculum…');
+  renderCanvasStatus(refs.canvas, 'Loading…');
+
+  void loadNavAndHandleErrors(refs, token, 'units', undefined, (curriculum) => {
+    const unit = curriculum.units.find((entry) => entry.id === unitId);
+    if (unit) {
+      renderContextBar(refs, { title: unit.title });
+    }
+    renderUnitStub(refs.canvas, curriculum, unitId);
+  });
+}
+
+function renderTeacherLessonsRoute(token: number): void {
+  const refs = mountTeacherShell();
+  renderContextBar(refs, { title: 'Lessons' });
+  renderRailStatus(refs.railNav, 'Loading curriculum…');
+  renderCanvasStatus(refs.canvas, 'Loading…');
+
+  void loadNavAndHandleErrors(refs, token, 'lessons', undefined, (curriculum) => {
+    renderLessonsIndex(refs.canvas, curriculum);
   });
 }
 
@@ -138,7 +233,7 @@ function renderTeacherLessonRoute(lessonId: string, token: number): void {
     isStale: () => token !== renderToken
   });
 
-  void loadNavAndHandleErrors(refs, token, lessonId, () => {});
+  void loadNavAndHandleErrors(refs, token, 'lessons', lessonId, () => {});
 }
 
 function renderStudentLessonRoute(lessonId: string, token: number): void {
@@ -153,6 +248,27 @@ function renderRoute(match: RouteMatch, token: number): void {
   switch (match.name) {
     case 'teacher-home':
       renderTeacherHomeRoute(token);
+      break;
+    case 'teacher-classes':
+      renderTeacherClassesRoute(token);
+      break;
+    case 'teacher-resources':
+      renderTeacherResourcesRoute(token);
+      break;
+    case 'teacher-scope-sequences':
+      renderTeacherScopeSequencesRoute(token);
+      break;
+    case 'teacher-scope-sequence':
+      renderTeacherScopeSequenceRoute(match.params.subjectId, token);
+      break;
+    case 'teacher-units':
+      renderTeacherUnitsRoute(token);
+      break;
+    case 'teacher-unit':
+      renderTeacherUnitRoute(match.params.unitId, token);
+      break;
+    case 'teacher-lessons':
+      renderTeacherLessonsRoute(token);
       break;
     case 'teacher-lesson':
       renderTeacherLessonRoute(match.params.lessonId, token);
