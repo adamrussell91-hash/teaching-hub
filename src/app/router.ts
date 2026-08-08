@@ -25,12 +25,9 @@ export type RouteParams = {
   'sign-in': Record<string, never>;
 };
 
-export type RouteMatch<N extends RouteName = RouteName> = {
-  name: N;
-  params: RouteParams[N];
-  requiresAuth: boolean;
-  path: string;
-};
+export type RouteMatch<N extends RouteName = RouteName> = N extends RouteName
+  ? { name: N; params: RouteParams[N]; requiresAuth: boolean; path: string }
+  : never;
 
 export type RouteHandler = (match: RouteMatch) => void;
 
@@ -88,17 +85,49 @@ export function match(pathname: string): RouteMatch | null {
     };
   }
 
-  const exactTeacher: Array<[string, RouteName]> = [
-    ['/classes', 'teacher-classes'],
-    ['/resources', 'teacher-resources'],
-    ['/units', 'teacher-units'],
-    ['/lessons', 'teacher-lessons'],
-    ['/scope-sequences', 'teacher-scope-sequences']
-  ];
-  for (const [exact, name] of exactTeacher) {
-    if (path === exact) {
-      return { name, params: {}, requiresAuth: true, path };
-    }
+  if (path === '/classes') {
+    return {
+      name: 'teacher-classes',
+      params: {},
+      requiresAuth: true,
+      path
+    };
+  }
+
+  if (path === '/resources') {
+    return {
+      name: 'teacher-resources',
+      params: {},
+      requiresAuth: true,
+      path
+    };
+  }
+
+  if (path === '/units') {
+    return {
+      name: 'teacher-units',
+      params: {},
+      requiresAuth: true,
+      path
+    };
+  }
+
+  if (path === '/lessons') {
+    return {
+      name: 'teacher-lessons',
+      params: {},
+      requiresAuth: true,
+      path
+    };
+  }
+
+  if (path === '/scope-sequences') {
+    return {
+      name: 'teacher-scope-sequences',
+      params: {},
+      requiresAuth: true,
+      path
+    };
   }
 
   const scopeSequence = path.match(/^\/scope-sequences\/([^/]+)$/);
