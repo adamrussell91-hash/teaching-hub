@@ -27,3 +27,10 @@ export {
   toPublishedLesson,
   type PublishedLesson
 } from './published-lesson';
+export {
+  PublishedUnitSchema,
+  PublishedUnitLessonSummarySchema,
+  orderLessonsByUnitIds,
+  type PublishedUnit,
+  type PublishedUnitLessonSummary
+} from './published-unit';
