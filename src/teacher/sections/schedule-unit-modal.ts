@@ -1,6 +1,7 @@
 import { ApiClientError } from '@/api/client';
 import type { Class, Unit } from '@/schemas';
 import { generateScheduleDates } from '@/schedule/generate-dates';
+import { resolveScheduleToday } from '@/schedule/today';
 import type { CurriculumResponse } from '@/teacher/nav';
 import { postScheduleUnit } from '@/teacher/schedule-api';
 
@@ -401,7 +402,7 @@ function defaultStartDate(
   const from =
     classDates.length > 0
       ? addUtcDays(classDates[classDates.length - 1], 1)
-      : curriculum.schedule_anchor_date;
+      : resolveScheduleToday(curriculum.schedule_anchor_date);
 
   const days = meetingDays.length > 0 ? meetingDays : DEFAULT_MEETING_DAYS;
   return generateScheduleDates({

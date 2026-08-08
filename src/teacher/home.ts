@@ -1,5 +1,6 @@
 import { navigate } from '@/app/router';
 import type { Class, ScheduledLesson } from '@/schemas';
+import { resolveScheduleToday } from '@/schedule/today';
 import type { CurriculumLessonSummary, CurriculumResponse } from './nav';
 import {
   groupWeekSchedule,
@@ -17,7 +18,7 @@ export function renderTeacherHome(canvas: HTMLElement, curriculum: CurriculumRes
 
   const lessonsById = new Map(curriculum.lessons.map((lesson) => [lesson.id, lesson]));
   const classesById = new Map(curriculum.classes.map((cls) => [cls.id, cls]));
-  const anchorDate = curriculum.schedule_anchor_date;
+  const anchorDate = resolveScheduleToday(curriculum.schedule_anchor_date);
   const todayEntries = selectTodaySchedule(curriculum.scheduled_lessons, anchorDate);
   const weekDays = groupWeekSchedule(curriculum.scheduled_lessons, anchorDate);
   const unpublished = selectUnpublishedChanges(curriculum.lessons);

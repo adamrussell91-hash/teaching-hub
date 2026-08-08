@@ -23,7 +23,7 @@ export interface CurriculumResponse {
   scheduled_lessons: ScheduledLesson[];
   scope_sequences: ScopeSequence[];
   media: Media[];
-  schedule_anchor_date: string; // YYYY-MM-DD — demo “today”
+  schedule_anchor_date: string; // YYYY-MM-DD — demo override (tests / VITE_SCHEDULE_ANCHOR_DATE)
 }
 
 export function fetchCurriculum(): Promise<CurriculumResponse> {

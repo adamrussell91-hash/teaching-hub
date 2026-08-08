@@ -1,6 +1,7 @@
 import { ApiClientError } from '@/api/client';
 import { navigate } from '@/app/router';
 import type { Class, ScheduledLesson } from '@/schemas';
+import { resolveScheduleToday } from '@/schedule/today';
 import type { CurriculumLessonSummary, CurriculumResponse } from '@/teacher/nav';
 import {
   mountHomepageEditor,
@@ -499,7 +500,7 @@ function resolveCurrentScheduledLesson(
     if (pinned) return pinned;
   }
 
-  const anchor = curriculum.schedule_anchor_date;
+  const anchor = resolveScheduleToday(curriculum.schedule_anchor_date);
   const candidates = curriculum.scheduled_lessons
     .filter((entry) => entry.class_id === cls.id && entry.date >= anchor)
     .sort((a, b) => {
