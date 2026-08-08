@@ -691,10 +691,116 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     return okResponse(200, validated.data);
   }
 
+  function handlePatchClass(
+    cookie: string | null | undefined,
+    classId: string,
+    body: unknown
+  ): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+
+    if (typeof body !== 'object' || body === null) {
+      return errorResponse(400, 'validation_error', 'Request body must be a JSON object');
+    }
+
+    const record = body as Record<string, unknown>;
+    const hasMeetingDays = record.meeting_days !== undefined;
+    const hasCurrent = record.current_scheduled_lesson_id !== undefined;
+
+    if (!hasMeetingDays && !hasCurrent) {
+      return errorResponse(
+        400,
+        'validation_error',
+        'Provide meeting_days and/or current_scheduled_lesson_id'
+      );
+    }
+
+    let meeting_days: number[] | undefined;
+    if (hasMeetingDays) {
+      if (!Array.isArray(record.meeting_days) || record.meeting_days.length === 0) {
+        return errorResponse(
+          400,
+          'validation_error',
+          'meeting_days must be a non-empty array when provided'
+        );
+      }
+      meeting_days = [];
+      for (const day of record.meeting_days) {
+        if (typeof day !== 'number' || !Number.isInteger(day) || day < 1 || day > 7) {
+          return errorResponse(
+            400,
+            'validation_error',
+            'meeting_days must contain integers from 1 to 7'
+          );
+        }
+        meeting_days.push(day);
+      }
+    }
+
+    let current_scheduled_lesson_id: string | null | undefined;
+    if (hasCurrent) {
+      const value = record.current_scheduled_lesson_id;
+      if (value === null) {
+        current_scheduled_lesson_id = null;
+      } else if (typeof value === 'string' && value) {
+        current_scheduled_lesson_id = value;
+      } else {
+        return errorResponse(
+          400,
+          'validation_error',
+          'current_scheduled_lesson_id must be a non-empty string or null'
+        );
+      }
+    }
+
+    const rawClass = store.getJSON(classKey(classId));
+    if (!rawClass) return notFoundResponse('Class not found');
+    const classParsed = ClassSchema.safeParse(rawClass);
+    if (!classParsed.success) {
+      return errorResponse(400, 'validation_error', 'Class data is invalid');
+    }
+
+    if (current_scheduled_lesson_id) {
+      const scheduled = store.getJSON<ScheduledLesson>(
+        scheduledLessonKey(current_scheduled_lesson_id)
+      );
+      if (!scheduled || scheduled.class_id !== classId) {
+        return notFoundResponse('Scheduled lesson not found');
+      }
+    }
+
+    const nowIso = new Date().toISOString();
+    const merged: Record<string, unknown> = {
+      ...classParsed.data,
+      updated_at: nowIso
+    };
+
+    if (meeting_days !== undefined) {
+      merged.meeting_days = meeting_days;
+    }
+
+    if (current_scheduled_lesson_id !== undefined) {
+      if (current_scheduled_lesson_id === null) {
+        delete merged.current_scheduled_lesson_id;
+      } else {
+        merged.current_scheduled_lesson_id = current_scheduled_lesson_id;
+      }
+    }
+
+    const validated = ClassSchema.safeParse(merged);
+    if (!validated.success) {
+      return errorResponse(400, 'validation_error', 'Class data is invalid');
+    }
+
+    store.setJSON(classKey(classId), validated.data);
+    return okResponse(200, validated.data);
+  }
+
   const LESSON_ID_RE = /^\/api\/lessons\/([^/]+)$/;
   const LESSON_PUBLISH_RE = /^\/api\/lessons\/([^/]+)\/publish$/;
   const PUBLISHED_LESSON_RE = /^\/api\/published\/lessons\/([^/]+)$/;
   const PUBLISHED_UNIT_RE = /^\/api\/published\/units\/([^/]+)$/;
+  const CLASS_PATCH_RE = /^\/api\/classes\/([^/]+)$/;
   const SCHEDULE_UNIT_RE = /^\/api\/classes\/([^/]+)\/schedule-unit$/;
   const SCHEDULED_LESSON_RE = /^\/api\/scheduled-lessons\/([^/]+)$/;
 
@@ -733,6 +839,11 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const scheduleUnitMatch = SCHEDULE_UNIT_RE.exec(path);
     if (scheduleUnitMatch && method === 'POST') {
       return handleScheduleUnit(cookie, scheduleUnitMatch[1], body);
+    }
+
+    const classPatchMatch = CLASS_PATCH_RE.exec(path);
+    if (classPatchMatch && method === 'PATCH') {
+      return handlePatchClass(cookie, classPatchMatch[1], body);
     }
 
     const scheduledLessonMatch = SCHEDULED_LESSON_RE.exec(path);

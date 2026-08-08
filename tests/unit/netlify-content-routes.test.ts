@@ -69,6 +69,7 @@ const publishedLessonHandler = (await import('../../netlify/functions/published-
 const publishedUnitHandler = (await import('../../netlify/functions/published-unit.mts')).default;
 const scheduleUnitHandler = (await import('../../netlify/functions/schedule-unit.mts')).default;
 const scheduledLessonHandler = (await import('../../netlify/functions/scheduled-lesson.mts')).default;
+const classHandler = (await import('../../netlify/functions/class.mts')).default;
 
 const SESSION_SECRET = 's'.repeat(32);
 const FUNCTION_ORIGIN = 'https://api.example.netlify.app';
@@ -757,6 +758,120 @@ describe('PATCH /api/scheduled-lessons/:id', () => {
     });
     expect(fakeStore.raw(scheduledLessonKey('scheduled_a'))).toMatchObject({
       schedule_order: 2
+    });
+  });
+});
+
+function seedClassForPatch() {
+  fakeStore.seed(classKey('class_2026_12engadv1'), {
+    id: 'class_2026_12engadv1',
+    type: 'class',
+    code: '12ENGADV1',
+    title: 'Year 12 English Advanced',
+    slug: '12engadv1',
+    academic_year: 2026,
+    year_id: 'year_12',
+    subject_id: 'subject_y12_engadv',
+    active_unit_ids: ['unit_aotfw'],
+    current_scheduled_lesson_id: 'scheduled_a',
+    meeting_days: [1, 2, 3, 4, 5],
+    status: 'active',
+    ...timestamps,
+    schema_version: 1
+  });
+
+  fakeStore.seed(scheduledLessonKey('scheduled_a'), {
+    id: 'scheduled_a',
+    type: 'scheduled_lesson',
+    class_id: 'class_2026_12engadv1',
+    unit_id: 'unit_schedule',
+    lesson_id: 'lesson_a',
+    date: '2026-08-10',
+    schedule_order: 1,
+    delivery_status: 'planned',
+    ...timestamps,
+    schema_version: 1
+  });
+
+  fakeStore.seed(scheduledLessonKey('scheduled_other'), {
+    id: 'scheduled_other',
+    type: 'scheduled_lesson',
+    class_id: 'class_other',
+    unit_id: 'unit_other',
+    lesson_id: 'lesson_other',
+    date: '2026-08-10',
+    schedule_order: 1,
+    delivery_status: 'planned',
+    ...timestamps,
+    schema_version: 1
+  });
+}
+
+describe('PATCH /api/classes/:id', () => {
+  it('rejects unauthenticated requests', async () => {
+    const response = await classHandler(
+      request('/api/classes/class_2026_12engadv1', {
+        method: 'PATCH',
+        body: JSON.stringify({ meeting_days: [1, 3, 5] })
+      }),
+      { params: { id: 'class_2026_12engadv1' } }
+    );
+    expect(response.status).toBe(401);
+  });
+
+  it('sets current_scheduled_lesson_id when the lesson belongs to this class', async () => {
+    seedClassForPatch();
+
+    const response = await classHandler(
+      request('/api/classes/class_2026_12engadv1', {
+        method: 'PATCH',
+        cookie: sessionCookieHeader(),
+        body: JSON.stringify({ current_scheduled_lesson_id: 'scheduled_a' })
+      }),
+      { params: { id: 'class_2026_12engadv1' } }
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.current_scheduled_lesson_id).toBe('scheduled_a');
+
+    expect(fakeStore.raw(classKey('class_2026_12engadv1'))).toMatchObject({
+      current_scheduled_lesson_id: 'scheduled_a'
+    });
+  });
+
+  it('rejects current_scheduled_lesson_id for a scheduled lesson in another class', async () => {
+    seedClassForPatch();
+
+    const response = await classHandler(
+      request('/api/classes/class_2026_12engadv1', {
+        method: 'PATCH',
+        cookie: sessionCookieHeader(),
+        body: JSON.stringify({ current_scheduled_lesson_id: 'scheduled_other' })
+      }),
+      { params: { id: 'class_2026_12engadv1' } }
+    );
+    expect(response.status).toBe(404);
+    const body = await response.json();
+    expect(body.error.code).toBe('not_found');
+  });
+
+  it('updates meeting_days and persists', async () => {
+    seedClassForPatch();
+
+    const response = await classHandler(
+      request('/api/classes/class_2026_12engadv1', {
+        method: 'PATCH',
+        cookie: sessionCookieHeader(),
+        body: JSON.stringify({ meeting_days: [2, 4] })
+      }),
+      { params: { id: 'class_2026_12engadv1' } }
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.meeting_days).toEqual([2, 4]);
+
+    expect(fakeStore.raw(classKey('class_2026_12engadv1'))).toMatchObject({
+      meeting_days: [2, 4]
     });
   });
 });
