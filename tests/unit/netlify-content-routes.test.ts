@@ -207,6 +207,23 @@ describe('GET /api/curriculum', () => {
     const lesson = body.data.lessons.find((l: { id: string }) => l.id === 'lesson_aotfw_008');
     expect(lesson.updated_at).toBeTruthy();
   });
+
+  it('includes published_at on lesson summaries when the draft has published_at', async () => {
+    fakeStore.seed(
+      draftLessonKey('lesson_aotfw_008'),
+      draftLesson({ published_at: '2026-02-01T12:00:00.000Z' })
+    );
+
+    const response = await curriculumHandler(request('/api/curriculum', { cookie: sessionCookieHeader() }));
+    const body = await response.json();
+
+    expect(body.data.lessons).toEqual([
+      expect.objectContaining({
+        id: 'lesson_aotfw_008',
+        published_at: '2026-02-01T12:00:00.000Z'
+      })
+    ]);
+  });
 });
 
 describe('GET/PUT /api/lessons/:id', () => {
