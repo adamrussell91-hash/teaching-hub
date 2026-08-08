@@ -1,39 +1,92 @@
 {
-  "home_schedule": {
-    "anchor_date": "2026-08-12",
-    "entries": [
-      {
-        "class_id": "class_demo_12engadv_p3",
-        "class_title": "12 Eng Adv — Period 3",
-        "lesson_id": "lesson_aotfw_006",
-        "scheduled_date": "2026-08-10"
-      },
-      {
-        "class_id": "class_demo_12engadv_p3",
-        "class_title": "12 Eng Adv — Period 3",
-        "lesson_id": "lesson_aotfw_007",
-        "scheduled_date": "2026-08-11"
-      },
-      {
-        "class_id": "class_demo_12engadv_p3",
-        "class_title": "12 Eng Adv — Period 3",
-        "lesson_id": "lesson_aotfw_008",
-        "scheduled_date": "2026-08-12"
-      },
-      {
-        "class_id": "class_demo_12engadv_p3",
-        "class_title": "12 Eng Adv — Period 3",
-        "lesson_id": "lesson_aotfw_001",
-        "scheduled_date": "2026-08-13"
-      },
-      {
-        "class_id": "class_demo_12engadv_p3",
-        "class_title": "12 Eng Adv — Period 3",
-        "lesson_id": "lesson_aotfw_002",
-        "scheduled_date": "2026-08-14"
-      }
-    ]
-  },
+  "schedule_anchor_date": "2026-08-12",
+  "classes": [
+    {
+      "id": "class_2026_12engadv1",
+      "type": "class",
+      "code": "12ENGADV1",
+      "title": "Year 12 English Advanced",
+      "slug": "12engadv1",
+      "display_name": "12ENGADV1",
+      "academic_year": 2026,
+      "year_id": "year_12",
+      "subject_id": "subject_y12_engadv",
+      "active_unit_ids": ["unit_aotfw"],
+      "current_unit_id": "unit_aotfw",
+      "current_scheduled_lesson_id": "scheduled_aotfw_008",
+      "status": "active",
+      "created_at": "2026-01-01T00:00:00.000Z",
+      "updated_at": "2026-01-01T00:00:00.000Z",
+      "schema_version": 1
+    }
+  ],
+  "scheduled_lessons": [
+    {
+      "id": "scheduled_aotfw_006",
+      "type": "scheduled_lesson",
+      "class_id": "class_2026_12engadv1",
+      "unit_id": "unit_aotfw",
+      "lesson_id": "lesson_aotfw_006",
+      "date": "2026-08-10",
+      "schedule_order": 1,
+      "delivery_status": "planned",
+      "created_at": "2026-01-01T00:00:00.000Z",
+      "updated_at": "2026-01-01T00:00:00.000Z",
+      "schema_version": 1
+    },
+    {
+      "id": "scheduled_aotfw_007",
+      "type": "scheduled_lesson",
+      "class_id": "class_2026_12engadv1",
+      "unit_id": "unit_aotfw",
+      "lesson_id": "lesson_aotfw_007",
+      "date": "2026-08-11",
+      "schedule_order": 2,
+      "delivery_status": "planned",
+      "created_at": "2026-01-01T00:00:00.000Z",
+      "updated_at": "2026-01-01T00:00:00.000Z",
+      "schema_version": 1
+    },
+    {
+      "id": "scheduled_aotfw_008",
+      "type": "scheduled_lesson",
+      "class_id": "class_2026_12engadv1",
+      "unit_id": "unit_aotfw",
+      "lesson_id": "lesson_aotfw_008",
+      "date": "2026-08-12",
+      "schedule_order": 3,
+      "delivery_status": "current",
+      "created_at": "2026-01-01T00:00:00.000Z",
+      "updated_at": "2026-01-01T00:00:00.000Z",
+      "schema_version": 1
+    },
+    {
+      "id": "scheduled_aotfw_001",
+      "type": "scheduled_lesson",
+      "class_id": "class_2026_12engadv1",
+      "unit_id": "unit_aotfw",
+      "lesson_id": "lesson_aotfw_001",
+      "date": "2026-08-13",
+      "schedule_order": 4,
+      "delivery_status": "planned",
+      "created_at": "2026-01-01T00:00:00.000Z",
+      "updated_at": "2026-01-01T00:00:00.000Z",
+      "schema_version": 1
+    },
+    {
+      "id": "scheduled_aotfw_002",
+      "type": "scheduled_lesson",
+      "class_id": "class_2026_12engadv1",
+      "unit_id": "unit_aotfw",
+      "lesson_id": "lesson_aotfw_002",
+      "date": "2026-08-14",
+      "schedule_order": 5,
+      "delivery_status": "planned",
+      "created_at": "2026-01-01T00:00:00.000Z",
+      "updated_at": "2026-01-01T00:00:00.000Z",
+      "schema_version": 1
+    }
+  ],
   "years": [
     {
       "id": "year_12",
@@ -59,7 +112,7 @@
       "scope_id": "scope_y12_engadv_2026",
       "unit_ids": ["unit_aotfw"],
       "outcome_ids": [],
-      "class_ids": [],
+      "class_ids": ["class_2026_12engadv1"],
       "status": "active",
       "created_at": "2026-01-01T00:00:00.000Z",
       "updated_at": "2026-01-01T00:00:00.000Z",

@@ -8,7 +8,8 @@ import {
   unitKey,
   draftLessonKey,
   publishedLessonKey,
-  homeScheduleKey
+  classKey,
+  scheduledLessonKey
 } from '@/storage/keys';
 import { MockStore } from '../../scripts/mock-store';
 
@@ -38,8 +39,11 @@ describe('storage key helpers', () => {
     expect(unitKey('unit_aotfw')).toBe('units/unit_aotfw');
   });
 
-  it('builds home schedule meta key', () => {
-    expect(homeScheduleKey()).toBe('meta/home_schedule');
+  it('builds class and scheduled lesson keys', () => {
+    expect(classKey('class_2026_12engadv1')).toBe('classes/class_2026_12engadv1');
+    expect(scheduledLessonKey('scheduled_aotfw_008')).toBe(
+      'scheduled_lessons/scheduled_aotfw_008'
+    );
   });
 });
 

@@ -18,6 +18,15 @@ export function publishedLessonKey(id: string): string {
   return `published/lessons/${id}`;
 }
 
+export function classKey(id: string): string {
+  return `classes/${id}`;
+}
+
+export function scheduledLessonKey(id: string): string {
+  return `scheduled_lessons/${id}`;
+}
+
+/** @deprecated Task 3 removes consumers */
 export function homeScheduleKey(): string {
   return 'meta/home_schedule';
 }
