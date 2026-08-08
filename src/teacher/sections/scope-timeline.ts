@@ -262,14 +262,16 @@ export function renderScopeTimelineEditor(
   const inspector = document.createElement('aside');
   inspector.className = 'scope-timeline__inspector';
 
-  const showBanner = (message: string): void => {
+  const showBanner = (message: string, tone: 'error' | 'info' = 'error'): void => {
     banner.hidden = false;
     banner.textContent = message;
+    banner.classList.toggle('scope-timeline__banner--info', tone === 'info');
   };
 
   const hideBanner = (): void => {
     banner.hidden = true;
     banner.textContent = '';
+    banner.classList.remove('scope-timeline__banner--info');
   };
 
   const applyScope = (next: ScopeSequence): void => {
@@ -278,22 +280,44 @@ export function renderScopeTimelineEditor(
     options?.onPatched?.(next);
   };
 
-  const persistItems = async (items: TimelineItem[]): Promise<boolean> => {
-    if (saving) return false;
-    saving = true;
-    try {
-      const updated = await patchScopeSequence(scope.id, { timeline_items: items });
-      applyScope(updated);
-      hideBanner();
-      refreshItems();
-      setSelection(selectedId);
-      return true;
-    } catch {
-      showBanner('Unable to save timeline.');
-      return false;
-    } finally {
-      saving = false;
+  let queuedItems: TimelineItem[] | null = null;
+  let inFlight: Promise<boolean> | null = null;
+
+  const persistItems = (items: TimelineItem[]): Promise<boolean> => {
+    queuedItems = items;
+    if (inFlight) {
+      showBanner('Saving…', 'info');
+      return inFlight;
     }
+
+    inFlight = (async () => {
+      saving = true;
+      let lastOk = true;
+      try {
+        while (queuedItems) {
+          const nextItems = queuedItems;
+          queuedItems = null;
+          try {
+            const updated = await patchScopeSequence(scope.id, { timeline_items: nextItems });
+            applyScope(updated);
+            hideBanner();
+            refreshItems();
+            setSelection(selectedId);
+            lastOk = true;
+          } catch {
+            showBanner('Unable to save timeline.');
+            lastOk = false;
+            break;
+          }
+        }
+      } finally {
+        saving = false;
+        inFlight = null;
+      }
+      return lastOk;
+    })();
+
+    return inFlight;
   };
 
   const renderInspectorContent = (item: TimelineItem): void => {
@@ -318,12 +342,17 @@ export function renderScopeTimelineEditor(
       titleInput.addEventListener('blur', () => {
         const nextTitle = titleInput.value.trim() || 'Note';
         if (nextTitle === item.title) return;
+        const previousTitle = item.title;
         const items = scope.timeline_items.map((entry) =>
           entry.id === item.id && entry.kind === 'note'
             ? { ...entry, title: nextTitle }
             : entry
         );
-        void persistItems(items);
+        void persistItems(items).then((ok) => {
+          if (!ok) {
+            titleInput.value = previousTitle;
+          }
+        });
       });
       inspector.append(titleInput, weeks);
 
@@ -333,8 +362,9 @@ export function renderScopeTimelineEditor(
       deleteBtn.textContent = 'Delete note';
       deleteBtn.addEventListener('click', () => {
         const items = scope.timeline_items.filter((entry) => entry.id !== item.id);
-        selectedId = null;
-        void persistItems(items);
+        void persistItems(items).then((ok) => {
+          if (ok) setSelection(null);
+        });
       });
       inspector.append(deleteBtn);
       return;
@@ -360,8 +390,9 @@ export function renderScopeTimelineEditor(
     remove.textContent = 'Remove from timeline';
     remove.addEventListener('click', () => {
       const items = scope.timeline_items.filter((entry) => entry.id !== item.id);
-      selectedId = null;
-      void persistItems(items);
+      void persistItems(items).then((ok) => {
+        if (ok) setSelection(null);
+      });
     });
 
     inspector.append(open, remove);

@@ -130,6 +130,21 @@ describe('renderBlock', () => {
     expect(el.textContent).toContain('Caption');
   });
 
+  it('skips unsafe image URLs', () => {
+    const el = renderBlock(
+      {
+        ...baseBlock,
+        block_type: 'image',
+        variant: 'large',
+        content: { url: 'javascript:alert(1)', alt_text: 'Unsafe', caption: 'Caption' }
+      },
+      'student'
+    );
+    expect(el.querySelector('img')).toBeNull();
+    expect(el.querySelector('.block-image__unavailable')?.textContent).toBe('Unsafe');
+    expect(el.textContent).toContain('Caption');
+  });
+
   it('renders youtube video iframe lazily', () => {
     const el = renderBlock(
       {
@@ -159,6 +174,21 @@ describe('renderBlock', () => {
     const link = el.querySelector('a');
     expect(link?.getAttribute('href')).toBe('https://example.com/page');
     expect(link?.textContent).toContain('Example');
+  });
+
+  it('skips unsafe embed URLs', () => {
+    const el = renderBlock(
+      {
+        ...baseBlock,
+        block_type: 'embed',
+        variant: 'large',
+        content: { url: 'javascript:alert(1)', title: 'Bad' }
+      },
+      'student'
+    );
+    expect(el.querySelector('iframe')).toBeNull();
+    expect(el.querySelector('a')).toBeNull();
+    expect(el.querySelector('.block-embed__unavailable')?.textContent).toBe('Embed unavailable.');
   });
 
   it('sanitises html blocks', () => {

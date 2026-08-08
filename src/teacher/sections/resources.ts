@@ -1,9 +1,12 @@
 import type { Media } from '@/schemas';
 import type { CurriculumResponse } from '@/teacher/nav';
+import { isHttpUrl } from '@/blocks/url-safety';
 
 export function openUrlForMedia(media: Media): string | undefined {
   const url = media.preview_url ?? media.download_url;
-  return url && url.trim() !== '' ? url : undefined;
+  if (!url || url.trim() === '') return undefined;
+  const trimmed = url.trim();
+  return isHttpUrl(trimmed) ? trimmed : undefined;
 }
 
 export function renderResourcesIndex(canvas: HTMLElement, curriculum: CurriculumResponse): void {

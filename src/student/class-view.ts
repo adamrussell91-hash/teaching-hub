@@ -1,4 +1,5 @@
 import { ApiClientError } from '@/api/client';
+import { navigate } from '@/app/router';
 import { renderBlock } from '@/blocks/render';
 import {
   fetchPublishedClass,
@@ -113,8 +114,13 @@ function renderPublishedClass(content: HTMLElement, cls: PublishedClass): void {
     if (isLessonPublished(cls.current_lesson.lesson_id, cls.schedule)) {
       const open = document.createElement('a');
       open.className = 'btn btn--secondary student-class__open';
-      open.href = `/s/classes/${cls.id}/lessons/${cls.current_lesson.lesson_id}`;
+      const href = `/s/classes/${cls.id}/lessons/${cls.current_lesson.lesson_id}`;
+      open.href = href;
       open.textContent = 'Open';
+      open.addEventListener('click', (event) => {
+        event.preventDefault();
+        navigate(href);
+      });
       row.append(open);
     }
 
@@ -153,8 +159,13 @@ function renderPublishedClass(content: HTMLElement, cls: PublishedClass): void {
       if (row.published) {
         const open = document.createElement('a');
         open.className = 'btn btn--secondary student-class__open';
-        open.href = `/s/classes/${cls.id}/lessons/${row.lesson_id}`;
+        const href = `/s/classes/${cls.id}/lessons/${row.lesson_id}`;
+        open.href = href;
         open.textContent = 'Open';
+        open.addEventListener('click', (event) => {
+          event.preventDefault();
+          navigate(href);
+        });
         item.append(open);
       }
 
@@ -179,8 +190,13 @@ function renderPublishedClass(content: HTMLElement, cls: PublishedClass): void {
       const item = document.createElement('li');
       const link = document.createElement('a');
       link.className = 'student-class__link';
-      link.href = `/s/units/${unit.id}`;
+      const href = `/s/units/${unit.id}`;
+      link.href = href;
       link.textContent = unit.title;
+      link.addEventListener('click', (event) => {
+        event.preventDefault();
+        navigate(href);
+      });
       item.append(link);
       list.append(item);
     }

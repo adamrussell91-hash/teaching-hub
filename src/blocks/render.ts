@@ -1,4 +1,5 @@
 import { sanitizeRichTextHtml } from '@/blocks/sanitize';
+import { isHttpUrl } from '@/blocks/url-safety';
 import { videoEmbedSrc } from '@/blocks/video-url';
 import type { Block } from '@/schemas/block';
 
@@ -87,11 +88,18 @@ export function renderImageBlock(
 ): HTMLElement {
   const figure = document.createElement('figure');
   figure.className = 'block-image';
-  const img = document.createElement('img');
-  img.src = block.content.url;
-  img.alt = block.content.alt_text;
-  img.loading = 'lazy';
-  figure.append(img);
+  if (isHttpUrl(block.content.url)) {
+    const img = document.createElement('img');
+    img.src = block.content.url;
+    img.alt = block.content.alt_text;
+    img.loading = 'lazy';
+    figure.append(img);
+  } else {
+    const unavailable = document.createElement('p');
+    unavailable.className = 'block-image__unavailable';
+    unavailable.textContent = block.content.alt_text.trim() || 'Image unavailable.';
+    figure.append(unavailable);
+  }
   if (block.content.caption) {
     const cap = document.createElement('figcaption');
     cap.className = 'block-image__caption';
@@ -140,22 +148,31 @@ export function renderEmbedBlock(
 ): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = 'block-embed';
-  const iframe = document.createElement('iframe');
-  iframe.className = 'block-embed__frame';
-  iframe.src = block.content.url;
-  iframe.setAttribute('loading', 'lazy');
-  iframe.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
-  iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-popups allow-forms');
-  iframe.title = block.content.title || 'Embedded content';
-  wrap.append(iframe);
+  const safeUrl = isHttpUrl(block.content.url) ? block.content.url.trim() : undefined;
 
-  const link = document.createElement('a');
-  link.className = 'block-embed__open';
-  link.href = block.content.url;
-  link.target = '_blank';
-  link.rel = 'noopener noreferrer';
-  link.textContent = block.content.title?.trim() || 'Open in new tab';
-  wrap.append(link);
+  if (safeUrl) {
+    const iframe = document.createElement('iframe');
+    iframe.className = 'block-embed__frame';
+    iframe.src = safeUrl;
+    iframe.setAttribute('loading', 'lazy');
+    iframe.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+    iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-popups allow-forms');
+    iframe.title = block.content.title || 'Embedded content';
+    wrap.append(iframe);
+
+    const link = document.createElement('a');
+    link.className = 'block-embed__open';
+    link.href = safeUrl;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = block.content.title?.trim() || 'Open in new tab';
+    wrap.append(link);
+  } else {
+    const unavailable = document.createElement('p');
+    unavailable.className = 'block-embed__unavailable';
+    unavailable.textContent = 'Embed unavailable.';
+    wrap.append(unavailable);
+  }
 
   return wrapBlock(wrap, block, mode);
 }

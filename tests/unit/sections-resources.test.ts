@@ -86,6 +86,17 @@ describe('resources section', () => {
     expect(openUrlForMedia(mediaWithoutUrl)).toBeUndefined();
   });
 
+  it('returns undefined for non-http URLs', () => {
+    const media: Media = {
+      ...baseMedia,
+      id: 'media_bad',
+      title: 'Bad Link',
+      slug: 'bad_link',
+      preview_url: 'javascript:alert(1)'
+    };
+    expect(openUrlForMedia(media)).toBeUndefined();
+  });
+
   it('lists active media titles sorted and Open when URL present', () => {
     renderResourcesIndex(canvas, curriculum);
 

@@ -374,6 +374,53 @@ describe('scope timeline editor', () => {
     });
   });
 
+  it('reverts note title when PATCH fails', async () => {
+    const local = makeCurriculum();
+    patchScopeSequenceMock.mockRejectedValue(new Error('network'));
+
+    renderScopeTimelineEditor(canvas, local, 'subject_y12_engadv');
+    canvas
+      .querySelector<HTMLElement>('.scope-timeline__item--note')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const input = canvas.querySelector<HTMLInputElement>('.scope-timeline__note-title');
+    expect(input?.value).toBe('Assessment week');
+    input!.value = 'Exam week';
+    input!.dispatchEvent(new Event('blur', { bubbles: true }));
+
+    await vi.waitFor(() => {
+      expect(patchScopeSequenceMock).toHaveBeenCalledTimes(1);
+    });
+    await vi.waitFor(() => {
+      expect(input!.value).toBe('Assessment week');
+    });
+    expect(canvas.querySelector('.scope-timeline__banner')?.textContent).toContain(
+      'Unable to save'
+    );
+  });
+
+  it('keeps selection when delete PATCH fails', async () => {
+    const local = makeCurriculum();
+    patchScopeSequenceMock.mockRejectedValue(new Error('network'));
+
+    renderScopeTimelineEditor(canvas, local, 'subject_y12_engadv');
+    canvas
+      .querySelector<HTMLElement>('.scope-timeline__item--note')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    canvas.querySelector<HTMLButtonElement>('.scope-timeline__delete-note')?.click();
+
+    await vi.waitFor(() => {
+      expect(patchScopeSequenceMock).toHaveBeenCalledTimes(1);
+    });
+    await vi.waitFor(() => {
+      expect(canvas.querySelector('.scope-timeline__banner')?.textContent).toContain(
+        'Unable to save'
+      );
+    });
+    expect(canvas.querySelector('.scope-timeline__note-title')).toBeTruthy();
+    expect(canvas.querySelector('.scope-timeline__item--note')).toBeTruthy();
+  });
+
   it('deletes a note via PATCH', async () => {
     const local = makeCurriculum();
     const updated = cloneScope();

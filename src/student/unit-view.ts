@@ -1,4 +1,5 @@
 import { apiGet, ApiClientError } from '@/api/client';
+import { navigate } from '@/app/router';
 import type { PublishedUnit } from '@/schemas/published-unit';
 
 export interface MountStudentUnitViewOptions {
@@ -67,8 +68,13 @@ function renderPublishedUnit(content: HTMLElement, unit: PublishedUnit): void {
 
     const link = document.createElement('a');
     link.className = 'student-unit__lesson-link';
-    link.href = `/s/lessons/${lesson.lesson_id}`;
+    const href = `/s/lessons/${lesson.lesson_id}`;
+    link.href = href;
     link.textContent = lesson.title;
+    link.addEventListener('click', (event) => {
+      event.preventDefault();
+      navigate(href);
+    });
 
     item.append(link);
     list.append(item);

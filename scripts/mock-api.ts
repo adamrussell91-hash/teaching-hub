@@ -955,6 +955,22 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
             'unit_id must be unique among unit timeline items'
           );
         }
+        const rawUnit = store.getJSON(unitKey(item.unit_id));
+        const unitParsed = UnitSchema.safeParse(rawUnit);
+        if (!unitParsed.success) {
+          return errorResponse(
+            400,
+            'validation_error',
+            `Unknown unit_id: ${item.unit_id}`
+          );
+        }
+        if (unitParsed.data.subject_id !== scopeParsed.data.subject_id) {
+          return errorResponse(
+            400,
+            'validation_error',
+            'unit_id must belong to the scope subject'
+          );
+        }
         seenUnitIds.add(item.unit_id);
       }
 

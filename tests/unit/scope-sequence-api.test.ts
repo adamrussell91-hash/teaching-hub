@@ -161,6 +161,70 @@ describe('PATCH /api/scope-sequences/:id (mock)', () => {
     const body = await res.json();
     expect(body.error.code).toBe('validation_error');
   });
+
+  it('rejects unknown unit_id', async () => {
+    const api = freshApi();
+    const cookie = await signIn(api);
+
+    const res = await api.request('PATCH', PATH, {
+      cookie,
+      body: {
+        timeline_items: [
+          {
+            id: 'ti_missing',
+            kind: 'unit',
+            unit_id: 'unit_does_not_exist',
+            start_week: 1,
+            end_week: 2,
+            order: 1
+          }
+        ]
+      }
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error.code).toBe('validation_error');
+    expect(body.error.message).toContain('Unknown unit_id');
+  });
+
+  it('rejects unit_id from another subject', async () => {
+    const seed = freshSeed();
+    seed.units.push({
+      id: 'unit_other_subject',
+      type: 'unit',
+      title: 'Other Subject Unit',
+      slug: 'other_subject_unit',
+      status: 'active',
+      created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
+      schema_version: 1,
+      year_id: 'year_12',
+      subject_id: 'subject_other',
+      lesson_ids: []
+    });
+    const api = freshApi(seed);
+    const cookie = await signIn(api);
+
+    const res = await api.request('PATCH', PATH, {
+      cookie,
+      body: {
+        timeline_items: [
+          {
+            id: 'ti_wrong_subject',
+            kind: 'unit',
+            unit_id: 'unit_other_subject',
+            start_week: 1,
+            end_week: 2,
+            order: 1
+          }
+        ]
+      }
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error.code).toBe('validation_error');
+    expect(body.error.message).toContain('scope subject');
+  });
 });
 
 describe('scope sequence storage key', () => {

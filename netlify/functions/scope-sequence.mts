@@ -2,7 +2,8 @@ import {
   getContentStore,
   getJSON,
   scopeSequenceKey,
-  setJSON
+  setJSON,
+  unitKey
 } from './_shared/blobs.mts';
 import { getTeacherSession } from './_shared/session.mts';
 import {
@@ -18,6 +19,7 @@ import {
 import {
   ScopeSequenceSchema,
   TimelineItemSchema,
+  UnitSchema,
   type TimelineItem
 } from '../../src/schemas';
 
@@ -91,6 +93,25 @@ function parseTimelineItems(
   return { ok: true, timeline_items };
 }
 
+async function assertTimelineUnitsExist(
+  items: TimelineItem[],
+  subjectId: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const store = getContentStore();
+  for (const item of items) {
+    if (item.kind !== 'unit') continue;
+    const rawUnit = await getJSON(store, unitKey(item.unit_id));
+    const unitParsed = UnitSchema.safeParse(rawUnit);
+    if (!unitParsed.success) {
+      return { ok: false, message: `Unknown unit_id: ${item.unit_id}` };
+    }
+    if (unitParsed.data.subject_id !== subjectId) {
+      return { ok: false, message: 'unit_id must belong to the scope subject' };
+    }
+  }
+  return { ok: true };
+}
+
 export default async function handler(request: Request, context: FunctionContext): Promise<Response> {
   const env = process.env;
 
@@ -134,6 +155,14 @@ export default async function handler(request: Request, context: FunctionContext
   const parsed = parseTimelineItems(body, scopeParsed.data.week_count);
   if (!parsed.ok) {
     return withCors(errorResponse(400, parsed.code, parsed.message), request, env);
+  }
+
+  const unitsCheck = await assertTimelineUnitsExist(
+    parsed.timeline_items,
+    scopeParsed.data.subject_id
+  );
+  if (!unitsCheck.ok) {
+    return withCors(errorResponse(400, 'validation_error', unitsCheck.message), request, env);
   }
 
   const nowIso = new Date().toISOString();
