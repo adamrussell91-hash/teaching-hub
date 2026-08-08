@@ -5,6 +5,12 @@ export {
 } from './common';
 export { YearSchema, type Year } from './year';
 export { SubjectSchema, type Subject } from './subject';
+export { ClassSchema, type Class } from './class';
+export {
+  ScheduledLessonSchema,
+  DeliveryStatusSchema,
+  type ScheduledLesson
+} from './scheduled-lesson';
 export { UnitSchema, type Unit } from './unit';
 export {
   VisibilitySchema,

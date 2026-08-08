@@ -1,0 +1,17 @@
+import { z } from 'zod';
+import { CommonFields } from './common';
+
+export const ClassSchema = z.object({
+  ...CommonFields,
+  type: z.literal('class'),
+  code: z.string().min(1),
+  display_name: z.string().min(1).optional(),
+  academic_year: z.number().int(),
+  year_id: z.string().min(1),
+  subject_id: z.string().min(1),
+  active_unit_ids: z.array(z.string().min(1)),
+  current_unit_id: z.string().min(1).optional(),
+  current_scheduled_lesson_id: z.string().min(1).optional()
+});
+
+export type Class = z.infer<typeof ClassSchema>;
