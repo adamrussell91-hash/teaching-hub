@@ -15,7 +15,7 @@ import type { TeacherSection } from '@/teacher/section';
 import { renderResourcesPlaceholder } from '@/teacher/sections/placeholders';
 import {
   renderScopeSequencesIndex,
-  renderScopeSequenceStub
+  renderScopeTimelineEditor
 } from '@/teacher/sections/scope-sequences';
 import { renderClassesIndex, renderClassPage, type ClassPageOptions } from '@/teacher/sections/classes';
 import { openScheduleUnitModal } from '@/teacher/sections/schedule-unit-modal';
@@ -263,7 +263,7 @@ function renderTeacherScopeSequenceRoute(subjectId: string, token: number): void
     if (subject) {
       renderContextBar(refs, { title: subject.title });
     }
-    renderScopeSequenceStub(refs.canvas, curriculum, subjectId);
+    renderScopeTimelineEditor(refs.canvas, curriculum, subjectId);
   });
 }
 

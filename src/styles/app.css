@@ -1475,6 +1475,223 @@ a:hover {
   font-size: 0.85rem;
 }
 
+/* ── Scope & Sequence timeline ────────────────────────────────────────── */
+
+.scope-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  min-height: 0;
+}
+
+.scope-timeline .home-heading {
+  margin-bottom: 0;
+}
+
+.scope-timeline__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.scope-timeline__banner {
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(176, 52, 52, 0.25);
+  background: rgba(176, 52, 52, 0.08);
+  color: #8a2a2a;
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+}
+
+.scope-timeline__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 1rem;
+  align-items: start;
+  min-height: 14rem;
+}
+
+.scope-timeline__main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+
+.scope-timeline__terms,
+.scope-timeline__track {
+  position: relative;
+  min-width: 40rem;
+  width: 100%;
+}
+
+.scope-timeline__terms {
+  height: 1.75rem;
+}
+
+.scope-timeline__term {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 0.5rem;
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-right: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.scope-timeline__term:last-child {
+  border-right: 0;
+}
+
+.scope-timeline__track {
+  min-height: 6.5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.scope-timeline__week-marks {
+  display: grid;
+  grid-template-columns: repeat(var(--week-count, 40), minmax(0, 1fr));
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-ui);
+  font-size: 0.65rem;
+  color: var(--muted);
+}
+
+.scope-timeline__week-mark {
+  padding: 0.2rem 0;
+  text-align: center;
+  border-right: 1px solid rgba(20, 43, 81, 0.06);
+}
+
+.scope-timeline__week-mark:last-child {
+  border-right: 0;
+}
+
+.scope-timeline__items {
+  position: relative;
+  height: 4.5rem;
+}
+
+.scope-timeline__item {
+  position: absolute;
+  top: 0.55rem;
+  height: 2.4rem;
+  margin: 0;
+  padding: 0 0.55rem;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius-md) * 0.65);
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: left;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(20, 43, 81, 0.08);
+}
+
+.scope-timeline__item--unit {
+  color: #fff;
+  background: var(--wave);
+  border-color: var(--marine);
+}
+
+.scope-timeline__item--note {
+  color: var(--marine);
+  background: rgba(240, 207, 172, 0.65);
+  border-color: rgba(224, 120, 24, 0.35);
+  height: 1.85rem;
+  top: 1.55rem;
+  font-weight: 500;
+}
+
+.scope-timeline__item--selected {
+  outline: 2px solid var(--high-sea);
+  outline-offset: 2px;
+  z-index: 1;
+}
+
+.scope-timeline__item:hover {
+  filter: brightness(1.04);
+}
+
+.scope-timeline__inspector {
+  position: sticky;
+  top: 0.5rem;
+  min-height: 12rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.scope-timeline__inspector-empty {
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.scope-timeline__inspector-kind {
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.scope-timeline__inspector-title {
+  font-family: var(--font-ui);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--depth);
+}
+
+.scope-timeline__inspector-weeks {
+  font-family: var(--font-ui);
+  font-size: 0.88rem;
+  color: var(--orca, var(--muted));
+}
+
+.scope-timeline__open-unit {
+  align-self: flex-start;
+  margin-top: 0.35rem;
+}
+
+@media (max-width: 900px) {
+  .scope-timeline__body {
+    grid-template-columns: 1fr;
+  }
+
+  .scope-timeline__inspector {
+    position: static;
+  }
+}
+
 /* ── Reduced motion ───────────────────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {

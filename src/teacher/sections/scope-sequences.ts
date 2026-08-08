@@ -1,5 +1,9 @@
 import { navigate } from '@/app/router';
 import type { CurriculumResponse } from '@/teacher/nav';
+import {
+  renderScopeTimelineEditor,
+  type ScopeTimelineEditorOptions
+} from '@/teacher/sections/scope-timeline';
 
 export function renderScopeSequencesIndex(
   canvas: HTMLElement,
@@ -61,29 +65,14 @@ export function renderScopeSequencesIndex(
   canvas.append(list);
 }
 
+/** @deprecated Prefer renderScopeTimelineEditor — kept as a thin wrapper for callers. */
 export function renderScopeSequenceStub(
   canvas: HTMLElement,
   curriculum: CurriculumResponse,
-  subjectId: string
+  subjectId: string,
+  options?: ScopeTimelineEditorOptions
 ): void {
-  canvas.replaceChildren();
-  const subject = curriculum.subjects.find((entry) => entry.id === subjectId);
-
-  if (!subject) {
-    const status = document.createElement('p');
-    status.className = 'teacher-layout__canvas-status';
-    status.textContent = 'Subject not found.';
-    canvas.append(status);
-    return;
-  }
-
-  const heading = document.createElement('h1');
-  heading.className = 'home-heading';
-  heading.textContent = subject.title;
-
-  const body = document.createElement('p');
-  body.className = 'teacher-layout__canvas-status';
-  body.textContent = `Scope & Sequence for ${subject.title} is coming next.`;
-
-  canvas.append(heading, body);
+  renderScopeTimelineEditor(canvas, curriculum, subjectId, options);
 }
+
+export { renderScopeTimelineEditor } from '@/teacher/sections/scope-timeline';
