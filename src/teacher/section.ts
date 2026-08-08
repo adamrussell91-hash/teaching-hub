@@ -13,6 +13,7 @@ export function sectionFromRoute(match: RouteMatch): TeacherSection | null {
     case 'teacher-home':
       return 'home';
     case 'teacher-classes':
+    case 'teacher-class':
       return 'classes';
     case 'teacher-scope-sequences':
     case 'teacher-scope-sequence':

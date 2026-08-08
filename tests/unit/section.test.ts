@@ -6,6 +6,7 @@ describe('sectionFromRoute', () => {
   it('maps teacher routes to primary sections', () => {
     expect(sectionFromRoute(match('/')!)).toBe('home');
     expect(sectionFromRoute(match('/classes')!)).toBe('classes');
+    expect(sectionFromRoute(match('/classes/class_2026_12engadv1')!)).toBe('classes');
     expect(sectionFromRoute(match('/scope-sequences')!)).toBe('scope-sequences');
     expect(sectionFromRoute(match('/scope-sequences/subject_y12_engadv')!)).toBe('scope-sequences');
     expect(sectionFromRoute(match('/units')!)).toBe('units');

@@ -110,6 +110,15 @@ describe('router match', () => {
     });
   });
 
+  it('matches teacher class detail', () => {
+    expect(match('/classes/class_2026_12engadv1')).toEqual({
+      name: 'teacher-class',
+      params: { classId: 'class_2026_12engadv1' },
+      requiresAuth: true,
+      path: '/classes/class_2026_12engadv1'
+    });
+  });
+
   it('does not treat list paths as lesson editor', () => {
     expect(match('/lessons')?.name).toBe('teacher-lessons');
     expect(match('/lessons/lesson_aotfw_008')?.name).toBe('teacher-lesson');
