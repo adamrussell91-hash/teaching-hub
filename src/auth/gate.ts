@@ -13,6 +13,10 @@ export async function authenticate(passphrase: string): Promise<SessionInfo> {
   return apiPost<SessionInfo>('/api/auth', { passphrase });
 }
 
+export async function logout(): Promise<void> {
+  await apiPost<{ loggedOut: boolean }>('/api/logout');
+}
+
 export interface SignInOptions {
   onSuccess?: (session: SessionInfo) => void;
 }

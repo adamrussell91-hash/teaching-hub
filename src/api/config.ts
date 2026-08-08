@@ -1,13 +1,24 @@
 /**
- * Production API origin is committed in-repo (same pattern as Life Hub).
- * It is not a secret — only Netlify env vars (passphrase hash, session secret) are sensitive.
+ * Production API origin (not a secret). Prefer build-time
+ * `VITE_API_BASE_URL` (e.g. in CI) so you don't need a code edit after the
+ * first Netlify deploy; otherwise fall back to the committed placeholder.
  *
- * Replace `YOUR_NETLIFY_SITE` with the real site name after the first deploy
- * of `netlify/functions/*.mts` (see `netlify.toml`). Before the site has any
- * content, run `npm run seed:blobs` once against that site's Blob store —
- * see `scripts/seed-blobs.mjs` for required env vars.
+ * Sensitive values stay on Netlify only: passphrase hash, session secret.
+ * After Functions are live, set SITE_ORIGIN to the Pages origin and run
+ * `npm run seed:blobs` once — see README Deploy.
  */
-const PRODUCTION_API_BASE_URL = 'https://YOUR_NETLIFY_SITE.netlify.app';
+const PLACEHOLDER_API_BASE_URL = 'https://YOUR_NETLIFY_SITE.netlify.app';
+
+function readViteApiBaseUrl(): string | undefined {
+  if (typeof import.meta === 'undefined') return undefined;
+  const value = (import.meta as ImportMeta & { env?: { VITE_API_BASE_URL?: string } }).env
+    ?.VITE_API_BASE_URL;
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim().replace(/\/$/, '');
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+const PRODUCTION_API_BASE_URL = readViteApiBaseUrl() ?? PLACEHOLDER_API_BASE_URL;
 
 const LOCAL_HOSTNAME_RE = /^(localhost|127\.0\.0\.1|\[::1\])$/;
 

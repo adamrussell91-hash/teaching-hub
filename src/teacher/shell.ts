@@ -5,6 +5,11 @@ export interface TeacherShellRefs {
   main: HTMLElement;
   contextBar: HTMLElement;
   canvas: HTMLElement;
+  logoutButton: HTMLButtonElement | null;
+}
+
+export interface TeacherShellOptions {
+  onLogout?: () => void | Promise<void>;
 }
 
 /**
@@ -12,7 +17,10 @@ export interface TeacherShellRefs {
  * references to the mount points callers render into. Replaces any existing
  * content in `root`.
  */
-export function renderTeacherShell(root: HTMLElement): TeacherShellRefs {
+export function renderTeacherShell(
+  root: HTMLElement,
+  options: TeacherShellOptions = {}
+): TeacherShellRefs {
   root.replaceChildren();
 
   const layout = document.createElement('div');
@@ -22,14 +30,35 @@ export function renderTeacherShell(root: HTMLElement): TeacherShellRefs {
   rail.className = 'teacher-layout__rail';
   rail.setAttribute('aria-label', 'Curriculum navigation');
 
+  const brandRow = document.createElement('div');
+  brandRow.className = 'teacher-layout__rail-brand-row';
+
   const brand = document.createElement('p');
   brand.className = 'teacher-layout__rail-brand';
   brand.textContent = 'Teaching Hub';
 
+  let logoutButton: HTMLButtonElement | null = null;
+  if (options.onLogout) {
+    logoutButton = document.createElement('button');
+    logoutButton.type = 'button';
+    logoutButton.className = 'teacher-layout__logout';
+    logoutButton.textContent = 'Sign out';
+    logoutButton.addEventListener('click', () => {
+      if (!logoutButton) return;
+      logoutButton.disabled = true;
+      void Promise.resolve(options.onLogout?.()).finally(() => {
+        if (logoutButton) logoutButton.disabled = false;
+      });
+    });
+    brandRow.append(brand, logoutButton);
+  } else {
+    brandRow.append(brand);
+  }
+
   const railNav = document.createElement('div');
   railNav.className = 'teacher-layout__rail-nav';
 
-  rail.append(brand, railNav);
+  rail.append(brandRow, railNav);
 
   const main = document.createElement('div');
   main.className = 'teacher-layout__main';
@@ -44,7 +73,7 @@ export function renderTeacherShell(root: HTMLElement): TeacherShellRefs {
   layout.append(rail, main);
   root.append(layout);
 
-  return { root, rail, railNav, main, contextBar, canvas };
+  return { root, rail, railNav, main, contextBar, canvas, logoutButton };
 }
 
 export interface ContextBarConfig {

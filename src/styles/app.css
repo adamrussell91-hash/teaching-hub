@@ -147,13 +147,47 @@ a:hover {
   font-family: var(--font-ui);
 }
 
-.teacher-layout__rail-brand {
+.teacher-layout__rail-brand-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
   padding: 0.35rem 0.65rem 1rem;
+}
+
+.teacher-layout__rail-brand {
+  margin: 0;
   font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.55);
+}
+
+.teacher-layout__logout {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0.2rem 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 0.4rem;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.78);
+  font-family: var(--font-ui);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.teacher-layout__logout:hover:not(:disabled) {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.teacher-layout__logout:disabled {
+  opacity: 0.55;
+  cursor: wait;
 }
 
 .teacher-layout__main {
@@ -676,7 +710,7 @@ a:hover {
     padding: 0.75rem;
   }
 
-  .teacher-layout__rail-brand {
+  .teacher-layout__rail-brand-row {
     padding: 0.25rem 0.5rem;
   }
 }

@@ -1,5 +1,5 @@
 import { ApiClientError } from '@/api/client';
-import { fetchSession, renderSignIn, type SessionInfo } from '@/auth/gate';
+import { fetchSession, logout, renderSignIn, type SessionInfo } from '@/auth/gate';
 import {
   renderCanvasStatus,
   renderContextBar,
@@ -73,6 +73,22 @@ function getCurriculum(): Promise<CurriculumResponse> {
   return curriculumPromise;
 }
 
+async function handleLogout(): Promise<void> {
+  try {
+    await logout();
+  } catch {
+    // Still clear local session so the teacher isn't stuck signed in if the
+    // network call fails (cookie may linger until it expires).
+  }
+  session = { authenticated: false };
+  curriculumPromise = null;
+  navigate('/sign-in', { replace: true });
+}
+
+function mountTeacherShell(): TeacherShellRefs {
+  return renderTeacherShell(appRoot, { onLogout: () => handleLogout() });
+}
+
 async function loadNavAndHandleErrors(
   refs: TeacherShellRefs,
   token: number,
@@ -99,7 +115,7 @@ async function loadNavAndHandleErrors(
 }
 
 function renderTeacherHomeRoute(token: number): void {
-  const refs = renderTeacherShell(appRoot);
+  const refs = mountTeacherShell();
   renderContextBar(refs, { title: 'Teacher workspace' });
   renderRailStatus(refs.railNav, 'Loading curriculum…');
   renderCanvasStatus(refs.canvas, 'Loading lessons…');
@@ -110,7 +126,7 @@ function renderTeacherHomeRoute(token: number): void {
 }
 
 function renderTeacherLessonRoute(lessonId: string, token: number): void {
-  const refs = renderTeacherShell(appRoot);
+  const refs = mountTeacherShell();
   renderRailStatus(refs.railNav, 'Loading curriculum…');
 
   // The lesson editor owns the context bar title (and Save/Publish controls)
