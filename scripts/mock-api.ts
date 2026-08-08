@@ -22,6 +22,7 @@ import {
   PublishedLessonSchema,
   ScheduledLessonSchema,
   ScopeSequenceSchema,
+  SubjectSchema,
   MediaSchema,
   TimelineItemSchema,
   UnitSchema,
@@ -32,7 +33,8 @@ import {
   type ScheduledLesson,
   type ScopeSequence,
   type Media,
-  type TimelineItem
+  type TimelineItem,
+  type Unit
 } from '../src/schemas';
 import { orderLessonsByUnitIds } from '../src/schemas/published-unit';
 import { filterBlocksForStudent } from '../src/blocks/visibility';
@@ -174,6 +176,40 @@ function unauthorizedResponse(): MockResponse {
 
 function notFoundResponse(message: string): MockResponse {
   return errorResponse(404, 'not_found', message);
+}
+
+function slugify(title: string): string {
+  return (
+    title
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 80) || 'item'
+  );
+}
+
+function nowIso(): string {
+  return new Date().toISOString();
+}
+
+function newId(prefix: string): string {
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function defaultScopeTerms(weekCount = 40) {
+  const termWeeks = weekCount / 4;
+  return [1, 2, 3, 4].map((term_number) => {
+    const start_week = (term_number - 1) * termWeeks + 1;
+    const end_week = term_number * termWeeks;
+    return {
+      id: `term_t${term_number}`,
+      title: `Term ${term_number}`,
+      term_number,
+      start_week,
+      end_week
+    };
+  });
 }
 
 interface SessionTokenPayload {
@@ -993,6 +1029,278 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     return okResponse(200, validated.data);
   }
 
+  function handlePostClass(cookie: string | null | undefined, body: unknown): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+
+    if (typeof body !== 'object' || body === null) {
+      return errorResponse(400, 'validation_error', 'Request body must be a JSON object');
+    }
+
+    const record = body as Record<string, unknown>;
+    const title = typeof record.title === 'string' ? record.title.trim() : '';
+    const code = typeof record.code === 'string' ? record.code.trim() : '';
+    const year_id = typeof record.year_id === 'string' ? record.year_id : '';
+    const subject_id = typeof record.subject_id === 'string' ? record.subject_id : '';
+    const academic_year =
+      typeof record.academic_year === 'number' && Number.isInteger(record.academic_year)
+        ? record.academic_year
+        : NaN;
+
+    if (!title || !code || !year_id || !subject_id || !Number.isFinite(academic_year)) {
+      return errorResponse(
+        400,
+        'validation_error',
+        'title, code, academic_year, year_id, and subject_id are required'
+      );
+    }
+
+    if (!store.getJSON(yearKey(year_id))) {
+      return notFoundResponse('Year not found');
+    }
+    if (!store.getJSON(subjectKey(subject_id))) {
+      return notFoundResponse('Subject not found');
+    }
+
+    const timestamp = nowIso();
+    const id = newId('class');
+    const candidate: Class = {
+      id,
+      type: 'class',
+      title,
+      slug: slugify(title),
+      code,
+      academic_year,
+      year_id,
+      subject_id,
+      active_unit_ids: [],
+      homepage: { announcements: [], resources: [], custom: [] },
+      status: 'active',
+      created_at: timestamp,
+      updated_at: timestamp,
+      schema_version: 1
+    };
+
+    const validated = ClassSchema.safeParse(candidate);
+    if (!validated.success) {
+      return errorResponse(400, 'validation_error', 'Class data is invalid', validated.error.flatten());
+    }
+
+    store.setJSON(classKey(id), validated.data);
+    seedIds.classes.push(id);
+    return okResponse(201, validated.data);
+  }
+
+  function handlePostUnit(cookie: string | null | undefined, body: unknown): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+
+    if (typeof body !== 'object' || body === null) {
+      return errorResponse(400, 'validation_error', 'Request body must be a JSON object');
+    }
+
+    const record = body as Record<string, unknown>;
+    const title = typeof record.title === 'string' ? record.title.trim() : '';
+    const year_id = typeof record.year_id === 'string' ? record.year_id : '';
+    const subject_id = typeof record.subject_id === 'string' ? record.subject_id : '';
+
+    if (!title || !year_id || !subject_id) {
+      return errorResponse(400, 'validation_error', 'title, year_id, and subject_id are required');
+    }
+
+    if (!store.getJSON(yearKey(year_id))) {
+      return notFoundResponse('Year not found');
+    }
+
+    const rawSubject = store.getJSON(subjectKey(subject_id));
+    if (!rawSubject) return notFoundResponse('Subject not found');
+
+    const timestamp = nowIso();
+    const id = newId('unit');
+    const candidate: Unit = {
+      id,
+      type: 'unit',
+      title,
+      slug: slugify(title),
+      year_id,
+      subject_id,
+      lesson_ids: [],
+      status: 'active',
+      created_at: timestamp,
+      updated_at: timestamp,
+      schema_version: 1
+    };
+
+    const validated = UnitSchema.safeParse(candidate);
+    if (!validated.success) {
+      return errorResponse(400, 'validation_error', 'Unit data is invalid', validated.error.flatten());
+    }
+
+    const subjectParsed = SubjectSchema.safeParse(rawSubject);
+    if (!subjectParsed.success) {
+      return errorResponse(400, 'validation_error', 'Subject data is invalid');
+    }
+
+    const updatedSubject = SubjectSchema.safeParse({
+      ...subjectParsed.data,
+      unit_ids: [...subjectParsed.data.unit_ids, id],
+      updated_at: timestamp
+    });
+    if (!updatedSubject.success) {
+      return errorResponse(400, 'validation_error', 'Subject data is invalid');
+    }
+
+    store.setJSON(unitKey(id), validated.data);
+    store.setJSON(subjectKey(subject_id), updatedSubject.data);
+    seedIds.units.push(id);
+    return okResponse(201, validated.data);
+  }
+
+  function handlePostLesson(cookie: string | null | undefined, body: unknown): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+
+    if (typeof body !== 'object' || body === null) {
+      return errorResponse(400, 'validation_error', 'Request body must be a JSON object');
+    }
+
+    const record = body as Record<string, unknown>;
+    const title = typeof record.title === 'string' ? record.title.trim() : '';
+    const unit_id = typeof record.unit_id === 'string' ? record.unit_id : '';
+
+    if (!title || !unit_id) {
+      return errorResponse(400, 'validation_error', 'title and unit_id are required');
+    }
+
+    const rawUnit = store.getJSON(unitKey(unit_id));
+    if (!rawUnit) return notFoundResponse('Unit not found');
+    const unitParsed = UnitSchema.safeParse(rawUnit);
+    if (!unitParsed.success) {
+      return errorResponse(400, 'validation_error', 'Unit data is invalid');
+    }
+
+    let maxSequence = 0;
+    for (const lessonId of unitParsed.data.lesson_ids) {
+      const lesson = store.getJSON<Lesson>(draftLessonKey(lessonId));
+      if (lesson && typeof lesson.sequence === 'number' && lesson.sequence > maxSequence) {
+        maxSequence = lesson.sequence;
+      }
+    }
+
+    const timestamp = nowIso();
+    const id = newId('lesson');
+    const candidate: Lesson = {
+      id,
+      type: 'lesson',
+      title,
+      slug: slugify(title),
+      unit_id,
+      sequence: maxSequence + 1,
+      blocks: [],
+      status: 'active',
+      created_at: timestamp,
+      updated_at: timestamp,
+      schema_version: 1
+    };
+
+    const validated = LessonSchema.safeParse(candidate);
+    if (!validated.success) {
+      return errorResponse(400, 'validation_error', 'Lesson data is invalid', validated.error.flatten());
+    }
+
+    const updatedUnit = UnitSchema.safeParse({
+      ...unitParsed.data,
+      lesson_ids: [...unitParsed.data.lesson_ids, id],
+      updated_at: timestamp
+    });
+    if (!updatedUnit.success) {
+      return errorResponse(400, 'validation_error', 'Unit data is invalid');
+    }
+
+    store.setJSON(draftLessonKey(id), validated.data);
+    store.setJSON(unitKey(unit_id), updatedUnit.data);
+    seedIds.lessons.push(id);
+    return okResponse(201, validated.data);
+  }
+
+  function handlePostScopeSequence(
+    cookie: string | null | undefined,
+    body: unknown
+  ): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+
+    if (typeof body !== 'object' || body === null) {
+      return errorResponse(400, 'validation_error', 'Request body must be a JSON object');
+    }
+
+    const record = body as Record<string, unknown>;
+    const title = typeof record.title === 'string' ? record.title.trim() : '';
+    const subject_id = typeof record.subject_id === 'string' ? record.subject_id : '';
+    const academic_year =
+      typeof record.academic_year === 'number' && Number.isInteger(record.academic_year)
+        ? record.academic_year
+        : NaN;
+
+    if (!title || !subject_id || !Number.isFinite(academic_year)) {
+      return errorResponse(
+        400,
+        'validation_error',
+        'title, subject_id, and academic_year are required'
+      );
+    }
+
+    const rawSubject = store.getJSON(subjectKey(subject_id));
+    if (!rawSubject) return notFoundResponse('Subject not found');
+    const subjectParsed = SubjectSchema.safeParse(rawSubject);
+    if (!subjectParsed.success) {
+      return errorResponse(400, 'validation_error', 'Subject data is invalid');
+    }
+
+    const week_count = 40;
+    const timestamp = nowIso();
+    const id = newId('scope');
+    const candidate: ScopeSequence = {
+      id,
+      type: 'scope_sequence',
+      title,
+      slug: slugify(title),
+      subject_id,
+      academic_year,
+      week_count,
+      terms: defaultScopeTerms(week_count),
+      timeline_items: [],
+      status: 'active',
+      created_at: timestamp,
+      updated_at: timestamp,
+      schema_version: 1
+    };
+
+    const validated = ScopeSequenceSchema.safeParse(candidate);
+    if (!validated.success) {
+      return errorResponse(
+        400,
+        'validation_error',
+        'Scope sequence data is invalid',
+        validated.error.flatten()
+      );
+    }
+
+    const updatedSubject = SubjectSchema.safeParse({
+      ...subjectParsed.data,
+      scope_id: id,
+      updated_at: timestamp
+    });
+    if (!updatedSubject.success) {
+      return errorResponse(400, 'validation_error', 'Subject data is invalid');
+    }
+
+    store.setJSON(scopeSequenceKey(id), validated.data);
+    store.setJSON(subjectKey(subject_id), updatedSubject.data);
+    seedIds.scope_sequences.push(id);
+    return okResponse(201, validated.data);
+  }
+
   const LESSON_ID_RE = /^\/api\/lessons\/([^/]+)$/;
   const LESSON_PUBLISH_RE = /^\/api\/lessons\/([^/]+)\/publish$/;
   const PUBLISHED_LESSON_RE = /^\/api\/published\/lessons\/([^/]+)$/;
@@ -1013,6 +1321,13 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     if (method === 'GET' && path === '/api/session') return handleSession(cookie);
     if (method === 'POST' && path === '/api/logout') return handleLogout();
     if (method === 'GET' && path === '/api/curriculum') return handleGetCurriculum(cookie);
+
+    if (method === 'POST' && path === '/api/classes') return handlePostClass(cookie, body);
+    if (method === 'POST' && path === '/api/units') return handlePostUnit(cookie, body);
+    if (method === 'POST' && path === '/api/lessons') return handlePostLesson(cookie, body);
+    if (method === 'POST' && path === '/api/scope-sequences') {
+      return handlePostScopeSequence(cookie, body);
+    }
 
     const publishMatch = LESSON_PUBLISH_RE.exec(path);
     if (publishMatch && method === 'POST') {
