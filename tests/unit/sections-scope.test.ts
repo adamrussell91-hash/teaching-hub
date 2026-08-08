@@ -92,6 +92,14 @@ const scope: ScopeSequence = {
       start_week: 12,
       end_week: 18,
       order: 1
+    },
+    {
+      id: 'ti_note_mid',
+      kind: 'note',
+      title: 'Mid-year note',
+      start_week: 20,
+      end_week: 20,
+      order: 2
     }
   ]
 };
@@ -116,20 +124,41 @@ describe('scope & sequences', () => {
     canvas = document.createElement('div');
   });
 
-  it('lists one row per subject with year context', () => {
+  it('renders overall timeline with subject rows and clickable unit bars', () => {
     renderScopeSequencesIndex(canvas, curriculum);
-    const titles = [...canvas.querySelectorAll('.lesson-list__title')].map((el) => el.textContent);
-    expect(titles).toEqual(['English Advanced', 'English Standard']);
-    const meta = [...canvas.querySelectorAll('.lesson-list__meta')].map((el) => el.textContent);
-    expect(meta).toEqual(['Year 12', 'Year 12']);
+    expect(canvas.querySelector('.scope-overview')).not.toBeNull();
+    expect(canvas.querySelector('.home-heading')?.textContent).toMatch(/Overall Scope/i);
+
+    const rows = canvas.querySelectorAll('.scope-overview__row');
+    expect(rows).toHaveLength(1);
+    expect(canvas.textContent).toContain('English Advanced');
+    expect(canvas.textContent).not.toContain('English Standard');
+
+    const label = canvas.querySelector<HTMLAnchorElement>('.scope-overview__label');
+    expect(label?.getAttribute('href')).toBe('/scope-sequences/subject_y12_engadv');
+
+    const bar = canvas.querySelector<HTMLAnchorElement>('[data-scope-bar-kind="unit"]');
+    expect(bar).not.toBeNull();
+    expect(bar!.getAttribute('href')).toContain('/units/unit_aotfw');
+
+    const noteBar = canvas.querySelector<HTMLAnchorElement>('[data-scope-bar-kind="note"]');
+    expect(noteBar?.getAttribute('href')).toBe(
+      '/scope-sequences/subject_y12_engadv?selectNote=ti_note_mid'
+    );
   });
 
-  it('opens the subject timeline route', () => {
+  it('navigates from overview row label and unit bar', () => {
     renderScopeSequencesIndex(canvas, curriculum);
-    canvas.querySelectorAll<HTMLAnchorElement>('.lesson-list__open')[0].dispatchEvent(
-      new MouseEvent('click', { bubbles: true, cancelable: true })
-    );
+
+    canvas
+      .querySelector<HTMLAnchorElement>('.scope-overview__label')!
+      .dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     expect(navigate).toHaveBeenCalledWith('/scope-sequences/subject_y12_engadv');
+
+    canvas
+      .querySelector<HTMLAnchorElement>('[data-scope-bar-kind="unit"]')!
+      .dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    expect(navigate).toHaveBeenCalledWith('/units/unit_aotfw');
   });
 
   it('renders the timeline editor for a known subject with a scope', () => {
@@ -137,6 +166,15 @@ describe('scope & sequences', () => {
     expect(canvas.querySelector('.home-heading')?.textContent).toBe('English Advanced');
     expect(canvas.querySelector('.scope-timeline')).toBeTruthy();
     expect(canvas.textContent).not.toMatch(/coming next/i);
+  });
+
+  it('selects a note when selectedNoteId is provided', () => {
+    renderScopeTimelineEditor(canvas, curriculum, 'subject_y12_engadv', {
+      selectedNoteId: 'ti_note_mid'
+    });
+    const selected = canvas.querySelector('.scope-timeline__item--selected');
+    expect(selected?.getAttribute('data-item-id')).toBe('ti_note_mid');
+    expect(canvas.querySelector('.scope-timeline__note-title')).toBeTruthy();
   });
 
   it('renders not-found for an unknown subject', () => {

@@ -19,6 +19,8 @@ interface ActiveDrag {
 
 export interface ScopeTimelineEditorOptions {
   onPatched?: (scope: ScopeSequence) => void;
+  /** When set, select this timeline note in the inspector on first paint. */
+  selectedNoteId?: string;
 }
 
 const UNIT_SPAN = 4;
@@ -606,7 +608,16 @@ export function renderScopeTimelineEditor(
   });
 
   refreshItems();
-  renderEmptyInspector(inspector);
+
+  const initialNoteId = options?.selectedNoteId;
+  if (
+    initialNoteId &&
+    scope.timeline_items.some((item) => item.id === initialNoteId && item.kind === 'note')
+  ) {
+    setSelection(initialNoteId);
+  } else {
+    renderEmptyInspector(inspector);
+  }
 
   track.append(weekMarks, itemsLayer);
   main.append(termsRow, track);

@@ -233,16 +233,36 @@ function bindPopState(): void {
   popStateBound = true;
 }
 
-export function navigate(path: string, options?: { replace?: boolean }): void {
-  const normalized = normalizePath(path);
-
-  if (options?.replace) {
-    history.replaceState(null, '', normalized);
-  } else {
-    history.pushState(null, '', normalized);
+function splitPathAndSearch(path: string): { pathname: string; search: string } {
+  if (/^https?:\/\//i.test(path)) {
+    const url = new URL(path);
+    return { pathname: normalizePath(url.pathname), search: url.search };
   }
 
-  notify(normalized);
+  const hashIndex = path.indexOf('#');
+  const withoutHash = hashIndex >= 0 ? path.slice(0, hashIndex) : path;
+  const queryIndex = withoutHash.indexOf('?');
+  if (queryIndex < 0) {
+    return { pathname: normalizePath(withoutHash), search: '' };
+  }
+
+  return {
+    pathname: normalizePath(withoutHash.slice(0, queryIndex)),
+    search: withoutHash.slice(queryIndex)
+  };
+}
+
+export function navigate(path: string, options?: { replace?: boolean }): void {
+  const { pathname, search } = splitPathAndSearch(path);
+  const full = `${pathname}${search}`;
+
+  if (options?.replace) {
+    history.replaceState(null, '', full);
+  } else {
+    history.pushState(null, '', full);
+  }
+
+  notify(pathname);
 }
 
 export function start(onRoute: RouteHandler): () => void {

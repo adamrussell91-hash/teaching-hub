@@ -211,6 +211,28 @@ describe('router navigation', () => {
     expect(pushState).not.toHaveBeenCalled();
   });
 
+  it('navigate preserves query strings in history', () => {
+    const onRoute = vi.fn<(match: RouteMatch) => void>();
+    const stop = start(onRoute);
+    onRoute.mockClear();
+
+    navigate('/scope-sequences/subject_y12_engadv?selectNote=ti_note_mid');
+
+    expect(pushState).toHaveBeenCalledWith(
+      null,
+      '',
+      '/scope-sequences/subject_y12_engadv?selectNote=ti_note_mid'
+    );
+    expect(onRoute).toHaveBeenCalledWith({
+      name: 'teacher-scope-sequence',
+      params: { subjectId: 'subject_y12_engadv' },
+      requiresAuth: true,
+      path: '/scope-sequences/subject_y12_engadv'
+    });
+
+    stop();
+  });
+
   it('start handles browser back and forward', () => {
     const onRoute = vi.fn<(match: RouteMatch) => void>();
     const stop = start(onRoute);

@@ -2207,4 +2207,95 @@ input.scope-timeline__note-title:focus-visible {
   overflow: hidden;
   cursor: pointer;
   border: 1px solid var(--line);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.scope-sequences-index__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.scope-sequences-index__titles {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.scope-sequences-index__year {
+  margin: 0;
+  font-size: var(--font-size-meta, 0.8rem);
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.scope-overview {
+  padding: 1.25rem 1.35rem 0.5rem;
+}
+
+.scope-overview__terms {
+  position: relative;
+  height: 2rem;
+  margin: 0 0 1rem 12.25rem;
+}
+
+.scope-overview__term {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.5rem;
+  font-size: var(--font-size-meta, 0.75rem);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--marine);
+  background: rgba(55, 111, 183, 0.12);
+  border: 1px solid var(--line);
+  border-right: none;
+  box-sizing: border-box;
+}
+
+.scope-overview__term:last-child {
+  border-right: 1px solid var(--line);
+  border-radius: 0 var(--radius-sm, 0.5rem) var(--radius-sm, 0.5rem) 0;
+}
+
+.scope-overview__term:first-child {
+  border-radius: var(--radius-sm, 0.5rem) 0 0 var(--radius-sm, 0.5rem);
+}
+
+.scope-overview__label {
+  font-size: var(--font-size-body, 1rem);
+  font-weight: 650;
+  color: var(--depth);
+  text-decoration: none;
+}
+
+.scope-overview__label:hover {
+  color: var(--wave);
+  text-decoration: underline;
+}
+
+.scope-overview__bar--unit {
+  color: #fff;
+  background: var(--wave);
+  border-color: var(--marine);
+}
+
+.scope-overview__bar--note {
+  top: 1.15rem;
+  bottom: 1.15rem;
+  color: var(--marine);
+  background: rgba(240, 207, 172, 0.75);
+  border-color: rgba(224, 120, 24, 0.35);
+  font-weight: 500;
 }

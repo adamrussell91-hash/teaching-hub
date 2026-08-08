@@ -70,6 +70,9 @@ let studentClassViewHandle: StudentClassViewHandle | null = null;
 // Home dashboard handle (clock interval + create control), if mounted.
 let homeHandle: { dispose: () => void } | null = null;
 
+// Scope sequences index handle (create control), if mounted.
+let scopeIndexHandle: { dispose?: () => void } | null = null;
+
 /**
  * Flushes any pending/in-flight autosave for the current lesson editor and
  * only disposes it once that flush has fully settled. Awaiting this (rather
@@ -108,6 +111,12 @@ function teardownTeacherHome(): void {
   if (!homeHandle) return;
   homeHandle.dispose();
   homeHandle = null;
+}
+
+function teardownScopeIndex(): void {
+  if (!scopeIndexHandle) return;
+  scopeIndexHandle.dispose?.();
+  scopeIndexHandle = null;
 }
 
 function pathForCreatedEntity(
@@ -301,7 +310,28 @@ function renderTeacherScopeSequencesRoute(token: number): void {
   renderCanvasStatus(refs.canvas, 'Loading…');
 
   void loadNavAndHandleErrors(refs, token, 'scope-sequences', undefined, (curriculum) => {
-    renderScopeSequencesIndex(refs.canvas, curriculum);
+    teardownScopeIndex();
+    scopeIndexHandle = renderScopeSequencesIndex(refs.canvas, curriculum, {
+      onCreated: async (kind, id) => {
+        curriculumPromise = null;
+        try {
+          const refreshed = await getCurriculum();
+          if (token !== renderToken) return;
+          navigate(pathForCreatedEntity(kind, id, refreshed));
+        } catch (error) {
+          if (token !== renderToken) return;
+          if (error instanceof ApiClientError && error.code === 'unauthorized') {
+            session = { authenticated: false };
+            navigate('/sign-in', { replace: true });
+            return;
+          }
+          renderCanvasStatus(
+            refs.canvas,
+            'Created, but unable to refresh. Please reload to open the new item.'
+          );
+        }
+      }
+    });
   });
 }
 
@@ -311,12 +341,17 @@ function renderTeacherScopeSequenceRoute(subjectId: string, token: number): void
   renderRailStatus(refs.railNav, 'Loading curriculum…');
   renderCanvasStatus(refs.canvas, 'Loading…');
 
+  const selectedNoteId =
+    new URLSearchParams(window.location.search).get('selectNote') ?? undefined;
+
   void loadNavAndHandleErrors(refs, token, 'scope-sequences', undefined, (curriculum) => {
     const subject = curriculum.subjects.find((entry) => entry.id === subjectId);
     if (subject) {
       renderContextBar(refs, { title: subject.title });
     }
-    renderScopeTimelineEditor(refs.canvas, curriculum, subjectId);
+    renderScopeTimelineEditor(refs.canvas, curriculum, subjectId, {
+      selectedNoteId
+    });
   });
 }
 
@@ -460,6 +495,7 @@ async function handleRoute(match: RouteMatch): Promise<void> {
   // before tearing the editor down.
   await teardownLessonEditor();
   teardownTeacherHome();
+  teardownScopeIndex();
   teardownStudentLessonView();
   teardownStudentUnitView();
   teardownStudentClassView();

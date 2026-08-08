@@ -1,68 +1,71 @@
-import { navigate } from '@/app/router';
+import { mountCreateControl } from '@/teacher/create/control';
+import type { CreateKind } from '@/teacher/create/types';
 import type { CurriculumResponse } from '@/teacher/nav';
+import { renderScopeOverview, subjectsWithScope } from '@/teacher/sections/scope-overview';
 import {
   renderScopeTimelineEditor,
   type ScopeTimelineEditorOptions
 } from '@/teacher/sections/scope-timeline';
 
+export interface ScopeSequencesIndexOptions {
+  onCreated?: (kind: CreateKind, id: string) => void | Promise<void>;
+}
+
 export function renderScopeSequencesIndex(
   canvas: HTMLElement,
-  curriculum: CurriculumResponse
-): void {
+  curriculum: CurriculumResponse,
+  options?: ScopeSequencesIndexOptions
+): { dispose?: () => void } {
   canvas.replaceChildren();
+
+  const disposers: Array<() => void> = [];
+
+  const header = document.createElement('header');
+  header.className = 'scope-sequences-index__header';
+
+  const titleBlock = document.createElement('div');
+  titleBlock.className = 'scope-sequences-index__titles';
 
   const heading = document.createElement('h1');
   heading.className = 'home-heading';
-  heading.textContent = 'Scope & Sequences';
-  canvas.append(heading);
+  heading.textContent = 'Overall Scope & Sequence';
 
-  const yearsById = new Map(curriculum.years.map((year) => [year.id, year]));
-  const subjects = [...curriculum.subjects].sort((a, b) => a.title.localeCompare(b.title));
+  const yearMeta = document.createElement('p');
+  yearMeta.className = 'scope-sequences-index__year';
+  const scoped = subjectsWithScope(curriculum);
+  const academicYear =
+    scoped[0]?.scope.academic_year ??
+    curriculum.scope_sequences[0]?.academic_year ??
+    curriculum.classes[0]?.academic_year;
+  yearMeta.textContent =
+    academicYear != null ? `Academic year ${academicYear}` : 'Academic year';
 
-  if (subjects.length === 0) {
-    const empty = document.createElement('p');
-    empty.className = 'teacher-layout__canvas-status';
-    empty.textContent = 'No subjects yet.';
-    canvas.append(empty);
-    return;
-  }
+  titleBlock.append(heading, yearMeta);
 
-  const list = document.createElement('ul');
-  list.className = 'lesson-list';
+  const createHost = document.createElement('div');
+  createHost.className = 'scope-sequences-index__create create-control';
+  createHost.dataset.createHost = '';
 
-  for (const subject of subjects) {
-    const year = yearsById.get(subject.year_id);
-    const item = document.createElement('li');
-    item.className = 'lesson-list__item';
+  header.append(titleBlock, createHost);
 
-    const info = document.createElement('div');
-    info.className = 'lesson-list__info';
+  const createControl = mountCreateControl(createHost, {
+    context: 'scope-sequences',
+    curriculum,
+    onCreated: options?.onCreated ?? (() => undefined)
+  });
+  disposers.push(createControl.dispose);
 
-    const title = document.createElement('p');
-    title.className = 'lesson-list__title';
-    title.textContent = subject.title;
+  const overviewHost = document.createElement('div');
+  overviewHost.className = 'scope-sequences-index__overview';
 
-    const meta = document.createElement('p');
-    meta.className = 'lesson-list__meta';
-    meta.textContent = year?.title ?? subject.year_id;
+  canvas.append(header, overviewHost);
+  renderScopeOverview(overviewHost, curriculum);
 
-    info.append(title, meta);
-
-    const path = `/scope-sequences/${subject.id}`;
-    const open = document.createElement('a');
-    open.className = 'btn btn--secondary lesson-list__open';
-    open.href = path;
-    open.textContent = 'Open';
-    open.addEventListener('click', (event) => {
-      event.preventDefault();
-      navigate(path);
-    });
-
-    item.append(info, open);
-    list.append(item);
-  }
-
-  canvas.append(list);
+  return {
+    dispose: () => {
+      for (const dispose of disposers.splice(0).reverse()) dispose();
+    }
+  };
 }
 
 /** @deprecated Prefer renderScopeTimelineEditor — kept as a thin wrapper for callers. */
