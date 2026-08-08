@@ -65,6 +65,54 @@ function writeExpandedIds(ids: Set<string>): void {
   }
 }
 
+export interface ClassesNavOptions {
+  activeClassId?: string;
+  onCreateClass?: () => void;
+}
+
+/**
+ * Renders the flat "Your classes" list into `container`.
+ * Class rows navigate to `/classes/:id` without expanding a curriculum tree.
+ */
+export function renderClassesNav(
+  container: HTMLElement,
+  curriculum: CurriculumResponse,
+  options: ClassesNavOptions = {}
+): void {
+  container.replaceChildren();
+
+  const label = document.createElement('p');
+  label.className = 'rail-classes__label';
+  label.textContent = 'Your classes';
+  container.append(label);
+
+  const list = document.createElement('div');
+  list.className = 'rail-classes';
+  for (const cls of [...curriculum.classes].sort((a, b) => a.code.localeCompare(b.code))) {
+    const link = document.createElement('a');
+    link.className = 'nav-item rail-classes__item';
+    const path = `/classes/${cls.id}`;
+    link.href = path;
+    link.textContent = cls.code || cls.title;
+    if (cls.id === options.activeClassId) {
+      link.classList.add('nav-item--selected');
+    }
+    link.addEventListener('click', (event) => {
+      event.preventDefault();
+      navigate(path);
+    });
+    list.append(link);
+  }
+  container.append(list);
+
+  const add = document.createElement('button');
+  add.type = 'button';
+  add.className = 'btn btn--ghost rail-classes__new';
+  add.textContent = '+ New class';
+  add.addEventListener('click', () => options.onCreateClass?.());
+  container.append(add);
+}
+
 export interface CurriculumNavOptions {
   /** Lesson ID for the current route, used to highlight and auto-expand its ancestors. */
   activeLessonId?: string;
@@ -73,6 +121,7 @@ export interface CurriculumNavOptions {
 /**
  * Renders the Year → Subject → Unit → Lesson tree into `container`.
  * Expand/collapse state persists to `localStorage` under `teaching-hub.nav`.
+ * Kept for tests / alternate surfaces; the teacher rail uses {@link renderClassesNav}.
  */
 export function renderCurriculumNav(
   container: HTMLElement,

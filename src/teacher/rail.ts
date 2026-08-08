@@ -1,12 +1,16 @@
 import type { CurriculumResponse } from '@/teacher/nav';
-import { renderCurriculumNav } from '@/teacher/nav';
+import { renderClassesNav } from '@/teacher/nav';
 import { renderPrimaryNav } from '@/teacher/primary-nav';
 import type { TeacherSection } from '@/teacher/section';
 
 export function renderTeacherRail(
   railNav: HTMLElement,
   curriculum: CurriculumResponse,
-  options: { activeSection: TeacherSection; activeLessonId?: string }
+  options: {
+    activeSection: TeacherSection;
+    activeClassId?: string;
+    onCreateClass?: () => void;
+  }
 ): void {
   railNav.replaceChildren();
 
@@ -17,5 +21,8 @@ export function renderTeacherRail(
 
   railNav.append(primaryHost, treeHost);
   renderPrimaryNav(primaryHost, { activeSection: options.activeSection });
-  renderCurriculumNav(treeHost, curriculum, { activeLessonId: options.activeLessonId });
+  renderClassesNav(treeHost, curriculum, {
+    activeClassId: options.activeClassId,
+    onCreateClass: options.onCreateClass
+  });
 }

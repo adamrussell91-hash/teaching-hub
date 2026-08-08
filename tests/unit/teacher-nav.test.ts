@@ -41,9 +41,11 @@ import { navigate } from '@/app/router';
 import { apiGet } from '@/api/client';
 import {
   fetchCurriculum,
+  renderClassesNav,
   renderCurriculumNav,
   type CurriculumResponse
 } from '@/teacher/nav';
+import type { Class } from '@/schemas';
 
 const ISO = '2026-01-01T00:00:00.000Z';
 
@@ -203,5 +205,72 @@ describe('fetchCurriculum', () => {
 
     expect(apiGet).toHaveBeenCalledWith('/api/curriculum');
     expect(result).toBe(curriculum);
+  });
+});
+
+const sampleClass: Class = {
+  id: 'class_2026_12engadv1',
+  type: 'class',
+  code: '12ENGADV1',
+  title: 'Year 12 English Advanced',
+  slug: '12engadv1',
+  academic_year: 2026,
+  year_id: 'year_12',
+  subject_id: 'subject_engadv',
+  active_unit_ids: ['unit_aotfw'],
+  status: 'active',
+  created_at: ISO,
+  updated_at: ISO,
+  schema_version: 1
+};
+
+describe('classes nav rendering', () => {
+  let container: HTMLElement;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    container = document.createElement('div');
+  });
+
+  it('lists classes and navigates to class page on click', () => {
+    const withClass: CurriculumResponse = {
+      ...curriculum,
+      classes: [sampleClass]
+    };
+
+    renderClassesNav(container, withClass);
+
+    expect(container.querySelector('.rail-classes__label')?.textContent).toBe('Your classes');
+    const links = [...container.querySelectorAll('a.rail-classes__item')] as HTMLAnchorElement[];
+    expect(links).toHaveLength(1);
+    expect(links[0].textContent).toBe('12ENGADV1');
+    expect(links[0].getAttribute('href')).toBe('/classes/class_2026_12engadv1');
+
+    links[0].dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    expect(navigate).toHaveBeenCalledWith('/classes/class_2026_12engadv1');
+  });
+
+  it('does not render year/subject expand tree', () => {
+    renderClassesNav(container, {
+      ...curriculum,
+      classes: [sampleClass]
+    });
+
+    expect(container.querySelector('.nav-item--toggle')).toBeNull();
+  });
+
+  it('highlights the active class and invokes onCreateClass', () => {
+    const onCreateClass = vi.fn();
+    renderClassesNav(
+      container,
+      { ...curriculum, classes: [sampleClass] },
+      { activeClassId: 'class_2026_12engadv1', onCreateClass }
+    );
+
+    expect(container.querySelector('a.nav-item--selected')?.textContent).toBe('12ENGADV1');
+    const add = container.querySelector('button.rail-classes__new') as HTMLButtonElement;
+    expect(add.textContent).toBe('+ New class');
+    add.click();
+    expect(onCreateClass).toHaveBeenCalledOnce();
   });
 });

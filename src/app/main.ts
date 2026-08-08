@@ -130,13 +130,13 @@ async function loadNavAndHandleErrors(
   refs: TeacherShellRefs,
   token: number,
   activeSection: TeacherSection,
-  activeLessonId: string | undefined,
+  activeClassId: string | undefined,
   onLoaded: (curriculum: CurriculumResponse) => void
 ): Promise<void> {
   try {
     const curriculum = await getCurriculum();
     if (token !== renderToken) return;
-    renderTeacherRail(refs.railNav, curriculum, { activeSection, activeLessonId });
+    renderTeacherRail(refs.railNav, curriculum, { activeSection, activeClassId });
     onLoaded(curriculum);
   } catch (error) {
     if (token !== renderToken) return;
@@ -189,7 +189,10 @@ function renderTeacherClassRoute(classId: string, token: number): void {
       const curriculum = await getCurriculum();
       if (token !== renderToken) return;
       currentCurriculum = curriculum;
-      renderTeacherRail(refs.railNav, curriculum, { activeSection: 'classes', activeLessonId: undefined });
+      renderTeacherRail(refs.railNav, curriculum, {
+        activeSection: 'classes',
+        activeClassId: classId
+      });
       const cls = curriculum.classes.find((entry) => entry.id === classId);
       if (cls) {
         renderContextBar(refs, { title: cls.code || cls.title });
@@ -220,7 +223,7 @@ function renderTeacherClassRoute(classId: string, token: number): void {
     }
   };
 
-  void loadNavAndHandleErrors(refs, token, 'classes', undefined, (curriculum) => {
+  void loadNavAndHandleErrors(refs, token, 'classes', classId, (curriculum) => {
     currentCurriculum = curriculum;
     const cls = curriculum.classes.find((entry) => entry.id === classId);
     if (cls) {
@@ -317,7 +320,7 @@ function renderTeacherLessonRoute(lessonId: string, token: number): void {
     isStale: () => token !== renderToken
   });
 
-  void loadNavAndHandleErrors(refs, token, 'lessons', lessonId, () => {});
+  void loadNavAndHandleErrors(refs, token, 'lessons', undefined, () => {});
 }
 
 function renderStudentLessonRoute(
