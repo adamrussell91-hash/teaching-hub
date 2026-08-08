@@ -148,6 +148,7 @@ const curriculum: CurriculumResponse = {
   ],
   classes: [classRow],
   scheduled_lessons: [scheduledCurrent, scheduledPlanned],
+  scope_sequences: [],
   schedule_anchor_date: '2026-08-12'
 };
 

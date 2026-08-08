@@ -59,7 +59,8 @@ const {
   publishedLessonKey,
   classKey,
   scheduledLessonKey,
-  scheduleAnchorKey
+  scheduleAnchorKey,
+  scopeSequenceKey
 } = await import('../../netlify/functions/_shared/blobs.mts');
 const { createSessionToken } = await import('../../netlify/functions/_shared/auth-security.mts');
 const curriculumHandler = (await import('../../netlify/functions/curriculum.mts')).default;
@@ -172,6 +173,7 @@ describe('GET /api/curriculum', () => {
         lessons: [],
         classes: [],
         scheduled_lessons: [],
+        scope_sequences: [],
         schedule_anchor_date: '2026-08-12'
       }
     });
@@ -210,6 +212,34 @@ describe('GET /api/curriculum', () => {
       schema_version: 1
     });
     fakeStore.seed(scheduleAnchorKey(), { date: '2026-08-12' });
+    fakeStore.seed(scopeSequenceKey('scope_y12_engadv_2026'), {
+      id: 'scope_y12_engadv_2026',
+      type: 'scope_sequence',
+      title: 'Year 12 English Advanced 2026',
+      slug: 'y12_engadv_2026',
+      subject_id: 'subject_engadv',
+      academic_year: 2026,
+      week_count: 40,
+      terms: [
+        { id: 'term_t1', title: 'Term 1', term_number: 1, start_week: 1, end_week: 10 },
+        { id: 'term_t2', title: 'Term 2', term_number: 2, start_week: 11, end_week: 20 },
+        { id: 'term_t3', title: 'Term 3', term_number: 3, start_week: 21, end_week: 30 },
+        { id: 'term_t4', title: 'Term 4', term_number: 4, start_week: 31, end_week: 40 }
+      ],
+      timeline_items: [
+        {
+          id: 'ti_unit_aotfw',
+          kind: 'unit',
+          unit_id: 'unit_aotfw',
+          start_week: 12,
+          end_week: 18,
+          order: 1
+        }
+      ],
+      status: 'active',
+      ...timestamps,
+      schema_version: 1
+    });
 
     const response = await curriculumHandler(request('/api/curriculum', { cookie: sessionCookieHeader() }));
     const body = await response.json();
@@ -223,6 +253,11 @@ describe('GET /api/curriculum', () => {
       ])
     );
     expect(body.data.scheduled_lessons.length).toBeGreaterThan(0);
+    expect(body.data.scope_sequences).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'scope_y12_engadv_2026', subject_id: 'subject_engadv' })
+      ])
+    );
     expect(body.data.schedule).toBeUndefined();
     expect(body.data.schedule_anchor_date).toBe('2026-08-12');
     expect(body.data.lessons).toEqual([

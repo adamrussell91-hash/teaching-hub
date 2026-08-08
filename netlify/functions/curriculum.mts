@@ -46,7 +46,7 @@ async function listEntries<T>(store: ContentStore, prefix: string): Promise<T[]>
  * against a fresh site before the first curriculum GET.
  */
 async function buildCurriculum(store: ContentStore) {
-  const [years, subjects, units, lessons, publishedList, classes, scheduled_lessons, anchor] =
+  const [years, subjects, units, lessons, publishedList, classes, scheduled_lessons, scope_sequences, anchor] =
     await Promise.all([
       listEntries<Record<string, unknown>>(store, 'years/'),
       listEntries<Record<string, unknown>>(store, 'subjects/'),
@@ -55,6 +55,7 @@ async function buildCurriculum(store: ContentStore) {
       store.list({ prefix: PUBLISHED_LESSON_PREFIX }),
       listEntries<Record<string, unknown>>(store, 'classes/'),
       listEntries<Record<string, unknown>>(store, 'scheduled_lessons/'),
+      listEntries<Record<string, unknown>>(store, 'scope_sequences/'),
       getJSON<{ date: string }>(store, scheduleAnchorKey())
     ]);
 
@@ -79,6 +80,7 @@ async function buildCurriculum(store: ContentStore) {
     lessons: lessonSummaries,
     classes,
     scheduled_lessons,
+    scope_sequences,
     schedule_anchor_date: anchor?.date ?? DEFAULT_SCHEDULE_ANCHOR_DATE
   };
 }

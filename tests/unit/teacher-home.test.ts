@@ -58,6 +58,7 @@ const curriculum: CurriculumResponse = {
       schema_version: 1
     }
   ],
+  scope_sequences: [],
   lessons: [
     {
       id: 'lesson_aotfw_008',

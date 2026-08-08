@@ -10,7 +10,8 @@ import {
   unitKey,
   classKey,
   scheduledLessonKey,
-  scheduleAnchorKey
+  scheduleAnchorKey,
+  scopeSequenceKey
 } from '../src/storage/keys';
 import {
   ClassHomepageSchema,
@@ -19,12 +20,14 @@ import {
   PublishableLessonSchema,
   PublishedLessonSchema,
   ScheduledLessonSchema,
+  ScopeSequenceSchema,
   UnitSchema,
   toPublishedLesson,
   type Class,
   type ClassHomepage,
   type Lesson,
-  type ScheduledLesson
+  type ScheduledLesson,
+  type ScopeSequence
 } from '../src/schemas';
 import { orderLessonsByUnitIds } from '../src/schemas/published-unit';
 import { filterBlocksForStudent } from '../src/blocks/visibility';
@@ -227,7 +230,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     units: options.seed.units.map((u) => (u as { id: string }).id),
     lessons: options.seed.lessons.map((l) => (l as { id: string }).id),
     classes: options.seed.classes.map((c) => (c as { id: string }).id),
-    scheduled_lessons: options.seed.scheduled_lessons.map((s) => (s as { id: string }).id)
+    scheduled_lessons: options.seed.scheduled_lessons.map((s) => (s as { id: string }).id),
+    scope_sequences: (options.seed.scope_sequences ?? []).map((s) => (s as { id: string }).id)
   };
 
   function sign(payload: string): string {
@@ -302,6 +306,14 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const scheduled_lessons = seedIds.scheduled_lessons
       .map((id) => store.getJSON<ScheduledLesson>(scheduledLessonKey(id)))
       .filter((entry): entry is ScheduledLesson => Boolean(entry));
+    const scope_sequences = seedIds.scope_sequences
+      .map((id) => {
+        const raw = store.getJSON(scopeSequenceKey(id));
+        if (!raw) return null;
+        const parsed = ScopeSequenceSchema.safeParse(raw);
+        return parsed.success ? parsed.data : null;
+      })
+      .filter((entry): entry is ScopeSequence => entry !== null);
 
     const anchor = store.getJSON<{ date: string }>(scheduleAnchorKey());
 
@@ -312,6 +324,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       lessons,
       classes,
       scheduled_lessons,
+      scope_sequences,
       schedule_anchor_date: anchor?.date ?? DEFAULT_SCHEDULE_ANCHOR_DATE
     };
   }

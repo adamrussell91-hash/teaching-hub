@@ -1,6 +1,6 @@
 import { apiGet } from '@/api/client';
 import { navigate } from '@/app/router';
-import type { Year, Subject, Unit, Class, ScheduledLesson } from '@/schemas';
+import type { Year, Subject, Unit, Class, ScheduledLesson, ScopeSequence } from '@/schemas';
 
 export interface CurriculumLessonSummary {
   id: string;
@@ -21,6 +21,7 @@ export interface CurriculumResponse {
   lessons: CurriculumLessonSummary[];
   classes: Class[];
   scheduled_lessons: ScheduledLesson[];
+  scope_sequences: ScopeSequence[];
   schedule_anchor_date: string; // YYYY-MM-DD — demo “today”
 }
 
