@@ -2,6 +2,13 @@ import { apiGet } from '@/api/client';
 import { navigate } from '@/app/router';
 import type { Year, Subject, Unit } from '@/schemas';
 
+export interface ScheduleEntry {
+  class_id: string;
+  class_title: string;
+  lesson_id: string;
+  scheduled_date: string; // YYYY-MM-DD
+}
+
 export interface CurriculumLessonSummary {
   id: string;
   title: string;
@@ -10,6 +17,8 @@ export interface CurriculumLessonSummary {
   sequence: number;
   status: string;
   published: boolean;
+  updated_at: string;
+  published_at?: string;
 }
 
 export interface CurriculumResponse {
@@ -17,6 +26,8 @@ export interface CurriculumResponse {
   subjects: Subject[];
   units: Unit[];
   lessons: CurriculumLessonSummary[];
+  schedule: ScheduleEntry[];
+  schedule_anchor_date: string; // YYYY-MM-DD — demo “today”
 }
 
 export function fetchCurriculum(): Promise<CurriculumResponse> {
