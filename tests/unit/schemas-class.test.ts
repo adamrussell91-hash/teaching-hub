@@ -4,6 +4,37 @@ import { ScheduledLessonSchema } from '@/schemas/scheduled-lesson';
 
 const ISO = '2026-01-01T00:00:00.000Z';
 
+const baseClass = {
+  id: 'class_2026_12engadv1',
+  type: 'class' as const,
+  code: '12ENGADV1',
+  title: 'Year 12 English Advanced',
+  slug: '12engadv1',
+  academic_year: 2026,
+  year_id: 'year_12',
+  subject_id: 'subject_y12_engadv',
+  active_unit_ids: ['unit_aotfw'],
+  status: 'active' as const,
+  created_at: ISO,
+  updated_at: ISO,
+  schema_version: 1 as const
+};
+
+const validHeadingBlock = {
+  id: 'block_001',
+  type: 'block' as const,
+  block_type: 'heading' as const,
+  variant: 'section' as const,
+  visibility: 'student_teacher' as const,
+  content: { text: 'Welcome' },
+  layout: {},
+  print: {},
+  settings: {},
+  created_at: ISO,
+  updated_at: ISO,
+  schema_version: 1 as const
+};
+
 describe('ClassSchema', () => {
   it('parses a class', () => {
     const cls = ClassSchema.parse({
@@ -62,6 +93,39 @@ describe('ClassSchema', () => {
         created_at: ISO,
         updated_at: ISO,
         schema_version: 1
+      })
+    ).toThrow();
+  });
+
+  it('accepts homepage with a valid heading block in announcements', () => {
+    const cls = ClassSchema.parse({
+      ...baseClass,
+      homepage: {
+        announcements: [validHeadingBlock],
+        resources: [],
+        custom: []
+      }
+    });
+    expect(cls.homepage?.announcements).toHaveLength(1);
+    expect(cls.homepage?.announcements[0]?.block_type).toBe('heading');
+    expect(cls.homepage?.announcements[0]?.content).toEqual({ text: 'Welcome' });
+  });
+
+  it('rejects invalid homepage blocks', () => {
+    expect(() =>
+      ClassSchema.parse({
+        ...baseClass,
+        homepage: {
+          announcements: [
+            {
+              ...validHeadingBlock,
+              block_type: 'quote',
+              content: { quote: 'test' }
+            }
+          ],
+          resources: [],
+          custom: []
+        }
       })
     ).toThrow();
   });

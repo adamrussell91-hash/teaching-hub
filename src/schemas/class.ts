@@ -1,5 +1,14 @@
 import { z } from 'zod';
+import { BlockSchema } from './block';
 import { CommonFields } from './common';
+
+export const ClassHomepageSchema = z.object({
+  announcements: z.array(BlockSchema),
+  resources: z.array(BlockSchema),
+  custom: z.array(BlockSchema)
+});
+
+export type ClassHomepage = z.infer<typeof ClassHomepageSchema>;
 
 export const ClassSchema = z.object({
   ...CommonFields,
@@ -12,7 +21,8 @@ export const ClassSchema = z.object({
   active_unit_ids: z.array(z.string().min(1)),
   current_unit_id: z.string().min(1).optional(),
   current_scheduled_lesson_id: z.string().min(1).optional(),
-  meeting_days: z.array(z.number().int().min(1).max(7)).optional()
+  meeting_days: z.array(z.number().int().min(1).max(7)).optional(),
+  homepage: ClassHomepageSchema.optional()
 });
 
 export type Class = z.infer<typeof ClassSchema>;
