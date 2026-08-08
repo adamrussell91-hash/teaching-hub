@@ -7,7 +7,7 @@
  * After Functions are live, set SITE_ORIGIN to the Pages origin and run
  * `npm run seed:blobs` once — see README Deploy.
  */
-const PLACEHOLDER_API_BASE_URL = 'https://YOUR_NETLIFY_SITE.netlify.app';
+const PLACEHOLDER_API_BASE_URL = 'https://arteaching-hub.netlify.app';
 
 function readViteApiBaseUrl(): string | undefined {
   if (typeof import.meta === 'undefined') return undefined;
