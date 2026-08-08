@@ -72,6 +72,7 @@ const publishedClassHandler = (await import('../../netlify/functions/published-c
 const scheduleUnitHandler = (await import('../../netlify/functions/schedule-unit.mts')).default;
 const scheduledLessonHandler = (await import('../../netlify/functions/scheduled-lesson.mts')).default;
 const classHandler = (await import('../../netlify/functions/class.mts')).default;
+const scopeSequenceHandler = (await import('../../netlify/functions/scope-sequence.mts')).default;
 
 const SESSION_SECRET = 's'.repeat(32);
 const FUNCTION_ORIGIN = 'https://api.example.netlify.app';
@@ -1059,5 +1060,160 @@ describe('PATCH /api/classes/:id', () => {
     expect(fakeStore.raw(classKey('class_2026_12engadv1'))).toMatchObject({
       meeting_days: [2, 4]
     });
+  });
+});
+
+function seedScopeForPatch() {
+  fakeStore.seed(scopeSequenceKey('scope_y12_engadv_2026'), {
+    id: 'scope_y12_engadv_2026',
+    type: 'scope_sequence',
+    title: 'Year 12 English Advanced 2026',
+    slug: 'y12_engadv_2026',
+    subject_id: 'subject_engadv',
+    academic_year: 2026,
+    week_count: 40,
+    terms: [
+      { id: 'term_t1', title: 'Term 1', term_number: 1, start_week: 1, end_week: 10 },
+      { id: 'term_t2', title: 'Term 2', term_number: 2, start_week: 11, end_week: 20 },
+      { id: 'term_t3', title: 'Term 3', term_number: 3, start_week: 21, end_week: 30 },
+      { id: 'term_t4', title: 'Term 4', term_number: 4, start_week: 31, end_week: 40 }
+    ],
+    timeline_items: [
+      {
+        id: 'ti_unit_aotfw',
+        kind: 'unit',
+        unit_id: 'unit_aotfw',
+        start_week: 12,
+        end_week: 18,
+        order: 1
+      }
+    ],
+    status: 'active',
+    ...timestamps,
+    schema_version: 1
+  });
+}
+
+describe('PATCH /api/scope-sequences/:id', () => {
+  it('rejects unauthenticated requests', async () => {
+    seedScopeForPatch();
+
+    const response = await scopeSequenceHandler(
+      request('/api/scope-sequences/scope_y12_engadv_2026', {
+        method: 'PATCH',
+        body: JSON.stringify({ timeline_items: [] })
+      }),
+      { params: { id: 'scope_y12_engadv_2026' } }
+    );
+    expect(response.status).toBe(401);
+  });
+
+  it('returns 404 when the scope sequence is missing', async () => {
+    const response = await scopeSequenceHandler(
+      request('/api/scope-sequences/scope_missing', {
+        method: 'PATCH',
+        cookie: sessionCookieHeader(),
+        body: JSON.stringify({ timeline_items: [] })
+      }),
+      { params: { id: 'scope_missing' } }
+    );
+    expect(response.status).toBe(404);
+    const body = await response.json();
+    expect(body.error.code).toBe('not_found');
+  });
+
+  it('replaces timeline_items and persists', async () => {
+    seedScopeForPatch();
+
+    const timeline_items = [
+      {
+        id: 'ti_note_1',
+        kind: 'note',
+        title: 'Week one',
+        start_week: 1,
+        end_week: 1,
+        order: 1
+      }
+    ];
+
+    const response = await scopeSequenceHandler(
+      request('/api/scope-sequences/scope_y12_engadv_2026', {
+        method: 'PATCH',
+        cookie: sessionCookieHeader(),
+        body: JSON.stringify({ timeline_items })
+      }),
+      { params: { id: 'scope_y12_engadv_2026' } }
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.timeline_items).toEqual(timeline_items);
+    expect(body.data.updated_at).not.toBe(timestamps.updated_at);
+
+    expect(fakeStore.raw(scopeSequenceKey('scope_y12_engadv_2026'))).toMatchObject({
+      timeline_items,
+      updated_at: body.data.updated_at
+    });
+  });
+
+  it('rejects duplicate unit_id among unit items', async () => {
+    seedScopeForPatch();
+
+    const response = await scopeSequenceHandler(
+      request('/api/scope-sequences/scope_y12_engadv_2026', {
+        method: 'PATCH',
+        cookie: sessionCookieHeader(),
+        body: JSON.stringify({
+          timeline_items: [
+            {
+              id: 'ti_a',
+              kind: 'unit',
+              unit_id: 'unit_aotfw',
+              start_week: 1,
+              end_week: 2,
+              order: 1
+            },
+            {
+              id: 'ti_b',
+              kind: 'unit',
+              unit_id: 'unit_aotfw',
+              start_week: 3,
+              end_week: 4,
+              order: 2
+            }
+          ]
+        })
+      }),
+      { params: { id: 'scope_y12_engadv_2026' } }
+    );
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error.code).toBe('validation_error');
+  });
+
+  it('rejects out-of-range weeks', async () => {
+    seedScopeForPatch();
+
+    const response = await scopeSequenceHandler(
+      request('/api/scope-sequences/scope_y12_engadv_2026', {
+        method: 'PATCH',
+        cookie: sessionCookieHeader(),
+        body: JSON.stringify({
+          timeline_items: [
+            {
+              id: 'ti_bad',
+              kind: 'note',
+              title: 'Too late',
+              start_week: 41,
+              end_week: 41,
+              order: 1
+            }
+          ]
+        })
+      }),
+      { params: { id: 'scope_y12_engadv_2026' } }
+    );
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error.code).toBe('validation_error');
   });
 });

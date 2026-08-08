@@ -21,13 +21,15 @@ import {
   PublishedLessonSchema,
   ScheduledLessonSchema,
   ScopeSequenceSchema,
+  TimelineItemSchema,
   UnitSchema,
   toPublishedLesson,
   type Class,
   type ClassHomepage,
   type Lesson,
   type ScheduledLesson,
-  type ScopeSequence
+  type ScopeSequence,
+  type TimelineItem
 } from '../src/schemas';
 import { orderLessonsByUnitIds } from '../src/schemas/published-unit';
 import { filterBlocksForStudent } from '../src/blocks/visibility';
@@ -885,12 +887,89 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     return okResponse(200, validated.data);
   }
 
+  function handlePatchScopeSequence(
+    cookie: string | null | undefined,
+    scopeId: string,
+    body: unknown
+  ): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+
+    if (typeof body !== 'object' || body === null) {
+      return errorResponse(400, 'validation_error', 'Request body must be a JSON object');
+    }
+
+    const record = body as Record<string, unknown>;
+    if (record.timeline_items === undefined) {
+      return errorResponse(400, 'validation_error', 'Provide timeline_items');
+    }
+    if (!Array.isArray(record.timeline_items)) {
+      return errorResponse(400, 'validation_error', 'timeline_items must be an array');
+    }
+
+    const rawScope = store.getJSON(scopeSequenceKey(scopeId));
+    if (!rawScope) return notFoundResponse('Scope sequence not found');
+    const scopeParsed = ScopeSequenceSchema.safeParse(rawScope);
+    if (!scopeParsed.success) {
+      return errorResponse(400, 'validation_error', 'Scope sequence data is invalid');
+    }
+
+    const weekCount = scopeParsed.data.week_count;
+    const timeline_items: TimelineItem[] = [];
+    const seenUnitIds = new Set<string>();
+
+    for (const raw of record.timeline_items) {
+      const itemParsed = TimelineItemSchema.safeParse(raw);
+      if (!itemParsed.success) {
+        return errorResponse(400, 'validation_error', 'timeline_items contains an invalid item');
+      }
+
+      const item = itemParsed.data;
+      if (item.start_week < 1 || item.end_week > weekCount) {
+        return errorResponse(
+          400,
+          'validation_error',
+          `timeline item weeks must be between 1 and ${weekCount}`
+        );
+      }
+
+      if (item.kind === 'unit') {
+        if (seenUnitIds.has(item.unit_id)) {
+          return errorResponse(
+            400,
+            'validation_error',
+            'unit_id must be unique among unit timeline items'
+          );
+        }
+        seenUnitIds.add(item.unit_id);
+      }
+
+      timeline_items.push(item);
+    }
+
+    const nowIso = new Date().toISOString();
+    const merged = {
+      ...scopeParsed.data,
+      timeline_items,
+      updated_at: nowIso
+    };
+
+    const validated = ScopeSequenceSchema.safeParse(merged);
+    if (!validated.success) {
+      return errorResponse(400, 'validation_error', 'Scope sequence data is invalid');
+    }
+
+    store.setJSON(scopeSequenceKey(scopeId), validated.data);
+    return okResponse(200, validated.data);
+  }
+
   const LESSON_ID_RE = /^\/api\/lessons\/([^/]+)$/;
   const LESSON_PUBLISH_RE = /^\/api\/lessons\/([^/]+)\/publish$/;
   const PUBLISHED_LESSON_RE = /^\/api\/published\/lessons\/([^/]+)$/;
   const PUBLISHED_UNIT_RE = /^\/api\/published\/units\/([^/]+)$/;
   const PUBLISHED_CLASS_RE = /^\/api\/published\/classes\/([^/]+)$/;
   const CLASS_PATCH_RE = /^\/api\/classes\/([^/]+)$/;
+  const SCOPE_SEQUENCE_PATCH_RE = /^\/api\/scope-sequences\/([^/]+)$/;
   const SCHEDULE_UNIT_RE = /^\/api\/classes\/([^/]+)\/schedule-unit$/;
   const SCHEDULED_LESSON_RE = /^\/api\/scheduled-lessons\/([^/]+)$/;
 
@@ -939,6 +1018,11 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const classPatchMatch = CLASS_PATCH_RE.exec(path);
     if (classPatchMatch && method === 'PATCH') {
       return handlePatchClass(cookie, classPatchMatch[1], body);
+    }
+
+    const scopeSequencePatchMatch = SCOPE_SEQUENCE_PATCH_RE.exec(path);
+    if (scopeSequencePatchMatch && method === 'PATCH') {
+      return handlePatchScopeSequence(cookie, scopeSequencePatchMatch[1], body);
     }
 
     const scheduledLessonMatch = SCHEDULED_LESSON_RE.exec(path);
