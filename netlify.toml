@@ -2,6 +2,10 @@
   publish = "netlify/public"
   functions = "netlify/functions"
 
+[build.environment]
+  # SITE_ORIGIN is a public Pages URL used for CORS allow-listing — not a secret.
+  SECRETS_SCAN_OMIT_KEYS = "SITE_ORIGIN"
+
 [functions]
   node_bundler = "esbuild"
   external_node_modules = ["@netlify/blobs"]
