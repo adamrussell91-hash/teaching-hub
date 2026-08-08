@@ -54,3 +54,9 @@ export {
   type ScopeSequence,
   type TimelineItem
 } from './scope-sequence';
+export {
+  MediaProviderSchema,
+  MediaTypeSchema,
+  MediaSchema,
+  type Media
+} from './media';
