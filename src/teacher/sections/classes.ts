@@ -1,6 +1,12 @@
 import { navigate } from '@/app/router';
 import type { Class, ScheduledLesson } from '@/schemas';
 import type { CurriculumLessonSummary, CurriculumResponse } from '@/teacher/nav';
+import { patchClass, patchScheduledLesson } from '@/teacher/schedule-api';
+
+export interface ClassPageOptions {
+  onScheduleMutated?: () => void | Promise<void>;
+  onScheduleUnit?: () => void;
+}
 
 export function renderClassesIndex(canvas: HTMLElement, curriculum: CurriculumResponse): void {
   canvas.replaceChildren();
@@ -62,7 +68,8 @@ export function renderClassesIndex(canvas: HTMLElement, curriculum: CurriculumRe
 export function renderClassPage(
   canvas: HTMLElement,
   curriculum: CurriculumResponse,
-  classId: string
+  classId: string,
+  options: ClassPageOptions = {}
 ): void {
   canvas.replaceChildren();
 
@@ -90,7 +97,7 @@ export function renderClassPage(
     buildHeader(cls, year?.title, subject?.title),
     buildCurrentUnitSection(cls, unitsById),
     buildCurrentLessonSection(cls, curriculum, lessonsById),
-    buildScheduleSection(cls, curriculum, lessonsById),
+    buildScheduleSection(cls, curriculum, lessonsById, options),
     buildUnitsSection(cls, unitsById),
     buildPlaceholderSection('Announcements', 'announcements'),
     buildPlaceholderSection('Resources', 'resources'),
@@ -206,16 +213,30 @@ function buildCurrentLessonSection(
 function buildScheduleSection(
   cls: Class,
   curriculum: CurriculumResponse,
-  lessonsById: Map<string, CurriculumLessonSummary>
+  lessonsById: Map<string, CurriculumLessonSummary>,
+  options: ClassPageOptions
 ): HTMLElement {
   const section = document.createElement('section');
   section.className = 'class-page__section';
   section.dataset.classSection = 'schedule';
 
+  const header = document.createElement('div');
+  header.className = 'class-page__section-header';
+
   const heading = document.createElement('h2');
   heading.className = 'class-page__heading';
   heading.textContent = 'Schedule';
-  section.append(heading);
+
+  const scheduleUnit = document.createElement('button');
+  scheduleUnit.type = 'button';
+  scheduleUnit.className = 'btn btn--primary class-schedule__schedule-unit';
+  scheduleUnit.textContent = 'Schedule unit';
+  scheduleUnit.addEventListener('click', () => {
+    options.onScheduleUnit?.();
+  });
+
+  header.append(heading, scheduleUnit);
+  section.append(header);
 
   const entries = curriculum.scheduled_lessons
     .filter((entry) => entry.class_id === cls.id)
@@ -231,8 +252,9 @@ function buildScheduleSection(
 
   for (const entry of entries) {
     const lesson = lessonsById.get(entry.lesson_id);
+    const isCurrent = cls.current_scheduled_lesson_id === entry.id;
     const item = document.createElement('li');
-    item.className = 'lesson-list__item';
+    item.className = `lesson-list__item class-schedule__row${isCurrent ? ' is-current' : ''}`;
 
     const info = document.createElement('div');
     info.className = 'lesson-list__info';
@@ -241,11 +263,61 @@ function buildScheduleSection(
     title.className = 'lesson-list__title';
     title.textContent = lesson?.title ?? entry.lesson_id;
 
+    const controls = document.createElement('div');
+    controls.className = 'class-schedule__controls';
+
+    const dateInput = document.createElement('input');
+    dateInput.type = 'date';
+    dateInput.className = 'class-schedule__date';
+    dateInput.value = entry.date;
+    dateInput.dataset.scheduleAction = 'date';
+    dateInput.addEventListener('change', () => {
+      void runScheduleMutation(options, async () => {
+        if (dateInput.value && dateInput.value !== entry.date) {
+          await patchScheduledLesson(entry.id, { date: dateInput.value });
+        }
+      });
+    });
+
     const meta = document.createElement('p');
     meta.className = 'lesson-list__meta';
-    meta.textContent = `${entry.date} · ${entry.delivery_status}`;
+    meta.textContent = entry.delivery_status;
 
-    info.append(title, meta);
+    controls.append(dateInput, meta);
+    info.append(title, controls);
+
+    const actions = document.createElement('div');
+    actions.className = 'class-schedule__actions';
+
+    const up = document.createElement('button');
+    up.type = 'button';
+    up.className = 'btn btn--ghost class-schedule__action';
+    up.textContent = 'Up';
+    up.dataset.scheduleAction = 'up';
+    up.addEventListener('click', () => {
+      void runScheduleMutation(options, () => patchScheduledLesson(entry.id, { direction: 'up' }));
+    });
+
+    const down = document.createElement('button');
+    down.type = 'button';
+    down.className = 'btn btn--ghost class-schedule__action';
+    down.textContent = 'Down';
+    down.dataset.scheduleAction = 'down';
+    down.addEventListener('click', () => {
+      void runScheduleMutation(options, () => patchScheduledLesson(entry.id, { direction: 'down' }));
+    });
+
+    const setCurrent = document.createElement('button');
+    setCurrent.type = 'button';
+    setCurrent.className = 'btn btn--secondary class-schedule__action';
+    setCurrent.textContent = 'Set current';
+    setCurrent.dataset.scheduleAction = 'set-current';
+    setCurrent.disabled = isCurrent;
+    setCurrent.addEventListener('click', () => {
+      void runScheduleMutation(options, () =>
+        patchClass(cls.id, { current_scheduled_lesson_id: entry.id })
+      );
+    });
 
     const path = `/lessons/${entry.lesson_id}`;
     const open = document.createElement('a');
@@ -257,12 +329,21 @@ function buildScheduleSection(
       navigate(path);
     });
 
-    item.append(info, open);
+    actions.append(up, down, setCurrent, open);
+    item.append(info, actions);
     list.append(item);
   }
 
   section.append(list);
   return section;
+}
+
+async function runScheduleMutation(
+  options: ClassPageOptions,
+  mutate: () => void | Promise<void>
+): Promise<void> {
+  await mutate();
+  await options.onScheduleMutated?.();
 }
 
 function buildUnitsSection(

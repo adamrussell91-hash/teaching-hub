@@ -17,7 +17,7 @@ import {
   renderScopeSequencesIndex,
   renderScopeSequenceStub
 } from '@/teacher/sections/scope-sequences';
-import { renderClassesIndex, renderClassPage } from '@/teacher/sections/classes';
+import { renderClassesIndex, renderClassPage, type ClassPageOptions } from '@/teacher/sections/classes';
 import { renderUnitsIndex, renderUnitStub } from '@/teacher/sections/units';
 import { renderLessonsIndex } from '@/teacher/sections/lessons';
 import {
@@ -166,12 +166,42 @@ function renderTeacherClassRoute(classId: string, token: number): void {
   renderRailStatus(refs.railNav, 'Loading curriculum…');
   renderCanvasStatus(refs.canvas, 'Loading…');
 
+  let classPageOptions: ClassPageOptions;
+
+  const refreshAfterScheduleMutation = async (): Promise<void> => {
+    curriculumPromise = null;
+    try {
+      const curriculum = await getCurriculum();
+      if (token !== renderToken) return;
+      renderTeacherRail(refs.railNav, curriculum, { activeSection: 'classes', activeLessonId: undefined });
+      const cls = curriculum.classes.find((entry) => entry.id === classId);
+      if (cls) {
+        renderContextBar(refs, { title: cls.code || cls.title });
+      }
+      renderClassPage(refs.canvas, curriculum, classId, classPageOptions);
+    } catch (error) {
+      if (token !== renderToken) return;
+
+      if (error instanceof ApiClientError && error.code === 'unauthorized') {
+        session = { authenticated: false };
+        navigate('/sign-in', { replace: true });
+        return;
+      }
+
+      renderCanvasStatus(refs.canvas, 'Unable to refresh schedule. Please refresh to try again.');
+    }
+  };
+
+  classPageOptions = {
+    onScheduleMutated: refreshAfterScheduleMutation
+  };
+
   void loadNavAndHandleErrors(refs, token, 'classes', undefined, (curriculum) => {
     const cls = curriculum.classes.find((entry) => entry.id === classId);
     if (cls) {
       renderContextBar(refs, { title: cls.code || cls.title });
     }
-    renderClassPage(refs.canvas, curriculum, classId);
+    renderClassPage(refs.canvas, curriculum, classId, classPageOptions);
   });
 }
 

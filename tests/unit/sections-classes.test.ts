@@ -1,8 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('@/app/router', () => ({ navigate: vi.fn() }));
+vi.mock('@/teacher/schedule-api', () => ({
+  patchScheduledLesson: vi.fn().mockResolvedValue({}),
+  patchClass: vi.fn().mockResolvedValue({}),
+  postScheduleUnit: vi.fn().mockResolvedValue({ class: {}, scheduled_lessons: [] })
+}));
 
 import { navigate } from '@/app/router';
+import { patchClass, patchScheduledLesson } from '@/teacher/schedule-api';
 import { renderClassesIndex, renderClassPage } from '@/teacher/sections/classes';
 import type { CurriculumResponse } from '@/teacher/nav';
 import type { Class, ScheduledLesson, Subject, Unit, Year } from '@/schemas';
@@ -205,5 +211,45 @@ describe('classes section', () => {
   it('shows not found for unknown class', () => {
     renderClassPage(canvas, curriculum, 'class_missing');
     expect(canvas.textContent).toMatch(/Class not found/i);
+  });
+
+  it('exposes date, reorder, and set-current controls on schedule rows', () => {
+    renderClassPage(canvas, curriculum, 'class_2026_12engadv1', { onScheduleMutated: vi.fn() });
+    const schedule = canvas.querySelector('[data-class-section="schedule"]');
+    expect(schedule?.querySelector('[data-schedule-action="set-current"]')).toBeTruthy();
+    expect(schedule?.querySelector('[data-schedule-action="up"]')).toBeTruthy();
+    expect(schedule?.querySelector('[data-schedule-action="down"]')).toBeTruthy();
+    expect(schedule?.querySelector('[data-schedule-action="date"]')).toBeTruthy();
+    expect(schedule?.querySelector('.class-schedule__schedule-unit')).toBeTruthy();
+    expect(schedule?.querySelector('.class-schedule__row.is-current')).toBeTruthy();
+  });
+
+  it('calls schedule API and refresh when reordering a row', async () => {
+    const onScheduleMutated = vi.fn().mockResolvedValue(undefined);
+    renderClassPage(canvas, curriculum, 'class_2026_12engadv1', { onScheduleMutated });
+
+    const up = canvas.querySelector<HTMLButtonElement>('[data-schedule-action="up"]');
+    up?.click();
+    await vi.waitFor(() => {
+      expect(patchScheduledLesson).toHaveBeenCalledWith('scheduled_aotfw_008', { direction: 'up' });
+      expect(onScheduleMutated).toHaveBeenCalled();
+    });
+  });
+
+  it('calls schedule API and refresh when setting current lesson', async () => {
+    const onScheduleMutated = vi.fn().mockResolvedValue(undefined);
+    renderClassPage(canvas, curriculum, 'class_2026_12engadv1', { onScheduleMutated });
+
+    const setCurrentButtons = canvas.querySelectorAll<HTMLButtonElement>(
+      '[data-schedule-action="set-current"]'
+    );
+    const enabled = [...setCurrentButtons].find((button) => !button.disabled);
+    enabled?.click();
+    await vi.waitFor(() => {
+      expect(patchClass).toHaveBeenCalledWith('class_2026_12engadv1', {
+        current_scheduled_lesson_id: 'scheduled_aotfw_001'
+      });
+      expect(onScheduleMutated).toHaveBeenCalled();
+    });
   });
 });

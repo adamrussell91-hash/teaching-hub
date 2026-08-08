@@ -786,6 +786,49 @@ a:hover {
   gap: 0.5rem;
 }
 
+.class-page__section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.class-schedule__row.is-current {
+  border-color: var(--wave);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.class-schedule__controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.class-schedule__date {
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius-md) * 0.45);
+  background: rgba(255, 255, 255, 0.65);
+  color: var(--ink);
+}
+
+.class-schedule__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.class-schedule__action {
+  padding: 0.4rem 0.65rem;
+  font-size: 0.8rem;
+}
+
 /* ── Home dashboard ───────────────────────────────────────────────────── */
 
 .home-dashboard {
