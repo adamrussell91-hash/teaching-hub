@@ -13,9 +13,11 @@ import {
   scheduleAnchorKey
 } from '../src/storage/keys';
 import {
+  ClassSchema,
   LessonSchema,
   PublishableLessonSchema,
   PublishedLessonSchema,
+  UnitSchema,
   toPublishedLesson,
   type Class,
   type Lesson,
@@ -24,6 +26,7 @@ import {
 import { orderLessonsByUnitIds } from '../src/schemas/published-unit';
 import { filterBlocksForStudent } from '../src/blocks/visibility';
 import { sanitizeRichTextHtml } from '../src/blocks/sanitize';
+import { applyScheduleUnit } from '../src/schedule/schedule-unit';
 
 export const SESSION_COOKIE_NAME = 'teaching_hub_session';
 
@@ -490,10 +493,122 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     });
   }
 
+  const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+  function handleScheduleUnit(
+    cookie: string | null | undefined,
+    classId: string,
+    body: unknown
+  ): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+
+    if (typeof body !== 'object' || body === null) {
+      return errorResponse(400, 'validation_error', 'Request body must be a JSON object');
+    }
+
+    const record = body as Record<string, unknown>;
+    const unit_id = record.unit_id;
+    const start_date = record.start_date;
+
+    if (typeof unit_id !== 'string' || !unit_id) {
+      return errorResponse(400, 'validation_error', 'unit_id is required');
+    }
+    if (typeof start_date !== 'string' || !DATE_RE.test(start_date)) {
+      return errorResponse(400, 'validation_error', 'start_date must be YYYY-MM-DD');
+    }
+
+    let meeting_days: number[] | undefined;
+    if (record.meeting_days !== undefined) {
+      if (!Array.isArray(record.meeting_days) || record.meeting_days.length === 0) {
+        return errorResponse(
+          400,
+          'validation_error',
+          'meeting_days must be a non-empty array when provided'
+        );
+      }
+      meeting_days = [];
+      for (const day of record.meeting_days) {
+        if (typeof day !== 'number' || !Number.isInteger(day) || day < 1 || day > 7) {
+          return errorResponse(
+            400,
+            'validation_error',
+            'meeting_days must contain integers from 1 to 7'
+          );
+        }
+        meeting_days.push(day);
+      }
+    }
+
+    const rawClass = store.getJSON(classKey(classId));
+    if (!rawClass) return notFoundResponse('Class not found');
+    const classParsed = ClassSchema.safeParse(rawClass);
+    if (!classParsed.success) {
+      return errorResponse(400, 'validation_error', 'Class data is invalid');
+    }
+
+    const rawUnit = store.getJSON(unitKey(unit_id));
+    if (!rawUnit) return notFoundResponse('Unit not found');
+    const unitParsed = UnitSchema.safeParse(rawUnit);
+    if (!unitParsed.success) {
+      return errorResponse(400, 'validation_error', 'Unit data is invalid');
+    }
+
+    if (unitParsed.data.subject_id !== classParsed.data.subject_id) {
+      return errorResponse(400, 'subject_mismatch', 'Unit subject does not match class subject');
+    }
+
+    const meetingDays = meeting_days ?? classParsed.data.meeting_days ?? [1, 2, 3, 4, 5];
+
+    const existing = store
+      .listKeys('scheduled_lessons/')
+      .map((key) => store.getJSON<ScheduledLesson>(key))
+      .filter((entry): entry is ScheduledLesson => Boolean(entry) && entry.class_id === classId);
+
+    const nowIso = new Date().toISOString();
+    const idFactory = (lessonId: string) => `scheduled_${classId}_${lessonId}`;
+
+    const result = applyScheduleUnit({
+      cls: classParsed.data,
+      unit: unitParsed.data,
+      existing,
+      startDate: start_date,
+      meetingDays,
+      nowIso,
+      idFactory
+    });
+
+    if (!result.ok) {
+      return errorResponse(400, result.code, result.message);
+    }
+
+    for (const created of result.created) {
+      if (store.get(scheduledLessonKey(created.id)) !== undefined) {
+        return errorResponse(
+          409,
+          'conflict',
+          `Scheduled lesson id already exists: ${created.id}`
+        );
+      }
+    }
+
+    store.setJSON(classKey(classId), result.class);
+    for (const created of result.created) {
+      store.setJSON(scheduledLessonKey(created.id), created);
+      seedIds.scheduled_lessons.push(created.id);
+    }
+
+    return okResponse(200, {
+      class: result.class,
+      scheduled_lessons: result.created
+    });
+  }
+
   const LESSON_ID_RE = /^\/api\/lessons\/([^/]+)$/;
   const LESSON_PUBLISH_RE = /^\/api\/lessons\/([^/]+)\/publish$/;
   const PUBLISHED_LESSON_RE = /^\/api\/published\/lessons\/([^/]+)$/;
   const PUBLISHED_UNIT_RE = /^\/api\/published\/units\/([^/]+)$/;
+  const SCHEDULE_UNIT_RE = /^\/api\/classes\/([^/]+)\/schedule-unit$/;
 
   async function handle(
     method: string,
@@ -525,6 +640,11 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const publishedUnitMatch = PUBLISHED_UNIT_RE.exec(path);
     if (publishedUnitMatch && method === 'GET') {
       return handleGetPublishedUnit(publishedUnitMatch[1]);
+    }
+
+    const scheduleUnitMatch = SCHEDULE_UNIT_RE.exec(path);
+    if (scheduleUnitMatch && method === 'POST') {
+      return handleScheduleUnit(cookie, scheduleUnitMatch[1], body);
     }
 
     return errorResponse(404, 'not_found', `No route for ${method} ${path}`);

@@ -67,6 +67,7 @@ const lessonHandler = (await import('../../netlify/functions/lesson.mts')).defau
 const publishHandler = (await import('../../netlify/functions/publish.mts')).default;
 const publishedLessonHandler = (await import('../../netlify/functions/published-lesson.mts')).default;
 const publishedUnitHandler = (await import('../../netlify/functions/published-unit.mts')).default;
+const scheduleUnitHandler = (await import('../../netlify/functions/schedule-unit.mts')).default;
 
 const SESSION_SECRET = 's'.repeat(32);
 const FUNCTION_ORIGIN = 'https://api.example.netlify.app';
@@ -514,5 +515,139 @@ describe('GET /api/published/units/:id', () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.data.lessons).toEqual([]);
+  });
+});
+
+function seedClassAndUnit(overrides: {
+  classSubject?: string;
+  unitSubject?: string;
+  lessonIds?: string[];
+  existingScheduledLessonIds?: string[];
+} = {}) {
+  const classSubject = overrides.classSubject ?? 'subject_y12_engadv';
+  const unitSubject = overrides.unitSubject ?? classSubject;
+  const lessonIds = overrides.lessonIds ?? ['lesson_a', 'lesson_b'];
+
+  fakeStore.seed(classKey('class_2026_12engadv1'), {
+    id: 'class_2026_12engadv1',
+    type: 'class',
+    code: '12ENGADV1',
+    title: 'Year 12 English Advanced',
+    slug: '12engadv1',
+    academic_year: 2026,
+    year_id: 'year_12',
+    subject_id: classSubject,
+    active_unit_ids: [],
+    status: 'active',
+    ...timestamps,
+    schema_version: 1
+  });
+  fakeStore.seed(unitKey('unit_schedule'), {
+    id: 'unit_schedule',
+    type: 'unit',
+    title: 'Schedule Unit',
+    slug: 'schedule-unit',
+    year_id: 'year_12',
+    subject_id: unitSubject,
+    lesson_ids: lessonIds,
+    status: 'active',
+    ...timestamps,
+    schema_version: 1
+  });
+
+  for (const lessonId of overrides.existingScheduledLessonIds ?? []) {
+    fakeStore.seed(scheduledLessonKey(`scheduled_existing_${lessonId}`), {
+      id: `scheduled_existing_${lessonId}`,
+      type: 'scheduled_lesson',
+      class_id: 'class_2026_12engadv1',
+      unit_id: 'unit_schedule',
+      lesson_id: lessonId,
+      date: '2026-08-10',
+      schedule_order: 1,
+      delivery_status: 'planned',
+      ...timestamps,
+      schema_version: 1
+    });
+  }
+}
+
+describe('POST /api/classes/:classId/schedule-unit', () => {
+  it('rejects unauthenticated requests', async () => {
+    const response = await scheduleUnitHandler(
+      request('/api/classes/class_2026_12engadv1/schedule-unit', {
+        method: 'POST',
+        body: JSON.stringify({ unit_id: 'unit_schedule', start_date: '2026-09-01' })
+      }),
+      { params: { classId: 'class_2026_12engadv1' } }
+    );
+    expect(response.status).toBe(401);
+  });
+
+  it('creates scheduled lessons and persists meeting_days', async () => {
+    seedClassAndUnit();
+
+    const response = await scheduleUnitHandler(
+      request('/api/classes/class_2026_12engadv1/schedule-unit', {
+        method: 'POST',
+        cookie: sessionCookieHeader(),
+        body: JSON.stringify({
+          unit_id: 'unit_schedule',
+          start_date: '2026-09-01',
+          meeting_days: [2, 4]
+        })
+      }),
+      { params: { classId: 'class_2026_12engadv1' } }
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.scheduled_lessons).toHaveLength(2);
+    expect(body.data.class.meeting_days).toEqual([2, 4]);
+    expect(body.data.class.active_unit_ids).toContain('unit_schedule');
+
+    const storedClass = fakeStore.raw(classKey('class_2026_12engadv1')) as {
+      meeting_days: number[];
+    };
+    expect(storedClass.meeting_days).toEqual([2, 4]);
+    expect(
+      fakeStore.raw(scheduledLessonKey('scheduled_class_2026_12engadv1_lesson_a'))
+    ).toMatchObject({ lesson_id: 'lesson_a', class_id: 'class_2026_12engadv1' });
+  });
+
+  it('returns already_scheduled when every lesson is already scheduled', async () => {
+    seedClassAndUnit({
+      lessonIds: ['lesson_a'],
+      existingScheduledLessonIds: ['lesson_a']
+    });
+
+    const response = await scheduleUnitHandler(
+      request('/api/classes/class_2026_12engadv1/schedule-unit', {
+        method: 'POST',
+        cookie: sessionCookieHeader(),
+        body: JSON.stringify({ unit_id: 'unit_schedule', start_date: '2026-09-01' })
+      }),
+      { params: { classId: 'class_2026_12engadv1' } }
+    );
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error.code).toBe('already_scheduled');
+  });
+
+  it('returns 400 when unit subject does not match class', async () => {
+    seedClassAndUnit({
+      classSubject: 'subject_y12_engadv',
+      unitSubject: 'subject_y12_engstd'
+    });
+
+    const response = await scheduleUnitHandler(
+      request('/api/classes/class_2026_12engadv1/schedule-unit', {
+        method: 'POST',
+        cookie: sessionCookieHeader(),
+        body: JSON.stringify({ unit_id: 'unit_schedule', start_date: '2026-09-01' })
+      }),
+      { params: { classId: 'class_2026_12engadv1' } }
+    );
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error.code).toBe('subject_mismatch');
   });
 });

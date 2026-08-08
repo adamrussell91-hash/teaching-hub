@@ -1,5 +1,5 @@
 import type { Class, ScheduledLesson, Unit } from '@/schemas';
-import { generateScheduleDates } from '@/schedule/generate-dates';
+import { generateScheduleDates } from './generate-dates';
 
 export type ScheduleUnitResult =
   | { ok: true; class: Class; created: ScheduledLesson[] }
