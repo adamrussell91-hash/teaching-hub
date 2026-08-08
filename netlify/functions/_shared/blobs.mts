@@ -4,13 +4,21 @@ import {
   subjectKey,
   unitKey,
   draftLessonKey,
-  publishedLessonKey
+  publishedLessonKey,
+  homeScheduleKey
 } from '../../../src/storage/keys';
 
 // Re-exported so function handlers have one place to import key builders from,
 // alongside the Blob store helpers below. Key strings must stay identical to
 // `src/storage/keys.ts` (and to `scripts/mock-store.ts`, used by the dev server).
-export { yearKey, subjectKey, unitKey, draftLessonKey, publishedLessonKey };
+export {
+  yearKey,
+  subjectKey,
+  unitKey,
+  draftLessonKey,
+  publishedLessonKey,
+  homeScheduleKey
+};
 
 const CONTENT_STORE_NAME = 'teaching-hub-content';
 

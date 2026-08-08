@@ -51,9 +51,8 @@ vi.mock('../../netlify/functions/_shared/blobs.mts', async (importOriginal) => {
   return { ...actual, getContentStore: () => fakeStore };
 });
 
-const { yearKey, subjectKey, unitKey, draftLessonKey, publishedLessonKey } = await import(
-  '../../netlify/functions/_shared/blobs.mts'
-);
+const { yearKey, subjectKey, unitKey, draftLessonKey, publishedLessonKey, homeScheduleKey } =
+  await import('../../netlify/functions/_shared/blobs.mts');
 const { createSessionToken } = await import('../../netlify/functions/_shared/auth-security.mts');
 const curriculumHandler = (await import('../../netlify/functions/curriculum.mts')).default;
 const lessonHandler = (await import('../../netlify/functions/lesson.mts')).default;
@@ -152,7 +151,17 @@ describe('GET /api/curriculum', () => {
     const response = await curriculumHandler(request('/api/curriculum', { cookie: sessionCookieHeader() }));
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body).toEqual({ ok: true, data: { years: [], subjects: [], units: [], lessons: [] } });
+    expect(body).toEqual({
+      ok: true,
+      data: {
+        years: [],
+        subjects: [],
+        units: [],
+        lessons: [],
+        schedule: [],
+        schedule_anchor_date: '2026-08-12'
+      }
+    });
   });
 
   it('aggregates seeded content and flags published lessons', async () => {
@@ -161,6 +170,17 @@ describe('GET /api/curriculum', () => {
     fakeStore.seed(unitKey('unit_aotfw'), { id: 'unit_aotfw', title: 'Artist of the Floating World' });
     fakeStore.seed(draftLessonKey('lesson_aotfw_008'), draftLesson());
     fakeStore.seed(publishedLessonKey('lesson_aotfw_008'), { lesson_id: 'lesson_aotfw_008' });
+    fakeStore.seed(homeScheduleKey(), {
+      anchor_date: '2026-08-12',
+      entries: [
+        {
+          class_id: 'class_demo',
+          class_title: '12 Eng Adv — Period 3',
+          lesson_id: 'lesson_aotfw_008',
+          scheduled_date: '2026-08-12'
+        }
+      ]
+    });
 
     const response = await curriculumHandler(request('/api/curriculum', { cookie: sessionCookieHeader() }));
     const body = await response.json();
@@ -168,6 +188,10 @@ describe('GET /api/curriculum', () => {
     expect(body.data.years).toHaveLength(1);
     expect(body.data.subjects).toHaveLength(1);
     expect(body.data.units).toHaveLength(1);
+    expect(body.data.schedule).toEqual([
+      expect.objectContaining({ lesson_id: 'lesson_aotfw_008', scheduled_date: '2026-08-12' })
+    ]);
+    expect(body.data.schedule_anchor_date).toBe('2026-08-12');
     expect(body.data.lessons).toEqual([
       {
         id: 'lesson_aotfw_008',
@@ -176,9 +200,12 @@ describe('GET /api/curriculum', () => {
         unit_id: 'unit_aotfw',
         sequence: 8,
         status: 'active',
-        published: true
+        published: true,
+        updated_at: '2026-01-01T00:00:00.000Z'
       }
     ]);
+    const lesson = body.data.lessons.find((l: { id: string }) => l.id === 'lesson_aotfw_008');
+    expect(lesson.updated_at).toBeTruthy();
   });
 });
 

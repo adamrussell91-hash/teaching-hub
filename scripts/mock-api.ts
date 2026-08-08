@@ -7,7 +7,8 @@ import {
   publishedLessonKey,
   yearKey,
   subjectKey,
-  unitKey
+  unitKey,
+  homeScheduleKey
 } from '../src/storage/keys';
 import {
   LessonSchema,
@@ -187,6 +188,13 @@ function buildClearedSessionCookie(): string {
   return `${SESSION_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`;
 }
 
+interface ScheduleEntry {
+  class_id: string;
+  class_title: string;
+  lesson_id: string;
+  scheduled_date: string;
+}
+
 interface CurriculumLessonSummary {
   id: string;
   title: string;
@@ -195,7 +203,11 @@ interface CurriculumLessonSummary {
   sequence: number;
   status: string;
   published: boolean;
+  updated_at: string;
+  published_at?: string;
 }
+
+const DEFAULT_SCHEDULE_ANCHOR_DATE = '2026-08-12';
 
 export function createMockApi(options: CreateMockApiOptions): MockApi {
   const passphrase = options.passphrase ?? DEFAULT_PASSPHRASE;
@@ -272,10 +284,25 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
         unit_id: lesson.unit_id,
         sequence: lesson.sequence,
         status: lesson.status,
-        published: store.get(publishedLessonKey(lesson.id)) !== undefined
+        published: store.get(publishedLessonKey(lesson.id)) !== undefined,
+        updated_at: lesson.updated_at,
+        ...(lesson.published_at ? { published_at: lesson.published_at } : {})
       }));
 
-    return { years, subjects, units, lessons };
+    const homeSchedule = store.getJSON<{
+      anchor_date: string;
+      entries: ScheduleEntry[];
+    }>(homeScheduleKey());
+    const schedule = homeSchedule?.entries ?? [];
+
+    return {
+      years,
+      subjects,
+      units,
+      lessons,
+      schedule,
+      schedule_anchor_date: homeSchedule?.anchor_date ?? DEFAULT_SCHEDULE_ANCHOR_DATE
+    };
   }
 
   function handleAuth(body: unknown): MockResponse {

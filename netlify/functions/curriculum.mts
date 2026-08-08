@@ -1,4 +1,4 @@
-import { getContentStore, getJSON } from './_shared/blobs.mts';
+import { getContentStore, getJSON, homeScheduleKey } from './_shared/blobs.mts';
 import { getTeacherSession } from './_shared/session.mts';
 import type { Lesson } from './_shared/validate.mts';
 import {
@@ -12,6 +12,13 @@ import {
   withCors
 } from './_shared/http.mts';
 
+interface ScheduleEntry {
+  class_id: string;
+  class_title: string;
+  lesson_id: string;
+  scheduled_date: string;
+}
+
 interface CurriculumLessonSummary {
   id: string;
   title: string;
@@ -20,10 +27,13 @@ interface CurriculumLessonSummary {
   sequence: number;
   status: string;
   published: boolean;
+  updated_at: string;
+  published_at?: string;
 }
 
 const DRAFT_LESSON_PREFIX = 'lessons/';
 const PUBLISHED_LESSON_PREFIX = 'published/lessons/';
+const DEFAULT_SCHEDULE_ANCHOR_DATE = '2026-08-12';
 
 type ContentStore = ReturnType<typeof getContentStore>;
 
@@ -39,12 +49,13 @@ async function listEntries<T>(store: ContentStore, prefix: string): Promise<T[]>
  * against a fresh site before the first curriculum GET.
  */
 async function buildCurriculum(store: ContentStore) {
-  const [years, subjects, units, lessons, publishedList] = await Promise.all([
+  const [years, subjects, units, lessons, publishedList, homeSchedule] = await Promise.all([
     listEntries<Record<string, unknown>>(store, 'years/'),
     listEntries<Record<string, unknown>>(store, 'subjects/'),
     listEntries<Record<string, unknown>>(store, 'units/'),
     listEntries<Lesson>(store, DRAFT_LESSON_PREFIX),
-    store.list({ prefix: PUBLISHED_LESSON_PREFIX })
+    store.list({ prefix: PUBLISHED_LESSON_PREFIX }),
+    getJSON<{ anchor_date: string; entries: ScheduleEntry[] }>(store, homeScheduleKey())
   ]);
 
   const publishedIds = new Set(publishedList.blobs.map((blob) => blob.key.slice(PUBLISHED_LESSON_PREFIX.length)));
@@ -56,10 +67,19 @@ async function buildCurriculum(store: ContentStore) {
     unit_id: lesson.unit_id,
     sequence: lesson.sequence,
     status: lesson.status,
-    published: publishedIds.has(lesson.id)
+    published: publishedIds.has(lesson.id),
+    updated_at: lesson.updated_at,
+    ...(lesson.published_at ? { published_at: lesson.published_at } : {})
   }));
 
-  return { years, subjects, units, lessons: lessonSummaries };
+  return {
+    years,
+    subjects,
+    units,
+    lessons: lessonSummaries,
+    schedule: homeSchedule?.entries ?? [],
+    schedule_anchor_date: homeSchedule?.anchor_date ?? DEFAULT_SCHEDULE_ANCHOR_DATE
+  };
 }
 
 export default async function handler(request: Request): Promise<Response> {

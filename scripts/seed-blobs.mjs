@@ -23,7 +23,13 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { getStore } from '@netlify/blobs';
-import { yearKey, subjectKey, unitKey, draftLessonKey } from '../src/storage/keys.ts';
+import {
+  yearKey,
+  subjectKey,
+  unitKey,
+  draftLessonKey,
+  homeScheduleKey
+} from '../src/storage/keys.ts';
 
 const CONTENT_STORE_NAME = 'teaching-hub-content';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -67,6 +73,11 @@ export async function seedStore(store, seed) {
   }
   for (const lesson of seed.lessons) {
     await store.setJSON(draftLessonKey(lesson.id), lesson);
+    written += 1;
+  }
+
+  if (seed.home_schedule) {
+    await store.setJSON(homeScheduleKey(), seed.home_schedule);
     written += 1;
   }
 
