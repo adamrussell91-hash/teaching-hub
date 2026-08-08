@@ -9,7 +9,8 @@ import {
   UnitSchema,
   LessonSchema,
   ClassSchema,
-  ScheduledLessonSchema
+  ScheduledLessonSchema,
+  MediaSchema
 } from '@/schemas';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -23,6 +24,7 @@ const seed = JSON.parse(
   lessons: unknown[];
   classes: unknown[];
   scheduled_lessons: unknown[];
+  media: unknown[];
   schedule_anchor_date: string;
 };
 
@@ -75,6 +77,17 @@ describe('seed fixtures', () => {
     }
     expect(seed.scheduled_lessons).toHaveLength(5);
     expect(seed.schedule_anchor_date).toBe('2026-08-12');
+  });
+
+  it('parses all media through MediaSchema', () => {
+    for (const item of seed.media) {
+      MediaSchema.parse(item);
+    }
+    expect(seed.media).toHaveLength(3);
+    const types = seed.media.map(
+      (m) => (m as { media_type: string }).media_type
+    );
+    expect(types).toEqual(['pdf', 'link', 'image']);
   });
 
   it('keeps English Advanced and Standard as separate subjects', () => {

@@ -31,7 +31,8 @@ import {
   draftLessonKey,
   classKey,
   scheduledLessonKey,
-  scheduleAnchorKey
+  scheduleAnchorKey,
+  mediaKey
 } from '../src/storage/keys.ts';
 
 const CONTENT_STORE_NAME = 'teaching-hub-content';
@@ -88,6 +89,10 @@ export async function seedStore(store, seed) {
   }
   for (const scheduled of seed.scheduled_lessons ?? []) {
     await store.setJSON(scheduledLessonKey(scheduled.id), scheduled);
+    written += 1;
+  }
+  for (const item of seed.media ?? []) {
+    await store.setJSON(mediaKey(item.id), item);
     written += 1;
   }
   if (seed.schedule_anchor_date) {

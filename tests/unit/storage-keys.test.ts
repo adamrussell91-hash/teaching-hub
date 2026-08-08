@@ -11,7 +11,8 @@ import {
   publishedLessonKey,
   classKey,
   scheduledLessonKey,
-  scheduleAnchorKey
+  scheduleAnchorKey,
+  mediaKey
 } from '@/storage/keys';
 import { MockStore } from '../../scripts/mock-store';
 
@@ -53,6 +54,10 @@ describe('storage key helpers', () => {
 
   it('builds schedule anchor key', () => {
     expect(scheduleAnchorKey()).toBe('meta/schedule_anchor_date');
+  });
+
+  it('builds media keys', () => {
+    expect(mediaKey('media_ono_extract')).toBe('media/media_ono_extract');
   });
 });
 
@@ -107,6 +112,18 @@ describe('MockStore', () => {
       lesson_id: 'lesson_aotfw_008'
     });
     expect(store.getJSON(scheduleAnchorKey())).toEqual({ date: '2026-08-12' });
+    expect(store.getJSON(mediaKey('media_ono_extract'))).toMatchObject({
+      id: 'media_ono_extract',
+      media_type: 'pdf'
+    });
+    expect(store.getJSON(mediaKey('media_syllabus_link'))).toMatchObject({
+      id: 'media_syllabus_link',
+      media_type: 'link'
+    });
+    expect(store.getJSON(mediaKey('media_cover_image'))).toMatchObject({
+      id: 'media_cover_image',
+      media_type: 'image'
+    });
   });
 
   it('keeps draft and published lesson keys distinct', () => {

@@ -6,7 +6,8 @@ import {
   draftLessonKey,
   classKey,
   scheduledLessonKey,
-  scheduleAnchorKey
+  scheduleAnchorKey,
+  mediaKey
 } from '../src/storage/keys';
 
 export type SeedData = {
@@ -17,6 +18,7 @@ export type SeedData = {
   lessons: unknown[];
   classes: unknown[];
   scheduled_lessons: unknown[];
+  media?: unknown[];
   schedule_anchor_date: string;
 };
 
@@ -85,6 +87,11 @@ export class MockStore {
     for (const scheduled of seed.scheduled_lessons) {
       const id = (scheduled as { id: string }).id;
       this.setJSON(scheduledLessonKey(id), scheduled);
+    }
+
+    for (const item of seed.media ?? []) {
+      const id = (item as { id: string }).id;
+      this.setJSON(mediaKey(id), item);
     }
 
     this.setJSON(scheduleAnchorKey(), { date: seed.schedule_anchor_date });

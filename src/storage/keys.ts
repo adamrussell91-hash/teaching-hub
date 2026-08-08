@@ -33,3 +33,7 @@ export function scheduledLessonKey(id: string): string {
 export function scheduleAnchorKey(): string {
   return 'meta/schedule_anchor_date';
 }
+
+export function mediaKey(id: string): string {
+  return `media/${id}`;
+}
