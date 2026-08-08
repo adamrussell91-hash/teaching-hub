@@ -113,7 +113,7 @@ function renderPublishedClass(content: HTMLElement, cls: PublishedClass): void {
     if (isLessonPublished(cls.current_lesson.lesson_id, cls.schedule)) {
       const open = document.createElement('a');
       open.className = 'btn btn--secondary student-class__open';
-      open.href = `/s/lessons/${cls.current_lesson.lesson_id}`;
+      open.href = `/s/classes/${cls.id}/lessons/${cls.current_lesson.lesson_id}`;
       open.textContent = 'Open';
       row.append(open);
     }
@@ -153,7 +153,7 @@ function renderPublishedClass(content: HTMLElement, cls: PublishedClass): void {
       if (row.published) {
         const open = document.createElement('a');
         open.className = 'btn btn--secondary student-class__open';
-        open.href = `/s/lessons/${row.lesson_id}`;
+        open.href = `/s/classes/${cls.id}/lessons/${row.lesson_id}`;
         open.textContent = 'Open';
         item.append(open);
       }

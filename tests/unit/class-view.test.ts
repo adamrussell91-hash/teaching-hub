@@ -113,7 +113,9 @@ describe('mountStudentClassView', () => {
       ...root.querySelectorAll('[data-class-section="schedule"] a.student-class__open')
     ];
     expect(scheduleOpens).toHaveLength(1);
-    expect(scheduleOpens[0].getAttribute('href')).toBe('/s/lessons/lesson_aotfw_001');
+    expect(scheduleOpens[0].getAttribute('href')).toBe(
+      `/s/classes/${CLASS_ID}/lessons/lesson_aotfw_001`
+    );
     expect(scheduleOpens[0].textContent).toBe('Open');
 
     expect(root.querySelector('[data-homepage-region="announcements"]')).toBeTruthy();
@@ -145,7 +147,9 @@ describe('mountStudentClassView', () => {
       const open = root.querySelector(
         '[data-class-section="current-lesson"] a.student-class__open'
       );
-      expect(open?.getAttribute('href')).toBe('/s/lessons/lesson_aotfw_008');
+      expect(open?.getAttribute('href')).toBe(
+        `/s/classes/${CLASS_ID}/lessons/lesson_aotfw_008`
+      );
     });
   });
 
