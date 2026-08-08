@@ -7,7 +7,8 @@ import {
   subjectKey,
   unitKey,
   draftLessonKey,
-  publishedLessonKey
+  publishedLessonKey,
+  homeScheduleKey
 } from '@/storage/keys';
 import { MockStore } from '../../scripts/mock-store';
 
@@ -35,6 +36,10 @@ describe('storage key helpers', () => {
       'subjects/subject_y12_engadv'
     );
     expect(unitKey('unit_aotfw')).toBe('units/unit_aotfw');
+  });
+
+  it('builds home schedule meta key', () => {
+    expect(homeScheduleKey()).toBe('meta/home_schedule');
   });
 });
 

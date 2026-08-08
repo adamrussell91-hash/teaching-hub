@@ -17,3 +17,7 @@ export function draftLessonKey(id: string): string {
 export function publishedLessonKey(id: string): string {
   return `published/lessons/${id}`;
 }
+
+export function homeScheduleKey(): string {
+  return 'meta/home_schedule';
+}

@@ -2,14 +2,26 @@ import {
   yearKey,
   subjectKey,
   unitKey,
-  draftLessonKey
+  draftLessonKey,
+  homeScheduleKey
 } from '../src/storage/keys';
+
+export type HomeScheduleSeed = {
+  anchor_date: string;
+  entries: Array<{
+    class_id: string;
+    class_title: string;
+    lesson_id: string;
+    scheduled_date: string;
+  }>;
+};
 
 export type SeedData = {
   years: unknown[];
   subjects: unknown[];
   units: unknown[];
   lessons: unknown[];
+  home_schedule: HomeScheduleSeed;
 };
 
 export class MockStore {
@@ -63,5 +75,7 @@ export class MockStore {
       const id = (lesson as { id: string }).id;
       this.setJSON(draftLessonKey(id), lesson);
     }
+
+    this.setJSON(homeScheduleKey(), seed.home_schedule);
   }
 }
