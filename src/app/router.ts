@@ -1,12 +1,26 @@
 export type RouteName =
   | 'teacher-home'
+  | 'teacher-classes'
+  | 'teacher-scope-sequences'
+  | 'teacher-scope-sequence'
+  | 'teacher-units'
+  | 'teacher-unit'
+  | 'teacher-lessons'
   | 'teacher-lesson'
+  | 'teacher-resources'
   | 'student-lesson'
   | 'sign-in';
 
 export type RouteParams = {
   'teacher-home': Record<string, never>;
+  'teacher-classes': Record<string, never>;
+  'teacher-scope-sequences': Record<string, never>;
+  'teacher-scope-sequence': { subjectId: string };
+  'teacher-units': Record<string, never>;
+  'teacher-unit': { unitId: string };
+  'teacher-lessons': Record<string, never>;
   'teacher-lesson': { lessonId: string };
+  'teacher-resources': Record<string, never>;
   'student-lesson': { lessonId: string };
   'sign-in': Record<string, never>;
 };
@@ -70,6 +84,39 @@ export function match(pathname: string): RouteMatch | null {
       name: 'student-lesson',
       params: { lessonId: studentLesson[1] },
       requiresAuth: false,
+      path
+    };
+  }
+
+  const exactTeacher: Array<[string, RouteName]> = [
+    ['/classes', 'teacher-classes'],
+    ['/resources', 'teacher-resources'],
+    ['/units', 'teacher-units'],
+    ['/lessons', 'teacher-lessons'],
+    ['/scope-sequences', 'teacher-scope-sequences']
+  ];
+  for (const [exact, name] of exactTeacher) {
+    if (path === exact) {
+      return { name, params: {}, requiresAuth: true, path };
+    }
+  }
+
+  const scopeSequence = path.match(/^\/scope-sequences\/([^/]+)$/);
+  if (scopeSequence) {
+    return {
+      name: 'teacher-scope-sequence',
+      params: { subjectId: scopeSequence[1] },
+      requiresAuth: true,
+      path
+    };
+  }
+
+  const teacherUnit = path.match(/^\/units\/([^/]+)$/);
+  if (teacherUnit) {
+    return {
+      name: 'teacher-unit',
+      params: { unitId: teacherUnit[1] },
+      requiresAuth: true,
       path
     };
   }

@@ -49,14 +49,69 @@ describe('router match', () => {
 
   it('returns null for unknown paths', () => {
     expect(match('/unknown')).toBeNull();
-    expect(match('/lessons')).toBeNull();
     expect(match('/s/lessons')).toBeNull();
+  });
+
+  it('matches teacher section list routes', () => {
+    expect(match('/lessons')).toEqual({
+      name: 'teacher-lessons',
+      params: {},
+      requiresAuth: true,
+      path: '/lessons'
+    });
+    expect(match('/classes')).toEqual({
+      name: 'teacher-classes',
+      params: {},
+      requiresAuth: true,
+      path: '/classes'
+    });
+    expect(match('/resources')).toEqual({
+      name: 'teacher-resources',
+      params: {},
+      requiresAuth: true,
+      path: '/resources'
+    });
+    expect(match('/units')).toEqual({
+      name: 'teacher-units',
+      params: {},
+      requiresAuth: true,
+      path: '/units'
+    });
+    expect(match('/scope-sequences')).toEqual({
+      name: 'teacher-scope-sequences',
+      params: {},
+      requiresAuth: true,
+      path: '/scope-sequences'
+    });
+  });
+
+  it('matches teacher section detail routes', () => {
+    expect(match('/units/unit_aotfw')).toEqual({
+      name: 'teacher-unit',
+      params: { unitId: 'unit_aotfw' },
+      requiresAuth: true,
+      path: '/units/unit_aotfw'
+    });
+    expect(match('/scope-sequences/subject_y12_engadv')).toEqual({
+      name: 'teacher-scope-sequence',
+      params: { subjectId: 'subject_y12_engadv' },
+      requiresAuth: true,
+      path: '/scope-sequences/subject_y12_engadv'
+    });
+  });
+
+  it('does not treat list paths as lesson editor', () => {
+    expect(match('/lessons')?.name).toBe('teacher-lessons');
+    expect(match('/lessons/lesson_aotfw_008')?.name).toBe('teacher-lesson');
   });
 
   it('marks only teacher routes as auth-required', () => {
     const cases: Array<[string, boolean]> = [
       ['/', true],
+      ['/classes', true],
+      ['/lessons', true],
       ['/lessons/lesson_aotfw_008', true],
+      ['/units/unit_aotfw', true],
       ['/s/lessons/lesson_aotfw_008', false],
       ['/sign-in', false]
     ];
