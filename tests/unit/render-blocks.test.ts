@@ -113,6 +113,66 @@ describe('renderBlock', () => {
     expect(teacherEl.classList.contains('block--teacher-only')).toBe(true);
     expect(studentEl.classList.contains('block--teacher-only')).toBe(false);
   });
+
+  it('renders image with alt and caption', () => {
+    const el = renderBlock(
+      {
+        ...baseBlock,
+        block_type: 'image',
+        variant: 'large',
+        content: { url: 'https://example.com/a.png', alt_text: 'Alt', caption: 'Caption' }
+      },
+      'student'
+    );
+    const img = el.querySelector('img');
+    expect(img?.getAttribute('src')).toBe('https://example.com/a.png');
+    expect(img?.getAttribute('alt')).toBe('Alt');
+    expect(el.textContent).toContain('Caption');
+  });
+
+  it('renders youtube video iframe lazily', () => {
+    const el = renderBlock(
+      {
+        ...baseBlock,
+        block_type: 'video',
+        variant: 'large',
+        content: { provider: 'youtube', external_id: 'dQw4w9WgXcQ' }
+      },
+      'student'
+    );
+    const iframe = el.querySelector('iframe');
+    expect(iframe?.getAttribute('loading')).toBe('lazy');
+    expect(iframe?.getAttribute('src')).toContain('youtube-nocookie.com/embed/dQw4w9WgXcQ');
+  });
+
+  it('renders embed iframe plus open link', () => {
+    const el = renderBlock(
+      {
+        ...baseBlock,
+        block_type: 'embed',
+        variant: 'large',
+        content: { url: 'https://example.com/page', title: 'Example' }
+      },
+      'student'
+    );
+    expect(el.querySelector('iframe')?.getAttribute('src')).toBe('https://example.com/page');
+    const link = el.querySelector('a');
+    expect(link?.getAttribute('href')).toBe('https://example.com/page');
+    expect(link?.textContent).toContain('Example');
+  });
+
+  it('sanitises html blocks', () => {
+    const el = renderBlock(
+      {
+        ...baseBlock,
+        block_type: 'html',
+        content: { html: '<p>Hi</p><script>alert(1)</script>' }
+      },
+      'student'
+    );
+    expect(el.innerHTML).toContain('<p>Hi</p>');
+    expect(el.innerHTML).not.toContain('script');
+  });
 });
 
 describe('CALLOUT_STYLE_CLASS', () => {
