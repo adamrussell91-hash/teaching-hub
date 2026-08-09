@@ -328,6 +328,72 @@ describe('PublishableLessonSchema media rules', () => {
     expect(result.success).toBe(false);
   });
 
+  it('rejects gallery item missing alt on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [
+        {
+          ...baseBlock,
+          id: 'g1',
+          block_type: 'gallery',
+          variant: 'large',
+          content: {
+            layout: 'grid',
+            items: [
+              { id: 'i1', url: 'https://example.com/a.png', alt_text: 'A' },
+              { id: 'i2', url: 'https://example.com/b.png', alt_text: '  ' }
+            ]
+          }
+        }
+      ]
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects gallery item with non-http url on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [
+        {
+          ...baseBlock,
+          id: 'g1',
+          block_type: 'gallery',
+          variant: 'large',
+          content: {
+            layout: 'carousel',
+            items: [
+              { id: 'i1', url: 'javascript:alert(1)', alt_text: 'A' },
+              { id: 'i2', url: 'https://example.com/b.png', alt_text: 'B' }
+            ]
+          }
+        }
+      ]
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('publishes gallery with valid items and empty captions', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [
+        {
+          ...baseBlock,
+          id: 'g1',
+          block_type: 'gallery',
+          variant: 'large',
+          content: {
+            layout: 'comparison',
+            items: [
+              { id: 'i1', url: 'https://example.com/a.png', alt_text: 'Before' },
+              { id: 'i2', url: 'https://example.com/b.png', alt_text: 'After' }
+            ]
+          }
+        }
+      ]
+    });
+    expect(result.success).toBe(true);
+  });
+
   it('rejects unrecognised video on publish', () => {
     const result = PublishableLessonSchema.safeParse({
       ...baseLesson,
@@ -500,6 +566,46 @@ describe('PublishableLessonSchema layout rules', () => {
       ]
     });
     expect(result.success).toBe(false);
+  });
+
+  it('rejects tabs with empty label on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...validLesson,
+      blocks: [
+        {
+          ...baseBlock,
+          id: 'tabs1',
+          block_type: 'tabs',
+          content: {
+            tabs: [
+              { id: 'a', label: '   ', blocks: [] },
+              { id: 'b', label: 'OK', blocks: [] }
+            ]
+          }
+        }
+      ]
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('allows tabs with empty panels when labels are set', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...validLesson,
+      blocks: [
+        {
+          ...baseBlock,
+          id: 'tabs1',
+          block_type: 'tabs',
+          content: {
+            tabs: [
+              { id: 'a', label: 'One', blocks: [] },
+              { id: 'b', label: 'Two', blocks: [] }
+            ]
+          }
+        }
+      ]
+    });
+    expect(result.success).toBe(true);
   });
 });
 

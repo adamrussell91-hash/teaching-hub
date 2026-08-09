@@ -329,6 +329,7 @@ describe('blockRegistry', () => {
       'definition',
       'divider',
       'embed',
+      'gallery',
       'heading',
       'html',
       'image',
@@ -338,6 +339,7 @@ describe('blockRegistry', () => {
       'section',
       'spacer',
       'table',
+      'tabs',
       'timeline',
       'video'
     ]);

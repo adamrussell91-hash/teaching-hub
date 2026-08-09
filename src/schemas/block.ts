@@ -7,6 +7,7 @@ export const BlockTypeSchema = z.enum([
   'heading',
   'callout',
   'image',
+  'gallery',
   'video',
   'embed',
   'html',
@@ -22,7 +23,8 @@ export const BlockTypeSchema = z.enum([
   'columns',
   'section',
   'spacer',
-  'timeline'
+  'timeline',
+  'tabs'
 ]);
 
 export const ColumnPresetSchema = z.enum(['50-50', '33-67', '67-33', '33-33-33']);
@@ -103,6 +105,39 @@ export const ImageBlockSchema = z.object({
     alt_text: z.string(),
     caption: z.string().optional()
   }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
+export const GalleryLayoutSchema = z.enum(['grid', 'carousel', 'comparison']);
+
+export const GalleryItemSchema = z.object({
+  id: z.string().min(1),
+  url: z.string(),
+  alt_text: z.string(),
+  caption: z.string().optional()
+});
+
+export const GalleryBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('gallery'),
+  variant: MediaSizeVariantSchema.default('large'),
+  visibility: VisibilitySchema,
+  content: z
+    .object({
+      layout: GalleryLayoutSchema,
+      items: z.array(GalleryItemSchema).min(2).max(12)
+    })
+    .superRefine((content, ctx) => {
+      if (content.layout === 'comparison' && content.items.length !== 2) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Comparison galleries need exactly 2 items',
+          path: ['items']
+        });
+      }
+    }),
   ...blockLayout,
   ...blockTimestamps
 });
@@ -315,6 +350,7 @@ const leafBlockSchemas = [
   HeadingBlockSchema,
   CalloutBlockSchema,
   ImageBlockSchema,
+  GalleryBlockSchema,
   VideoBlockSchema,
   EmbedBlockSchema,
   HtmlBlockSchema,
@@ -378,11 +414,44 @@ export const ColumnsBlockSchema = z.object({
   ...blockTimestamps
 });
 
+/** Allowed inside a tabs panel: leaves, spacer, columns — not tabs or section */
+export const TabChildBlockSchema = z.lazy(() =>
+  z.discriminatedUnion('block_type', [
+    ...leafBlockSchemas,
+    SpacerBlockSchema,
+    ColumnsBlockSchema,
+    TimelineBlockSchema
+  ])
+);
+
+export const TabsBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('tabs'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    tabs: z
+      .array(
+        z.object({
+          id: z.string().min(1),
+          label: z.string(),
+          blocks: z.array(TabChildBlockSchema)
+        })
+      )
+      .min(2)
+      .max(8)
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
 export const SectionChildBlockSchema = z.lazy(() =>
   z.discriminatedUnion('block_type', [
     ...leafBlockSchemas,
     SpacerBlockSchema,
     ColumnsBlockSchema,
+    TabsBlockSchema,
     TimelineBlockSchema
   ])
 );
@@ -408,7 +477,8 @@ export const BlockSchema = z.lazy(() =>
     SpacerBlockSchema,
     ColumnsBlockSchema,
     SectionBlockSchema,
-    TimelineBlockSchema
+    TimelineBlockSchema,
+    TabsBlockSchema
   ])
 );
 

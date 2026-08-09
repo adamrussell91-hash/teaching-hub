@@ -70,4 +70,19 @@ describe('filterBlocksForStudent', () => {
     section.visibility = 'teacher_only';
     expect(filterBlocksForStudent([section])).toEqual([]);
   });
+
+  it('recursively drops teacher_only children inside tabs panels', () => {
+    const tabs = createBlock('tabs', 'tabs1');
+    if (tabs.block_type !== 'tabs') throw new Error('expected tabs');
+    const visible = createBlock('rich_text', 'vis');
+    const hidden = createBlock('rich_text', 'hid');
+    hidden.visibility = 'teacher_only';
+    tabs.content.tabs[0]!.blocks = [visible, hidden] as (typeof tabs.content.tabs)[number]['blocks'];
+
+    const out = filterBlocksForStudent([tabs]);
+    expect(out).toHaveLength(1);
+    const t = out[0]!;
+    if (t.block_type !== 'tabs') throw new Error('expected tabs');
+    expect(t.content.tabs[0]!.blocks.map((b) => b.id)).toEqual(['vis']);
+  });
 });

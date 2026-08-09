@@ -2,6 +2,7 @@ import type { Block } from '@/schemas/block';
 
 type ColumnsBlock = Extract<Block, { block_type: 'columns' }>;
 type SectionBlock = Extract<Block, { block_type: 'section' }>;
+type TabsBlock = Extract<Block, { block_type: 'tabs' }>;
 
 export function filterBlocksForStudent(blocks: Block[]): Block[] {
   return blocks
@@ -24,6 +25,17 @@ export function filterBlocksForStudent(blocks: Block[]): Block[] {
             columns: block.content.columns.map((col) => ({
               ...col,
               blocks: filterBlocksForStudent(col.blocks) as ColumnsBlock['content']['columns'][number]['blocks']
+            }))
+          }
+        };
+      }
+      if (block.block_type === 'tabs') {
+        return {
+          ...block,
+          content: {
+            tabs: block.content.tabs.map((panel) => ({
+              ...panel,
+              blocks: filterBlocksForStudent(panel.blocks) as TabsBlock['content']['tabs'][number]['blocks']
             }))
           }
         };

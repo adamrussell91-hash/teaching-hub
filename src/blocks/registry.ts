@@ -8,6 +8,7 @@ import {
   createDefinitionEditor,
   createDividerEditor,
   createEmbedEditor,
+  createGalleryEditor,
   createHeadingEditor,
   createHtmlEditor,
   createImageEditor,
@@ -22,7 +23,8 @@ import {
 import {
   createColumnsEditor,
   createSectionEditor,
-  createSpacerEditor
+  createSpacerEditor,
+  createTabsEditor
 } from '@/blocks/layout-editors';
 import {
   renderAccordionBlock,
@@ -35,6 +37,7 @@ import {
   renderDefinitionBlock,
   renderDividerBlock,
   renderEmbedBlock,
+  renderGalleryBlock,
   renderHeadingBlock,
   renderHtmlBlock,
   renderImageBlock,
@@ -45,6 +48,7 @@ import {
   renderSpacerBlock,
   renderTableBlock,
   renderTimelineBlock,
+  renderTabsBlock,
   renderVideoBlock,
   type RenderMode
 } from '@/blocks/render';
@@ -77,6 +81,10 @@ export const blockRegistry: {
   image: {
     render: renderImageBlock,
     createEditor: createImageEditor
+  },
+  gallery: {
+    render: renderGalleryBlock,
+    createEditor: createGalleryEditor
   },
   video: {
     render: renderVideoBlock,
@@ -141,6 +149,10 @@ export const blockRegistry: {
   spacer: {
     render: renderSpacerBlock,
     createEditor: createSpacerEditor
+  },
+  tabs: {
+    render: renderTabsBlock,
+    createEditor: createTabsEditor
   }
 };
 
@@ -155,6 +167,7 @@ export {
   createDefinitionEditor,
   createDividerEditor,
   createEmbedEditor,
+  createGalleryEditor,
   createHeadingEditor,
   createHtmlEditor,
   createImageEditor,
@@ -165,6 +178,7 @@ export {
   createSpacerEditor,
   createTableEditor,
   createTimelineEditor,
+  createTabsEditor,
   createVideoEditor,
   renderAccordionBlock,
   renderAttachmentBlock,
@@ -176,6 +190,7 @@ export {
   renderDefinitionBlock,
   renderDividerBlock,
   renderEmbedBlock,
+  renderGalleryBlock,
   renderHeadingBlock,
   renderHtmlBlock,
   renderImageBlock,
@@ -186,6 +201,7 @@ export {
   renderSpacerBlock,
   renderTableBlock,
   renderTimelineBlock,
+  renderTabsBlock,
   renderVideoBlock
 };
 

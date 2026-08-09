@@ -2,7 +2,8 @@ import { parseVideoInput } from '@/blocks/video-url';
 import {
   createColumnsEditor,
   createSectionEditor,
-  createSpacerEditor
+  createSpacerEditor,
+  createTabsEditor
 } from '@/blocks/layout-editors';
 import type { Block } from '@/schemas/block';
 
@@ -1048,6 +1049,190 @@ export function createQuestionSetEditor(
   return editorShell(block, onChange, fields, getLatest);
 }
 
+export function createGalleryEditor(
+  block: Extract<Block, { block_type: 'gallery' }>,
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'gallery' }>>,
+  getLatest: () => Extract<Block, { block_type: 'gallery' }> = () => block
+): HTMLElement {
+  const fields = document.createElement('div');
+  fields.className = 'block-editor__fields';
+
+  let layout = block.content.layout;
+  let items = block.content.items.map((entry) => ({ ...entry }));
+
+  const emitChange = () => {
+    onChange({
+      ...getLatest(),
+      variant: sizeSelect.value as typeof block.variant,
+      content: {
+        layout,
+        items: items.map((entry) => ({
+          id: entry.id,
+          url: entry.url,
+          alt_text: entry.alt_text,
+          ...(entry.caption ? { caption: entry.caption } : {})
+        }))
+      }
+    });
+  };
+
+  const layoutSelect = document.createElement('select');
+  layoutSelect.className = 'block-editor__gallery-layout';
+  layoutSelect.setAttribute('aria-label', 'Gallery layout');
+  for (const [value, label] of [
+    ['grid', 'Grid'],
+    ['carousel', 'Carousel'],
+    ['comparison', 'Comparison']
+  ] as const) {
+    const opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = label;
+    layoutSelect.append(opt);
+  }
+  layoutSelect.value = layout;
+
+  const sizeSelect = createMediaSizeSelect(block.variant, emitChange);
+
+  const itemsContainer = document.createElement('div');
+  itemsContainer.className = 'block-editor__gallery-items';
+
+  const addButton = document.createElement('button');
+  addButton.type = 'button';
+  addButton.className = 'btn btn--secondary block-editor__gallery-add';
+  addButton.textContent = 'Add image';
+
+  function emptyItem(id: string) {
+    return { id, url: '', alt_text: '', caption: undefined as string | undefined };
+  }
+
+  function renderItems(): void {
+    itemsContainer.replaceChildren();
+    const comparison = layout === 'comparison';
+    const atMin = items.length <= 2;
+    const atMax = items.length >= 12;
+
+    items.forEach((entry, index) => {
+      const row = document.createElement('div');
+      row.className = 'block-editor__gallery-item';
+
+      const url = document.createElement('input');
+      url.type = 'url';
+      url.className = 'block-editor__gallery-url';
+      url.value = entry.url;
+      url.placeholder = 'Image URL (https://…)';
+      url.setAttribute('aria-label', `Gallery image ${index + 1} URL`);
+
+      const alt = document.createElement('input');
+      alt.type = 'text';
+      alt.className = 'block-editor__gallery-alt';
+      alt.value = entry.alt_text;
+      alt.placeholder = 'Alt text (required to publish)';
+      alt.setAttribute('aria-label', `Gallery image ${index + 1} alt text`);
+
+      const caption = document.createElement('input');
+      caption.type = 'text';
+      caption.className = 'block-editor__gallery-caption';
+      caption.value = entry.caption ?? '';
+      caption.placeholder = 'Caption (optional)';
+      caption.setAttribute('aria-label', `Gallery image ${index + 1} caption`);
+
+      const up = document.createElement('button');
+      up.type = 'button';
+      up.className = 'btn btn--ghost block-editor__gallery-up';
+      up.textContent = 'Up';
+      up.disabled = index === 0;
+      up.addEventListener('click', () => {
+        if (index === 0) return;
+        const next = [...items];
+        const tmp = next[index - 1]!;
+        next[index - 1] = next[index]!;
+        next[index] = tmp;
+        items = next;
+        emitChange();
+        renderItems();
+      });
+
+      const down = document.createElement('button');
+      down.type = 'button';
+      down.className = 'btn btn--ghost block-editor__gallery-down';
+      down.textContent = 'Down';
+      down.disabled = index === items.length - 1;
+      down.addEventListener('click', () => {
+        if (index >= items.length - 1) return;
+        const next = [...items];
+        const tmp = next[index + 1]!;
+        next[index + 1] = next[index]!;
+        next[index] = tmp;
+        items = next;
+        emitChange();
+        renderItems();
+      });
+
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'btn btn--ghost block-editor__gallery-remove';
+      remove.textContent = 'Remove';
+      remove.disabled = comparison || atMin;
+      remove.addEventListener('click', () => {
+        if (comparison || items.length <= 2) return;
+        items = items.filter((_, i) => i !== index);
+        emitChange();
+        renderItems();
+      });
+
+      url.addEventListener('input', () => {
+        items[index] = { ...items[index]!, url: url.value };
+        emitChange();
+      });
+      alt.addEventListener('input', () => {
+        items[index] = { ...items[index]!, alt_text: alt.value };
+        emitChange();
+      });
+      caption.addEventListener('input', () => {
+        items[index] = {
+          ...items[index]!,
+          caption: caption.value || undefined
+        };
+        emitChange();
+      });
+
+      row.append(url, alt, caption, up, down, remove);
+      itemsContainer.append(row);
+    });
+
+    if (comparison) {
+      addButton.remove();
+    } else if (!addButton.isConnected) {
+      fields.append(addButton);
+    }
+    addButton.disabled = atMax;
+  }
+
+  layoutSelect.addEventListener('change', () => {
+    layout = layoutSelect.value as typeof layout;
+    if (layout === 'comparison' && items.length > 2) {
+      items = items.slice(0, 2);
+    }
+    while (layout === 'comparison' && items.length < 2) {
+      items = [...items, emptyItem(`${getLatest().id}_i${items.length + 1}`)];
+    }
+    emitChange();
+    renderItems();
+  });
+
+  addButton.addEventListener('click', () => {
+    if (layout === 'comparison' || items.length >= 12) return;
+    const id = `${getLatest().id}_i${Date.now()}`;
+    items = [...items, emptyItem(id)];
+    emitChange();
+    renderItems();
+  });
+
+  fields.append(layoutSelect, sizeSelect, itemsContainer, addButton);
+  renderItems();
+  return editorShell(block, onChange, fields, getLatest);
+}
+
 type TimelineEventDraft = {
   id: string;
   when: string;
@@ -1282,6 +1467,8 @@ export function createBlockEditor(
       return createAttachmentEditor(block, onChange, latest as () => Extract<Block, { block_type: 'attachment' }>);
     case 'accordion':
       return createAccordionEditor(block, onChange, latest as () => Extract<Block, { block_type: 'accordion' }>);
+    case 'gallery':
+      return createGalleryEditor(block, onChange, latest as () => Extract<Block, { block_type: 'gallery' }>);
     case 'table':
       return createTableEditor(block, onChange, latest as () => Extract<Block, { block_type: 'table' }>);
     case 'question_set':
@@ -1294,5 +1481,7 @@ export function createBlockEditor(
       return createSectionEditor(block, onChange, latest as () => Extract<Block, { block_type: 'section' }>);
     case 'columns':
       return createColumnsEditor(block, onChange, latest as () => Extract<Block, { block_type: 'columns' }>);
+    case 'tabs':
+      return createTabsEditor(block, onChange, latest as () => Extract<Block, { block_type: 'tabs' }>);
   }
 }

@@ -3,6 +3,7 @@ import type { Block } from '@/schemas/block';
 
 type ColumnsBlock = Extract<Block, { block_type: 'columns' }>;
 type SectionBlock = Extract<Block, { block_type: 'section' }>;
+type TabsBlock = Extract<Block, { block_type: 'tabs' }>;
 
 export const NEW_BLOCK_TYPES = [
   'rich_text',
@@ -14,6 +15,7 @@ export const NEW_BLOCK_TYPES = [
   'code',
   'html',
   'image',
+  'gallery',
   'video',
   'embed',
   'audio',
@@ -24,7 +26,8 @@ export const NEW_BLOCK_TYPES = [
   'columns',
   'section',
   'spacer',
-  'timeline'
+  'timeline',
+  'tabs'
 ] as const;
 
 export type NewBlockType = (typeof NEW_BLOCK_TYPES)[number];
@@ -39,6 +42,7 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   code: 'Code',
   html: 'HTML',
   image: 'Image',
+  gallery: 'Gallery',
   video: 'Video',
   embed: 'Embed',
   audio: 'Audio',
@@ -49,7 +53,8 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   columns: 'Columns',
   section: 'Section',
   spacer: 'Spacer',
-  timeline: 'Timeline'
+  timeline: 'Timeline',
+  tabs: 'Tabs'
 };
 
 export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[] }> = [
@@ -59,7 +64,7 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
   },
   {
     label: 'Media',
-    types: ['image', 'video', 'embed', 'audio', 'attachment']
+    types: ['image', 'gallery', 'video', 'embed', 'audio', 'attachment']
   },
   {
     label: 'Teaching',
@@ -67,17 +72,22 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
   },
   {
     label: 'Layout',
-    types: ['section', 'columns', 'spacer']
+    types: ['section', 'columns', 'spacer', 'tabs']
   }
 ];
 
 /** Block types allowed inside a columns cell */
 export const COLUMN_CHILD_TYPES = NEW_BLOCK_TYPES.filter(
-  (t) => t !== 'columns' && t !== 'section' && t !== 'timeline'
+  (t) => t !== 'columns' && t !== 'section' && t !== 'timeline' && t !== 'tabs'
 );
 
 /** Block types allowed inside a section */
 export const SECTION_CHILD_TYPES = NEW_BLOCK_TYPES.filter((t) => t !== 'section');
+
+/** Block types allowed inside a tabs panel */
+export const TAB_CHILD_TYPES = NEW_BLOCK_TYPES.filter(
+  (t) => t !== 'tabs' && t !== 'section'
+);
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -114,6 +124,20 @@ export function createBlock(type: NewBlockType, id: string): Block {
         block_type: 'image',
         variant: 'large',
         content: { url: '', alt_text: '' }
+      };
+    case 'gallery':
+      return {
+        ...shared,
+        block_type: 'gallery',
+        variant: 'large',
+        content: {
+          layout: 'grid',
+          items: [
+            { id: `${id}_i1`, url: '', alt_text: '' },
+            { id: `${id}_i2`, url: '', alt_text: '' },
+            { id: `${id}_i3`, url: '', alt_text: '' }
+          ]
+        }
       };
     case 'video':
       return {
@@ -241,6 +265,19 @@ export function createBlock(type: NewBlockType, id: string): Block {
           ]
         }
       };
+    case 'tabs':
+      return {
+        ...shared,
+        block_type: 'tabs',
+        variant: 'medium',
+        content: {
+          tabs: [
+            { id: `${id}_t1`, label: '', blocks: [] },
+            { id: `${id}_t2`, label: '', blocks: [] },
+            { id: `${id}_t3`, label: '', blocks: [] }
+          ]
+        }
+      };
   }
 }
 
@@ -276,6 +313,24 @@ export function cloneBlockWithNewIds(
     cloned.content = {
       events: cloned.content.events.map((event) => ({
         ...event,
+        id: nextId()
+      }))
+    };
+  } else if (cloned.block_type === 'tabs') {
+    cloned.content = {
+      tabs: cloned.content.tabs.map((panel) => ({
+        id: nextId(),
+        label: panel.label,
+        blocks: panel.blocks.map((child) =>
+          cloneBlockWithNewIds(child, nextId, now)
+        ) as TabsBlock['content']['tabs'][number]['blocks']
+      }))
+    };
+  } else if (cloned.block_type === 'gallery') {
+    cloned.content = {
+      ...cloned.content,
+      items: cloned.content.items.map((entry) => ({
+        ...entry,
         id: nextId()
       }))
     };

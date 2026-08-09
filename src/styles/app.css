@@ -442,6 +442,10 @@ a:hover {
 .block-editor__attachment-title,
 .block-editor__attachment-filename,
 .block-editor__accordion-title,
+.block-editor__gallery-layout,
+.block-editor__gallery-url,
+.block-editor__gallery-alt,
+.block-editor__gallery-caption,
 .block-editor__question-set-title,
 .block-editor__question-kind,
 .block-editor__table-header,
@@ -498,13 +502,15 @@ a:hover {
 }
 
 .block-editor__accordion-items,
-.block-editor__questions {
+.block-editor__questions,
+.block-editor__gallery-items {
   display: grid;
   gap: 0.65rem;
 }
 
 .block-editor__accordion-item,
-.block-editor__question {
+.block-editor__question,
+.block-editor__gallery-item {
   display: grid;
   gap: 0.45rem;
   padding: 0.65rem;
@@ -2193,26 +2199,212 @@ a.home-class-tile:hover {
   }
 }
 
+.block-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.block-tabs__tablist {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.25rem;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 0;
+}
+
+.block-tabs__tab {
+  flex: 0 0 auto;
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--ink-muted, var(--ink));
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  padding: 0.5rem 0.85rem;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.block-tabs__tab:hover {
+  color: var(--ink);
+}
+
+.block-tabs__tab--active,
+.block-tabs__tab[aria-selected='true'] {
+  color: var(--ink);
+  border-bottom-color: var(--accent, var(--ink));
+  font-weight: 600;
+}
+
+.block-tabs__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.block-tabs__panel[hidden] {
+  display: none;
+}
+
+/* Gallery */
+.block-gallery--small {
+  max-width: 18rem;
+}
+
+.block-gallery--medium {
+  max-width: 32rem;
+}
+
+.block-gallery--large {
+  max-width: 100%;
+}
+
+.block-gallery__list {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+}
+
+.block-gallery--comparison .block-gallery__list {
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+@media (max-width: 30rem) {
+  .block-gallery--comparison .block-gallery__list {
+    grid-template-columns: 1fr;
+  }
+}
+
+.block-gallery__item {
+  margin: 0;
+}
+
+.block-gallery__open {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.block-gallery__open img,
+.block-gallery__item > img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: calc(var(--radius-md) * 0.5);
+}
+
+.block-gallery__caption {
+  margin-top: 0.35rem;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.block-gallery__viewport {
+  outline: none;
+}
+
+.block-gallery__controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.block-gallery__status {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.block-gallery__dots {
+  display: flex;
+  justify-content: center;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.block-gallery__dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: transparent;
+  padding: 0;
+}
+
+.block-gallery__dot[aria-selected='true'] {
+  background: var(--ink);
+}
+
+.block-gallery-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: rgba(10, 20, 30, 0.72);
+}
+
+.block-gallery-lightbox__image {
+  max-width: min(96vw, 56rem);
+  max-height: 85vh;
+  object-fit: contain;
+  border-radius: calc(var(--radius-md) * 0.5);
+}
+
+.block-gallery-lightbox__close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+}
+
 /* Nested editor chrome */
 .block-editor__columns,
 .block-editor__section-children,
-.block-editor__column-pane {
+.block-editor__column-pane,
+.block-editor__tabs-panel {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
   margin-top: 0.5rem;
 }
 
-.block-editor__column-panes {
+.block-editor__column-panes,
+.block-editor__tabs-panels {
   display: grid;
   gap: 0.75rem;
 }
 
-.block-editor__column-pane {
+.block-editor__column-pane,
+.block-editor__tabs-panel {
   border: 1px solid var(--line);
   border-radius: calc(var(--radius-md) * 0.5);
   padding: 0.75rem;
   background: var(--glass);
+}
+
+.block-editor__tabs-panel-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.block-editor__tab-label {
+  flex: 1 1 10rem;
+  min-width: 8rem;
 }
 
 .block-editor__nested-row {
