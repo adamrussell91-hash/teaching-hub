@@ -1,5 +1,5 @@
-import { sanitizeRichTextHtml } from './sanitize';
-import type { Block } from '../schemas/block';
+import { sanitizeRichTextHtml } from '@/blocks/sanitize';
+import type { Block } from '@/schemas/block';
 
 type ColumnsBlock = Extract<Block, { block_type: 'columns' }>;
 type SectionBlock = Extract<Block, { block_type: 'section' }>;
