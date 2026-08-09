@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { BlockSchema } from '@/schemas/block';
 import { createBlock, cloneBlockWithNewIds, COLUMN_CHILD_TYPES, TAB_CHILD_TYPES } from '@/blocks/create-block';
+import { createGalleryEditor } from '@/blocks/editors';
 
 const timestamps = {
   created_at: '2026-01-01T00:00:00.000Z',
@@ -160,5 +161,62 @@ describe('createBlock gallery', () => {
     if (cloned.block_type !== 'gallery') throw new Error('expected gallery');
     expect(cloned.content.items.map((i) => i.id)).toEqual(['id_2', 'id_3', 'id_4']);
     expect(cloned.content.items[0]!.alt_text).toBe('A');
+  });
+});
+
+describe('createGalleryEditor', () => {
+  it('renders layout select and item fields; add disabled at 12', () => {
+    const block = createBlock('gallery', 'g1');
+    if (block.block_type !== 'gallery') throw new Error('expected gallery');
+    const changes: unknown[] = [];
+    const el = createGalleryEditor(block, (next) => changes.push(next));
+
+    const layout = el.querySelector('.block-editor__gallery-layout') as HTMLSelectElement;
+    expect(layout.value).toBe('grid');
+
+    const rows = el.querySelectorAll('.block-editor__gallery-item');
+    expect(rows.length).toBe(3);
+
+    const add = el.querySelector('.block-editor__gallery-add') as HTMLButtonElement;
+    expect(add.disabled).toBe(false);
+
+    // Fill to 12 via repeated add
+    for (let i = 0; i < 9; i++) add.click();
+    expect(el.querySelectorAll('.block-editor__gallery-item').length).toBe(12);
+    expect(add.disabled).toBe(true);
+  });
+
+  it('switching to comparison keeps first 2 items', () => {
+    const block = createBlock('gallery', 'g1');
+    if (block.block_type !== 'gallery') throw new Error('expected gallery');
+    let latest = block;
+    const el = createGalleryEditor(block, (next) => {
+      latest = next;
+    });
+
+    const layout = el.querySelector('.block-editor__gallery-layout') as HTMLSelectElement;
+    layout.value = 'comparison';
+    layout.dispatchEvent(new Event('change'));
+
+    expect(latest.content.layout).toBe('comparison');
+    expect(latest.content.items).toHaveLength(2);
+    expect(latest.content.items.map((i) => i.id)).toEqual(['g1_i1', 'g1_i2']);
+    expect(el.querySelector('.block-editor__gallery-add')).toBeNull();
+  });
+
+  it('remove disabled at 2 for grid', () => {
+    const block = createBlock('gallery', 'g1');
+    if (block.block_type !== 'gallery') throw new Error('expected gallery');
+    let latest = block;
+    const el = createGalleryEditor(block, (next) => {
+      latest = next;
+    });
+
+    const removes = () =>
+      el.querySelectorAll('.block-editor__gallery-remove') as NodeListOf<HTMLButtonElement>;
+
+    removes()[0]!.click();
+    expect(latest.content.items).toHaveLength(2);
+    expect([...removes()].every((b) => b.disabled)).toBe(true);
   });
 });
