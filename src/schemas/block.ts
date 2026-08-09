@@ -18,8 +18,14 @@ export const BlockTypeSchema = z.enum([
   'attachment',
   'accordion',
   'table',
-  'question_set'
+  'question_set',
+  'columns',
+  'section',
+  'spacer'
 ]);
+
+export const ColumnPresetSchema = z.enum(['50-50', '33-67', '67-33', '33-33-33']);
+export const SpacerSizeSchema = z.enum(['small', 'medium', 'large']);
 
 export const VideoProviderSchema = z.enum(['youtube', 'vimeo']);
 export const HeadingVariantSchema = z.enum(['page', 'section', 'subsection']);
@@ -279,7 +285,7 @@ export const QuestionSetBlockSchema = z.object({
   ...blockTimestamps
 });
 
-export const BlockSchema = z.discriminatedUnion('block_type', [
+const leafBlockSchemas = [
   RichTextBlockSchema,
   HeadingBlockSchema,
   CalloutBlockSchema,
@@ -296,6 +302,87 @@ export const BlockSchema = z.discriminatedUnion('block_type', [
   AccordionBlockSchema,
   TableBlockSchema,
   QuestionSetBlockSchema
-]);
+] as const;
+
+export const SpacerBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('spacer'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    size: SpacerSizeSchema
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
+export const ColumnChildBlockSchema = z.lazy(() =>
+  z.discriminatedUnion('block_type', [...leafBlockSchemas, SpacerBlockSchema])
+);
+
+const columnsArraySchema = z
+  .array(
+    z.object({
+      width: z.number().int().min(1).max(12),
+      blocks: z.array(ColumnChildBlockSchema)
+    })
+  )
+  .superRefine((columns, ctx) => {
+    const sum = columns.reduce((acc, col) => acc + col.width, 0);
+    if (sum !== 12) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Column widths must sum to 12',
+        path: []
+      });
+    }
+  });
+
+export const ColumnsBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('columns'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    preset: ColumnPresetSchema,
+    columns: columnsArraySchema
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
+export const SectionChildBlockSchema = z.lazy(() =>
+  z.discriminatedUnion('block_type', [
+    ...leafBlockSchemas,
+    SpacerBlockSchema,
+    ColumnsBlockSchema
+  ])
+);
+
+export const SectionBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('section'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    title: z.string(),
+    collapsed_in_editor: z.boolean().optional(),
+    blocks: z.array(SectionChildBlockSchema)
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
+export const BlockSchema = z.lazy(() =>
+  z.discriminatedUnion('block_type', [
+    ...leafBlockSchemas,
+    SpacerBlockSchema,
+    ColumnsBlockSchema,
+    SectionBlockSchema
+  ])
+);
 
 export type Block = z.infer<typeof BlockSchema>;
