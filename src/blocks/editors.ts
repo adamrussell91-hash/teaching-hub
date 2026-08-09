@@ -1048,6 +1048,205 @@ export function createQuestionSetEditor(
   return editorShell(block, onChange, fields, getLatest);
 }
 
+type TimelineEventDraft = {
+  id: string;
+  when: string;
+  label: string;
+  description: string;
+  image_url?: string;
+  image_alt?: string;
+  link_url?: string;
+  link_label?: string;
+};
+
+export function createTimelineEditor(
+  block: Extract<Block, { block_type: 'timeline' }>,
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'timeline' }>>,
+  getLatest: () => Extract<Block, { block_type: 'timeline' }> = () => block
+): HTMLElement {
+  const fields = document.createElement('div');
+  fields.className = 'block-editor__fields';
+
+  const eventsContainer = document.createElement('div');
+  eventsContainer.className = 'block-editor__timeline-items';
+
+  let events: TimelineEventDraft[] = block.content.events.map((event) => ({ ...event }));
+  let eventCounter = events.length;
+
+  const emitChange = () => {
+    onChange({
+      ...getLatest(),
+      content: {
+        events: events.map((event) => ({
+          id: event.id,
+          when: event.when,
+          label: event.label,
+          description: event.description,
+          image_url: event.image_url?.trim() ? event.image_url : undefined,
+          image_alt: event.image_alt?.trim() ? event.image_alt : undefined,
+          link_url: event.link_url?.trim() ? event.link_url : undefined,
+          link_label: event.link_label?.trim() ? event.link_label : undefined
+        }))
+      }
+    });
+  };
+
+  function renderEvents(): void {
+    eventsContainer.replaceChildren();
+
+    events.forEach((event, index) => {
+      const row = document.createElement('div');
+      row.className = 'block-editor__timeline-item';
+
+      const when = document.createElement('input');
+      when.type = 'text';
+      when.className = 'block-editor__timeline-when';
+      when.value = event.when;
+      when.placeholder = 'When';
+      when.setAttribute('aria-label', `Timeline event ${index + 1} when`);
+
+      const label = document.createElement('input');
+      label.type = 'text';
+      label.className = 'block-editor__timeline-label';
+      label.value = event.label;
+      label.placeholder = 'Label';
+      label.setAttribute('aria-label', `Timeline event ${index + 1} label`);
+
+      const description = document.createElement('textarea');
+      description.className = 'block-editor__timeline-description';
+      description.value = event.description;
+      description.rows = 3;
+      description.placeholder = 'Description';
+      description.setAttribute('aria-label', `Timeline event ${index + 1} description`);
+
+      const imageUrl = document.createElement('input');
+      imageUrl.type = 'url';
+      imageUrl.className = 'block-editor__timeline-image-url';
+      imageUrl.value = event.image_url ?? '';
+      imageUrl.placeholder = 'Image URL (optional)';
+      imageUrl.setAttribute('aria-label', `Timeline event ${index + 1} image URL`);
+
+      const imageAlt = document.createElement('input');
+      imageAlt.type = 'text';
+      imageAlt.className = 'block-editor__timeline-image-alt';
+      imageAlt.value = event.image_alt ?? '';
+      imageAlt.placeholder = 'Image alt (required if URL set)';
+      imageAlt.setAttribute('aria-label', `Timeline event ${index + 1} image alt`);
+
+      const linkUrl = document.createElement('input');
+      linkUrl.type = 'url';
+      linkUrl.className = 'block-editor__timeline-link-url';
+      linkUrl.value = event.link_url ?? '';
+      linkUrl.placeholder = 'Link URL (optional)';
+      linkUrl.setAttribute('aria-label', `Timeline event ${index + 1} link URL`);
+
+      const linkLabel = document.createElement('input');
+      linkLabel.type = 'text';
+      linkLabel.className = 'block-editor__timeline-link-label';
+      linkLabel.value = event.link_label ?? '';
+      linkLabel.placeholder = 'Link label (optional)';
+      linkLabel.setAttribute('aria-label', `Timeline event ${index + 1} link label`);
+
+      const up = document.createElement('button');
+      up.type = 'button';
+      up.className = 'btn btn--ghost block-editor__timeline-up';
+      up.textContent = 'Up';
+      up.disabled = index === 0;
+      up.addEventListener('click', () => {
+        if (index === 0) return;
+        const next = [...events];
+        const current = next[index]!;
+        next[index] = next[index - 1]!;
+        next[index - 1] = current;
+        events = next;
+        emitChange();
+        renderEvents();
+      });
+
+      const down = document.createElement('button');
+      down.type = 'button';
+      down.className = 'btn btn--ghost block-editor__timeline-down';
+      down.textContent = 'Down';
+      down.disabled = index >= events.length - 1;
+      down.addEventListener('click', () => {
+        if (index >= events.length - 1) return;
+        const next = [...events];
+        const current = next[index]!;
+        next[index] = next[index + 1]!;
+        next[index + 1] = current;
+        events = next;
+        emitChange();
+        renderEvents();
+      });
+
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'btn btn--ghost block-editor__timeline-remove';
+      remove.textContent = 'Remove';
+      remove.disabled = events.length <= 1;
+      remove.addEventListener('click', () => {
+        if (events.length <= 1) return;
+        events = events.filter((_, i) => i !== index);
+        emitChange();
+        renderEvents();
+      });
+
+      const patch = (partial: Partial<TimelineEventDraft>) => {
+        events[index] = { ...events[index]!, ...partial };
+        emitChange();
+      };
+
+      when.addEventListener('input', () => patch({ when: when.value }));
+      label.addEventListener('input', () => patch({ label: label.value }));
+      description.addEventListener('input', () => patch({ description: description.value }));
+      imageUrl.addEventListener('input', () => patch({ image_url: imageUrl.value }));
+      imageAlt.addEventListener('input', () => patch({ image_alt: imageAlt.value }));
+      linkUrl.addEventListener('input', () => patch({ link_url: linkUrl.value }));
+      linkLabel.addEventListener('input', () => patch({ link_label: linkLabel.value }));
+
+      row.append(
+        when,
+        label,
+        description,
+        imageUrl,
+        imageAlt,
+        linkUrl,
+        linkLabel,
+        up,
+        down,
+        remove
+      );
+      eventsContainer.append(row);
+    });
+
+    addButton.disabled = events.length >= 12;
+  }
+
+  const addButton = document.createElement('button');
+  addButton.type = 'button';
+  addButton.className = 'btn btn--secondary block-editor__timeline-add';
+  addButton.textContent = 'Add event';
+  addButton.addEventListener('click', () => {
+    if (events.length >= 12) return;
+    eventCounter += 1;
+    events = [
+      ...events,
+      {
+        id: `${getLatest().id}_e${eventCounter}`,
+        when: '',
+        label: '',
+        description: ''
+      }
+    ];
+    emitChange();
+    renderEvents();
+  });
+
+  renderEvents();
+  fields.append(eventsContainer, addButton);
+  return editorShell(block, onChange, fields, getLatest);
+}
+
 export function createBlockEditor(
   block: Block,
   onChange: BlockChangeHandler,
@@ -1087,6 +1286,8 @@ export function createBlockEditor(
       return createTableEditor(block, onChange, latest as () => Extract<Block, { block_type: 'table' }>);
     case 'question_set':
       return createQuestionSetEditor(block, onChange, latest as () => Extract<Block, { block_type: 'question_set' }>);
+    case 'timeline':
+      return createTimelineEditor(block, onChange, latest as () => Extract<Block, { block_type: 'timeline' }>);
     case 'spacer':
       return createSpacerEditor(block, onChange, latest as () => Extract<Block, { block_type: 'spacer' }>);
     case 'section':

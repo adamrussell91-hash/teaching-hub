@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { BlockSchema } from '@/schemas/block';
 import { createBlock, cloneBlockWithNewIds, COLUMN_CHILD_TYPES } from '@/blocks/create-block';
+import { createBlockEditor } from '@/blocks/editors';
 
 const timestamps = {
   created_at: '2026-01-01T00:00:00.000Z',
@@ -145,5 +146,84 @@ describe('createBlock timeline', () => {
     if (cloned.block_type !== 'timeline') throw new Error('expected timeline');
     expect(cloned.content.events.map((e) => e.id)).toEqual(['id_2', 'id_3', 'id_4']);
     expect(cloned.content.events[0]!.label).toBe('A');
+  });
+});
+
+describe('timeline editor', () => {
+  it('updates when and label on input', () => {
+    const block = createBlock('timeline', 'tl1');
+    let latest = block;
+    const editor = createBlockEditor(block, (next) => {
+      latest = next;
+    });
+    const when = editor.querySelector(
+      '[aria-label="Timeline event 1 when"]'
+    ) as HTMLInputElement;
+    const label = editor.querySelector(
+      '[aria-label="Timeline event 1 label"]'
+    ) as HTMLInputElement;
+    when.value = '1788';
+    when.dispatchEvent(new Event('input', { bubbles: true }));
+    label.value = 'Fleet';
+    label.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(latest.block_type).toBe('timeline');
+    if (latest.block_type !== 'timeline') throw new Error('expected timeline');
+    expect(latest.content.events[0]!.when).toBe('1788');
+    expect(latest.content.events[0]!.label).toBe('Fleet');
+  });
+
+  it('adds up to 12 and removes down to 1', () => {
+    const block = createBlock('timeline', 'tl1');
+    let latest = block;
+    const mount = document.createElement('div');
+    const rebuild = () => {
+      mount.replaceChildren(
+        createBlockEditor(latest, (next) => {
+          latest = next;
+          rebuild();
+        })
+      );
+    };
+    rebuild();
+    const add = () =>
+      (mount.querySelector('.block-editor__timeline-add') as HTMLButtonElement).click();
+    for (let i = 0; i < 9; i += 1) add();
+    expect(latest.block_type === 'timeline' && latest.content.events).toHaveLength(12);
+    expect(
+      (mount.querySelector('.block-editor__timeline-add') as HTMLButtonElement).disabled
+    ).toBe(true);
+    while (latest.block_type === 'timeline' && latest.content.events.length > 1) {
+      (mount.querySelector('.block-editor__timeline-remove') as HTMLButtonElement).click();
+    }
+    expect(latest.block_type === 'timeline' && latest.content.events).toHaveLength(1);
+    expect(
+      (mount.querySelector('.block-editor__timeline-remove') as HTMLButtonElement).disabled
+    ).toBe(true);
+  });
+
+  it('reorders events with up/down', () => {
+    const block = createBlock('timeline', 'tl1');
+    if (block.block_type !== 'timeline') throw new Error('expected timeline');
+    block.content.events[0]!.label = 'A';
+    block.content.events[1]!.label = 'B';
+    block.content.events[2]!.label = 'C';
+    let latest = block;
+    const mount = document.createElement('div');
+    const rebuild = () => {
+      mount.replaceChildren(
+        createBlockEditor(latest, (next) => {
+          latest = next;
+          rebuild();
+        })
+      );
+    };
+    rebuild();
+    const downs = mount.querySelectorAll('.block-editor__timeline-down');
+    (downs[0] as HTMLButtonElement).click();
+    expect(latest.block_type === 'timeline' && latest.content.events.map((e) => e.label)).toEqual([
+      'B',
+      'A',
+      'C'
+    ]);
   });
 });
