@@ -16,6 +16,14 @@ import {
   layoutConceptMap
 } from '@/blocks/graph-layout';
 import { buildChartSvg, buildChartTableRows } from '@/blocks/chart-svg';
+import {
+  createBlockEditor,
+  createChartEditor,
+  createConceptMapEditor,
+  createDiagramEditor,
+  createEquationEditor,
+  createMindMapEditor
+} from '@/blocks/editors';
 import { renderBlock } from '@/blocks/render';
 
 const timestamps = {
@@ -422,5 +430,169 @@ describe('visualisation renderers', () => {
     expect(
       renderBlock(createBlock('concept_map', 'cm1'), 'student').querySelector('svg')
     ).toBeTruthy();
+  });
+});
+
+describe('visualisation editors', () => {
+  describe('createChartEditor', () => {
+    it('mounts fields and updates content on input', () => {
+      const block = createBlock('chart', 'c1');
+      if (block.block_type !== 'chart') throw new Error('expected chart');
+      let latest = block;
+      const el = createChartEditor(block, (next) => {
+        latest = next;
+      });
+
+      expect(el.querySelector('.block-editor__chart-type')).not.toBeNull();
+      expect(el.querySelector('.block-editor__chart-preview svg')).not.toBeNull();
+
+      const title = el.querySelector('.block-editor__chart-title') as HTMLInputElement;
+      title.value = 'Enrolments';
+      title.dispatchEvent(new Event('input'));
+      expect(latest.content.title).toBe('Enrolments');
+
+      const type = el.querySelector('.block-editor__chart-type') as HTMLSelectElement;
+      type.value = 'line';
+      type.dispatchEvent(new Event('change'));
+      expect(latest.content.chart_type).toBe('line');
+
+      const seriesName = el.querySelector('.block-editor__chart-series-name') as HTMLInputElement;
+      seriesName.value = 'Class A';
+      seriesName.dispatchEvent(new Event('input'));
+      expect(latest.content.series[0]!.name).toBe('Class A');
+    });
+  });
+
+  describe('createEquationEditor', () => {
+    it('mounts latex field and updates content on input', () => {
+      const block = createBlock('equation', 'e1');
+      if (block.block_type !== 'equation') throw new Error('expected equation');
+      let latest = block;
+      const el = createEquationEditor(block, (next) => {
+        latest = next;
+      });
+
+      const latex = el.querySelector('.block-editor__equation-latex') as HTMLTextAreaElement;
+      expect(latex).not.toBeNull();
+      latex.value = 'a^2 + b^2 = c^2';
+      latex.dispatchEvent(new Event('input'));
+      expect(latest.content.latex).toBe('a^2 + b^2 = c^2');
+
+      const caption = el.querySelector('.block-editor__equation-caption') as HTMLInputElement;
+      caption.value = 'Pythagoras';
+      caption.dispatchEvent(new Event('input'));
+      expect(latest.content.caption).toBe('Pythagoras');
+    });
+  });
+
+  describe('createDiagramEditor', () => {
+    it('mounts source fields and updates content on input', () => {
+      const block = createBlock('diagram', 'd1');
+      if (block.block_type !== 'diagram') throw new Error('expected diagram');
+      let latest = block;
+      const el = createDiagramEditor(block, (next) => {
+        latest = next;
+      });
+
+      const url = el.querySelector('.block-editor__diagram-url') as HTMLInputElement;
+      expect(url).not.toBeNull();
+      url.value = 'https://example.com/diagram.png';
+      url.dispatchEvent(new Event('input'));
+      expect(latest.content.image_url).toBe('https://example.com/diagram.png');
+
+      const source = el.querySelector('.block-editor__diagram-source') as HTMLSelectElement;
+      source.value = 'svg';
+      source.dispatchEvent(new Event('change'));
+      expect(latest.content.source).toBe('svg');
+
+      const svg = el.querySelector('.block-editor__diagram-svg') as HTMLTextAreaElement;
+      expect(svg.hidden).toBe(false);
+      svg.value = '<svg xmlns="http://www.w3.org/2000/svg"><circle r="2"/></svg>';
+      svg.dispatchEvent(new Event('input'));
+      expect(latest.content.svg_markup).toContain('circle');
+    });
+  });
+
+  describe('createMindMapEditor', () => {
+    it('mounts nodes and updates labels on input', () => {
+      const block = createBlock('mind_map', 'm1');
+      if (block.block_type !== 'mind_map') throw new Error('expected mind_map');
+      let latest = block;
+      const el = createMindMapEditor(block, (next) => {
+        latest = next;
+      });
+
+      expect(el.querySelectorAll('.block-editor__mind-map-node').length).toBe(3);
+      expect(el.querySelector('.block-editor__mind-map-preview svg')).not.toBeNull();
+
+      const label = el.querySelector('.block-editor__mind-map-label') as HTMLInputElement;
+      label.value = 'Root idea';
+      label.dispatchEvent(new Event('input'));
+      expect(latest.content.nodes[0]!.label).toBe('Root idea');
+
+      const title = el.querySelector('.block-editor__mind-map-title') as HTMLInputElement;
+      title.value = 'Unit map';
+      title.dispatchEvent(new Event('input'));
+      expect(latest.content.title).toBe('Unit map');
+    });
+  });
+
+  describe('createConceptMapEditor', () => {
+    it('mounts nodes/edges and updates content on input', () => {
+      const block = createBlock('concept_map', 'cm1');
+      if (block.block_type !== 'concept_map') throw new Error('expected concept_map');
+      let latest = block;
+      const el = createConceptMapEditor(block, (next) => {
+        latest = next;
+      });
+
+      expect(el.querySelectorAll('.block-editor__concept-map-node').length).toBe(2);
+      expect(el.querySelectorAll('.block-editor__concept-map-edge').length).toBe(1);
+      expect(el.querySelector('.block-editor__concept-map-preview svg')).not.toBeNull();
+
+      const nodeLabel = el.querySelector(
+        '.block-editor__concept-map-node-label'
+      ) as HTMLInputElement;
+      nodeLabel.value = 'Photosynthesis';
+      nodeLabel.dispatchEvent(new Event('input'));
+      expect(latest.content.nodes[0]!.label).toBe('Photosynthesis');
+
+      const edgeLabel = el.querySelector(
+        '.block-editor__concept-map-edge-label'
+      ) as HTMLInputElement;
+      edgeLabel.value = 'produces';
+      edgeLabel.dispatchEvent(new Event('input'));
+      expect(latest.content.edges[0]!.label).toBe('produces');
+    });
+  });
+
+  describe('createBlockEditor', () => {
+    it('dispatches to visualisation editors', () => {
+      expect(
+        createBlockEditor(createBlock('chart', 'c1'), () => {}).querySelector(
+          '.block-editor__chart-type'
+        )
+      ).not.toBeNull();
+      expect(
+        createBlockEditor(createBlock('equation', 'e1'), () => {}).querySelector(
+          '.block-editor__equation-latex'
+        )
+      ).not.toBeNull();
+      expect(
+        createBlockEditor(createBlock('diagram', 'd1'), () => {}).querySelector(
+          '.block-editor__diagram-source'
+        )
+      ).not.toBeNull();
+      expect(
+        createBlockEditor(createBlock('mind_map', 'm1'), () => {}).querySelector(
+          '.block-editor__mind-map-title'
+        )
+      ).not.toBeNull();
+      expect(
+        createBlockEditor(createBlock('concept_map', 'cm1'), () => {}).querySelector(
+          '.block-editor__concept-map-title'
+        )
+      ).not.toBeNull();
+    });
   });
 });

@@ -1,10 +1,15 @@
-import { parseVideoInput } from '@/blocks/video-url';
+import katex from 'katex';
+import { buildChartSvg, escapeXml } from '@/blocks/chart-svg';
+import { layoutConceptMap, layoutMindMap } from '@/blocks/graph-layout';
 import {
   createColumnsEditor,
   createSectionEditor,
   createSpacerEditor,
   createTabsEditor
 } from '@/blocks/layout-editors';
+import { sanitizeSvgMarkup } from '@/blocks/sanitize-svg';
+import { isHttpUrl } from '@/blocks/url-safety';
+import { parseVideoInput } from '@/blocks/video-url';
 import type { Block } from '@/schemas/block';
 
 export type BlockChangeHandler<T extends Block = Block> = (block: T) => void;
@@ -1816,6 +1821,878 @@ export function createSelfCheckEditor(
   return editorShell(block, onChange, fields, getLatest);
 }
 
+
+const VIZ_MAP_VIEW_W = 400;
+const VIZ_MAP_VIEW_H = 240;
+const VIZ_MAP_NODE_R = 28;
+
+function parseChartX(raw: string): string | number {
+  const trimmed = raw.trim();
+  if (trimmed !== '' && /^-?\d+(\.\d+)?$/.test(trimmed)) {
+    return Number(trimmed);
+  }
+  return raw;
+}
+
+function parseChartY(raw: string): number {
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function buildMindMapPreviewSvg(content: {
+  title?: string;
+  nodes: Array<{ id: string; label: string; parent_id?: string | null }>;
+}): string {
+  const positioned = layoutMindMap(content.nodes);
+  const byId = new Map(positioned.map((node) => [node.id, node]));
+  const lines: string[] = [];
+  for (const node of content.nodes) {
+    if (node.parent_id == null) continue;
+    const child = byId.get(node.id);
+    const parent = byId.get(node.parent_id);
+    if (!child || !parent) continue;
+    lines.push(
+      `<line x1="${parent.x}" y1="${parent.y}" x2="${child.x}" y2="${child.y}" stroke="#64748b" stroke-width="1.5" />`
+    );
+  }
+  const nodesMarkup = positioned
+    .map(
+      (node) =>
+        `<circle cx="${node.x}" cy="${node.y}" r="${VIZ_MAP_NODE_R}" fill="#e0f2fe" stroke="#0284c7" stroke-width="1.5" />` +
+        `<text x="${node.x}" y="${node.y}" text-anchor="middle" dominant-baseline="middle" font-size="12">${escapeXml(node.label)}</text>`
+    )
+    .join('');
+  const title = content.title?.trim()
+    ? `<text x="${VIZ_MAP_VIEW_W / 2}" y="18" text-anchor="middle" font-size="14">${escapeXml(content.title.trim())}</text>`
+    : '';
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VIZ_MAP_VIEW_W} ${VIZ_MAP_VIEW_H}" width="100%" role="img">${title}${lines.join('')}${nodesMarkup}</svg>`;
+}
+
+function buildConceptMapPreviewSvg(content: {
+  title?: string;
+  nodes: Array<{ id: string; label: string }>;
+  edges: Array<{ id: string; from: string; to: string; label?: string }>;
+}): string {
+  const layout = layoutConceptMap(content.nodes, content.edges);
+  const edgesMarkup = layout.edges
+    .map((edge) => {
+      const midX = (edge.x1 + edge.x2) / 2;
+      const midY = (edge.y1 + edge.y2) / 2;
+      const label = edge.label
+        ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="11">${escapeXml(edge.label)}</text>`
+        : '';
+      return (
+        `<line x1="${edge.x1}" y1="${edge.y1}" x2="${edge.x2}" y2="${edge.y2}" stroke="#64748b" stroke-width="1.5" />` +
+        label
+      );
+    })
+    .join('');
+  const nodesMarkup = layout.nodes
+    .map(
+      (node) =>
+        `<circle cx="${node.x}" cy="${node.y}" r="${VIZ_MAP_NODE_R}" fill="#fef3c7" stroke="#d97706" stroke-width="1.5" />` +
+        `<text x="${node.x}" y="${node.y}" text-anchor="middle" dominant-baseline="middle" font-size="12">${escapeXml(node.label)}</text>`
+    )
+    .join('');
+  const title = content.title?.trim()
+    ? `<text x="${VIZ_MAP_VIEW_W / 2}" y="18" text-anchor="middle" font-size="14">${escapeXml(content.title.trim())}</text>`
+    : '';
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VIZ_MAP_VIEW_W} ${VIZ_MAP_VIEW_H}" width="100%" role="img">${title}${edgesMarkup}${nodesMarkup}</svg>`;
+}
+
+type ChartPointDraft = { x: string | number; y: number };
+type ChartSeriesDraft = { id: string; name: string; points: ChartPointDraft[] };
+
+export function createChartEditor(
+  block: Extract<Block, { block_type: 'chart' }>,
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'chart' }>>,
+  getLatest: () => Extract<Block, { block_type: 'chart' }> = () => block
+): HTMLElement {
+  const fields = document.createElement('div');
+  fields.className = 'block-editor__fields';
+
+  let chartType = block.content.chart_type;
+  let series: ChartSeriesDraft[] = block.content.series.map((entry) => ({
+    id: entry.id,
+    name: entry.name,
+    points: entry.points.map((point) => ({ ...point }))
+  }));
+  let seriesCounter = series.length;
+
+  const chartTypeSelect = document.createElement('select');
+  chartTypeSelect.className = 'block-editor__chart-type';
+  chartTypeSelect.setAttribute('aria-label', 'Chart type');
+  for (const [value, label] of [
+    ['bar', 'Bar'],
+    ['line', 'Line'],
+    ['pie', 'Pie'],
+    ['scatter', 'Scatter']
+  ] as const) {
+    const opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = label;
+    opt.selected = chartType === value;
+    chartTypeSelect.append(opt);
+  }
+
+  const title = document.createElement('input');
+  title.type = 'text';
+  title.className = 'block-editor__chart-title';
+  title.value = block.content.title ?? '';
+  title.placeholder = 'Title (optional)';
+  title.setAttribute('aria-label', 'Chart title');
+
+  const xLabel = document.createElement('input');
+  xLabel.type = 'text';
+  xLabel.className = 'block-editor__chart-x-label';
+  xLabel.value = block.content.x_label ?? '';
+  xLabel.placeholder = 'X axis label (optional)';
+  xLabel.setAttribute('aria-label', 'Chart X label');
+
+  const yLabel = document.createElement('input');
+  yLabel.type = 'text';
+  yLabel.className = 'block-editor__chart-y-label';
+  yLabel.value = block.content.y_label ?? '';
+  yLabel.placeholder = 'Y axis label (optional)';
+  yLabel.setAttribute('aria-label', 'Chart Y label');
+
+  const seriesContainer = document.createElement('div');
+  seriesContainer.className = 'block-editor__chart-series';
+
+  const preview = document.createElement('div');
+  preview.className = 'block-editor__viz-preview block-editor__chart-preview';
+  preview.setAttribute('aria-label', 'Chart preview');
+
+  const emitChange = () => {
+    const content = {
+      chart_type: chartType,
+      title: title.value.trim() || undefined,
+      x_label: xLabel.value.trim() || undefined,
+      y_label: yLabel.value.trim() || undefined,
+      series: series.map((entry) => ({
+        id: entry.id,
+        name: entry.name,
+        points: entry.points.map((point) => ({ x: point.x, y: point.y }))
+      }))
+    };
+    preview.innerHTML = buildChartSvg(content);
+    onChange({
+      ...getLatest(),
+      content
+    });
+  };
+
+  function renderSeries(): void {
+    seriesContainer.replaceChildren();
+    const atMinSeries = series.length <= 1;
+    const atMaxSeries = series.length >= 6;
+
+    series.forEach((entry, seriesIndex) => {
+      const row = document.createElement('div');
+      row.className = 'block-editor__chart-series-item';
+
+      const name = document.createElement('input');
+      name.type = 'text';
+      name.className = 'block-editor__chart-series-name';
+      name.value = entry.name;
+      name.placeholder = 'Series name';
+      name.setAttribute('aria-label', `Series ${seriesIndex + 1} name`);
+
+      const pointsContainer = document.createElement('div');
+      pointsContainer.className = 'block-editor__chart-points';
+
+      const atMinPoints = entry.points.length <= 1;
+      const atMaxPoints = entry.points.length >= 24;
+
+      entry.points.forEach((point, pointIndex) => {
+        const pointRow = document.createElement('div');
+        pointRow.className = 'block-editor__chart-point';
+
+        const xInput = document.createElement('input');
+        xInput.type = 'text';
+        xInput.className = 'block-editor__chart-point-x';
+        xInput.value = String(point.x);
+        xInput.placeholder = 'X';
+        xInput.setAttribute('aria-label', `Series ${seriesIndex + 1} point ${pointIndex + 1} X`);
+
+        const yInput = document.createElement('input');
+        yInput.type = 'number';
+        yInput.className = 'block-editor__chart-point-y';
+        yInput.value = String(point.y);
+        yInput.placeholder = 'Y';
+        yInput.setAttribute('aria-label', `Series ${seriesIndex + 1} point ${pointIndex + 1} Y`);
+
+        const removePoint = document.createElement('button');
+        removePoint.type = 'button';
+        removePoint.className = 'btn btn--ghost block-editor__chart-remove-point';
+        removePoint.textContent = 'Remove point';
+        removePoint.disabled = atMinPoints;
+        removePoint.addEventListener('click', () => {
+          if (series[seriesIndex]!.points.length <= 1) return;
+          series[seriesIndex] = {
+            ...series[seriesIndex]!,
+            points: series[seriesIndex]!.points.filter((_, i) => i !== pointIndex)
+          };
+          emitChange();
+          renderSeries();
+        });
+
+        xInput.addEventListener('input', () => {
+          series[seriesIndex]!.points[pointIndex] = {
+            ...series[seriesIndex]!.points[pointIndex]!,
+            x: parseChartX(xInput.value)
+          };
+          emitChange();
+        });
+        yInput.addEventListener('input', () => {
+          series[seriesIndex]!.points[pointIndex] = {
+            ...series[seriesIndex]!.points[pointIndex]!,
+            y: parseChartY(yInput.value)
+          };
+          emitChange();
+        });
+
+        pointRow.append(xInput, yInput, removePoint);
+        pointsContainer.append(pointRow);
+      });
+
+      const addPoint = document.createElement('button');
+      addPoint.type = 'button';
+      addPoint.className = 'btn btn--ghost block-editor__chart-add-point';
+      addPoint.textContent = 'Add point';
+      addPoint.disabled = atMaxPoints;
+      addPoint.addEventListener('click', () => {
+        if (series[seriesIndex]!.points.length >= 24) return;
+        series[seriesIndex] = {
+          ...series[seriesIndex]!,
+          points: [...series[seriesIndex]!.points, { x: '', y: 0 }]
+        };
+        emitChange();
+        renderSeries();
+      });
+
+      const removeSeries = document.createElement('button');
+      removeSeries.type = 'button';
+      removeSeries.className = 'btn btn--ghost block-editor__chart-remove-series';
+      removeSeries.textContent = 'Remove series';
+      removeSeries.disabled = atMinSeries;
+      removeSeries.addEventListener('click', () => {
+        if (series.length <= 1) return;
+        series = series.filter((_, i) => i !== seriesIndex);
+        emitChange();
+        renderSeries();
+      });
+
+      name.addEventListener('input', () => {
+        series[seriesIndex] = { ...series[seriesIndex]!, name: name.value };
+        emitChange();
+      });
+
+      row.append(name, pointsContainer, addPoint, removeSeries);
+      seriesContainer.append(row);
+    });
+
+    addSeriesButton.disabled = atMaxSeries;
+  }
+
+  const addSeriesButton = document.createElement('button');
+  addSeriesButton.type = 'button';
+  addSeriesButton.className = 'btn btn--secondary block-editor__chart-add-series';
+  addSeriesButton.textContent = 'Add series';
+  addSeriesButton.addEventListener('click', () => {
+    if (series.length >= 6) return;
+    seriesCounter += 1;
+    series = [
+      ...series,
+      {
+        id: `${getLatest().id}_s${seriesCounter}`,
+        name: `Series ${seriesCounter}`,
+        points: [{ x: '', y: 0 }]
+      }
+    ];
+    emitChange();
+    renderSeries();
+  });
+
+  chartTypeSelect.addEventListener('change', () => {
+    chartType = chartTypeSelect.value as typeof chartType;
+    emitChange();
+  });
+  title.addEventListener('input', emitChange);
+  xLabel.addEventListener('input', emitChange);
+  yLabel.addEventListener('input', emitChange);
+
+  renderSeries();
+  preview.innerHTML = buildChartSvg({
+    chart_type: chartType,
+    title: title.value.trim() || undefined,
+    x_label: xLabel.value.trim() || undefined,
+    y_label: yLabel.value.trim() || undefined,
+    series: series.map((entry) => ({
+      id: entry.id,
+      name: entry.name,
+      points: entry.points.map((point) => ({ x: point.x, y: point.y }))
+    }))
+  });
+  fields.append(chartTypeSelect, title, xLabel, yLabel, seriesContainer, addSeriesButton, preview);
+  return editorShell(block, onChange, fields, getLatest);
+}
+
+export function createEquationEditor(
+  block: Extract<Block, { block_type: 'equation' }>,
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'equation' }>>,
+  getLatest: () => Extract<Block, { block_type: 'equation' }> = () => block
+): HTMLElement {
+  const fields = document.createElement('div');
+  fields.className = 'block-editor__fields';
+
+  const latex = document.createElement('textarea');
+  latex.className = 'block-editor__equation-latex';
+  latex.value = block.content.latex;
+  latex.rows = 4;
+  latex.placeholder = 'LaTeX';
+  latex.setAttribute('aria-label', 'Equation LaTeX');
+
+  const caption = document.createElement('input');
+  caption.type = 'text';
+  caption.className = 'block-editor__equation-caption';
+  caption.value = block.content.caption ?? '';
+  caption.placeholder = 'Caption (optional)';
+  caption.setAttribute('aria-label', 'Equation caption');
+
+  const preview = document.createElement('div');
+  preview.className = 'block-editor__viz-preview block-editor__equation-preview';
+  preview.setAttribute('aria-label', 'Equation preview');
+
+  const updatePreview = () => {
+    preview.replaceChildren();
+    const math = document.createElement('div');
+    math.className = 'block-equation__math';
+    const value = latex.value;
+    if (!value.trim()) {
+      math.textContent = '';
+    } else {
+      try {
+        katex.render(value, math, { throwOnError: false, displayMode: true });
+      } catch {
+        math.textContent = value;
+        math.classList.add('block-equation__math--error');
+      }
+    }
+    preview.append(math);
+  };
+
+  const emitChange = () => {
+    updatePreview();
+    onChange({
+      ...getLatest(),
+      content: {
+        latex: latex.value,
+        caption: caption.value.trim() || undefined
+      }
+    });
+  };
+
+  latex.addEventListener('input', emitChange);
+  caption.addEventListener('input', emitChange);
+
+  updatePreview();
+  fields.append(latex, caption, preview);
+  return editorShell(block, onChange, fields, getLatest);
+}
+
+export function createDiagramEditor(
+  block: Extract<Block, { block_type: 'diagram' }>,
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'diagram' }>>,
+  getLatest: () => Extract<Block, { block_type: 'diagram' }> = () => block
+): HTMLElement {
+  const fields = document.createElement('div');
+  fields.className = 'block-editor__fields';
+
+  let source = block.content.source;
+
+  const sourceSelect = document.createElement('select');
+  sourceSelect.className = 'block-editor__diagram-source';
+  sourceSelect.setAttribute('aria-label', 'Diagram source');
+  for (const [value, label] of [
+    ['image', 'Image URL'],
+    ['svg', 'Inline SVG']
+  ] as const) {
+    const opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = label;
+    opt.selected = source === value;
+    sourceSelect.append(opt);
+  }
+
+  const imageUrl = document.createElement('input');
+  imageUrl.type = 'url';
+  imageUrl.className = 'block-editor__diagram-url';
+  imageUrl.value = block.content.image_url ?? '';
+  imageUrl.placeholder = 'Image URL (https://…)';
+  imageUrl.setAttribute('aria-label', 'Diagram image URL');
+
+  const imageAlt = document.createElement('input');
+  imageAlt.type = 'text';
+  imageAlt.className = 'block-editor__diagram-alt';
+  imageAlt.value = block.content.image_alt ?? '';
+  imageAlt.placeholder = 'Alt text';
+  imageAlt.setAttribute('aria-label', 'Diagram image alt');
+
+  const svgMarkup = document.createElement('textarea');
+  svgMarkup.className = 'block-editor__diagram-svg';
+  svgMarkup.value = block.content.svg_markup ?? '';
+  svgMarkup.rows = 6;
+  svgMarkup.placeholder = '<svg>…</svg>';
+  svgMarkup.setAttribute('aria-label', 'Diagram SVG markup');
+
+  const caption = document.createElement('input');
+  caption.type = 'text';
+  caption.className = 'block-editor__diagram-caption';
+  caption.value = block.content.caption ?? '';
+  caption.placeholder = 'Caption (optional)';
+  caption.setAttribute('aria-label', 'Diagram caption');
+
+  const preview = document.createElement('div');
+  preview.className = 'block-editor__viz-preview block-editor__diagram-preview';
+  preview.setAttribute('aria-label', 'Diagram preview');
+
+  const updatePreview = () => {
+    preview.replaceChildren();
+    if (source === 'image') {
+      const url = imageUrl.value;
+      if (isHttpUrl(url)) {
+        const img = document.createElement('img');
+        img.src = url;
+        img.alt = imageAlt.value;
+        preview.append(img);
+      } else {
+        const unavailable = document.createElement('p');
+        unavailable.textContent = imageAlt.value.trim() || 'Image unavailable.';
+        preview.append(unavailable);
+      }
+    } else {
+      const wrap = document.createElement('div');
+      wrap.innerHTML = sanitizeSvgMarkup(svgMarkup.value);
+      preview.append(wrap);
+    }
+  };
+
+  const renderSourceFields = () => {
+    const isImage = source === 'image';
+    imageUrl.hidden = !isImage;
+    imageAlt.hidden = !isImage;
+    svgMarkup.hidden = isImage;
+  };
+
+  const emitChange = () => {
+    updatePreview();
+    onChange({
+      ...getLatest(),
+      content: {
+        source,
+        image_url: source === 'image' ? imageUrl.value : undefined,
+        image_alt: source === 'image' ? imageAlt.value : undefined,
+        svg_markup: source === 'svg' ? svgMarkup.value : undefined,
+        caption: caption.value.trim() || undefined
+      }
+    });
+  };
+
+  sourceSelect.addEventListener('change', () => {
+    source = sourceSelect.value as typeof source;
+    renderSourceFields();
+    emitChange();
+  });
+  imageUrl.addEventListener('input', emitChange);
+  imageAlt.addEventListener('input', emitChange);
+  svgMarkup.addEventListener('input', emitChange);
+  caption.addEventListener('input', emitChange);
+
+  renderSourceFields();
+  updatePreview();
+  fields.append(sourceSelect, imageUrl, imageAlt, svgMarkup, caption, preview);
+  return editorShell(block, onChange, fields, getLatest);
+}
+
+type MindMapNodeDraft = { id: string; label: string; parent_id?: string | null };
+
+export function createMindMapEditor(
+  block: Extract<Block, { block_type: 'mind_map' }>,
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'mind_map' }>>,
+  getLatest: () => Extract<Block, { block_type: 'mind_map' }> = () => block
+): HTMLElement {
+  const fields = document.createElement('div');
+  fields.className = 'block-editor__fields';
+
+  let nodes: MindMapNodeDraft[] = block.content.nodes.map((node) => ({ ...node }));
+  let nodeCounter = nodes.length;
+
+  const title = document.createElement('input');
+  title.type = 'text';
+  title.className = 'block-editor__mind-map-title';
+  title.value = block.content.title ?? '';
+  title.placeholder = 'Title (optional)';
+  title.setAttribute('aria-label', 'Mind map title');
+
+  const nodesContainer = document.createElement('div');
+  nodesContainer.className = 'block-editor__mind-map-nodes';
+
+  const preview = document.createElement('div');
+  preview.className = 'block-editor__viz-preview block-editor__mind-map-preview';
+  preview.setAttribute('aria-label', 'Mind map preview');
+
+  const emitChange = () => {
+    const latest = getLatest();
+    const content = {
+      title: title.value.trim() || undefined,
+      nodes: nodes.map((node) => ({
+        id: node.id,
+        label: node.label,
+        parent_id: node.parent_id ?? null
+      })),
+      edges: latest.content.edges ?? []
+    };
+    preview.innerHTML = buildMindMapPreviewSvg(content);
+    onChange({
+      ...latest,
+      content
+    });
+  };
+
+  function renderNodes(): void {
+    nodesContainer.replaceChildren();
+    const atMin = nodes.length <= 1;
+    const atMax = nodes.length >= 24;
+
+    nodes.forEach((node, index) => {
+      const row = document.createElement('div');
+      row.className = 'block-editor__mind-map-node';
+
+      const label = document.createElement('input');
+      label.type = 'text';
+      label.className = 'block-editor__mind-map-label';
+      label.value = node.label;
+      label.placeholder = 'Node label';
+      label.setAttribute('aria-label', `Mind map node ${index + 1} label`);
+
+      const parent = document.createElement('select');
+      parent.className = 'block-editor__mind-map-parent';
+      parent.setAttribute('aria-label', `Mind map node ${index + 1} parent`);
+      const none = document.createElement('option');
+      none.value = '';
+      none.textContent = 'None';
+      none.selected = node.parent_id == null || node.parent_id === '';
+      parent.append(none);
+      for (const other of nodes) {
+        if (other.id === node.id) continue;
+        const opt = document.createElement('option');
+        opt.value = other.id;
+        opt.textContent = other.label.trim() || other.id;
+        opt.selected = node.parent_id === other.id;
+        parent.append(opt);
+      }
+
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'btn btn--ghost block-editor__mind-map-remove';
+      remove.textContent = 'Remove';
+      remove.disabled = atMin;
+      remove.addEventListener('click', () => {
+        if (nodes.length <= 1) return;
+        const removedId = nodes[index]!.id;
+        nodes = nodes
+          .filter((_, i) => i !== index)
+          .map((entry) =>
+            entry.parent_id === removedId ? { ...entry, parent_id: null } : entry
+          );
+        emitChange();
+        renderNodes();
+      });
+
+      label.addEventListener('input', () => {
+        nodes[index] = { ...nodes[index]!, label: label.value };
+        emitChange();
+        // Refresh parent option labels without full re-render to keep focus
+        nodesContainer
+          .querySelectorAll('.block-editor__mind-map-parent')
+          .forEach((selectEl) => {
+            const select = selectEl as HTMLSelectElement;
+            for (const opt of Array.from(select.options)) {
+              if (!opt.value) continue;
+              const match = nodes.find((n) => n.id === opt.value);
+              if (match) opt.textContent = match.label.trim() || match.id;
+            }
+          });
+      });
+      parent.addEventListener('change', () => {
+        nodes[index] = {
+          ...nodes[index]!,
+          parent_id: parent.value ? parent.value : null
+        };
+        emitChange();
+      });
+
+      row.append(label, parent, remove);
+      nodesContainer.append(row);
+    });
+
+    addButton.disabled = atMax;
+  }
+
+  const addButton = document.createElement('button');
+  addButton.type = 'button';
+  addButton.className = 'btn btn--secondary block-editor__mind-map-add';
+  addButton.textContent = 'Add node';
+  addButton.addEventListener('click', () => {
+    if (nodes.length >= 24) return;
+    nodeCounter += 1;
+    const root = nodes.find((n) => n.parent_id == null) ?? nodes[0];
+    nodes = [
+      ...nodes,
+      {
+        id: `${getLatest().id}_n${nodeCounter}`,
+        label: '',
+        parent_id: root?.id ?? null
+      }
+    ];
+    emitChange();
+    renderNodes();
+  });
+
+  title.addEventListener('input', emitChange);
+
+  renderNodes();
+  preview.innerHTML = buildMindMapPreviewSvg({
+    title: title.value.trim() || undefined,
+    nodes: nodes.map((node) => ({
+      id: node.id,
+      label: node.label,
+      parent_id: node.parent_id ?? null
+    }))
+  });
+  fields.append(title, nodesContainer, addButton, preview);
+  return editorShell(block, onChange, fields, getLatest);
+}
+
+type ConceptNodeDraft = { id: string; label: string };
+type ConceptEdgeDraft = { id: string; from: string; to: string; label?: string };
+
+export function createConceptMapEditor(
+  block: Extract<Block, { block_type: 'concept_map' }>,
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'concept_map' }>>,
+  getLatest: () => Extract<Block, { block_type: 'concept_map' }> = () => block
+): HTMLElement {
+  const fields = document.createElement('div');
+  fields.className = 'block-editor__fields';
+
+  let nodes: ConceptNodeDraft[] = block.content.nodes.map((node) => ({
+    id: node.id,
+    label: node.label
+  }));
+  let edges: ConceptEdgeDraft[] = block.content.edges.map((edge) => ({ ...edge }));
+  let nodeCounter = nodes.length;
+  let edgeCounter = edges.length;
+
+  const title = document.createElement('input');
+  title.type = 'text';
+  title.className = 'block-editor__concept-map-title';
+  title.value = block.content.title ?? '';
+  title.placeholder = 'Title (optional)';
+  title.setAttribute('aria-label', 'Concept map title');
+
+  const nodesContainer = document.createElement('div');
+  nodesContainer.className = 'block-editor__concept-map-nodes';
+
+  const edgesContainer = document.createElement('div');
+  edgesContainer.className = 'block-editor__concept-map-edges';
+
+  const preview = document.createElement('div');
+  preview.className = 'block-editor__viz-preview block-editor__concept-map-preview';
+  preview.setAttribute('aria-label', 'Concept map preview');
+
+  const emitChange = () => {
+    const content = {
+      title: title.value.trim() || undefined,
+      nodes: nodes.map((node) => ({ id: node.id, label: node.label })),
+      edges: edges.map((edge) => ({
+        id: edge.id,
+        from: edge.from,
+        to: edge.to,
+        label: edge.label?.trim() ? edge.label : undefined
+      }))
+    };
+    preview.innerHTML = buildConceptMapPreviewSvg(content);
+    onChange({
+      ...getLatest(),
+      content
+    });
+  };
+
+  function fillNodeSelect(select: HTMLSelectElement, selectedId: string): void {
+    select.replaceChildren();
+    for (const node of nodes) {
+      const opt = document.createElement('option');
+      opt.value = node.id;
+      opt.textContent = node.label.trim() || node.id;
+      opt.selected = node.id === selectedId;
+      select.append(opt);
+    }
+  }
+
+  function renderEdges(): void {
+    edgesContainer.replaceChildren();
+
+    edges.forEach((edge, index) => {
+      const row = document.createElement('div');
+      row.className = 'block-editor__concept-map-edge';
+
+      const from = document.createElement('select');
+      from.className = 'block-editor__concept-map-edge-from';
+      from.setAttribute('aria-label', `Concept map edge ${index + 1} from`);
+      fillNodeSelect(from, edge.from);
+
+      const to = document.createElement('select');
+      to.className = 'block-editor__concept-map-edge-to';
+      to.setAttribute('aria-label', `Concept map edge ${index + 1} to`);
+      fillNodeSelect(to, edge.to);
+
+      const label = document.createElement('input');
+      label.type = 'text';
+      label.className = 'block-editor__concept-map-edge-label';
+      label.value = edge.label ?? '';
+      label.placeholder = 'Edge label';
+      label.setAttribute('aria-label', `Concept map edge ${index + 1} label`);
+
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'btn btn--ghost block-editor__concept-map-edge-remove';
+      remove.textContent = 'Remove edge';
+      remove.addEventListener('click', () => {
+        edges = edges.filter((_, i) => i !== index);
+        emitChange();
+        renderEdges();
+      });
+
+      from.addEventListener('change', () => {
+        edges[index] = { ...edges[index]!, from: from.value };
+        emitChange();
+      });
+      to.addEventListener('change', () => {
+        edges[index] = { ...edges[index]!, to: to.value };
+        emitChange();
+      });
+      label.addEventListener('input', () => {
+        edges[index] = { ...edges[index]!, label: label.value };
+        emitChange();
+      });
+
+      row.append(from, to, label, remove);
+      edgesContainer.append(row);
+    });
+
+    addEdgeButton.disabled = edges.length >= 40 || nodes.length === 0;
+  }
+
+  function renderNodes(): void {
+    nodesContainer.replaceChildren();
+    const atMin = nodes.length <= 1;
+    const atMax = nodes.length >= 24;
+
+    nodes.forEach((node, index) => {
+      const row = document.createElement('div');
+      row.className = 'block-editor__concept-map-node';
+
+      const label = document.createElement('input');
+      label.type = 'text';
+      label.className = 'block-editor__concept-map-node-label';
+      label.value = node.label;
+      label.placeholder = 'Node label';
+      label.setAttribute('aria-label', `Concept map node ${index + 1} label`);
+
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'btn btn--ghost block-editor__concept-map-node-remove';
+      remove.textContent = 'Remove';
+      remove.disabled = atMin;
+      remove.addEventListener('click', () => {
+        if (nodes.length <= 1) return;
+        const removedId = nodes[index]!.id;
+        nodes = nodes.filter((_, i) => i !== index);
+        edges = edges.filter((edge) => edge.from !== removedId && edge.to !== removedId);
+        emitChange();
+        renderNodes();
+        renderEdges();
+      });
+
+      label.addEventListener('input', () => {
+        nodes[index] = { ...nodes[index]!, label: label.value };
+        emitChange();
+        edgesContainer
+          .querySelectorAll(
+            '.block-editor__concept-map-edge-from, .block-editor__concept-map-edge-to'
+          )
+          .forEach((selectEl) => {
+            const select = selectEl as HTMLSelectElement;
+            for (const opt of Array.from(select.options)) {
+              const match = nodes.find((n) => n.id === opt.value);
+              if (match) opt.textContent = match.label.trim() || match.id;
+            }
+          });
+      });
+
+      row.append(label, remove);
+      nodesContainer.append(row);
+    });
+
+    addNodeButton.disabled = atMax;
+  }
+
+  const addNodeButton = document.createElement('button');
+  addNodeButton.type = 'button';
+  addNodeButton.className = 'btn btn--secondary block-editor__concept-map-node-add';
+  addNodeButton.textContent = 'Add node';
+  addNodeButton.addEventListener('click', () => {
+    if (nodes.length >= 24) return;
+    nodeCounter += 1;
+    nodes = [...nodes, { id: `${getLatest().id}_n${nodeCounter}`, label: '' }];
+    emitChange();
+    renderNodes();
+    renderEdges();
+  });
+
+  const addEdgeButton = document.createElement('button');
+  addEdgeButton.type = 'button';
+  addEdgeButton.className = 'btn btn--secondary block-editor__concept-map-edge-add';
+  addEdgeButton.textContent = 'Add edge';
+  addEdgeButton.addEventListener('click', () => {
+    if (edges.length >= 40 || nodes.length === 0) return;
+    edgeCounter += 1;
+    const from = nodes[0]!.id;
+    const to = nodes[1]?.id ?? nodes[0]!.id;
+    edges = [...edges, { id: `${getLatest().id}_e${edgeCounter}`, from, to, label: '' }];
+    emitChange();
+    renderEdges();
+  });
+
+  title.addEventListener('input', emitChange);
+
+  renderNodes();
+  renderEdges();
+  preview.innerHTML = buildConceptMapPreviewSvg({
+    title: title.value.trim() || undefined,
+    nodes: nodes.map((node) => ({ id: node.id, label: node.label })),
+    edges: edges.map((edge) => ({
+      id: edge.id,
+      from: edge.from,
+      to: edge.to,
+      label: edge.label?.trim() ? edge.label : undefined
+    }))
+  });
+  fields.append(title, nodesContainer, addNodeButton, edgesContainer, addEdgeButton, preview);
+  return editorShell(block, onChange, fields, getLatest);
+}
+
 export function createBlockEditor(
   block: Block,
   onChange: BlockChangeHandler,
@@ -1865,6 +2742,16 @@ export function createBlockEditor(
       return createClozeEditor(block, onChange, latest as () => Extract<Block, { block_type: 'cloze' }>);
     case 'self_check':
       return createSelfCheckEditor(block, onChange, latest as () => Extract<Block, { block_type: 'self_check' }>);
+    case 'chart':
+      return createChartEditor(block, onChange, latest as () => Extract<Block, { block_type: 'chart' }>);
+    case 'equation':
+      return createEquationEditor(block, onChange, latest as () => Extract<Block, { block_type: 'equation' }>);
+    case 'diagram':
+      return createDiagramEditor(block, onChange, latest as () => Extract<Block, { block_type: 'diagram' }>);
+    case 'mind_map':
+      return createMindMapEditor(block, onChange, latest as () => Extract<Block, { block_type: 'mind_map' }>);
+    case 'concept_map':
+      return createConceptMapEditor(block, onChange, latest as () => Extract<Block, { block_type: 'concept_map' }>);
     case 'spacer':
       return createSpacerEditor(block, onChange, latest as () => Extract<Block, { block_type: 'spacer' }>);
     case 'section':
