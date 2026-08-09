@@ -2674,6 +2674,31 @@ a.home-class-tile:hover {
   background: var(--glass);
 }
 
+.block-editor__column-pane--drop {
+  outline: 2px dashed var(--wave);
+  outline-offset: 2px;
+}
+
+.block-editor__columns-widths {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+
+.block-editor__columns-width-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+}
+
+.block-editor__columns-width {
+  width: 3.5rem;
+}
+
 .block-editor__tabs-panel-header {
   display: flex;
   flex-wrap: wrap;

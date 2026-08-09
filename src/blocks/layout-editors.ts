@@ -1,8 +1,11 @@
 import {
   COLUMN_PRESETS,
   remapColumnsPreset,
-  type ColumnPreset
+  type ColumnPreset,
+  type ColumnSlot
 } from '@/blocks/column-presets';
+import { moveBlockBetweenColumns } from '@/blocks/column-move';
+import { trySetColumnWidths } from '@/blocks/column-widths';
 import {
   COLUMN_CHILD_TYPES,
   SECTION_CHILD_TYPES,
@@ -13,6 +16,7 @@ import { createNestedBlocksEditor } from '@/blocks/nested-blocks-editor';
 import type { Block } from '@/schemas/block';
 
 type TabsBlock = Extract<Block, { block_type: 'tabs' }>;
+type ColumnsBlock = Extract<Block, { block_type: 'columns' }>;
 
 export function createSpacerEditor(
   block: Extract<Block, { block_type: 'spacer' }>,
@@ -116,34 +120,109 @@ export function createColumnsEditor(
   const preset = document.createElement('select');
   preset.className = 'block-editor__columns-preset';
   preset.setAttribute('aria-label', 'Column layout');
-  for (const value of COLUMN_PRESETS) {
+  for (const value of [...COLUMN_PRESETS, 'custom'] as const) {
     const opt = document.createElement('option');
     opt.value = value;
-    opt.textContent = value;
+    opt.textContent = value === 'custom' ? 'Custom' : value;
     preset.append(opt);
   }
   preset.value = block.content.preset;
   preset.addEventListener('change', () => {
     const current = getLatest();
-    const nextPreset = preset.value as ColumnPreset;
-    onChange({
-      ...current,
-      content: {
-        preset: nextPreset,
-        columns: remapColumnsPreset(
-          current.content.columns,
-          nextPreset
-        ) as Extract<Block, { block_type: 'columns' }>['content']['columns']
-      }
-    });
+    const nextPreset = preset.value as ColumnsBlock['content']['preset'];
+    if (nextPreset === 'custom') {
+      onChange({
+        ...current,
+        content: {
+          preset: 'custom',
+          columns: current.content.columns
+        }
+      });
+    } else {
+      onChange({
+        ...current,
+        content: {
+          preset: nextPreset,
+          columns: remapColumnsPreset(
+            current.content.columns,
+            nextPreset as ColumnPreset
+          ) as Extract<Block, { block_type: 'columns' }>['content']['columns']
+        }
+      });
+    }
     rebuildPanes();
   });
+
+  const widthsRow = document.createElement('div');
+  widthsRow.className = 'block-editor__columns-widths';
+
+  const widthsHint = document.createElement('p');
+  widthsHint.className = 'block-editor__hint block-editor__columns-widths-hint';
 
   const panes = document.createElement('div');
   panes.className = 'block-editor__column-panes';
 
+  function applyMove(fromCol: number, fromIndex: number, toCol: number): void {
+    const latest = getLatest();
+    const moved = moveBlockBetweenColumns(
+      latest.content.columns as ColumnSlot[],
+      fromCol,
+      fromIndex,
+      toCol
+    );
+    onChange({
+      ...latest,
+      content: {
+        ...latest.content,
+        columns: moved as typeof latest.content.columns
+      }
+    });
+    rebuildPanes();
+  }
+
   function rebuildPanes(): void {
     const current = getLatest();
+    widthsRow.replaceChildren();
+    widthsHint.textContent = '';
+
+    if (current.content.preset === 'custom') {
+      current.content.columns.forEach((col, colIndex) => {
+        const label = document.createElement('label');
+        label.className = 'block-editor__columns-width-label';
+        label.textContent = `Col ${colIndex + 1}`;
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.min = '1';
+        input.max = '11';
+        input.className = 'block-editor__columns-width';
+        input.value = String(col.width);
+        input.setAttribute('aria-label', `Column ${colIndex + 1} width`);
+        input.addEventListener('change', () => {
+          const latest = getLatest();
+          const inputs = [
+            ...widthsRow.querySelectorAll('input.block-editor__columns-width')
+          ] as HTMLInputElement[];
+          const widths = inputs.map((el) => Number.parseInt(el.value, 10));
+          const nextCols = trySetColumnWidths(latest.content.columns as ColumnSlot[], widths);
+          if (!nextCols) {
+            widthsHint.textContent = 'Widths must sum to 12';
+            return;
+          }
+          widthsHint.textContent = '';
+          onChange({
+            ...latest,
+            content: {
+              preset: 'custom',
+              columns: nextCols as typeof latest.content.columns
+            }
+          });
+          rebuildPanes();
+        });
+        label.append(input);
+        widthsRow.append(label);
+      });
+    }
+
     panes.replaceChildren();
     panes.style.gridTemplateColumns = current.content.columns
       .map((col) => `${col.width}fr`)
@@ -155,6 +234,26 @@ export function createColumnsEditor(
       const label = document.createElement('p');
       label.className = 'block-editor__hint';
       label.textContent = `Column ${colIndex + 1} (${col.width}/12)`;
+
+      pane.addEventListener('dragover', (event) => {
+        event.preventDefault();
+        pane.classList.add('block-editor__column-pane--drop');
+      });
+      pane.addEventListener('dragleave', () => {
+        pane.classList.remove('block-editor__column-pane--drop');
+      });
+      pane.addEventListener('drop', (event) => {
+        event.preventDefault();
+        pane.classList.remove('block-editor__column-pane--drop');
+        const raw = event.dataTransfer?.getData('application/x-th-col-move');
+        if (!raw) return;
+        const [fromColS, fromIndexS] = raw.split(':');
+        const fromCol = Number.parseInt(fromColS ?? '', 10);
+        const fromIndex = Number.parseInt(fromIndexS ?? '', 10);
+        if (!Number.isFinite(fromCol) || !Number.isFinite(fromIndex)) return;
+        applyMove(fromCol, fromIndex, colIndex);
+      });
+
       const nested = createNestedBlocksEditor({
         blocks: col.blocks,
         allowedTypes: COLUMN_CHILD_TYPES,
@@ -173,6 +272,13 @@ export function createColumnsEditor(
             ...latest,
             content: { ...latest.content, columns }
           });
+        },
+        columnMove: {
+          columnCount: current.content.columns.length,
+          columnIndex: colIndex,
+          onMoveToColumn: (toCol, fromIndex) => {
+            applyMove(colIndex, fromIndex, toCol);
+          }
         }
       });
       pane.append(label, nested);
@@ -181,7 +287,7 @@ export function createColumnsEditor(
   }
 
   rebuildPanes();
-  fields.append(preset, panes);
+  fields.append(preset, widthsRow, widthsHint, panes);
   return editorShell(block, onChange, fields, getLatest);
 }
 

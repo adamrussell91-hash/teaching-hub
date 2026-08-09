@@ -20,10 +20,11 @@ Block primitives: [`docs/specs/03_BLOCK_SYSTEM.md`](specs/03_BLOCK_SYSTEM.md)
 
 Suggested order for continuing builder / teaching-page work (adjust as needed):
 
-1. **Builder UX** — drag-and-drop between columns; free-form column widths
+1. **Response space** — if still distinct from `question_set`
 
 Larger product tracks (not “next block”, but still ahead):
 
+- Map / Slides / Document viewer behaviours (as needed)
 - A4 print render
 - Google Drive / media library uploads
 - Templates & reuse
@@ -59,6 +60,7 @@ Larger product tracks (not “next block”, but still ahead):
 | 2026-08-09 | **Visualisation pack** | `chart`, `equation`, `diagram`, `mind_map`, `concept_map` + KaTeX + custom SVG — [`design`](superpowers/specs/2026-08-09-visualisation-pack-design.md) / [`plan`](superpowers/plans/2026-08-09-visualisation-pack.md) |
 | 2026-08-09 | **Collection** | Unit lessons + recent on class homepage — [`design`](superpowers/specs/2026-08-09-collection-block-design.md) / [`plan`](superpowers/plans/2026-08-09-collection-block.md) |
 | 2026-08-09 | **HTML app** | Sandboxed inline `html_app` + optional laned OpenAI/Anthropic proxy — [`design`](superpowers/specs/2026-08-09-html-app-design.md) / [`plan`](superpowers/plans/2026-08-09-html-app.md) |
+| 2026-08-09 | **Builder UX** | Columns: Custom 12-grid widths + Move-to / HTML5 DnD between columns — [`design`](superpowers/specs/2026-08-09-builder-ux-columns-design.md) / [`plan`](superpowers/plans/2026-08-09-builder-ux-columns.md) |
 
 ### Block types live today (32)
 
@@ -69,7 +71,7 @@ Larger product tracks (not “next block”, but still ahead):
 | Spec phase | Status |
 |------------|--------|
 | 0–4 Foundation → basic builder → publish | Done (core) |
-| 5 Block system expansion | **In progress** — layout + timeline + tabs + gallery + activities + viz + collection + html_app done; Builder UX next |
+| 5 Block system expansion | **In progress** — layout + timeline + tabs + gallery + activities + viz + collection + html_app + columns UX done; Response space next |
 | 6–8 Unit/class pages, scheduling, scope | Largely done for v1 |
 | 9 A4 print | Not started |
 | 10 Google Drive | Not started |
@@ -88,7 +90,7 @@ Unchecked = not built yet.
 - [x] Section, Columns, Spacer (Phase A — nested model)
 - [x] Tabs
 - [x] Collection (navigation / resource lists)
-- [ ] Columns UX: drag between columns; non-preset widths
+- [x] Columns UX: drag between columns; non-preset widths
 
 ### Content / media (remaining)
 - [x] Timeline (in-lesson)
@@ -121,4 +123,4 @@ Unchecked = not built yet.
 
 ## Latest note
 
-**2026-08-09** — HTML app shipped (sandboxed `srcdoc` + optional laned AI proxy). Next builder slice: **Builder UX** (column drag / free widths).
+**2026-08-09** — Builder UX shipped (custom column widths + cross-column Move-to / DnD). Next builder slice: **Response space** (if still distinct from `question_set`).

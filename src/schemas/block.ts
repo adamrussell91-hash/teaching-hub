@@ -37,7 +37,7 @@ export const BlockTypeSchema = z.enum([
   'collection'
 ]);
 
-export const ColumnPresetSchema = z.enum(['50-50', '33-67', '67-33', '33-33-33']);
+export const ColumnPresetSchema = z.enum(['50-50', '33-67', '67-33', '33-33-33', 'custom']);
 export const SpacerSizeSchema = z.enum(['small', 'medium', 'large']);
 
 export const VideoProviderSchema = z.enum(['youtube', 'vimeo']);

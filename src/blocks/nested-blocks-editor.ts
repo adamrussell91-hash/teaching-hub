@@ -13,6 +13,11 @@ export interface NestedBlocksEditorOptions {
   allowedTypes: readonly NewBlockType[];
   onChange: (blocks: Block[]) => void;
   idFactory: () => string;
+  columnMove?: {
+    columnCount: number;
+    columnIndex: number;
+    onMoveToColumn: (toColumnIndex: number, fromIndex: number) => void;
+  };
 }
 
 export function createNestedBlocksEditor(options: NestedBlocksEditorOptions): HTMLElement {
@@ -91,6 +96,41 @@ export function createNestedBlocksEditor(options: NestedBlocksEditorOptions): HT
       });
 
       controls.append(up, down, dup, del);
+
+      const columnMove = options.columnMove;
+      if (columnMove && columnMove.columnCount > 1) {
+        const move = document.createElement('select');
+        move.className = 'block-editor__nested-move-column';
+        move.setAttribute('aria-label', 'Move to column');
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = 'Move to column…';
+        move.append(placeholder);
+        for (let i = 0; i < columnMove.columnCount; i += 1) {
+          if (i === columnMove.columnIndex) continue;
+          const opt = document.createElement('option');
+          opt.value = String(i);
+          opt.textContent = `Column ${i + 1}`;
+          move.append(opt);
+        }
+        move.addEventListener('change', () => {
+          if (move.value === '') return;
+          const to = Number.parseInt(move.value, 10);
+          move.value = '';
+          if (!Number.isFinite(to)) return;
+          columnMove.onMoveToColumn(to, index);
+        });
+        controls.append(move);
+
+        row.draggable = true;
+        row.addEventListener('dragstart', (event) => {
+          event.dataTransfer?.setData(
+            'application/x-th-col-move',
+            `${columnMove.columnIndex}:${index}`
+          );
+          if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+        });
+      }
 
       const editor = createBlockEditor(
         block,
