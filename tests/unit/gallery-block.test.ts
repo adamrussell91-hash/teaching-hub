@@ -281,4 +281,47 @@ describe('renderGalleryBlock', () => {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(document.body.querySelector('.block-gallery-lightbox')).toBeNull();
   });
+
+  it('replacing lightbox cleans up the previous escape handler', () => {
+    const el = renderGalleryBlock(sampleGallery('grid', 2), 'student');
+    const buttons = el.querySelectorAll('.block-gallery__open') as NodeListOf<HTMLButtonElement>;
+
+    buttons[0]!.click();
+    expect(document.body.querySelectorAll('.block-gallery-lightbox')).toHaveLength(1);
+
+    buttons[1]!.click();
+    expect(document.body.querySelectorAll('.block-gallery-lightbox')).toHaveLength(1);
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(document.body.querySelector('.block-gallery-lightbox')).toBeNull();
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(document.body.querySelector('.block-gallery-lightbox')).toBeNull();
+  });
+
+  it('closing lightbox restores focus to the open button', () => {
+    const el = renderGalleryBlock(sampleGallery('grid', 2), 'student');
+    document.body.append(el);
+    const imgBtn = el.querySelector('.block-gallery__open') as HTMLButtonElement;
+    imgBtn.focus();
+    imgBtn.click();
+
+    const dialog = document.body.querySelector('.block-gallery-lightbox') as HTMLElement;
+    (dialog.querySelector('.block-gallery-lightbox__close') as HTMLButtonElement).click();
+    expect(document.activeElement).toBe(imgBtn);
+    el.remove();
+  });
+
+  it('Escape restores focus to the open button', () => {
+    const el = renderGalleryBlock(sampleGallery('grid', 2), 'student');
+    document.body.append(el);
+    const imgBtn = el.querySelector('.block-gallery__open') as HTMLButtonElement;
+    imgBtn.focus();
+    imgBtn.click();
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(document.body.querySelector('.block-gallery-lightbox')).toBeNull();
+    expect(document.activeElement).toBe(imgBtn);
+    el.remove();
+  });
 });

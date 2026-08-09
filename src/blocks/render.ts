@@ -556,9 +556,13 @@ export function renderTabsBlock(
   return wrapBlock(root, block, mode);
 }
 
+let activeLightboxCleanup: (() => void) | null = null;
+
 function openGalleryLightbox(src: string, alt: string): void {
-  const existing = document.body.querySelector('.block-gallery-lightbox');
-  existing?.remove();
+  activeLightboxCleanup?.();
+
+  const previousFocus =
+    document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
   const backdrop = document.createElement('div');
   backdrop.className = 'block-gallery-lightbox';
@@ -580,7 +584,10 @@ function openGalleryLightbox(src: string, alt: string): void {
   function dismiss(): void {
     document.removeEventListener('keydown', onKey);
     backdrop.remove();
-    close.blur();
+    activeLightboxCleanup = null;
+    if (previousFocus && document.contains(previousFocus)) {
+      previousFocus.focus();
+    }
   }
 
   function onKey(event: KeyboardEvent): void {
@@ -595,6 +602,7 @@ function openGalleryLightbox(src: string, alt: string): void {
     if (event.target === backdrop) dismiss();
   });
   document.addEventListener('keydown', onKey);
+  activeLightboxCleanup = dismiss;
 
   backdrop.append(img, close);
   document.body.append(backdrop);
