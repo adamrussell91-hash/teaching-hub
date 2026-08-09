@@ -19,6 +19,11 @@ import {
   type BlockChangeHandler
 } from '@/blocks/editors';
 import {
+  createColumnsEditor,
+  createSectionEditor,
+  createSpacerEditor
+} from '@/blocks/layout-editors';
+import {
   renderAccordionBlock,
   renderAttachmentBlock,
   renderAudioBlock,
@@ -101,7 +106,7 @@ export const blockRegistry: {
   },
   columns: {
     render: renderColumnsBlock,
-    createEditor: () => document.createElement('div')
+    createEditor: createColumnsEditor
   },
   audio: {
     render: renderAudioBlock,
@@ -125,11 +130,11 @@ export const blockRegistry: {
   },
   section: {
     render: renderSectionBlock,
-    createEditor: () => document.createElement('div')
+    createEditor: createSectionEditor
   },
   spacer: {
     render: renderSpacerBlock,
-    createEditor: () => document.createElement('div')
+    createEditor: createSpacerEditor
   }
 };
 
@@ -140,6 +145,7 @@ export {
   createBlockEditor,
   createCalloutEditor,
   createCodeEditor,
+  createColumnsEditor,
   createDefinitionEditor,
   createDividerEditor,
   createEmbedEditor,
@@ -149,6 +155,8 @@ export {
   createQuestionSetEditor,
   createQuoteEditor,
   createRichTextEditor,
+  createSectionEditor,
+  createSpacerEditor,
   createTableEditor,
   createVideoEditor,
   renderAccordionBlock,

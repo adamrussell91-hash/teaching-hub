@@ -1,13 +1,16 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { createBlock, cloneBlockWithNewIds } from '@/blocks/create-block';
 import {
+  createColumnsEditor,
+  createSectionEditor,
+  createSpacerEditor,
   renderSpacerBlock,
   renderSectionBlock,
   renderColumnsBlock,
   renderBlock
 } from '@/blocks/registry';
 import { sanitizeBlocksDeep } from '@/blocks/sanitize-blocks';
-import { BlockSchema } from '@/schemas/block';
+import { BlockSchema, type Block } from '@/schemas/block';
 
 const timestamps = {
   created_at: '2026-01-01T00:00:00.000Z',
@@ -295,5 +298,112 @@ describe('layout block renderers', () => {
     expect(renderBlock(createBlock('spacer', 'sp'), 'student').dataset.blockType).toBe(
       'spacer'
     );
+  });
+});
+
+describe('layout block editors', () => {
+  it('spacer size select emits change via getLatest', () => {
+    const block = createBlock('spacer', 'sp');
+    const onChange = vi.fn();
+    let latest = block;
+    const el = createSpacerEditor(
+      block as Extract<Block, { block_type: 'spacer' }>,
+      (b) => {
+        latest = b;
+        onChange(b);
+      },
+      () => latest as Extract<Block, { block_type: 'spacer' }>
+    );
+    const select = el.querySelector(
+      '.block-editor__spacer-size'
+    ) as HTMLSelectElement;
+    select.value = 'large';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(onChange).toHaveBeenCalled();
+    expect(
+      (onChange.mock.calls.at(-1)![0] as Extract<Block, { block_type: 'spacer' }>).content.size
+    ).toBe('large');
+  });
+
+  it('section title input updates content.title', () => {
+    const block = createBlock('section', 'sec');
+    const onChange = vi.fn();
+    let latest = block;
+    const el = createSectionEditor(
+      block as Extract<Block, { block_type: 'section' }>,
+      (b) => {
+        latest = b;
+        onChange(b);
+      },
+      () => latest as Extract<Block, { block_type: 'section' }>
+    );
+    const input = el.querySelector(
+      '.block-editor__section-title'
+    ) as HTMLInputElement;
+    input.value = 'Module A';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(
+      (onChange.mock.calls.at(-1)![0] as Extract<Block, { block_type: 'section' }>).content
+        .title
+    ).toBe('Module A');
+  });
+
+  it('columns preset change remaps widths and folds surplus blocks', () => {
+    const block = createBlock('columns', 'cols');
+    if (block.block_type !== 'columns') throw new Error('expected columns');
+    block.content.preset = '33-33-33';
+    block.content.columns = [
+      { width: 4, blocks: [createBlock('rich_text', 'a')] },
+      { width: 4, blocks: [createBlock('rich_text', 'b')] },
+      { width: 4, blocks: [createBlock('rich_text', 'c')] }
+    ] as typeof block.content.columns;
+    const onChange = vi.fn();
+    let latest = block;
+    const el = createColumnsEditor(
+      block,
+      (b) => {
+        latest = b;
+        onChange(b);
+      },
+      () => latest as Extract<Block, { block_type: 'columns' }>
+    );
+    const select = el.querySelector(
+      '.block-editor__columns-preset'
+    ) as HTMLSelectElement;
+    select.value = '50-50';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    const updated = onChange.mock.calls.at(-1)![0] as Extract<
+      Block,
+      { block_type: 'columns' }
+    >;
+    expect(updated.content.preset).toBe('50-50');
+    expect(updated.content.columns.map((c) => c.width)).toEqual([6, 6]);
+    expect(updated.content.columns[1]!.blocks.map((b) => b.id)).toEqual(['b', 'c']);
+  });
+
+  it('adding a block inside a column nests it under that column', () => {
+    const block = createBlock('columns', 'cols');
+    const onChange = vi.fn();
+    let latest = block;
+    const el = createColumnsEditor(
+      block as Extract<Block, { block_type: 'columns' }>,
+      (b) => {
+        latest = b;
+        onChange(b);
+      },
+      () => latest as Extract<Block, { block_type: 'columns' }>
+    );
+    const firstPane = el.querySelectorAll('.block-editor__column-pane')[0]!;
+    const addSelect = firstPane.querySelector('select') as HTMLSelectElement;
+    const addButton = firstPane.querySelector(
+      'button.block-editor__nested-add'
+    ) as HTMLButtonElement;
+    addSelect.value = 'heading';
+    addButton.click();
+    const updated = onChange.mock.calls.at(-1)![0] as Extract<
+      Block,
+      { block_type: 'columns' }
+    >;
+    expect(updated.content.columns[0]!.blocks[0]!.block_type).toBe('heading');
   });
 });

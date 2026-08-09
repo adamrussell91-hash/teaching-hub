@@ -1,4 +1,9 @@
 import { parseVideoInput } from '@/blocks/video-url';
+import {
+  createColumnsEditor,
+  createSectionEditor,
+  createSpacerEditor
+} from '@/blocks/layout-editors';
 import type { Block } from '@/schemas/block';
 
 export type BlockChangeHandler<T extends Block = Block> = (block: T) => void;
@@ -61,7 +66,7 @@ function createMediaSizeSelect(
   return select;
 }
 
-function editorShell<T extends Block>(
+export function editorShell<T extends Block>(
   block: T,
   onChange: BlockChangeHandler<T>,
   fields: HTMLElement,
@@ -1082,5 +1087,11 @@ export function createBlockEditor(
       return createTableEditor(block, onChange, latest as () => Extract<Block, { block_type: 'table' }>);
     case 'question_set':
       return createQuestionSetEditor(block, onChange, latest as () => Extract<Block, { block_type: 'question_set' }>);
+    case 'spacer':
+      return createSpacerEditor(block, onChange, latest as () => Extract<Block, { block_type: 'spacer' }>);
+    case 'section':
+      return createSectionEditor(block, onChange, latest as () => Extract<Block, { block_type: 'section' }>);
+    case 'columns':
+      return createColumnsEditor(block, onChange, latest as () => Extract<Block, { block_type: 'columns' }>);
   }
 }
