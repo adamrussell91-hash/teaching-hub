@@ -8,6 +8,14 @@ import {
   cloneBlockWithNewIds,
   NEW_BLOCK_TYPES
 } from '@/blocks/create-block';
+import { sanitizeSvgMarkup } from '@/blocks/sanitize-svg';
+import {
+  validateMindMap,
+  validateConceptMap,
+  layoutMindMap,
+  layoutConceptMap
+} from '@/blocks/graph-layout';
+import { buildChartSvg, buildChartTableRows } from '@/blocks/chart-svg';
 
 const timestamps = {
   created_at: '2026-01-01T00:00:00.000Z',
@@ -218,5 +226,128 @@ describe('createBlock visualisation defaults', () => {
       expect(cm2.content.edges[0].from).not.toBe(concept.content.nodes[0].id);
       expect(cm2.content.edges[0].to).not.toBe(concept.content.nodes[1].id);
     }
+  });
+});
+
+describe('sanitizeSvgMarkup', () => {
+  it('strips script and on* handlers', () => {
+    const out = sanitizeSvgMarkup(
+      '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script><circle onclick="evil()" r="5"/></svg>'
+    );
+    expect(out).not.toMatch(/script/i);
+    expect(out).not.toMatch(/onclick/i);
+    expect(out).toMatch(/<circle/i);
+  });
+
+  it('strips foreignObject and external hrefs', () => {
+    const out = sanitizeSvgMarkup(
+      '<svg><foreignObject><div>x</div></foreignObject><use href="https://evil.test/x"/></svg>'
+    );
+    expect(out).not.toMatch(/foreignObject/i);
+    expect(out).not.toMatch(/https:\/\/evil/i);
+  });
+});
+
+describe('graph-layout validators', () => {
+  it('mind map requires one root and no cycles', () => {
+    expect(
+      validateMindMap({
+        nodes: [
+          { id: 'a', label: 'A', parent_id: null },
+          { id: 'b', label: 'B', parent_id: 'a' }
+        ],
+        edges: []
+      })
+    ).toBeNull();
+
+    expect(
+      validateMindMap({
+        nodes: [
+          { id: 'a', label: 'A', parent_id: null },
+          { id: 'b', label: 'B', parent_id: null }
+        ],
+        edges: []
+      })
+    ).toMatch(/root/i);
+
+    expect(
+      validateMindMap({
+        nodes: [
+          { id: 'a', label: 'A', parent_id: 'b' },
+          { id: 'b', label: 'B', parent_id: 'a' }
+        ],
+        edges: []
+      })
+    ).toMatch(/cycle/i);
+  });
+
+  it('concept map requires labelled edges and valid endpoints', () => {
+    expect(
+      validateConceptMap({
+        nodes: [
+          { id: 'a', label: 'A' },
+          { id: 'b', label: 'B' }
+        ],
+        edges: [{ id: 'e1', from: 'a', to: 'b', label: 'to' }]
+      })
+    ).toBeNull();
+
+    expect(
+      validateConceptMap({
+        nodes: [
+          { id: 'a', label: 'A' },
+          { id: 'b', label: 'B' }
+        ],
+        edges: [{ id: 'e1', from: 'a', to: 'b', label: '  ' }]
+      })
+    ).toMatch(/label/i);
+  });
+
+  it('layout helpers return deterministic positioned nodes', () => {
+    const mindNodes = [
+      { id: 'b', label: 'B', parent_id: 'a' },
+      { id: 'a', label: 'A', parent_id: null },
+      { id: 'c', label: 'C', parent_id: 'a' }
+    ];
+    const mindLayout = layoutMindMap(mindNodes);
+    expect(mindLayout).toHaveLength(mindNodes.length);
+    for (const node of mindLayout) {
+      expect(Number.isFinite(node.x)).toBe(true);
+      expect(Number.isFinite(node.y)).toBe(true);
+    }
+    expect(layoutMindMap(mindNodes)).toEqual(mindLayout);
+
+    const conceptNodes = [
+      { id: 'b', label: 'B' },
+      { id: 'a', label: 'A' }
+    ];
+    const conceptEdges = [{ id: 'e1', from: 'a', to: 'b', label: 'to' }];
+    const conceptLayout = layoutConceptMap(conceptNodes, conceptEdges);
+    expect(conceptLayout.nodes).toHaveLength(conceptNodes.length);
+    for (const node of conceptLayout.nodes) {
+      expect(Number.isFinite(node.x)).toBe(true);
+      expect(Number.isFinite(node.y)).toBe(true);
+    }
+    expect(conceptLayout.edges).toHaveLength(1);
+    expect(Number.isFinite(conceptLayout.edges[0].x1)).toBe(true);
+    expect(Number.isFinite(conceptLayout.edges[0].y1)).toBe(true);
+    expect(Number.isFinite(conceptLayout.edges[0].x2)).toBe(true);
+    expect(Number.isFinite(conceptLayout.edges[0].y2)).toBe(true);
+    expect(layoutConceptMap(conceptNodes, conceptEdges)).toEqual(conceptLayout);
+  });
+});
+
+describe('chart-svg', () => {
+  it('emits svg and table rows for bar chart', () => {
+    const content = {
+      chart_type: 'bar' as const,
+      title: 'Demo',
+      series: [{ id: 's1', name: 'S', points: [{ x: 'A', y: 2 }, { x: 'B', y: 4 }] }]
+    };
+    const svg = buildChartSvg(content);
+    expect(svg).toMatch(/<svg[\s\S]*<\/svg>/);
+    expect(svg).toMatch(/A/);
+    const rows = buildChartTableRows(content);
+    expect(rows.length).toBeGreaterThanOrEqual(2);
   });
 });
