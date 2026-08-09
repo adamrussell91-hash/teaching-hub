@@ -17,6 +17,7 @@ import {
   createFlashcardsEditor,
   createGalleryEditor,
   createHeadingEditor,
+  createHtmlAppEditor,
   createHtmlEditor,
   createImageEditor,
   createMindMapEditor,
@@ -56,6 +57,7 @@ import {
   renderFlashcardsBlock,
   renderGalleryBlock,
   renderHeadingBlock,
+  renderHtmlAppBlock,
   renderHtmlBlock,
   renderImageBlock,
   renderMindMapBlock,
@@ -116,6 +118,10 @@ export const blockRegistry: {
   html: {
     render: renderHtmlBlock,
     createEditor: createHtmlEditor
+  },
+  html_app: {
+    render: (block, mode) => renderHtmlAppBlock(block, mode, {}),
+    createEditor: createHtmlAppEditor
   },
   quote: {
     render: renderQuoteBlock,
@@ -231,6 +237,7 @@ export {
   createFlashcardsEditor,
   createGalleryEditor,
   createHeadingEditor,
+  createHtmlAppEditor,
   createHtmlEditor,
   createImageEditor,
   createMindMapEditor,
@@ -263,6 +270,7 @@ export {
   renderFlashcardsBlock,
   renderGalleryBlock,
   renderHeadingBlock,
+  renderHtmlAppBlock,
   renderHtmlBlock,
   renderImageBlock,
   renderMindMapBlock,

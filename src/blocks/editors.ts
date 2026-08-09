@@ -484,6 +484,131 @@ export function createHtmlEditor(
   return editorShell(block, onChange, textarea, getLatest);
 }
 
+export function createHtmlAppEditor(
+  block: Extract<Block, { block_type: 'html_app' }>,
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'html_app' }>>,
+  getLatest: () => Extract<Block, { block_type: 'html_app' }> = () => block
+): HTMLElement {
+  const fields = document.createElement('div');
+  fields.className = 'block-editor__fields';
+
+  const title = document.createElement('input');
+  title.type = 'text';
+  title.className = 'block-editor__html-app-title';
+  title.value = block.content.title ?? '';
+  title.placeholder = 'Title (optional)';
+  title.setAttribute('aria-label', 'HTML app title');
+
+  const height = document.createElement('input');
+  height.type = 'number';
+  height.className = 'block-editor__html-app-height';
+  height.min = '120';
+  height.max = '4000';
+  height.value = String(block.content.height_px ?? 480);
+  height.setAttribute('aria-label', 'Height in pixels');
+
+  const html = document.createElement('textarea');
+  html.className = 'block-editor__html-app-html';
+  html.value = block.content.html;
+  html.rows = 10;
+  html.setAttribute('aria-label', 'HTML app markup');
+
+  const aiToggleLabel = document.createElement('label');
+  aiToggleLabel.className = 'block-editor__html-app-ai-toggle';
+  const aiToggle = document.createElement('input');
+  aiToggle.type = 'checkbox';
+  aiToggle.className = 'block-editor__html-app-ai-enabled';
+  aiToggle.checked = Boolean(block.content.ai);
+  aiToggle.setAttribute('aria-label', 'Enable AI lane');
+  aiToggleLabel.append(aiToggle, document.createTextNode(' Enable AI lane'));
+
+  const aiFields = document.createElement('div');
+  aiFields.className = 'block-editor__html-app-ai-fields';
+  aiFields.hidden = !block.content.ai;
+
+  const provider = document.createElement('select');
+  provider.className = 'block-editor__html-app-ai-provider';
+  provider.setAttribute('aria-label', 'AI provider');
+  for (const [value, label] of [
+    ['openai', 'OpenAI'],
+    ['anthropic', 'Anthropic']
+  ] as const) {
+    const opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = label;
+    provider.append(opt);
+  }
+  provider.value = block.content.ai?.provider ?? 'openai';
+
+  const model = document.createElement('input');
+  model.type = 'text';
+  model.className = 'block-editor__html-app-ai-model';
+  model.value = block.content.ai?.model ?? 'gpt-4o-mini';
+  model.placeholder = 'Model';
+  model.setAttribute('aria-label', 'AI model');
+
+  const system = document.createElement('textarea');
+  system.className = 'block-editor__html-app-ai-system';
+  system.value = block.content.ai?.system ?? '';
+  system.rows = 4;
+  system.placeholder = 'Focus / guardrails (system prompt)';
+  system.setAttribute('aria-label', 'AI system prompt');
+
+  const maxTokens = document.createElement('input');
+  maxTokens.type = 'number';
+  maxTokens.className = 'block-editor__html-app-ai-max-tokens';
+  maxTokens.min = '1';
+  maxTokens.max = '2000';
+  maxTokens.value = String(block.content.ai?.max_tokens ?? 512);
+  maxTokens.setAttribute('aria-label', 'Max tokens');
+
+  aiFields.append(provider, model, system, maxTokens);
+
+  const emitChange = () => {
+    const current = getLatest();
+    const heightPx = Number.parseInt(height.value, 10);
+    const content: Extract<Block, { block_type: 'html_app' }>['content'] = {
+      html: html.value,
+      height_px: Number.isFinite(heightPx) && heightPx > 0 ? heightPx : 480
+    };
+    const titleVal = title.value.trim();
+    if (titleVal) content.title = titleVal;
+
+    if (aiToggle.checked) {
+      const tokens = Number.parseInt(maxTokens.value, 10);
+      content.ai = {
+        enabled: true,
+        provider: provider.value === 'anthropic' ? 'anthropic' : 'openai',
+        model: model.value.trim() || 'gpt-4o-mini',
+        system: system.value,
+        max_tokens:
+          Number.isFinite(tokens) && tokens > 0 ? Math.min(tokens, 2000) : 512
+      };
+    }
+
+    onChange({ ...current, content });
+  };
+
+  aiToggle.addEventListener('change', () => {
+    aiFields.hidden = !aiToggle.checked;
+    if (aiToggle.checked && !model.value.trim()) {
+      model.value = provider.value === 'anthropic' ? 'claude-sonnet-4-5' : 'gpt-4o-mini';
+    }
+    emitChange();
+  });
+
+  title.addEventListener('input', emitChange);
+  height.addEventListener('input', emitChange);
+  html.addEventListener('input', emitChange);
+  provider.addEventListener('change', emitChange);
+  model.addEventListener('input', emitChange);
+  system.addEventListener('input', emitChange);
+  maxTokens.addEventListener('input', emitChange);
+
+  fields.append(title, height, html, aiToggleLabel, aiFields);
+  return editorShell(block, onChange, fields, getLatest);
+}
+
 export function createQuoteEditor(
   block: Extract<Block, { block_type: 'quote' }>,
   onChange: BlockChangeHandler<Extract<Block, { block_type: 'quote' }>>,
@@ -2785,6 +2910,12 @@ export function createBlockEditor(
       return createEmbedEditor(block, onChange, latest as () => Extract<Block, { block_type: 'embed' }>);
     case 'html':
       return createHtmlEditor(block, onChange, latest as () => Extract<Block, { block_type: 'html' }>);
+    case 'html_app':
+      return createHtmlAppEditor(
+        block,
+        onChange,
+        latest as () => Extract<Block, { block_type: 'html_app' }>
+      );
     case 'quote':
       return createQuoteEditor(block, onChange, latest as () => Extract<Block, { block_type: 'quote' }>);
     case 'divider':

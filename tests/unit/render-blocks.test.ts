@@ -339,6 +339,7 @@ describe('blockRegistry', () => {
       'gallery',
       'heading',
       'html',
+      'html_app',
       'image',
       'mind_map',
       'question_set',

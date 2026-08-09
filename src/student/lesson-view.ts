@@ -99,7 +99,7 @@ function renderPublishedLesson(content: HTMLElement, lesson: PublishedLesson): v
   content.append(title);
 
   for (const block of lesson.blocks) {
-    content.append(renderBlock(block, 'student'));
+    content.append(renderBlock(block, 'student', { lessonId: lesson.lesson_id }));
   }
 }
 
