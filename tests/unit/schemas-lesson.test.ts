@@ -434,3 +434,71 @@ describe('PublishableLessonSchema media rules', () => {
     expect(result.success).toBe(true);
   });
 });
+
+describe('PublishableLessonSchema layout rules', () => {
+  const validLesson = {
+    id: 'lesson_aotfw_008',
+    type: 'lesson' as const,
+    title: 'Memory, Identity and Ono',
+    slug: 'memory_identity_and_ono',
+    unit_id: 'unit_aotfw',
+    sequence: 8,
+    blocks: [
+      {
+        ...baseBlock,
+        block_type: 'rich_text',
+        content: { html: '<p>Content</p>' }
+      }
+    ],
+    status: 'active' as const,
+    ...timestamps,
+    schema_version: 1 as const
+  };
+
+  it('rejects section with empty title on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...validLesson,
+      blocks: [
+        {
+          ...baseBlock,
+          id: 'sec',
+          block_type: 'section',
+          content: { title: '   ', blocks: [] }
+        }
+      ]
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects nested image missing alt inside columns on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...validLesson,
+      blocks: [
+        {
+          ...baseBlock,
+          id: 'cols',
+          block_type: 'columns',
+          content: {
+            preset: '50-50',
+            columns: [
+              {
+                width: 6,
+                blocks: [
+                  {
+                    ...baseBlock,
+                    id: 'img',
+                    block_type: 'image',
+                    variant: 'large',
+                    content: { url: 'https://example.com/a.png', alt_text: '   ' }
+                  }
+                ]
+              },
+              { width: 6, blocks: [] }
+            ]
+          }
+        }
+      ]
+    });
+    expect(result.success).toBe(false);
+  });
+});

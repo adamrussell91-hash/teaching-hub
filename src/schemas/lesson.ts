@@ -81,6 +81,19 @@ function publishBlockIssues(blocks: z.infer<typeof BlockSchema>[]): string | nul
         return 'Table blocks need at least one header to publish';
       }
     }
+    if (block.block_type === 'section') {
+      if (block.content.title.trim().length === 0) {
+        return 'Section blocks need a title to publish';
+      }
+      const nested = publishBlockIssues(block.content.blocks);
+      if (nested) return nested;
+    }
+    if (block.block_type === 'columns') {
+      for (const col of block.content.columns) {
+        const nested = publishBlockIssues(col.blocks);
+        if (nested) return nested;
+      }
+    }
   }
   return null;
 }
