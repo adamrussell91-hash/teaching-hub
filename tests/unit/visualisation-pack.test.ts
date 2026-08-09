@@ -8,7 +8,8 @@ import {
   cloneBlockWithNewIds,
   NEW_BLOCK_TYPES
 } from '@/blocks/create-block';
-import { sanitizeSvgMarkup } from '@/blocks/sanitize-svg';
+import { sanitizeSvgMarkup, svgHasMeaningfulContent } from '@/blocks/sanitize-svg';
+import { sanitizeBlocksDeep } from '@/blocks/sanitize-blocks';
 import {
   validateMindMap,
   validateConceptMap,
@@ -25,6 +26,7 @@ import {
   createMindMapEditor
 } from '@/blocks/editors';
 import { renderBlock } from '@/blocks/render';
+import { toPublishedLesson, LessonSchema } from '@/schemas';
 
 const timestamps = {
   created_at: '2026-01-01T00:00:00.000Z',
@@ -271,6 +273,93 @@ describe('sanitizeSvgMarkup', () => {
     );
     expect(out).not.toMatch(/data:image\/svg\+xml/i);
     expect(out).toMatch(/<use/i);
+  });
+
+  it('rejects external url() in fill/stroke/clip-path/mask', () => {
+    const out = sanitizeSvgMarkup(
+      [
+        '<svg xmlns="http://www.w3.org/2000/svg">',
+        '<defs><clipPath id="c"><circle r="5"/></clipPath></defs>',
+        '<circle fill="url(https://evil.test/x)" stroke="url(//evil.test/y)" r="5"/>',
+        '<rect fill="url(#c)" clip-path="url(https://evil.test/clip)" width="10" height="10"/>',
+        '<ellipse fill="url(#c)" mask="url(\'https://evil.test/m\')" rx="2" ry="2"/>',
+        '</svg>'
+      ].join('')
+    );
+    expect(out).not.toMatch(/evil\.test/i);
+    expect(out).toMatch(/fill="url\(#c\)"/);
+    expect(out).toMatch(/<circle/i);
+  });
+
+  it('keeps same-document url(#...) references', () => {
+    const out = sanitizeSvgMarkup(
+      '<svg><circle fill="url(#grad)" stroke="url(#grad)" clip-path="url(#clip)" mask="url(#m)" r="3"/></svg>'
+    );
+    expect(out).toMatch(/fill="url\(#grad\)"/);
+    expect(out).toMatch(/stroke="url\(#grad\)"/);
+    expect(out).toMatch(/clip-path="url\(#clip\)"/);
+    expect(out).toMatch(/mask="url\(#m\)"/);
+  });
+
+  it('detects empty SVG shells as non-meaningful', () => {
+    expect(svgHasMeaningfulContent('')).toBe(false);
+    expect(svgHasMeaningfulContent('<svg></svg>')).toBe(false);
+    expect(svgHasMeaningfulContent('<svg><g></g></svg>')).toBe(false);
+    expect(svgHasMeaningfulContent('<svg><defs><linearGradient id="g"/></defs></svg>')).toBe(
+      false
+    );
+    expect(svgHasMeaningfulContent('<svg><path/></svg>')).toBe(false);
+    expect(svgHasMeaningfulContent('<svg><path d=""/></svg>')).toBe(false);
+    expect(svgHasMeaningfulContent('<svg><circle r="5"/></svg>')).toBe(true);
+    expect(svgHasMeaningfulContent('<svg><path d="M0 0 L1 1"/></svg>')).toBe(true);
+    expect(svgHasMeaningfulContent('<svg><text>Hi</text></svg>')).toBe(true);
+  });
+});
+
+describe('sanitizeBlocksDeep diagram', () => {
+  it('persists sanitised svg_markup for diagram blocks', () => {
+    const block = createBlock('diagram', 'd1');
+    if (block.block_type !== 'diagram') throw new Error('expected diagram');
+    block.content = {
+      source: 'svg',
+      svg_markup:
+        '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script><circle fill="url(https://evil.test/x)" r="3"/></svg>'
+    };
+
+    const [out] = sanitizeBlocksDeep([block]);
+    expect(out?.block_type).toBe('diagram');
+    if (out?.block_type !== 'diagram') return;
+    expect(out.content.svg_markup).not.toMatch(/script/i);
+    expect(out.content.svg_markup).not.toMatch(/evil\.test/i);
+    expect(out.content.svg_markup).toMatch(/<circle/i);
+  });
+
+  it('stores sanitised diagram markup on publish snapshot', () => {
+    const diagram = createBlock('diagram', 'd1');
+    if (diagram.block_type !== 'diagram') throw new Error('expected diagram');
+    diagram.content = {
+      source: 'svg',
+      svg_markup:
+        '<svg xmlns="http://www.w3.org/2000/svg"><script>bad()</script><circle r="4"/></svg>'
+    };
+    const lesson = LessonSchema.parse({
+      id: 'lesson_viz',
+      type: 'lesson',
+      title: 'Viz',
+      slug: 'viz',
+      unit_id: 'unit_1',
+      sequence: 1,
+      blocks: [diagram],
+      status: 'active',
+      ...timestamps,
+      schema_version: 1
+    });
+    const published = toPublishedLesson(lesson, '2026-08-09T00:00:00.000Z');
+    const stored = published.blocks[0];
+    expect(stored?.block_type).toBe('diagram');
+    if (stored?.block_type !== 'diagram') return;
+    expect(stored.content.svg_markup).not.toMatch(/script/i);
+    expect(stored.content.svg_markup).toMatch(/<circle/i);
   });
 });
 

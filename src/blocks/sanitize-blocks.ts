@@ -1,4 +1,5 @@
 import { sanitizeRichTextHtml } from './sanitize';
+import { sanitizeSvgMarkup } from './sanitize-svg';
 import type { Block } from '../schemas/block';
 
 type ColumnsBlock = Extract<Block, { block_type: 'columns' }>;
@@ -11,6 +12,15 @@ export function sanitizeBlocksDeep(blocks: Block[]): Block[] {
       return {
         ...block,
         content: { html: sanitizeRichTextHtml(block.content.html) }
+      };
+    }
+    if (block.block_type === 'diagram' && block.content.svg_markup != null) {
+      return {
+        ...block,
+        content: {
+          ...block.content,
+          svg_markup: sanitizeSvgMarkup(block.content.svg_markup)
+        }
       };
     }
     if (block.block_type === 'section') {

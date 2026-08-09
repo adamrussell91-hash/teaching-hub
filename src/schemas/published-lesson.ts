@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { IsoDateSchema } from './common';
 import { BlockSchema } from './block';
+import { sanitizeBlocksDeep } from '../blocks/sanitize-blocks';
 import { PublishableLessonSchema, type Lesson } from './lesson';
 
 export const PublishedLessonSchema = z.object({
@@ -23,7 +24,7 @@ export function toPublishedLesson(
     lesson_id: lesson.id,
     title: lesson.title,
     unit_id: lesson.unit_id,
-    blocks: lesson.blocks,
+    blocks: sanitizeBlocksDeep(lesson.blocks),
     published_at: publishedAt,
     schema_version: 1
   });

@@ -66,8 +66,27 @@ const ALLOWED_ATTRS = new Set([
 
 const STRIP_TAGS = new Set(['script', 'style']);
 
+const MEANINGFUL_TAGS = new Set([
+  'circle',
+  'ellipse',
+  'rect',
+  'line',
+  'polyline',
+  'polygon',
+  'text',
+  'use',
+  'image'
+]);
+
 function isSafeHref(value: string): boolean {
   return value.trim().startsWith('#');
+}
+
+/** Allow `url(#id)` same-document refs; reject external `url(...)` values. */
+function isSafeUrlAttrValue(value: string): boolean {
+  if (!/url\s*\(/i.test(value)) return true;
+  const withoutSafe = value.replace(/url\s*\(\s*(['"]?)#([^)'"]*)\1\s*\)/gi, '');
+  return !/url\s*\(/i.test(withoutSafe);
 }
 
 function escapeText(value: string): string {
@@ -125,6 +144,7 @@ export function sanitizeSvgMarkup(markup: string): string {
       if (name.startsWith('on')) continue;
       if (!ALLOWED_ATTRS.has(name)) continue;
       if ((name === 'href' || name === 'xlink:href') && !isSafeHref(attr.value)) continue;
+      if (!isSafeUrlAttrValue(attr.value)) continue;
       attrs.push(`${attr.name}="${escapeAttr(attr.value)}"`);
     }
 
@@ -134,4 +154,34 @@ export function sanitizeSvgMarkup(markup: string): string {
   }
 
   return Array.from(root.childNodes).map(clean).join('');
+}
+
+/** True when cleaned SVG has at least one drawing element (not an empty shell). */
+export function svgHasMeaningfulContent(markup: string): boolean {
+  if (!markup.trim()) return false;
+
+  const doc = new DOMParser().parseFromString(
+    `<sanitize-root>${markup}</sanitize-root>`,
+    'application/xml'
+  );
+  if (doc.getElementsByTagName('parsererror').length > 0) return false;
+
+  const root = doc.documentElement;
+  if (!root) return false;
+
+  function walk(node: Node): boolean {
+    if (node.nodeType !== Node.ELEMENT_NODE) return false;
+    const el = node as Element;
+    const tag = el.tagName.toLowerCase();
+
+    if (MEANINGFUL_TAGS.has(tag)) return true;
+    if (tag === 'path') {
+      const d = el.getAttribute('d')?.trim() ?? '';
+      if (d.length > 0) return true;
+    }
+
+    return Array.from(el.childNodes).some(walk);
+  }
+
+  return Array.from(root.childNodes).some(walk);
 }

@@ -3,7 +3,7 @@ import { CommonFields, IsoDateSchema } from './common';
 import { BlockSchema } from './block';
 import { isHttpUrl } from '../blocks/url-safety';
 import { parseClozeText } from '../blocks/learning-activity';
-import { sanitizeSvgMarkup } from '../blocks/sanitize-svg';
+import { sanitizeSvgMarkup, svgHasMeaningfulContent } from '../blocks/sanitize-svg';
 import { validateMindMap, validateConceptMap } from '../blocks/graph-layout';
 
 export const LessonSchema = z.object({
@@ -194,7 +194,7 @@ function publishBlockIssues(blocks: z.infer<typeof BlockSchema>[]): string | nul
         }
       } else {
         const cleaned = sanitizeSvgMarkup(block.content.svg_markup ?? '');
-        if (cleaned.trim().length === 0) {
+        if (!svgHasMeaningfulContent(cleaned)) {
           return 'Diagram SVG needs safe SVG markup to publish';
         }
       }

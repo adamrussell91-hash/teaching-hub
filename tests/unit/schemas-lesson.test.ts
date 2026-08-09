@@ -1200,6 +1200,22 @@ describe('PublishableLessonSchema visualisation rules', () => {
     }
   });
 
+  it('rejects diagram svg that is only an empty shell on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [
+        {
+          ...okDiagramSvg,
+          content: { source: 'svg', svg_markup: '<svg xmlns="http://www.w3.org/2000/svg"></svg>' }
+        }
+      ]
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.message.includes('safe SVG'))).toBe(true);
+    }
+  });
+
   it('rejects mind map with multiple roots on publish', () => {
     const result = PublishableLessonSchema.safeParse({
       ...baseLesson,
