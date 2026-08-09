@@ -16,6 +16,7 @@ import {
   layoutConceptMap
 } from '@/blocks/graph-layout';
 import { buildChartSvg, buildChartTableRows } from '@/blocks/chart-svg';
+import { renderBlock } from '@/blocks/render';
 
 const timestamps = {
   created_at: '2026-01-01T00:00:00.000Z',
@@ -366,5 +367,42 @@ describe('chart-svg', () => {
     expect(svg).toMatch(/A/);
     const rows = buildChartTableRows(content);
     expect(rows.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe('visualisation renderers', () => {
+  it('renders chart svg and table', () => {
+    const block = createBlock('chart', 'c1');
+    const el = renderBlock(block, 'student');
+    expect(el.querySelector('svg')).toBeTruthy();
+    expect(el.querySelector('table, details')).toBeTruthy();
+  });
+
+  it('renders equation with katex or fallback', () => {
+    const block = createBlock('equation', 'e1');
+    const el = renderBlock(block, 'student');
+    expect(el.querySelector('.block-equation')).toBeTruthy();
+    expect(el.textContent).toMatch(/E|mc|error|\\\\|=/i);
+  });
+
+  it('renders sanitised diagram svg', () => {
+    const block = {
+      ...createBlock('diagram', 'd1'),
+      content: {
+        source: 'svg' as const,
+        svg_markup:
+          '<svg xmlns="http://www.w3.org/2000/svg"><script>bad()</script><circle r="3"/></svg>'
+      }
+    };
+    const el = renderBlock(block as ReturnType<typeof createBlock>, 'student');
+    expect(el.querySelector('script')).toBeNull();
+    expect(el.innerHTML).toMatch(/circle/i);
+  });
+
+  it('renders mind_map and concept_map svg', () => {
+    expect(renderBlock(createBlock('mind_map', 'm1'), 'student').querySelector('svg')).toBeTruthy();
+    expect(
+      renderBlock(createBlock('concept_map', 'cm1'), 'student').querySelector('svg')
+    ).toBeTruthy();
   });
 });

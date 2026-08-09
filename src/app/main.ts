@@ -1,3 +1,4 @@
+import 'katex/dist/katex.min.css';
 import { ApiClientError } from '@/api/client';
 import { fetchSession, logout, renderSignIn, type SessionInfo } from '@/auth/gate';
 import {

@@ -19,6 +19,7 @@
   "dependencies": {
     "@netlify/blobs": "9.1.2",
     "happy-dom": "^17.4.4",
+    "katex": "^0.16.22",
     "zod": "3.25.76"
   },
   "devDependencies": {

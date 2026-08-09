@@ -1,4 +1,13 @@
+import katex from 'katex';
+import { buildChartSvg, buildChartTableRows, escapeXml } from '@/blocks/chart-svg';
+import {
+  layoutConceptMap,
+  layoutMindMap,
+  type ConceptMapContent,
+  type MindMapContent
+} from '@/blocks/graph-layout';
 import { sanitizeRichTextHtml } from '@/blocks/sanitize';
+import { sanitizeSvgMarkup } from '@/blocks/sanitize-svg';
 import { isHttpUrl } from '@/blocks/url-safety';
 import { videoEmbedSrc } from '@/blocks/video-url';
 import {
@@ -1327,6 +1336,222 @@ export function renderSelfCheckBlock(
   return wrapBlock(root, block, mode);
 }
 
+const MAP_VIEW_W = 400;
+const MAP_VIEW_H = 240;
+const MAP_NODE_R = 28;
+
+function buildMindMapSvg(content: MindMapContent): string {
+  const positioned = layoutMindMap(content.nodes);
+  const byId = new Map(positioned.map((node) => [node.id, node]));
+  const lines: string[] = [];
+  for (const node of content.nodes) {
+    if (node.parent_id == null) continue;
+    const child = byId.get(node.id);
+    const parent = byId.get(node.parent_id);
+    if (!child || !parent) continue;
+    lines.push(
+      `<line x1="${parent.x}" y1="${parent.y}" x2="${child.x}" y2="${child.y}" stroke="#64748b" stroke-width="1.5" />`
+    );
+  }
+  const nodesMarkup = positioned
+    .map(
+      (node) =>
+        `<circle cx="${node.x}" cy="${node.y}" r="${MAP_NODE_R}" fill="#e0f2fe" stroke="#0284c7" stroke-width="1.5" />` +
+        `<text x="${node.x}" y="${node.y}" text-anchor="middle" dominant-baseline="middle" font-size="12">${escapeXml(node.label)}</text>`
+    )
+    .join('');
+  const title = content.title?.trim()
+    ? `<text x="${MAP_VIEW_W / 2}" y="18" text-anchor="middle" font-size="14">${escapeXml(content.title.trim())}</text>`
+    : '';
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${MAP_VIEW_W} ${MAP_VIEW_H}" width="100%" role="img">${title}${lines.join('')}${nodesMarkup}</svg>`;
+}
+
+function buildConceptMapSvg(content: ConceptMapContent): string {
+  const layout = layoutConceptMap(content.nodes, content.edges);
+  const edgesMarkup = layout.edges
+    .map((edge) => {
+      const midX = (edge.x1 + edge.x2) / 2;
+      const midY = (edge.y1 + edge.y2) / 2;
+      const label = edge.label
+        ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="11">${escapeXml(edge.label)}</text>`
+        : '';
+      return (
+        `<line x1="${edge.x1}" y1="${edge.y1}" x2="${edge.x2}" y2="${edge.y2}" stroke="#64748b" stroke-width="1.5" />` +
+        label
+      );
+    })
+    .join('');
+  const nodesMarkup = layout.nodes
+    .map(
+      (node) =>
+        `<circle cx="${node.x}" cy="${node.y}" r="${MAP_NODE_R}" fill="#fef3c7" stroke="#d97706" stroke-width="1.5" />` +
+        `<text x="${node.x}" y="${node.y}" text-anchor="middle" dominant-baseline="middle" font-size="12">${escapeXml(node.label)}</text>`
+    )
+    .join('');
+  const title = content.title?.trim()
+    ? `<text x="${MAP_VIEW_W / 2}" y="18" text-anchor="middle" font-size="14">${escapeXml(content.title.trim())}</text>`
+    : '';
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${MAP_VIEW_W} ${MAP_VIEW_H}" width="100%" role="img">${title}${edgesMarkup}${nodesMarkup}</svg>`;
+}
+
+export function renderChartBlock(
+  block: Extract<Block, { block_type: 'chart' }>,
+  mode: RenderMode
+): HTMLElement {
+  const root = document.createElement('figure');
+  root.className = 'block-chart';
+
+  if (block.content.title?.trim()) {
+    const cap = document.createElement('figcaption');
+    cap.className = 'block-chart__title';
+    cap.textContent = block.content.title;
+    root.append(cap);
+  }
+
+  const wrap = document.createElement('div');
+  wrap.className = 'block-chart__svg';
+  wrap.innerHTML = buildChartSvg(block.content);
+  root.append(wrap);
+
+  const details = document.createElement('details');
+  details.className = 'block-chart__data';
+  const summary = document.createElement('summary');
+  summary.textContent = 'Chart data';
+  const table = document.createElement('table');
+  table.className = 'block-chart__table';
+  const thead = document.createElement('thead');
+  const headerRow = document.createElement('tr');
+  for (const label of ['Series', 'X', 'Y']) {
+    const th = document.createElement('th');
+    th.scope = 'col';
+    th.textContent = label;
+    headerRow.append(th);
+  }
+  thead.append(headerRow);
+  table.append(thead);
+  const tbody = document.createElement('tbody');
+  for (const row of buildChartTableRows(block.content)) {
+    const tr = document.createElement('tr');
+    for (const value of [row.series, row.x, row.y]) {
+      const td = document.createElement('td');
+      td.textContent = value;
+      tr.append(td);
+    }
+    tbody.append(tr);
+  }
+  table.append(tbody);
+  details.append(summary, table);
+  root.append(details);
+
+  return wrapBlock(root, block, mode);
+}
+
+export function renderEquationBlock(
+  block: Extract<Block, { block_type: 'equation' }>,
+  mode: RenderMode
+): HTMLElement {
+  const root = document.createElement('figure');
+  root.className = 'block-equation';
+
+  const math = document.createElement('div');
+  math.className = 'block-equation__math';
+  const latex = block.content.latex ?? '';
+  if (!latex.trim()) {
+    math.textContent = '';
+  } else {
+    try {
+      katex.render(latex, math, { throwOnError: false, displayMode: true });
+    } catch {
+      math.textContent = latex;
+      math.classList.add('block-equation__math--error');
+    }
+  }
+  root.append(math);
+
+  if (block.content.caption?.trim()) {
+    const cap = document.createElement('figcaption');
+    cap.className = 'block-equation__caption';
+    cap.textContent = block.content.caption;
+    root.append(cap);
+  }
+
+  return wrapBlock(root, block, mode);
+}
+
+export function renderDiagramBlock(
+  block: Extract<Block, { block_type: 'diagram' }>,
+  mode: RenderMode
+): HTMLElement {
+  const root = document.createElement('figure');
+  root.className = 'block-diagram';
+
+  if (block.content.source === 'image') {
+    const img = document.createElement('img');
+    img.className = 'block-diagram__image';
+    img.src = block.content.image_url ?? '';
+    img.alt = block.content.image_alt ?? '';
+    root.append(img);
+  } else {
+    const wrap = document.createElement('div');
+    wrap.className = 'block-diagram__svg';
+    wrap.innerHTML = sanitizeSvgMarkup(block.content.svg_markup ?? '');
+    root.append(wrap);
+  }
+
+  if (block.content.caption?.trim()) {
+    const cap = document.createElement('figcaption');
+    cap.className = 'block-diagram__caption';
+    cap.textContent = block.content.caption;
+    root.append(cap);
+  }
+
+  return wrapBlock(root, block, mode);
+}
+
+export function renderMindMapBlock(
+  block: Extract<Block, { block_type: 'mind_map' }>,
+  mode: RenderMode
+): HTMLElement {
+  const root = document.createElement('figure');
+  root.className = 'block-mind-map';
+
+  if (block.content.title?.trim()) {
+    const cap = document.createElement('figcaption');
+    cap.className = 'block-mind-map__title';
+    cap.textContent = block.content.title;
+    root.append(cap);
+  }
+
+  const wrap = document.createElement('div');
+  wrap.className = 'block-mind-map__svg';
+  wrap.innerHTML = buildMindMapSvg(block.content);
+  root.append(wrap);
+
+  return wrapBlock(root, block, mode);
+}
+
+export function renderConceptMapBlock(
+  block: Extract<Block, { block_type: 'concept_map' }>,
+  mode: RenderMode
+): HTMLElement {
+  const root = document.createElement('figure');
+  root.className = 'block-concept-map';
+
+  if (block.content.title?.trim()) {
+    const cap = document.createElement('figcaption');
+    cap.className = 'block-concept-map__title';
+    cap.textContent = block.content.title;
+    root.append(cap);
+  }
+
+  const wrap = document.createElement('div');
+  wrap.className = 'block-concept-map__svg';
+  wrap.innerHTML = buildConceptMapSvg(block.content);
+  root.append(wrap);
+
+  return wrapBlock(root, block, mode);
+}
+
 export function renderBlock(block: Block, mode: RenderMode): HTMLElement {
   switch (block.block_type) {
     case 'rich_text':
@@ -1379,5 +1604,15 @@ export function renderBlock(block: Block, mode: RenderMode): HTMLElement {
       return renderColumnsBlock(block, mode);
     case 'tabs':
       return renderTabsBlock(block, mode);
+    case 'chart':
+      return renderChartBlock(block, mode);
+    case 'equation':
+      return renderEquationBlock(block, mode);
+    case 'diagram':
+      return renderDiagramBlock(block, mode);
+    case 'mind_map':
+      return renderMindMapBlock(block, mode);
+    case 'concept_map':
+      return renderConceptMapBlock(block, mode);
   }
 }
