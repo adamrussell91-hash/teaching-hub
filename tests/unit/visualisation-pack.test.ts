@@ -246,6 +246,23 @@ describe('sanitizeSvgMarkup', () => {
     expect(out).not.toMatch(/foreignObject/i);
     expect(out).not.toMatch(/https:\/\/evil/i);
   });
+
+  it('escapes entity-encoded markup in text so it cannot break out', () => {
+    const out = sanitizeSvgMarkup(
+      '<svg xmlns="http://www.w3.org/2000/svg"><text>&lt;/text&gt;&lt;script&gt;alert(1)&lt;/script&gt;</text></svg>'
+    );
+    expect(out).not.toMatch(/<script/i);
+    expect(out).toMatch(/&lt;\/text&gt;/i);
+    expect(out).toMatch(/&lt;script&gt;/i);
+  });
+
+  it('strips data URI hrefs', () => {
+    const out = sanitizeSvgMarkup(
+      '<svg><use href="data:image/svg+xml;base64,PHN2Zy8+"/></svg>'
+    );
+    expect(out).not.toMatch(/data:image\/svg\+xml/i);
+    expect(out).toMatch(/<use/i);
+  });
 });
 
 describe('graph-layout validators', () => {

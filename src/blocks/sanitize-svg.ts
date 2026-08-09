@@ -67,8 +67,11 @@ const ALLOWED_ATTRS = new Set([
 const STRIP_TAGS = new Set(['script', 'style']);
 
 function isSafeHref(value: string): boolean {
-  const v = value.trim();
-  return v.startsWith('#') || v.startsWith('data:image/svg+xml');
+  return value.trim().startsWith('#');
+}
+
+function escapeText(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function escapeAttr(value: string): string {
@@ -101,7 +104,7 @@ export function sanitizeSvgMarkup(markup: string): string {
 
   function clean(node: Node): string {
     if (node.nodeType === Node.TEXT_NODE) {
-      return node.textContent ?? '';
+      return escapeText(node.textContent ?? '');
     }
     if (node.nodeType !== Node.ELEMENT_NODE) return '';
 
