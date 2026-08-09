@@ -94,6 +94,26 @@ function publishBlockIssues(blocks: z.infer<typeof BlockSchema>[]): string | nul
         if (nested) return nested;
       }
     }
+    if (block.block_type === 'timeline') {
+      for (const event of block.content.events) {
+        if (event.label.trim().length === 0 || event.when.trim().length === 0) {
+          return 'Timeline events need a label and when value to publish';
+        }
+        if (event.image_url !== undefined && event.image_url.trim().length > 0) {
+          if (!isHttpUrl(event.image_url)) {
+            return 'Timeline event images need a valid http(s) URL to publish';
+          }
+          if ((event.image_alt ?? '').trim().length === 0) {
+            return 'Timeline event images need alt text to publish';
+          }
+        }
+        if (event.link_url !== undefined && event.link_url.trim().length > 0) {
+          if (!isHttpUrl(event.link_url)) {
+            return 'Timeline event links need a valid http(s) URL to publish';
+          }
+        }
+      }
+    }
   }
   return null;
 }

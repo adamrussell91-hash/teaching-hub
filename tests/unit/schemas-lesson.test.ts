@@ -502,3 +502,143 @@ describe('PublishableLessonSchema layout rules', () => {
     expect(result.success).toBe(false);
   });
 });
+
+describe('PublishableLessonSchema timeline rules', () => {
+  const baseLesson = {
+    id: 'lesson_1',
+    type: 'lesson' as const,
+    title: 'Lesson',
+    slug: 'lesson',
+    status: 'active' as const,
+    unit_id: 'unit_aotfw',
+    sequence: 1,
+    created_at: '2026-01-01T00:00:00.000Z',
+    updated_at: '2026-01-01T00:00:00.000Z',
+    schema_version: 1 as const
+  };
+
+  const okEvent = {
+    id: 'e1',
+    when: '1788',
+    label: 'First Fleet',
+    description: ''
+  };
+
+  it('accepts timeline with label, when, and empty description', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [
+        {
+          ...baseBlock,
+          block_type: 'timeline',
+          content: { events: [okEvent] }
+        }
+      ]
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects empty label on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [
+        {
+          ...baseBlock,
+          block_type: 'timeline',
+          content: { events: [{ ...okEvent, label: '   ' }] }
+        }
+      ]
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects empty when on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [
+        {
+          ...baseBlock,
+          block_type: 'timeline',
+          content: { events: [{ ...okEvent, when: '' }] }
+        }
+      ]
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects image_url without http(s)', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [
+        {
+          ...baseBlock,
+          block_type: 'timeline',
+          content: {
+            events: [{ ...okEvent, image_url: 'ftp://x', image_alt: 'Alt' }]
+          }
+        }
+      ]
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects image_url with blank image_alt', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [
+        {
+          ...baseBlock,
+          block_type: 'timeline',
+          content: {
+            events: [
+              {
+                ...okEvent,
+                image_url: 'https://example.com/a.png',
+                image_alt: '   '
+              }
+            ]
+          }
+        }
+      ]
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects link_url without http(s)', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [
+        {
+          ...baseBlock,
+          block_type: 'timeline',
+          content: { events: [{ ...okEvent, link_url: 'javascript:alert(1)' }] }
+        }
+      ]
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts image with alt and link with url', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [
+        {
+          ...baseBlock,
+          block_type: 'timeline',
+          content: {
+            events: [
+              {
+                ...okEvent,
+                image_url: 'https://example.com/a.png',
+                image_alt: 'Fleet',
+                link_url: 'https://example.com/more',
+                link_label: 'Read more'
+              }
+            ]
+          }
+        }
+      ]
+    });
+    expect(result.success).toBe(true);
+  });
+});
