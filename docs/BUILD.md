@@ -20,11 +20,10 @@ Block primitives: [`docs/specs/03_BLOCK_SYSTEM.md`](specs/03_BLOCK_SYSTEM.md)
 
 Suggested order for continuing builder / teaching-page work (adjust as needed):
 
-1. **Response space** — if still distinct from `question_set`
+1. **Map / Slides / Document viewer** — behaviours as needed (or jump to A4 / Drive)
 
 Larger product tracks (not “next block”, but still ahead):
 
-- Map / Slides / Document viewer behaviours (as needed)
 - A4 print render
 - Google Drive / media library uploads
 - Templates & reuse
@@ -61,6 +60,7 @@ Larger product tracks (not “next block”, but still ahead):
 | 2026-08-09 | **Collection** | Unit lessons + recent on class homepage — [`design`](superpowers/specs/2026-08-09-collection-block-design.md) / [`plan`](superpowers/plans/2026-08-09-collection-block.md) |
 | 2026-08-09 | **HTML app** | Sandboxed inline `html_app` + optional laned OpenAI/Anthropic proxy — [`design`](superpowers/specs/2026-08-09-html-app-design.md) / [`plan`](superpowers/plans/2026-08-09-html-app.md) |
 | 2026-08-09 | **Builder UX** | Columns: Custom 12-grid widths + Move-to / HTML5 DnD between columns — [`design`](superpowers/specs/2026-08-09-builder-ux-columns-design.md) / [`plan`](superpowers/plans/2026-08-09-builder-ux-columns.md) |
+| 2026-08-09 | **Response space** | `response_space` on short-answer `question_set` items (schema + builder); student UI unchanged; print deferred — [`design`](superpowers/specs/2026-08-09-response-space-design.md) / [`plan`](superpowers/plans/2026-08-09-response-space.md) |
 
 ### Block types live today (32)
 
@@ -71,7 +71,7 @@ Larger product tracks (not “next block”, but still ahead):
 | Spec phase | Status |
 |------------|--------|
 | 0–4 Foundation → basic builder → publish | Done (core) |
-| 5 Block system expansion | **In progress** — layout + timeline + tabs + gallery + activities + viz + collection + html_app + columns UX done; Response space next |
+| 5 Block system expansion | **In progress** — layout + timeline + tabs + gallery + activities + viz + collection + html_app + columns UX + response space done; Map/Slides/Document next (or A4) |
 | 6–8 Unit/class pages, scheduling, scope | Largely done for v1 |
 | 9 A4 print | Not started |
 | 10 Google Drive | Not started |
@@ -102,7 +102,7 @@ Unchecked = not built yet.
 - [x] Flashcards
 - [x] Cloze
 - [x] Self check
-- [ ] Response space (if still distinct from question_set)
+- [x] Response space (schema + builder on short-answer; print deferred)
 
 ### Visualisation
 - [x] Chart
@@ -123,4 +123,4 @@ Unchecked = not built yet.
 
 ## Latest note
 
-**2026-08-09** — Builder UX shipped (custom column widths + cross-column Move-to / DnD). Next builder slice: **Response space** (if still distinct from `question_set`).
+**2026-08-09** — Response space shipped (optional enum on short-answer questions + builder control). Student view unchanged; A4 lines later. Next: **Map / Slides / Document viewer** or jump to A4 print.
