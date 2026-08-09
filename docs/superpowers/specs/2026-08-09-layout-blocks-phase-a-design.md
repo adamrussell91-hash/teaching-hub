@@ -105,9 +105,11 @@ Let teachers place content side-by-side (½½, ⅓⅔, ⅔⅓, ⅓⅓⅓), group
 
 ## Publish
 
-- Containers themselves have no extra required fields (empty section title discouraged but not blocking in v1 — require non-empty section title on publish)  
+- Section title required (non-empty) on publish  
+- Columns / spacer have no extra required fields beyond schema  
 - Children validated with existing `publishBlockIssues` recursively  
 - Empty columns allowed  
+- Empty section body allowed (title still required)
 
 ## Testing
 
