@@ -21,7 +21,8 @@ export const BlockTypeSchema = z.enum([
   'question_set',
   'columns',
   'section',
-  'spacer'
+  'spacer',
+  'timeline'
 ]);
 
 export const ColumnPresetSchema = z.enum(['50-50', '33-67', '67-33', '33-33-33']);
@@ -285,6 +286,30 @@ export const QuestionSetBlockSchema = z.object({
   ...blockTimestamps
 });
 
+export const TimelineEventSchema = z.object({
+  id: z.string().min(1),
+  when: z.string(),
+  label: z.string(),
+  description: z.string(),
+  image_url: z.string().optional(),
+  image_alt: z.string().optional(),
+  link_url: z.string().optional(),
+  link_label: z.string().optional()
+});
+
+export const TimelineBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('timeline'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    events: z.array(TimelineEventSchema).min(1).max(12)
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
 const leafBlockSchemas = [
   RichTextBlockSchema,
   HeadingBlockSchema,
@@ -357,7 +382,8 @@ export const SectionChildBlockSchema = z.lazy(() =>
   z.discriminatedUnion('block_type', [
     ...leafBlockSchemas,
     SpacerBlockSchema,
-    ColumnsBlockSchema
+    ColumnsBlockSchema,
+    TimelineBlockSchema
   ])
 );
 
@@ -381,7 +407,8 @@ export const BlockSchema = z.lazy(() =>
     ...leafBlockSchemas,
     SpacerBlockSchema,
     ColumnsBlockSchema,
-    SectionBlockSchema
+    SectionBlockSchema,
+    TimelineBlockSchema
   ])
 );
 

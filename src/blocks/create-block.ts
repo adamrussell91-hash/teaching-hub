@@ -23,7 +23,8 @@ export const NEW_BLOCK_TYPES = [
   'question_set',
   'columns',
   'section',
-  'spacer'
+  'spacer',
+  'timeline'
 ] as const;
 
 export type NewBlockType = (typeof NEW_BLOCK_TYPES)[number];
@@ -47,7 +48,8 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   question_set: 'Question set',
   columns: 'Columns',
   section: 'Section',
-  spacer: 'Spacer'
+  spacer: 'Spacer',
+  timeline: 'Timeline'
 };
 
 export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[] }> = [
@@ -61,7 +63,7 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
   },
   {
     label: 'Teaching',
-    types: ['accordion', 'table', 'question_set']
+    types: ['accordion', 'table', 'question_set', 'timeline']
   },
   {
     label: 'Layout',
@@ -71,7 +73,7 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
 
 /** Block types allowed inside a columns cell */
 export const COLUMN_CHILD_TYPES = NEW_BLOCK_TYPES.filter(
-  (t) => t !== 'columns' && t !== 'section'
+  (t) => t !== 'columns' && t !== 'section' && t !== 'timeline'
 );
 
 /** Block types allowed inside a section */
@@ -226,6 +228,19 @@ export function createBlock(type: NewBlockType, id: string): Block {
         variant: 'medium',
         content: { size: 'medium' }
       };
+    case 'timeline':
+      return {
+        ...shared,
+        block_type: 'timeline',
+        variant: 'medium',
+        content: {
+          events: [
+            { id: `${id}_e1`, when: '', label: '', description: '' },
+            { id: `${id}_e2`, when: '', label: '', description: '' },
+            { id: `${id}_e3`, when: '', label: '', description: '' }
+          ]
+        }
+      };
   }
 }
 
@@ -256,6 +271,13 @@ export function cloneBlockWithNewIds(
       blocks: cloned.content.blocks.map((child) =>
         cloneBlockWithNewIds(child, nextId, now)
       ) as SectionBlock['content']['blocks']
+    };
+  } else if (cloned.block_type === 'timeline') {
+    cloned.content = {
+      events: cloned.content.events.map((event) => ({
+        ...event,
+        id: nextId()
+      }))
     };
   }
   return cloned;
