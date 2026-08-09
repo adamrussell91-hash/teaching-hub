@@ -329,6 +329,7 @@ describe('blockRegistry', () => {
       'definition',
       'divider',
       'embed',
+      'gallery',
       'heading',
       'html',
       'image',

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { BlockSchema } from '@/schemas/block';
+import { BlockSchema, type Block } from '@/schemas/block';
 import { createBlock, cloneBlockWithNewIds, COLUMN_CHILD_TYPES, TAB_CHILD_TYPES } from '@/blocks/create-block';
-import { createGalleryEditor } from '@/blocks/editors';
+import { createGalleryEditor, renderGalleryBlock } from '@/blocks/registry';
 
 const timestamps = {
   created_at: '2026-01-01T00:00:00.000Z',
@@ -218,5 +218,67 @@ describe('createGalleryEditor', () => {
     removes()[0]!.click();
     expect(latest.content.items).toHaveLength(2);
     expect([...removes()].every((b) => b.disabled)).toBe(true);
+  });
+});
+
+function sampleGallery(
+  layout: 'grid' | 'carousel' | 'comparison',
+  count = 2
+): Extract<Block, { block_type: 'gallery' }> {
+  return {
+    ...baseBlock,
+    id: 'g1',
+    block_type: 'gallery',
+    content: {
+      layout,
+      items: Array.from({ length: count }, (_, i) =>
+        item(`i${i + 1}`, {
+          url: `https://example.com/${i + 1}.png`,
+          alt_text: `Image ${i + 1}`,
+          caption: `Cap ${i + 1}`
+        })
+      )
+    }
+  };
+}
+
+describe('renderGalleryBlock', () => {
+  it('renders grid figures', () => {
+    const el = renderGalleryBlock(sampleGallery('grid', 3), 'student');
+    expect(el.querySelector('.block-gallery--grid')).toBeTruthy();
+    expect(el.querySelectorAll('.block-gallery__item').length).toBe(3);
+    expect(el.querySelectorAll('img').length).toBe(3);
+  });
+
+  it('carousel next advances the active slide', () => {
+    const el = renderGalleryBlock(sampleGallery('carousel', 3), 'student');
+    const status = el.querySelector('.block-gallery__status') as HTMLElement;
+    expect(status.textContent).toMatch(/1\s*\/\s*3/);
+    (el.querySelector('.block-gallery__next') as HTMLButtonElement).click();
+    expect(status.textContent).toMatch(/2\s*\/\s*3/);
+  });
+
+  it('comparison renders two items', () => {
+    const el = renderGalleryBlock(sampleGallery('comparison', 2), 'student');
+    expect(el.querySelector('.block-gallery--comparison')).toBeTruthy();
+    expect(el.querySelectorAll('.block-gallery__item').length).toBe(2);
+  });
+
+  it('opens and closes lightbox', () => {
+    const el = renderGalleryBlock(sampleGallery('grid', 2), 'student');
+    const imgBtn = el.querySelector('.block-gallery__open') as HTMLButtonElement;
+    imgBtn.click();
+    const dialog = document.body.querySelector('.block-gallery-lightbox') as HTMLElement;
+    expect(dialog).toBeTruthy();
+    expect(dialog.getAttribute('role')).toBe('dialog');
+    (dialog.querySelector('.block-gallery-lightbox__close') as HTMLButtonElement).click();
+    expect(document.body.querySelector('.block-gallery-lightbox')).toBeNull();
+  });
+
+  it('Escape closes lightbox', () => {
+    const el = renderGalleryBlock(sampleGallery('grid', 2), 'student');
+    (el.querySelector('.block-gallery__open') as HTMLButtonElement).click();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(document.body.querySelector('.block-gallery-lightbox')).toBeNull();
   });
 });

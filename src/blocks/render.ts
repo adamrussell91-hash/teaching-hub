@@ -556,6 +556,177 @@ export function renderTabsBlock(
   return wrapBlock(root, block, mode);
 }
 
+function openGalleryLightbox(src: string, alt: string): void {
+  const existing = document.body.querySelector('.block-gallery-lightbox');
+  existing?.remove();
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'block-gallery-lightbox';
+  backdrop.setAttribute('role', 'dialog');
+  backdrop.setAttribute('aria-modal', 'true');
+  backdrop.setAttribute('aria-label', alt || 'Enlarged image');
+
+  const img = document.createElement('img');
+  img.className = 'block-gallery-lightbox__image';
+  img.src = src;
+  img.alt = alt;
+
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'btn block-gallery-lightbox__close';
+  close.textContent = 'Close';
+  close.setAttribute('aria-label', 'Close enlarged image');
+
+  function dismiss(): void {
+    document.removeEventListener('keydown', onKey);
+    backdrop.remove();
+    close.blur();
+  }
+
+  function onKey(event: KeyboardEvent): void {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      dismiss();
+    }
+  }
+
+  close.addEventListener('click', dismiss);
+  backdrop.addEventListener('click', (event) => {
+    if (event.target === backdrop) dismiss();
+  });
+  document.addEventListener('keydown', onKey);
+
+  backdrop.append(img, close);
+  document.body.append(backdrop);
+  close.focus();
+}
+
+function galleryFigure(
+  entry: { url: string; alt_text: string; caption?: string },
+  interactive: boolean
+): HTMLElement {
+  const figure = document.createElement('figure');
+  figure.className = 'block-gallery__item';
+
+  if (isHttpUrl(entry.url)) {
+    if (interactive) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'block-gallery__open';
+      button.setAttribute('aria-label', `Enlarge: ${entry.alt_text || 'image'}`);
+      const img = document.createElement('img');
+      img.src = entry.url;
+      img.alt = entry.alt_text;
+      img.loading = 'lazy';
+      button.append(img);
+      button.addEventListener('click', () => openGalleryLightbox(entry.url, entry.alt_text));
+      figure.append(button);
+    } else {
+      const img = document.createElement('img');
+      img.src = entry.url;
+      img.alt = entry.alt_text;
+      img.loading = 'lazy';
+      figure.append(img);
+    }
+  } else {
+    const unavailable = document.createElement('p');
+    unavailable.className = 'block-gallery__unavailable';
+    unavailable.textContent = entry.alt_text.trim() || 'Image unavailable.';
+    figure.append(unavailable);
+  }
+
+  if (entry.caption) {
+    const cap = document.createElement('figcaption');
+    cap.className = 'block-gallery__caption';
+    cap.textContent = entry.caption;
+    figure.append(cap);
+  }
+  return figure;
+}
+
+export function renderGalleryBlock(
+  block: Extract<Block, { block_type: 'gallery' }>,
+  mode: RenderMode
+): HTMLElement {
+  const root = document.createElement('div');
+  root.className = `block-gallery block-gallery--${block.content.layout} block-gallery--${block.variant}`;
+
+  if (block.content.layout === 'carousel') {
+    let index = 0;
+    const viewport = document.createElement('div');
+    viewport.className = 'block-gallery__viewport';
+    viewport.tabIndex = 0;
+    viewport.setAttribute('aria-roledescription', 'carousel');
+
+    const status = document.createElement('p');
+    status.className = 'block-gallery__status';
+    status.setAttribute('aria-live', 'polite');
+
+    const dots = document.createElement('div');
+    dots.className = 'block-gallery__dots';
+    dots.setAttribute('role', 'tablist');
+    dots.setAttribute('aria-label', 'Gallery slides');
+
+    const prev = document.createElement('button');
+    prev.type = 'button';
+    prev.className = 'btn btn--ghost block-gallery__prev';
+    prev.textContent = 'Previous';
+
+    const next = document.createElement('button');
+    next.type = 'button';
+    next.className = 'btn btn--ghost block-gallery__next';
+    next.textContent = 'Next';
+
+    function show(i: number): void {
+      const len = block.content.items.length;
+      index = ((i % len) + len) % len;
+      viewport.replaceChildren(galleryFigure(block.content.items[index]!, true));
+      status.textContent = `${index + 1} / ${len}`;
+      [...dots.children].forEach((dot, di) => {
+        (dot as HTMLButtonElement).setAttribute('aria-selected', di === index ? 'true' : 'false');
+      });
+    }
+
+    block.content.items.forEach((_, di) => {
+      const dot = document.createElement('button');
+      dot.type = 'button';
+      dot.className = 'block-gallery__dot';
+      dot.setAttribute('role', 'tab');
+      dot.setAttribute('aria-label', `Slide ${di + 1}`);
+      dot.addEventListener('click', () => show(di));
+      dots.append(dot);
+    });
+
+    prev.addEventListener('click', () => show(index - 1));
+    next.addEventListener('click', () => show(index + 1));
+    viewport.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        show(index - 1);
+      } else if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        show(index + 1);
+      }
+    });
+
+    const controls = document.createElement('div');
+    controls.className = 'block-gallery__controls';
+    controls.append(prev, status, next);
+
+    root.append(viewport, controls, dots);
+    show(0);
+  } else {
+    const list = document.createElement('div');
+    list.className = 'block-gallery__list';
+    for (const entry of block.content.items) {
+      list.append(galleryFigure(entry, true));
+    }
+    root.append(list);
+  }
+
+  return wrapBlock(root, block, mode);
+}
+
 export function renderBlock(block: Block, mode: RenderMode): HTMLElement {
   switch (block.block_type) {
     case 'rich_text':
@@ -566,6 +737,8 @@ export function renderBlock(block: Block, mode: RenderMode): HTMLElement {
       return renderCalloutBlock(block, mode);
     case 'image':
       return renderImageBlock(block, mode);
+    case 'gallery':
+      return renderGalleryBlock(block, mode);
     case 'video':
       return renderVideoBlock(block, mode);
     case 'embed':

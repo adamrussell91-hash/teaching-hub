@@ -8,6 +8,7 @@ import {
   createDefinitionEditor,
   createDividerEditor,
   createEmbedEditor,
+  createGalleryEditor,
   createHeadingEditor,
   createHtmlEditor,
   createImageEditor,
@@ -35,6 +36,7 @@ import {
   renderDefinitionBlock,
   renderDividerBlock,
   renderEmbedBlock,
+  renderGalleryBlock,
   renderHeadingBlock,
   renderHtmlBlock,
   renderImageBlock,
@@ -77,6 +79,10 @@ export const blockRegistry: {
   image: {
     render: renderImageBlock,
     createEditor: createImageEditor
+  },
+  gallery: {
+    render: renderGalleryBlock,
+    createEditor: createGalleryEditor
   },
   video: {
     render: renderVideoBlock,
@@ -155,6 +161,7 @@ export {
   createDefinitionEditor,
   createDividerEditor,
   createEmbedEditor,
+  createGalleryEditor,
   createHeadingEditor,
   createHtmlEditor,
   createImageEditor,
@@ -176,6 +183,7 @@ export {
   renderDefinitionBlock,
   renderDividerBlock,
   renderEmbedBlock,
+  renderGalleryBlock,
   renderHeadingBlock,
   renderHtmlBlock,
   renderImageBlock,
