@@ -211,7 +211,9 @@ describe('cloneBlockWithNewIds', () => {
     if (section.block_type !== 'section') throw new Error('expected section');
     const columns = createBlock('columns', 'cols');
     if (columns.block_type !== 'columns') throw new Error('expected columns');
-    columns.content.columns[0]!.blocks.push(createBlock('rich_text', 'rt'));
+    columns.content.columns[0]!.blocks.push(
+      createBlock('rich_text', 'rt') as (typeof columns.content.columns)[number]['blocks'][number]
+    );
     section.content.blocks = [columns];
 
     const clone = cloneBlockWithNewIds(section, nextId);

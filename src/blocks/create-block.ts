@@ -1,6 +1,9 @@
 import { emptyColumnsForPreset } from '@/blocks/column-presets';
 import type { Block } from '@/schemas/block';
 
+type ColumnsBlock = Extract<Block, { block_type: 'columns' }>;
+type SectionBlock = Extract<Block, { block_type: 'section' }>;
+
 export const NEW_BLOCK_TYPES = [
   'rich_text',
   'heading',
@@ -206,7 +209,7 @@ export function createBlock(type: NewBlockType, id: string): Block {
         variant: 'medium',
         content: {
           preset: '50-50',
-          columns: emptyColumnsForPreset('50-50')
+          columns: emptyColumnsForPreset('50-50') as ColumnsBlock['content']['columns']
         }
       };
     case 'section':
@@ -242,13 +245,17 @@ export function cloneBlockWithNewIds(
       ...cloned.content,
       columns: cloned.content.columns.map((col) => ({
         ...col,
-        blocks: col.blocks.map((child) => cloneBlockWithNewIds(child, nextId, now))
+        blocks: col.blocks.map((child) =>
+          cloneBlockWithNewIds(child, nextId, now)
+        ) as typeof col.blocks
       }))
     };
   } else if (cloned.block_type === 'section') {
     cloned.content = {
       ...cloned.content,
-      blocks: cloned.content.blocks.map((child) => cloneBlockWithNewIds(child, nextId, now))
+      blocks: cloned.content.blocks.map((child) =>
+        cloneBlockWithNewIds(child, nextId, now)
+      ) as SectionBlock['content']['blocks']
     };
   }
   return cloned;
