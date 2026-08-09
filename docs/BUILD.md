@@ -20,12 +20,12 @@ Block primitives: [`docs/specs/03_BLOCK_SYSTEM.md`](specs/03_BLOCK_SYSTEM.md)
 
 Suggested order for continuing builder / teaching-page work (adjust as needed):
 
-1. **A4 print pipeline** — preview + printable worksheet output (or jump to Drive / templates)
+1. **A4 print pipeline** — preview + printable worksheet output (or jump to Drive)
 
 Larger product tracks (not “next block”, but still ahead):
 
 - Google Drive / media library uploads
-- Templates & reuse
+- Lesson / unit templates & linked reuse (compositions v1 shipped)
 - Search / nav acceleration
 - AI agent integration
 - Versioning, archive, recovery  
@@ -61,6 +61,7 @@ Larger product tracks (not “next block”, but still ahead):
 | 2026-08-09 | **Builder UX** | Columns: Custom 12-grid widths + Move-to / HTML5 DnD between columns — [`design`](superpowers/specs/2026-08-09-builder-ux-columns-design.md) / [`plan`](superpowers/plans/2026-08-09-builder-ux-columns.md) |
 | 2026-08-09 | **Response space** | `response_space` on short-answer `question_set` items (schema + builder); student UI unchanged; print deferred — [`design`](superpowers/specs/2026-08-09-response-space-design.md) / [`plan`](superpowers/plans/2026-08-09-response-space.md) |
 | 2026-08-09 | **Embed viewers** | Map / Slides / Document / PDF via provider-aware `embed` (menu presets + URL detect; iframe vs card) — [`design`](superpowers/specs/2026-08-09-embed-viewers-design.md) / [`plan`](superpowers/plans/2026-08-09-embed-viewers.md) |
+| 2026-08-09 | **Templates & reuse** | Composition save/insert (section → independent copy); no linked templates yet — [`design`](superpowers/specs/2026-08-09-templates-reuse-design.md) / [`plan`](superpowers/plans/2026-08-09-templates-reuse.md) |
 
 ### Block types live today (32)
 
@@ -75,7 +76,7 @@ Larger product tracks (not “next block”, but still ahead):
 | 6–8 Unit/class pages, scheduling, scope | Largely done for v1 |
 | 9 A4 print | Not started |
 | 10 Google Drive | Not started |
-| 11 Templates / reuse | Not started |
+| 11 Templates / reuse | **Compositions v1** — save/insert section; lesson/unit/linked templates later |
 | 12 Search | Not started |
 | 13 AI | Not started |
 | 14–15 Versioning / hardening | Not started |
@@ -114,7 +115,7 @@ Unchecked = not built yet.
 ### Platform (later)
 - [ ] A4 print pipeline
 - [ ] Media library + uploads / Drive
-- [ ] Templates & compositions
+- [x] Templates & compositions (compositions v1: save section + insert independent copy; lesson/unit/linked later)
 - [ ] Search
 - [ ] AI agent
 - [ ] Versioning / archive / recovery
@@ -123,4 +124,4 @@ Unchecked = not built yet.
 
 ## Latest note
 
-**2026-08-09** — Embed viewers shipped (Map / Slides / Document / PDF presets + URL detection; Slides/Maps iframe, Docs/PDF card). Next: **A4 print pipeline**.
+**2026-08-09** — Composition templates shipped (save top-level section → insert independent copy). Next: **A4 print pipeline**.

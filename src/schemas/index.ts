@@ -25,6 +25,7 @@ export {
   RichTextBlockSchema,
   HeadingBlockSchema,
   CalloutBlockSchema,
+  SectionBlockSchema,
   BlockSchema,
   type Block
 } from './block';
@@ -60,3 +61,9 @@ export {
   MediaSchema,
   type Media
 } from './media';
+export {
+  CompositionTemplateSchema,
+  CompositionSummarySchema,
+  type CompositionTemplate,
+  type CompositionSummary
+} from './composition';

@@ -37,3 +37,7 @@ export function scheduleAnchorKey(): string {
 export function mediaKey(id: string): string {
   return `media/${id}`;
 }
+
+export function compositionKey(id: string): string {
+  return `templates/compositions/${id}`;
+}

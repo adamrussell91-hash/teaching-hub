@@ -12,7 +12,8 @@ import {
   classKey,
   scheduledLessonKey,
   scheduleAnchorKey,
-  mediaKey
+  mediaKey,
+  compositionKey
 } from '@/storage/keys';
 import { MockStore } from '../../scripts/mock-store';
 
@@ -58,6 +59,10 @@ describe('storage key helpers', () => {
 
   it('builds media keys', () => {
     expect(mediaKey('media_ono_extract')).toBe('media/media_ono_extract');
+  });
+
+  it('builds composition keys', () => {
+    expect(compositionKey('composition_1')).toBe('templates/compositions/composition_1');
   });
 });
 

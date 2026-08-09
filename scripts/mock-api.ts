@@ -12,16 +12,19 @@ import {
   scheduledLessonKey,
   scheduleAnchorKey,
   scopeSequenceKey,
-  mediaKey
+  mediaKey,
+  compositionKey
 } from '../src/storage/keys';
 import {
   ClassHomepageSchema,
   ClassSchema,
+  CompositionTemplateSchema,
   LessonSchema,
   PublishableLessonSchema,
   PublishedLessonSchema,
   ScheduledLessonSchema,
   ScopeSequenceSchema,
+  SectionBlockSchema,
   SubjectSchema,
   MediaSchema,
   TimelineItemSchema,
@@ -29,6 +32,8 @@ import {
   toPublishedLesson,
   type Class,
   type ClassHomepage,
+  type CompositionSummary,
+  type CompositionTemplate,
   type Lesson,
   type ScheduledLesson,
   type ScopeSequence,
@@ -1301,6 +1306,96 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     return okResponse(201, validated.data);
   }
 
+  function listCompositionSummaries(): CompositionSummary[] {
+    return store
+      .listKeys('templates/compositions/')
+      .map((key) => store.getJSON<CompositionTemplate>(key))
+      .filter((entry): entry is CompositionTemplate => {
+        if (!entry) return false;
+        const parsed = CompositionTemplateSchema.safeParse(entry);
+        return parsed.success && parsed.data.status === 'active';
+      })
+      .map((entry) => ({
+        id: entry.id,
+        title: entry.title,
+        updated_at: entry.updated_at
+      }))
+      .sort((a, b) => a.title.localeCompare(b.title));
+  }
+
+  function handleGetCompositions(cookie: string | null | undefined): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+    return okResponse(200, { compositions: listCompositionSummaries() });
+  }
+
+  function handlePostComposition(cookie: string | null | undefined, body: unknown): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+
+    if (typeof body !== 'object' || body === null) {
+      return errorResponse(400, 'validation_error', 'Request body must be a JSON object');
+    }
+
+    const record = body as Record<string, unknown>;
+    const title = typeof record.title === 'string' ? record.title.trim() : '';
+    if (!title) {
+      return errorResponse(400, 'validation_error', 'title is required');
+    }
+
+    const rootParsed = SectionBlockSchema.safeParse(record.root);
+    if (!rootParsed.success) {
+      return errorResponse(
+        400,
+        'validation_error',
+        'root must be a section block',
+        rootParsed.error.flatten()
+      );
+    }
+
+    const timestamp = nowIso();
+    const id = newId('composition');
+    const candidate: CompositionTemplate = {
+      id,
+      type: 'composition_template',
+      title,
+      slug: slugify(title),
+      status: 'active',
+      root: structuredClone(rootParsed.data),
+      created_at: timestamp,
+      updated_at: timestamp,
+      schema_version: 1
+    };
+
+    const validated = CompositionTemplateSchema.safeParse(candidate);
+    if (!validated.success) {
+      return errorResponse(
+        400,
+        'validation_error',
+        'Composition data is invalid',
+        validated.error.flatten()
+      );
+    }
+
+    store.setJSON(compositionKey(id), validated.data);
+    return okResponse(201, validated.data);
+  }
+
+  function handleGetComposition(cookie: string | null | undefined, id: string): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+
+    const raw = store.getJSON<CompositionTemplate>(compositionKey(id));
+    if (!raw) return notFoundResponse('Composition not found');
+
+    const parsed = CompositionTemplateSchema.safeParse(raw);
+    if (!parsed.success) {
+      return errorResponse(500, 'invalid_data', 'Stored composition is invalid');
+    }
+
+    return okResponse(200, parsed.data);
+  }
+
   const LESSON_ID_RE = /^\/api\/lessons\/([^/]+)$/;
   const LESSON_PUBLISH_RE = /^\/api\/lessons\/([^/]+)\/publish$/;
   const PUBLISHED_LESSON_RE = /^\/api\/published\/lessons\/([^/]+)$/;
@@ -1310,6 +1405,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
   const SCOPE_SEQUENCE_PATCH_RE = /^\/api\/scope-sequences\/([^/]+)$/;
   const SCHEDULE_UNIT_RE = /^\/api\/classes\/([^/]+)\/schedule-unit$/;
   const SCHEDULED_LESSON_RE = /^\/api\/scheduled-lessons\/([^/]+)$/;
+  const COMPOSITION_ID_RE = /^\/api\/compositions\/([^/]+)$/;
 
   async function handle(
     method: string,
@@ -1346,6 +1442,13 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     if (method === 'POST' && path === '/api/lessons') return handlePostLesson(cookie, body);
     if (method === 'POST' && path === '/api/scope-sequences') {
       return handlePostScopeSequence(cookie, body);
+    }
+    if (method === 'GET' && path === '/api/compositions') return handleGetCompositions(cookie);
+    if (method === 'POST' && path === '/api/compositions') return handlePostComposition(cookie, body);
+
+    const compositionMatch = COMPOSITION_ID_RE.exec(path);
+    if (compositionMatch && method === 'GET') {
+      return handleGetComposition(cookie, compositionMatch[1]!);
     }
 
     const publishMatch = LESSON_PUBLISH_RE.exec(path);

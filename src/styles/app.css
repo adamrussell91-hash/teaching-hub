@@ -330,6 +330,7 @@ a:hover {
 
 .lesson-editor__add-block {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.6rem;
   padding: 0.9rem 1rem;
@@ -345,7 +346,8 @@ a:hover {
   color: var(--orca);
 }
 
-.lesson-editor__add-block-select {
+.lesson-editor__add-block-select,
+.lesson-editor__composition-select {
   padding: 0.4rem 0.6rem;
   font: inherit;
   font-family: var(--font-ui);
@@ -353,6 +355,13 @@ a:hover {
   background: rgba(255, 255, 255, 0.88);
   border: 1px solid var(--line);
   border-radius: calc(var(--radius-md) * 0.5);
+}
+
+.lesson-editor__composition-status {
+  margin: 0.5rem 0 0;
+  font-family: var(--font-ui);
+  font-size: 0.84rem;
+  color: var(--orca);
 }
 
 .lesson-editor__publish-panel {

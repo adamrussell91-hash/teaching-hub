@@ -1,4 +1,4 @@
-import { apiGet, ApiClientError } from '@/api/client';
+import { apiGet, apiPost, ApiClientError } from '@/api/client';
 import {
   LESSON_BLOCK_GROUPS,
   INSERT_MENU_LABEL,
@@ -7,7 +7,9 @@ import {
   expandGroupTypesForMenu,
   type InsertMenuValue
 } from '@/blocks/create-block';
+import { insertCompositionRoot } from '@/blocks/composition-insert';
 import { createBlockEditor } from '@/blocks/registry';
+import type { CompositionSummary, CompositionTemplate } from '@/schemas/composition';
 import type { Lesson } from '@/schemas/lesson';
 import { renderContextBar, type TeacherShellRefs } from '@/teacher/shell';
 import { mountSavePublishControls, SaveController, type SavePublishHandle } from '@/teacher/save-publish';
@@ -128,13 +130,82 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     addButton.className = 'btn btn--secondary lesson-editor__add-block-button';
     addButton.textContent = 'Add block';
 
-    addBlockBar.append(addLabel, addSelect, addButton);
+    const compositionSelectId = `insert-composition-${lesson.id}`;
+    const compositionLabel = document.createElement('label');
+    compositionLabel.className = 'lesson-editor__add-block-label';
+    compositionLabel.htmlFor = compositionSelectId;
+    compositionLabel.textContent = 'Composition';
 
-    refs.canvas.append(publishPanel, titleField, blocksContainer, addBlockBar);
+    const compositionSelect = document.createElement('select');
+    compositionSelect.id = compositionSelectId;
+    compositionSelect.className = 'lesson-editor__composition-select';
+
+    const compositionButton = document.createElement('button');
+    compositionButton.type = 'button';
+    compositionButton.className = 'btn btn--secondary lesson-editor__insert-composition-button';
+    compositionButton.textContent = 'Insert composition';
+
+    const compositionStatus = document.createElement('p');
+    compositionStatus.className = 'lesson-editor__composition-status';
+    compositionStatus.hidden = true;
+
+    addBlockBar.append(
+      addLabel,
+      addSelect,
+      addButton,
+      compositionLabel,
+      compositionSelect,
+      compositionButton
+    );
+
+    refs.canvas.append(publishPanel, titleField, blocksContainer, addBlockBar, compositionStatus);
 
     function markDirty(): void {
       saveController?.notifyChange();
     }
+
+    function setCompositionStatus(text: string | null): void {
+      if (!text) {
+        compositionStatus.hidden = true;
+        compositionStatus.textContent = '';
+        return;
+      }
+      compositionStatus.hidden = false;
+      compositionStatus.textContent = text;
+    }
+
+    function fillCompositionSelect(compositions: CompositionSummary[]): void {
+      compositionSelect.replaceChildren();
+      if (compositions.length === 0) {
+        const empty = document.createElement('option');
+        empty.value = '';
+        empty.textContent = 'No compositions yet';
+        compositionSelect.append(empty);
+        compositionSelect.disabled = true;
+        compositionButton.disabled = true;
+        return;
+      }
+      compositionSelect.disabled = false;
+      compositionButton.disabled = false;
+      for (const row of compositions) {
+        const opt = document.createElement('option');
+        opt.value = row.id;
+        opt.textContent = row.title;
+        compositionSelect.append(opt);
+      }
+    }
+
+    async function refreshCompositions(): Promise<void> {
+      try {
+        const data = await apiGet<{ compositions: CompositionSummary[] }>('/api/compositions');
+        fillCompositionSelect(data.compositions);
+      } catch {
+        fillCompositionSelect([]);
+        setCompositionStatus('Unable to load compositions.');
+      }
+    }
+
+    void refreshCompositions();
 
     function renderBlocksList(): void {
       blocksContainer.replaceChildren();
@@ -186,6 +257,21 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
 
         controls.append(upButton, downButton, duplicateButton, deleteButton);
 
+        if (block.block_type === 'section') {
+          const saveCompositionButton = document.createElement('button');
+          saveCompositionButton.type = 'button';
+          saveCompositionButton.className = 'btn btn--ghost lesson-editor__save-composition';
+          saveCompositionButton.textContent = 'Save as composition';
+          saveCompositionButton.setAttribute(
+            'aria-label',
+            `Save block ${index + 1} as composition`
+          );
+          saveCompositionButton.addEventListener('click', () => {
+            void saveBlockAsComposition(index);
+          });
+          controls.append(saveCompositionButton);
+        }
+
         const editor = createBlockEditor(
           block,
           (updated) => {
@@ -229,6 +315,47 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       renderBlocksList();
     }
 
+    async function saveBlockAsComposition(index: number): Promise<void> {
+      const block = lesson.blocks[index];
+      if (!block || block.block_type !== 'section') return;
+      const defaultTitle = block.content.title.trim() || 'Composition';
+      const title = window.prompt('Composition name', defaultTitle);
+      if (title === null) return;
+      const trimmed = title.trim();
+      if (!trimmed) {
+        setCompositionStatus('Composition name is required.');
+        return;
+      }
+      try {
+        await apiPost<CompositionTemplate>('/api/compositions', {
+          title: trimmed,
+          root: block
+        });
+        setCompositionStatus(`Saved “${trimmed}” as a composition.`);
+        await refreshCompositions();
+      } catch {
+        setCompositionStatus('Unable to save composition.');
+      }
+    }
+
+    async function insertSelectedComposition(): Promise<void> {
+      const id = compositionSelect.value;
+      if (!id) return;
+      try {
+        const full = await apiGet<CompositionTemplate>(`/api/compositions/${id}`);
+        const clone = insertCompositionRoot(full.root, () => {
+          blockCounter += 1;
+          return `block_${lesson.id}_${blockCounter}`;
+        });
+        lesson.blocks.push(clone);
+        markDirty();
+        renderBlocksList();
+        setCompositionStatus(`Inserted “${full.title}”.`);
+      } catch {
+        setCompositionStatus('Unable to insert composition.');
+      }
+    }
+
     function addBlock(type: InsertMenuValue): void {
       blockCounter += 1;
       const id = `block_${lesson.id}_${blockCounter}`;
@@ -244,6 +371,10 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
 
     addButton.addEventListener('click', () => {
       addBlock(addSelect.value as InsertMenuValue);
+    });
+
+    compositionButton.addEventListener('click', () => {
+      void insertSelectedComposition();
     });
 
     renderBlocksList();
