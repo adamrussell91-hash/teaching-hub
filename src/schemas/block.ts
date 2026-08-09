@@ -7,6 +7,7 @@ export const BlockTypeSchema = z.enum([
   'heading',
   'callout',
   'image',
+  'gallery',
   'video',
   'embed',
   'html',
@@ -103,6 +104,39 @@ export const ImageBlockSchema = z.object({
     alt_text: z.string(),
     caption: z.string().optional()
   }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
+export const GalleryLayoutSchema = z.enum(['grid', 'carousel', 'comparison']);
+
+export const GalleryItemSchema = z.object({
+  id: z.string().min(1),
+  url: z.string(),
+  alt_text: z.string(),
+  caption: z.string().optional()
+});
+
+export const GalleryBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('gallery'),
+  variant: MediaSizeVariantSchema.default('large'),
+  visibility: VisibilitySchema,
+  content: z
+    .object({
+      layout: GalleryLayoutSchema,
+      items: z.array(GalleryItemSchema).min(2).max(12)
+    })
+    .superRefine((content, ctx) => {
+      if (content.layout === 'comparison' && content.items.length !== 2) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Comparison galleries need exactly 2 items',
+          path: ['items']
+        });
+      }
+    }),
   ...blockLayout,
   ...blockTimestamps
 });
@@ -291,6 +325,7 @@ const leafBlockSchemas = [
   HeadingBlockSchema,
   CalloutBlockSchema,
   ImageBlockSchema,
+  GalleryBlockSchema,
   VideoBlockSchema,
   EmbedBlockSchema,
   HtmlBlockSchema,

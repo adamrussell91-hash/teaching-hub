@@ -15,6 +15,7 @@ export const NEW_BLOCK_TYPES = [
   'code',
   'html',
   'image',
+  'gallery',
   'video',
   'embed',
   'audio',
@@ -40,6 +41,7 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   code: 'Code',
   html: 'HTML',
   image: 'Image',
+  gallery: 'Gallery',
   video: 'Video',
   embed: 'Embed',
   audio: 'Audio',
@@ -60,7 +62,7 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
   },
   {
     label: 'Media',
-    types: ['image', 'video', 'embed', 'audio', 'attachment']
+    types: ['image', 'gallery', 'video', 'embed', 'audio', 'attachment']
   },
   {
     label: 'Teaching',
@@ -119,6 +121,20 @@ export function createBlock(type: NewBlockType, id: string): Block {
         block_type: 'image',
         variant: 'large',
         content: { url: '', alt_text: '' }
+      };
+    case 'gallery':
+      return {
+        ...shared,
+        block_type: 'gallery',
+        variant: 'large',
+        content: {
+          layout: 'grid',
+          items: [
+            { id: `${id}_i1`, url: '', alt_text: '' },
+            { id: `${id}_i2`, url: '', alt_text: '' },
+            { id: `${id}_i3`, url: '', alt_text: '' }
+          ]
+        }
       };
     case 'video':
       return {
@@ -285,6 +301,14 @@ export function cloneBlockWithNewIds(
         blocks: panel.blocks.map((child) =>
           cloneBlockWithNewIds(child, nextId, now)
         ) as TabsBlock['content']['tabs'][number]['blocks']
+      }))
+    };
+  } else if (cloned.block_type === 'gallery') {
+    cloned.content = {
+      ...cloned.content,
+      items: cloned.content.items.map((entry) => ({
+        ...entry,
+        id: nextId()
       }))
     };
   }
