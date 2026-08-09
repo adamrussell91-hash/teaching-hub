@@ -32,7 +32,8 @@ export const BlockTypeSchema = z.enum([
   'section',
   'spacer',
   'timeline',
-  'tabs'
+  'tabs',
+  'collection'
 ]);
 
 export const ColumnPresetSchema = z.enum(['50-50', '33-67', '67-33', '33-33-33']);
@@ -520,6 +521,22 @@ export const TimelineBlockSchema = z.object({
   ...blockTimestamps
 });
 
+export const CollectionSourceSchema = z.enum(['unit_lessons', 'recent_lessons']);
+
+export const CollectionBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('collection'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    source: CollectionSourceSchema,
+    title: z.string().optional()
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
 const leafBlockSchemas = [
   RichTextBlockSchema,
   HeadingBlockSchema,
@@ -661,7 +678,8 @@ export const BlockSchema = z.lazy(() =>
     ColumnsBlockSchema,
     SectionBlockSchema,
     TimelineBlockSchema,
-    TabsBlockSchema
+    TabsBlockSchema,
+    CollectionBlockSchema
   ])
 );
 

@@ -43,7 +43,11 @@ function sampleClass(overrides: Partial<PublishedClass> = {}): PublishedClass {
       resources: [],
       custom: []
     },
-    current_unit: { id: 'unit_aotfw', title: 'Artist of the Floating World' },
+    current_unit: {
+      id: 'unit_aotfw',
+      title: 'Artist of the Floating World',
+      lessons: []
+    },
     current_lesson: {
       id: 'scheduled_aotfw_008',
       title: 'Memory, Identity and Ono',
@@ -151,6 +155,59 @@ describe('mountStudentClassView', () => {
         `/s/classes/${CLASS_ID}/lessons/lesson_aotfw_008`
       );
     });
+  });
+
+  it('renders resolved collection links on homepage regions', async () => {
+    const collection = {
+      id: 'block_coll_001',
+      type: 'block' as const,
+      block_type: 'collection' as const,
+      variant: 'medium',
+      visibility: 'student_teacher' as const,
+      content: { source: 'unit_lessons' as const, title: 'Unit lessons' },
+      layout: {},
+      print: {},
+      settings: {},
+      created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
+      schema_version: 1 as const
+    };
+
+    vi.mocked(apiGet).mockResolvedValue(
+      sampleClass({
+        homepage: {
+          announcements: [],
+          resources: [],
+          custom: [collection]
+        },
+        current_unit: {
+          id: 'unit_aotfw',
+          title: 'Artist of the Floating World',
+          lessons: [
+            { id: 'lesson_aotfw_001', title: 'Intro' },
+            { id: 'lesson_aotfw_008', title: 'Memory, Identity and Ono' }
+          ]
+        }
+      })
+    );
+
+    const root = document.createElement('div');
+    document.body.append(root);
+    mountStudentClassView({ root, classId: CLASS_ID });
+
+    await vi.waitFor(() => {
+      expect(root.querySelector('[data-homepage-region="custom"]')).toBeTruthy();
+      expect(root.textContent).toContain('Unit lessons');
+      expect(root.textContent).toContain('Intro');
+      expect(root.textContent).toContain('Memory, Identity and Ono');
+    });
+
+    const links = [
+      ...root.querySelectorAll('[data-homepage-region="custom"] a.block-collection__link')
+    ];
+    expect(links).toHaveLength(2);
+    expect(links[0]?.getAttribute('href')).toBe('/s/lessons/lesson_aotfw_001');
+    expect(links[1]?.getAttribute('href')).toBe('/s/lessons/lesson_aotfw_008');
   });
 
   it('shows class not found on 404', async () => {

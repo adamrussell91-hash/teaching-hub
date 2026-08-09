@@ -1,6 +1,6 @@
 import { apiGet, ApiClientError } from '@/api/client';
 import {
-  BLOCK_GROUPS,
+  LESSON_BLOCK_GROUPS,
   NEW_BLOCK_LABEL,
   cloneBlockWithNewIds,
   createBlock,
@@ -110,7 +110,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     const addSelect = document.createElement('select');
     addSelect.id = addSelectId;
     addSelect.className = 'lesson-editor__add-block-select';
-    for (const group of BLOCK_GROUPS) {
+    for (const group of LESSON_BLOCK_GROUPS) {
       const optgroup = document.createElement('optgroup');
       optgroup.label = group.label;
       for (const type of group.types) {

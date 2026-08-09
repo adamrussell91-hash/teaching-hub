@@ -3345,3 +3345,23 @@ input.scope-timeline__note-title:focus-visible {
   border-radius: calc(var(--radius-md) * 0.55);
   background: rgba(255, 255, 255, 0.72);
 }
+
+.block-collection {
+  margin: 0 0 var(--space-4, 1rem);
+}
+
+.block-collection__title {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.block-collection__list {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.block-collection__empty {
+  margin: 0;
+  color: var(--text-muted, #666);
+  font-size: 0.875rem;
+}

@@ -31,7 +31,7 @@ const units: Unit[] = [
     slug: 'aotfw',
     year_id: 'year_12',
     subject_id: 'subject_y12_engadv',
-    lesson_ids: ['lesson_a', 'lesson_b'],
+    lesson_ids: ['lesson_a', 'lesson_c', 'lesson_b'],
     status: 'active',
     created_at: ISO,
     updated_at: ISO,
@@ -127,7 +127,8 @@ describe('buildPublishedClass', () => {
 
     expect(dto.current_unit).toEqual({
       id: 'unit_aotfw',
-      title: 'Artist of the Floating World'
+      title: 'Artist of the Floating World',
+      lessons: []
     });
     expect(dto.current_lesson).toEqual({
       id: 'scheduled_b',
@@ -137,5 +138,20 @@ describe('buildPublishedClass', () => {
     expect(dto.active_units).toEqual([
       { id: 'unit_aotfw', title: 'Artist of the Floating World' }
     ]);
+  });
+
+  it('includes ordered published lessons on current_unit', () => {
+    const dto = buildPublishedClass({
+      cls: baseClass,
+      units,
+      lessons: [
+        { id: 'lesson_a', title: 'Lesson A' },
+        { id: 'lesson_b', title: 'Lesson B' },
+        { id: 'lesson_c', title: 'Lesson C' }
+      ],
+      scheduled,
+      publishedLessonIds: new Set(['lesson_a', 'lesson_b'])
+    });
+    expect(dto.current_unit?.lessons.map((l) => l.id)).toEqual(['lesson_a', 'lesson_b']);
   });
 });

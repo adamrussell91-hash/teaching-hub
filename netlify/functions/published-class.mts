@@ -80,6 +80,14 @@ export default async function handler(request: Request, context: FunctionContext
   for (const row of scheduled) {
     lessonIds.add(row.lesson_id);
   }
+  if (cls.current_unit_id) {
+    const currentUnit = units.find((unit) => unit.id === cls.current_unit_id);
+    if (currentUnit) {
+      for (const lessonId of currentUnit.lesson_ids) {
+        lessonIds.add(lessonId);
+      }
+    }
+  }
 
   const lessons: Array<{ id: string; title: string }> = [];
   for (const lessonId of lessonIds) {

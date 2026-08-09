@@ -35,7 +35,8 @@ export const NEW_BLOCK_TYPES = [
   'section',
   'spacer',
   'timeline',
-  'tabs'
+  'tabs',
+  'collection'
 ] as const;
 
 export type NewBlockType = (typeof NEW_BLOCK_TYPES)[number];
@@ -70,7 +71,8 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   section: 'Section',
   spacer: 'Spacer',
   timeline: 'Timeline',
-  tabs: 'Tabs'
+  tabs: 'Tabs',
+  collection: 'Collection'
 };
 
 export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[] }> = [
@@ -96,23 +98,39 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
   },
   {
     label: 'Layout',
-    types: ['section', 'columns', 'spacer', 'tabs']
+    types: ['section', 'columns', 'spacer', 'tabs', 'collection']
   }
 ];
 
 export const HOMEPAGE_BLOCK_GROUPS = BLOCK_GROUPS.filter((group) => group.label !== 'Learning');
 
+export const LESSON_BLOCK_GROUPS = BLOCK_GROUPS.map((group) =>
+  group.label === 'Layout'
+    ? {
+        ...group,
+        types: group.types.filter((t) => t !== 'collection')
+      }
+    : group
+);
+
 /** Block types allowed inside a columns cell */
 export const COLUMN_CHILD_TYPES = NEW_BLOCK_TYPES.filter(
-  (t) => t !== 'columns' && t !== 'section' && t !== 'timeline' && t !== 'tabs'
+  (t) =>
+    t !== 'columns' &&
+    t !== 'section' &&
+    t !== 'timeline' &&
+    t !== 'tabs' &&
+    t !== 'collection'
 );
 
 /** Block types allowed inside a section */
-export const SECTION_CHILD_TYPES = NEW_BLOCK_TYPES.filter((t) => t !== 'section');
+export const SECTION_CHILD_TYPES = NEW_BLOCK_TYPES.filter(
+  (t) => t !== 'section' && t !== 'collection'
+);
 
 /** Block types allowed inside a tabs panel */
 export const TAB_CHILD_TYPES = NEW_BLOCK_TYPES.filter(
-  (t) => t !== 'tabs' && t !== 'section'
+  (t) => t !== 'tabs' && t !== 'section' && t !== 'collection'
 );
 
 function nowIso(): string {
@@ -399,6 +417,13 @@ export function createBlock(type: NewBlockType, id: string): Block {
             { id: `${id}_t3`, label: '', blocks: [] }
           ]
         }
+      };
+    case 'collection':
+      return {
+        ...shared,
+        block_type: 'collection',
+        variant: 'medium',
+        content: { source: 'unit_lessons', title: '' }
       };
   }
 }

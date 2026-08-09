@@ -6,6 +6,7 @@ import {
   type ConceptMapContent,
   type MindMapContent
 } from '@/blocks/graph-layout';
+import type { CollectionLink } from '@/blocks/collection-resolve';
 import { sanitizeRichTextHtml } from '@/blocks/sanitize';
 import { sanitizeSvgMarkup } from '@/blocks/sanitize-svg';
 import { isHttpUrl } from '@/blocks/url-safety';
@@ -539,6 +540,47 @@ export function renderTimelineBlock(
   }
 
   return wrapBlock(list, block, mode);
+}
+
+export function renderCollectionBlock(
+  block: Extract<Block, { block_type: 'collection' }>,
+  _mode: RenderMode,
+  resolved: { links: CollectionLink[]; emptyMessage?: string } = { links: [] }
+): HTMLElement {
+  const root = document.createElement('div');
+  root.className = 'block block-collection';
+  root.dataset.blockId = block.id;
+  root.dataset.collectionSource = block.content.source;
+
+  const titleText = block.content.title?.trim();
+  if (titleText) {
+    const title = document.createElement('h3');
+    title.className = 'block-collection__title';
+    title.textContent = titleText;
+    root.append(title);
+  }
+
+  if (resolved.links.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'block-collection__empty';
+    empty.textContent = resolved.emptyMessage ?? 'No items.';
+    root.append(empty);
+    return root;
+  }
+
+  const list = document.createElement('ul');
+  list.className = 'block-collection__list';
+  for (const link of resolved.links) {
+    const item = document.createElement('li');
+    const anchor = document.createElement('a');
+    anchor.className = 'block-collection__link student-class__link';
+    anchor.href = link.href;
+    anchor.textContent = link.title;
+    item.append(anchor);
+    list.append(item);
+  }
+  root.append(list);
+  return root;
 }
 
 export function renderTabsBlock(
@@ -1605,6 +1647,8 @@ export function renderBlock(block: Block, mode: RenderMode): HTMLElement {
       return renderSelfCheckBlock(block, mode);
     case 'timeline':
       return renderTimelineBlock(block, mode);
+    case 'collection':
+      return renderCollectionBlock(block, mode);
     case 'spacer':
       return renderSpacerBlock(block, mode);
     case 'section':

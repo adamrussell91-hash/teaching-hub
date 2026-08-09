@@ -544,6 +544,14 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       .map((parsed) => parsed.data);
 
     const lessonIds = new Set(scheduled.map((row) => row.lesson_id));
+    if (cls.current_unit_id) {
+      const currentUnit = units.find((unit) => unit.id === cls.current_unit_id);
+      if (currentUnit) {
+        for (const lessonId of currentUnit.lesson_ids) {
+          lessonIds.add(lessonId);
+        }
+      }
+    }
     const lessons: Array<{ id: string; title: string }> = [];
     for (const lessonId of lessonIds) {
       const draft = store.getJSON<{ title?: string }>(draftLessonKey(lessonId));

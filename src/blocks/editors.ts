@@ -1,4 +1,5 @@
 import katex from 'katex';
+import type { CollectionLink } from '@/blocks/collection-resolve';
 import { buildChartSvg, escapeXml } from '@/blocks/chart-svg';
 import { layoutConceptMap, layoutMindMap } from '@/blocks/graph-layout';
 import {
@@ -7,12 +8,19 @@ import {
   createSpacerEditor,
   createTabsEditor
 } from '@/blocks/layout-editors';
+import { renderCollectionBlock } from '@/blocks/render';
 import { sanitizeSvgMarkup } from '@/blocks/sanitize-svg';
 import { isHttpUrl } from '@/blocks/url-safety';
 import { parseVideoInput } from '@/blocks/video-url';
 import type { Block } from '@/schemas/block';
 
 export type BlockChangeHandler<T extends Block = Block> = (block: T) => void;
+
+export type BlockEditorContext = {
+  resolveCollection?: (
+    block: Extract<Block, { block_type: 'collection' }>
+  ) => { links: CollectionLink[]; emptyMessage?: string };
+};
 
 const VISIBILITY_OPTIONS = [
   { value: 'student_teacher', label: 'Students & teacher' },
@@ -2693,10 +2701,73 @@ export function createConceptMapEditor(
   return editorShell(block, onChange, fields, getLatest);
 }
 
+export function createCollectionEditor(
+  block: Extract<Block, { block_type: 'collection' }>,
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'collection' }>>,
+  getLatest: () => Extract<Block, { block_type: 'collection' }> = () => block,
+  context: BlockEditorContext = {}
+): HTMLElement {
+  const fields = document.createElement('div');
+  fields.className = 'block-editor__fields';
+
+  const source = document.createElement('select');
+  source.className = 'block-editor__collection-source';
+  source.setAttribute('aria-label', 'Collection source');
+  for (const [value, label] of [
+    ['unit_lessons', 'Unit lessons'],
+    ['recent_lessons', 'Recent lessons']
+  ] as const) {
+    const opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = label;
+    opt.selected = block.content.source === value;
+    source.append(opt);
+  }
+
+  const title = document.createElement('input');
+  title.type = 'text';
+  title.className = 'block-editor__collection-title';
+  title.value = block.content.title ?? '';
+  title.placeholder = 'Title (optional)';
+  title.setAttribute('aria-label', 'Collection title');
+
+  const preview = document.createElement('div');
+  preview.className = 'block-editor__collection-preview';
+  preview.setAttribute('aria-label', 'Collection preview');
+
+  const updatePreview = (draft: Extract<Block, { block_type: 'collection' }>) => {
+    const resolved = context.resolveCollection?.(draft) ?? {
+      links: [],
+      emptyMessage: 'Preview needs class context.'
+    };
+    preview.replaceChildren(renderCollectionBlock(draft, 'teacher', resolved));
+  };
+
+  const emitChange = () => {
+    const draft = {
+      ...getLatest(),
+      content: {
+        source: source.value as 'unit_lessons' | 'recent_lessons',
+        title: title.value.trim() || undefined
+      }
+    };
+    onChange(draft);
+    updatePreview(draft);
+  };
+
+  source.addEventListener('change', emitChange);
+  title.addEventListener('input', emitChange);
+
+  fields.append(source, title, preview);
+  updatePreview(getLatest());
+  return editorShell(block, onChange, fields, getLatest);
+}
+
 export function createBlockEditor(
   block: Block,
   onChange: BlockChangeHandler,
-  getLatest?: () => Block
+  getLatest?: () => Block,
+  context: BlockEditorContext = {}
 ): HTMLElement {
   const latest = (getLatest ?? (() => block)) as () => Block;
   switch (block.block_type) {
@@ -2736,6 +2807,13 @@ export function createBlockEditor(
       return createQuestionSetEditor(block, onChange, latest as () => Extract<Block, { block_type: 'question_set' }>);
     case 'timeline':
       return createTimelineEditor(block, onChange, latest as () => Extract<Block, { block_type: 'timeline' }>);
+    case 'collection':
+      return createCollectionEditor(
+        block,
+        onChange,
+        latest as () => Extract<Block, { block_type: 'collection' }>,
+        context
+      );
     case 'flashcards':
       return createFlashcardsEditor(block, onChange, latest as () => Extract<Block, { block_type: 'flashcards' }>);
     case 'cloze':

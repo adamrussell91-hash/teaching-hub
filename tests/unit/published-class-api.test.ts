@@ -60,7 +60,8 @@ describe('GET /api/published/classes/:id (mock)', () => {
 
     expect(body.data.current_unit).toEqual({
       id: 'unit_aotfw',
-      title: 'Artist of the Floating World'
+      title: 'Artist of the Floating World',
+      lessons: []
     });
 
     expect(body.data.current_lesson).toEqual({
@@ -83,6 +84,29 @@ describe('GET /api/published/classes/:id (mock)', () => {
       title: 'Memory, Identity and Ono',
       published: false
     });
+  });
+
+  it('includes published unscheduled unit lessons on current_unit', async () => {
+    const api = freshApi();
+    const authRes = await api.request('POST', '/api/auth', {
+      body: { passphrase: 'teaching-hub-local' }
+    });
+    const cookie = authRes.headers.get('set-cookie') as string;
+
+    const publishRes = await api.request('POST', '/api/lessons/lesson_aotfw_003/publish', {
+      cookie
+    });
+    expect(publishRes.status).toBe(200);
+
+    const res = await api.request('GET', PATH);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data.current_unit.lessons).toEqual([
+      {
+        id: 'lesson_aotfw_003',
+        title: 'Narrative Structure and Unreliable Memory'
+      }
+    ]);
   });
 
   it('marks schedule rows published when a published lesson snapshot exists', async () => {

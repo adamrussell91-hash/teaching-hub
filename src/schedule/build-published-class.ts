@@ -25,7 +25,17 @@ export function buildPublishedClass(input: {
   const current_unit = cls.current_unit_id
     ? (() => {
         const unit = unitById.get(cls.current_unit_id);
-        return unit ? { id: unit.id, title: unit.title } : undefined;
+        if (!unit) return undefined;
+
+        const lessonsForUnit = unit.lesson_ids
+          .map((lessonId) => {
+            if (!publishedLessonIds.has(lessonId)) return null;
+            const lesson = lessonById.get(lessonId);
+            return lesson ? { id: lesson.id, title: lesson.title } : null;
+          })
+          .filter((entry): entry is { id: string; title: string } => entry !== null);
+
+        return { id: unit.id, title: unit.title, lessons: lessonsForUnit };
       })()
     : undefined;
 

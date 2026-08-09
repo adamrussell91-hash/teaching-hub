@@ -327,6 +327,7 @@ describe('blockRegistry', () => {
       'chart',
       'cloze',
       'code',
+      'collection',
       'columns',
       'concept_map',
       'definition',

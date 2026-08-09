@@ -1,5 +1,6 @@
 import { ApiClientError } from '@/api/client';
 import { navigate } from '@/app/router';
+import type { CollectionResolveContext } from '@/blocks/collection-resolve';
 import type { Class, ScheduledLesson } from '@/schemas';
 import { resolveScheduleToday } from '@/schedule/today';
 import { mountCreateControl } from '@/teacher/create/control';
@@ -132,10 +133,41 @@ export function renderClassPage(
     buildCurrentLessonSection(cls, curriculum, lessonsById),
     buildScheduleSection(cls, curriculum, lessonsById, options),
     buildUnitsSection(cls, unitsById),
-    buildHomepageSection(cls, options)
+    buildHomepageSection(cls, curriculum, options)
   );
 
   canvas.append(root);
+}
+
+function collectionContextForClass(
+  cls: Class,
+  curriculum: CurriculumResponse
+): CollectionResolveContext {
+  const unit = cls.current_unit_id
+    ? curriculum.units.find((u) => u.id === cls.current_unit_id)
+    : undefined;
+  const lessonsById = new Map(curriculum.lessons.map((l) => [l.id, l]));
+  const unitLessons = (unit?.lesson_ids ?? [])
+    .map((id) => {
+      const lesson = lessonsById.get(id);
+      return lesson ? { lesson_id: lesson.id, title: lesson.title } : null;
+    })
+    .filter((x): x is { lesson_id: string; title: string } => x !== null);
+
+  const schedule = curriculum.scheduled_lessons
+    .filter((row) => row.class_id === cls.id)
+    .map((row) => ({
+      lesson_id: row.lesson_id,
+      title: lessonsById.get(row.lesson_id)?.title ?? row.lesson_id,
+      schedule_order: row.schedule_order,
+      published: true // teacher preview treats scheduled rows as listable
+    }));
+
+  return {
+    currentUnitId: cls.current_unit_id,
+    unitLessons,
+    schedule
+  };
 }
 
 function buildHeader(cls: Class, yearTitle?: string, subjectTitle?: string): HTMLElement {
@@ -455,7 +487,11 @@ function buildUnitsSection(
   return section;
 }
 
-function buildHomepageSection(cls: Class, options: ClassPageOptions): HTMLElement {
+function buildHomepageSection(
+  cls: Class,
+  curriculum: CurriculumResponse,
+  options: ClassPageOptions
+): HTMLElement {
   const section = document.createElement('div');
   section.className = 'class-page__homepage';
   section.dataset.classSection = 'homepage';
@@ -482,19 +518,21 @@ function buildHomepageSection(cls: Class, options: ClassPageOptions): HTMLElemen
   const regionsContainer = document.createElement('div');
   regionsContainer.className = 'class-page__homepage-regions';
 
+  const resolveContext = collectionContextForClass(cls, curriculum);
   let editorHandle: HomepageEditorHandle | null = null;
 
   function showViewMode(): void {
     editorHandle?.destroy();
     editorHandle = null;
     editButton.hidden = false;
-    renderHomepageRegionsView(regionsContainer, normalizeHomepage(cls.homepage));
+    renderHomepageRegionsView(regionsContainer, normalizeHomepage(cls.homepage), resolveContext);
   }
 
   function showEditMode(): void {
     editButton.hidden = true;
     editorHandle?.destroy();
     editorHandle = mountHomepageEditor(regionsContainer, normalizeHomepage(cls.homepage), {
+      resolveContext,
       onSave: async (homepage) => {
         await patchClass(cls.id, { homepage });
         await options.onScheduleMutated?.();

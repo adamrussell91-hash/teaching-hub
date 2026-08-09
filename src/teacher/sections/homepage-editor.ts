@@ -5,7 +5,17 @@ import {
   createBlock,
   type NewBlockType
 } from '@/blocks/create-block';
-import { createBlockEditor, renderBlock } from '@/blocks/registry';
+import {
+  emptyMessageForCollection,
+  resolveCollection,
+  type CollectionResolveContext
+} from '@/blocks/collection-resolve';
+import {
+  createBlockEditor,
+  renderBlock,
+  renderCollectionBlock,
+  type BlockEditorContext
+} from '@/blocks/registry';
 import type { Block } from '@/schemas/block';
 import type { ClassHomepage } from '@/schemas/class';
 
@@ -50,7 +60,36 @@ function regionEmptyCopy(text: string): HTMLElement {
   return empty;
 }
 
-export function renderHomepageRegionsView(container: HTMLElement, homepage: ClassHomepage): void {
+function resolveCollectionBlock(
+  block: Extract<Block, { block_type: 'collection' }>,
+  resolveContext?: CollectionResolveContext
+): { links: ReturnType<typeof resolveCollection>; emptyMessage?: string } {
+  if (!resolveContext) {
+    return { links: [], emptyMessage: 'Preview needs class context.' };
+  }
+  const links = resolveCollection(block.content, resolveContext, { publishedOnly: false });
+  const emptyMessage = emptyMessageForCollection(block.content.source, {
+    hasCurrentUnit: Boolean(resolveContext.currentUnitId),
+    linkCount: links.length
+  });
+  return { links, emptyMessage };
+}
+
+function renderHomepageBlock(
+  block: Block,
+  resolveContext?: CollectionResolveContext
+): HTMLElement {
+  if (block.block_type === 'collection') {
+    return renderCollectionBlock(block, 'teacher', resolveCollectionBlock(block, resolveContext));
+  }
+  return renderBlock(block, 'teacher');
+}
+
+export function renderHomepageRegionsView(
+  container: HTMLElement,
+  homepage: ClassHomepage,
+  resolveContext?: CollectionResolveContext
+): void {
   container.replaceChildren();
   const normalized = normalizeHomepage(homepage);
 
@@ -71,7 +110,7 @@ export function renderHomepageRegionsView(container: HTMLElement, homepage: Clas
       const list = document.createElement('div');
       list.className = 'homepage-regions__blocks';
       for (const block of blocks) {
-        list.append(renderBlock(block, 'teacher'));
+        list.append(renderHomepageBlock(block, resolveContext));
       }
       section.append(list);
     }
@@ -90,11 +129,16 @@ export function mountHomepageEditor(
   options: {
     onSave: (homepage: ClassHomepage) => Promise<void>;
     onCancel: () => void;
+    resolveContext?: CollectionResolveContext;
   }
 ): HomepageEditorHandle {
   const homepage = cloneHomepage(normalizeHomepage(initial));
   let blockCounter = countBlocks(homepage);
   let destroyed = false;
+
+  const editorContext: BlockEditorContext = {
+    resolveCollection: (block) => resolveCollectionBlock(block, options.resolveContext)
+  };
 
   container.replaceChildren();
 
@@ -177,7 +221,8 @@ export function mountHomepageEditor(
         (updated) => {
           homepage[regionKey][index] = updated;
         },
-        () => homepage[regionKey][index]!
+        () => homepage[regionKey][index]!,
+        editorContext
       );
 
       row.append(controls, editor);

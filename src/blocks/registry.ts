@@ -7,6 +7,7 @@ import {
   createChartEditor,
   createClozeEditor,
   createCodeEditor,
+  createCollectionEditor,
   createConceptMapEditor,
   createDefinitionEditor,
   createDiagramEditor,
@@ -26,7 +27,8 @@ import {
   createTableEditor,
   createTimelineEditor,
   createVideoEditor,
-  type BlockChangeHandler
+  type BlockChangeHandler,
+  type BlockEditorContext
 } from '@/blocks/editors';
 import {
   createColumnsEditor,
@@ -43,6 +45,7 @@ import {
   renderChartBlock,
   renderClozeBlock,
   renderCodeBlock,
+  renderCollectionBlock,
   renderColumnsBlock,
   renderConceptMapBlock,
   renderDefinitionBlock,
@@ -170,6 +173,10 @@ export const blockRegistry: {
     render: renderTimelineBlock,
     createEditor: createTimelineEditor
   },
+  collection: {
+    render: renderCollectionBlock,
+    createEditor: createCollectionEditor
+  },
   section: {
     render: renderSectionBlock,
     createEditor: createSectionEditor
@@ -213,6 +220,7 @@ export {
   createChartEditor,
   createClozeEditor,
   createCodeEditor,
+  createCollectionEditor,
   createColumnsEditor,
   createConceptMapEditor,
   createDefinitionEditor,
@@ -244,6 +252,7 @@ export {
   renderChartBlock,
   renderClozeBlock,
   renderCodeBlock,
+  renderCollectionBlock,
   renderColumnsBlock,
   renderConceptMapBlock,
   renderDefinitionBlock,
@@ -269,4 +278,4 @@ export {
   renderVideoBlock
 };
 
-export type { BlockChangeHandler, RenderMode };
+export type { BlockChangeHandler, BlockEditorContext, RenderMode };

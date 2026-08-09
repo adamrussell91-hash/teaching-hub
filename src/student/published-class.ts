@@ -20,7 +20,11 @@ export interface PublishedClass {
     resources: Block[];
     custom: Block[];
   };
-  current_unit?: { id: string; title: string };
+  current_unit?: {
+    id: string;
+    title: string;
+    lessons: Array<{ id: string; title: string }>;
+  };
   current_lesson?: { id: string; title: string; lesson_id: string };
   schedule: PublishedClassScheduleRow[];
   active_units: Array<{ id: string; title: string }>;

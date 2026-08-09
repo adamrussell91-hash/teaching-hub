@@ -1,6 +1,10 @@
 import { ApiClientError } from '@/api/client';
 import { navigate } from '@/app/router';
-import { renderBlock } from '@/blocks/render';
+import {
+  emptyMessageForCollection,
+  resolveCollection
+} from '@/blocks/collection-resolve';
+import { renderBlock, renderCollectionBlock } from '@/blocks/render';
 import {
   fetchPublishedClass,
   type PublishedClass,
@@ -215,7 +219,38 @@ function renderPublishedClass(content: HTMLElement, cls: PublishedClass): void {
     const list = document.createElement('div');
     list.className = 'student-class__blocks';
     for (const block of blocks) {
-      list.append(renderBlock(block, 'student'));
+      if (block.block_type === 'collection') {
+        const ctx = {
+          currentUnitId: cls.current_unit?.id,
+          unitLessons: (cls.current_unit?.lessons ?? []).map((l) => ({
+            lesson_id: l.id,
+            title: l.title
+          })),
+          schedule: cls.schedule.map((row) => ({
+            lesson_id: row.lesson_id,
+            title: row.title,
+            schedule_order: row.schedule_order,
+            published: row.published
+          }))
+        };
+        const links = resolveCollection(block.content, ctx, { publishedOnly: true });
+        const emptyMessage = emptyMessageForCollection(block.content.source, {
+          hasCurrentUnit: Boolean(cls.current_unit?.id),
+          linkCount: links.length
+        });
+        const collectionEl = renderCollectionBlock(block, 'student', { links, emptyMessage });
+        for (const anchor of collectionEl.querySelectorAll<HTMLAnchorElement>('a.student-class__link')) {
+          const href = anchor.getAttribute('href');
+          if (!href) continue;
+          anchor.addEventListener('click', (event) => {
+            event.preventDefault();
+            navigate(href);
+          });
+        }
+        list.append(collectionEl);
+      } else {
+        list.append(renderBlock(block, 'student'));
+      }
     }
     section.append(list);
     content.append(section);

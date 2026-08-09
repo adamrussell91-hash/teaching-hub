@@ -17,6 +17,9 @@ export const LessonSchema = z.object({
 
 function publishBlockIssues(blocks: z.infer<typeof BlockSchema>[]): string | null {
   for (const block of blocks) {
+    if (block.block_type === 'collection') {
+      return 'Collection blocks can only be used on class homepages';
+    }
     if (block.block_type === 'image') {
       if (!isHttpUrl(block.content.url)) {
         return 'Image blocks need a valid http(s) URL to publish';
