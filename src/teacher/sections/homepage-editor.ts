@@ -348,9 +348,13 @@ export function mountHomepageEditor(
 
       controls.append(upButton, downButton, deleteButton);
 
-      const editor = createBlockEditor(block, (updated) => {
-        homepage[regionKey][index] = updated;
-      });
+      const editor = createBlockEditor(
+        block,
+        (updated) => {
+          homepage[regionKey][index] = updated;
+        },
+        () => homepage[regionKey][index]!
+      );
 
       row.append(controls, editor);
       blocksContainer.append(row);

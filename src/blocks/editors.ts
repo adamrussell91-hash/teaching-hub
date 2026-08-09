@@ -16,7 +16,8 @@ const MEDIA_SIZE_OPTIONS = [
 
 export function createVisibilitySelect<T extends Block>(
   block: T,
-  onChange: BlockChangeHandler<T>
+  onChange: BlockChangeHandler<T>,
+  getLatest: () => T = () => block
 ): HTMLSelectElement {
   const select = document.createElement('select');
   select.className = 'block-editor__visibility';
@@ -32,7 +33,7 @@ export function createVisibilitySelect<T extends Block>(
 
   select.addEventListener('change', () => {
     onChange({
-      ...block,
+      ...getLatest(),
       visibility: select.value as Block['visibility']
     });
   });
@@ -63,13 +64,14 @@ function createMediaSizeSelect(
 function editorShell<T extends Block>(
   block: T,
   onChange: BlockChangeHandler<T>,
-  fields: HTMLElement
+  fields: HTMLElement,
+  getLatest: () => T = () => block
 ): HTMLElement {
   const shell = document.createElement('div');
   shell.className = 'block-editor';
   shell.dataset.blockId = block.id;
   shell.dataset.blockType = block.block_type;
-  shell.append(createVisibilitySelect(block, onChange), fields);
+  shell.append(createVisibilitySelect(block, onChange, getLatest), fields);
   return shell;
 }
 
@@ -165,7 +167,8 @@ function createRichTextToolbar(textarea: HTMLTextAreaElement): HTMLElement {
 
 export function createRichTextEditor(
   block: Extract<Block, { block_type: 'rich_text' }>,
-  onChange: BlockChangeHandler<Extract<Block, { block_type: 'rich_text' }>>
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'rich_text' }>>,
+  getLatest: () => Extract<Block, { block_type: 'rich_text' }> = () => block
 ): HTMLElement {
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
@@ -180,18 +183,19 @@ export function createRichTextEditor(
 
   textarea.addEventListener('input', () => {
     onChange({
-      ...block,
+      ...getLatest(),
       content: { html: textarea.value }
     });
   });
 
   fields.append(toolbar, textarea);
-  return editorShell(block, onChange, fields);
+  return editorShell(block, onChange, fields, getLatest);
 }
 
 export function createHeadingEditor(
   block: Extract<Block, { block_type: 'heading' }>,
-  onChange: BlockChangeHandler<Extract<Block, { block_type: 'heading' }>>
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'heading' }>>,
+  getLatest: () => Extract<Block, { block_type: 'heading' }> = () => block
 ): HTMLElement {
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
@@ -216,7 +220,7 @@ export function createHeadingEditor(
 
   const emitChange = () => {
     onChange({
-      ...block,
+      ...getLatest(),
       variant: variantSelect.value as typeof block.variant,
       content: { text: textInput.value }
     });
@@ -226,12 +230,13 @@ export function createHeadingEditor(
   variantSelect.addEventListener('change', emitChange);
 
   fields.append(textInput, variantSelect);
-  return editorShell(block, onChange, fields);
+  return editorShell(block, onChange, fields, getLatest);
 }
 
 export function createCalloutEditor(
   block: Extract<Block, { block_type: 'callout' }>,
-  onChange: BlockChangeHandler<Extract<Block, { block_type: 'callout' }>>
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'callout' }>>,
+  getLatest: () => Extract<Block, { block_type: 'callout' }> = () => block
 ): HTMLElement {
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
@@ -272,7 +277,7 @@ export function createCalloutEditor(
   const emitChange = () => {
     const title = titleInput.value.trim();
     onChange({
-      ...block,
+      ...getLatest(),
       content: {
         style: styleSelect.value as typeof block.content.style,
         title: title.length > 0 ? title : undefined,
@@ -286,12 +291,13 @@ export function createCalloutEditor(
   bodyInput.addEventListener('input', emitChange);
 
   fields.append(styleSelect, titleInput, bodyInput);
-  return editorShell(block, onChange, fields);
+  return editorShell(block, onChange, fields, getLatest);
 }
 
 export function createImageEditor(
   block: Extract<Block, { block_type: 'image' }>,
-  onChange: BlockChangeHandler<Extract<Block, { block_type: 'image' }>>
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'image' }>>,
+  getLatest: () => Extract<Block, { block_type: 'image' }> = () => block
 ): HTMLElement {
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
@@ -319,7 +325,7 @@ export function createImageEditor(
 
   const emitChange = () => {
     onChange({
-      ...block,
+      ...getLatest(),
       variant: sizeSelect.value as typeof block.variant,
       content: {
         url: url.value,
@@ -336,12 +342,13 @@ export function createImageEditor(
   caption.addEventListener('input', emitChange);
 
   fields.append(url, alt, caption, sizeSelect);
-  return editorShell(block, onChange, fields);
+  return editorShell(block, onChange, fields, getLatest);
 }
 
 export function createVideoEditor(
   block: Extract<Block, { block_type: 'video' }>,
-  onChange: BlockChangeHandler<Extract<Block, { block_type: 'video' }>>
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'video' }>>,
+  getLatest: () => Extract<Block, { block_type: 'video' }> = () => block
 ): HTMLElement {
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
@@ -370,7 +377,7 @@ export function createVideoEditor(
     if (parsed) {
       status.textContent = `${parsed.provider}: ${parsed.external_id}`;
       onChange({
-        ...block,
+        ...getLatest(),
         variant: sizeSelect.value as typeof block.variant,
         content: {
           ...block.content,
@@ -383,7 +390,7 @@ export function createVideoEditor(
     } else {
       status.textContent = 'Unrecognised video link';
       onChange({
-        ...block,
+        ...getLatest(),
         variant: sizeSelect.value as typeof block.variant,
         content: {
           ...block.content,
@@ -401,12 +408,13 @@ export function createVideoEditor(
   title.addEventListener('input', emitChange);
 
   fields.append(url, status, title, sizeSelect);
-  return editorShell(block, onChange, fields);
+  return editorShell(block, onChange, fields, getLatest);
 }
 
 export function createEmbedEditor(
   block: Extract<Block, { block_type: 'embed' }>,
-  onChange: BlockChangeHandler<Extract<Block, { block_type: 'embed' }>>
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'embed' }>>,
+  getLatest: () => Extract<Block, { block_type: 'embed' }> = () => block
 ): HTMLElement {
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
@@ -425,7 +433,7 @@ export function createEmbedEditor(
 
   const emitChange = () => {
     onChange({
-      ...block,
+      ...getLatest(),
       content: {
         ...block.content,
         url: url.value,
@@ -438,12 +446,13 @@ export function createEmbedEditor(
   title.addEventListener('input', emitChange);
 
   fields.append(url, title);
-  return editorShell(block, onChange, fields);
+  return editorShell(block, onChange, fields, getLatest);
 }
 
 export function createHtmlEditor(
   block: Extract<Block, { block_type: 'html' }>,
-  onChange: BlockChangeHandler<Extract<Block, { block_type: 'html' }>>
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'html' }>>,
+  getLatest: () => Extract<Block, { block_type: 'html' }> = () => block
 ): HTMLElement {
   const textarea = document.createElement('textarea');
   textarea.className = 'block-editor__html';
@@ -451,14 +460,15 @@ export function createHtmlEditor(
   textarea.rows = 8;
   textarea.setAttribute('aria-label', 'HTML');
   textarea.addEventListener('input', () => {
-    onChange({ ...block, content: { html: textarea.value } });
+    onChange({ ...getLatest(), content: { html: textarea.value } });
   });
-  return editorShell(block, onChange, textarea);
+  return editorShell(block, onChange, textarea, getLatest);
 }
 
 export function createQuoteEditor(
   block: Extract<Block, { block_type: 'quote' }>,
-  onChange: BlockChangeHandler<Extract<Block, { block_type: 'quote' }>>
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'quote' }>>,
+  getLatest: () => Extract<Block, { block_type: 'quote' }> = () => block
 ): HTMLElement {
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
@@ -492,7 +502,7 @@ export function createQuoteEditor(
 
   const emitChange = () => {
     onChange({
-      ...block,
+      ...getLatest(),
       content: {
         quote: quote.value,
         attribution: attribution.value.trim() || undefined,
@@ -508,22 +518,24 @@ export function createQuoteEditor(
   reference.addEventListener('input', emitChange);
 
   fields.append(quote, attribution, source, reference);
-  return editorShell(block, onChange, fields);
+  return editorShell(block, onChange, fields, getLatest);
 }
 
 export function createDividerEditor(
   block: Extract<Block, { block_type: 'divider' }>,
-  onChange: BlockChangeHandler<Extract<Block, { block_type: 'divider' }>>
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'divider' }>>,
+  getLatest: () => Extract<Block, { block_type: 'divider' }> = () => block
 ): HTMLElement {
   const hint = document.createElement('p');
   hint.className = 'block-editor__hint';
   hint.textContent = 'Divider — no extra fields.';
-  return editorShell(block, onChange, hint);
+  return editorShell(block, onChange, hint, getLatest);
 }
 
 export function createDefinitionEditor(
   block: Extract<Block, { block_type: 'definition' }>,
-  onChange: BlockChangeHandler<Extract<Block, { block_type: 'definition' }>>
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'definition' }>>,
+  getLatest: () => Extract<Block, { block_type: 'definition' }> = () => block
 ): HTMLElement {
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
@@ -544,7 +556,7 @@ export function createDefinitionEditor(
 
   const emitChange = () => {
     onChange({
-      ...block,
+      ...getLatest(),
       content: {
         term: term.value,
         definition: definition.value
@@ -556,12 +568,13 @@ export function createDefinitionEditor(
   definition.addEventListener('input', emitChange);
 
   fields.append(term, definition);
-  return editorShell(block, onChange, fields);
+  return editorShell(block, onChange, fields, getLatest);
 }
 
 export function createCodeEditor(
   block: Extract<Block, { block_type: 'code' }>,
-  onChange: BlockChangeHandler<Extract<Block, { block_type: 'code' }>>
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'code' }>>,
+  getLatest: () => Extract<Block, { block_type: 'code' }> = () => block
 ): HTMLElement {
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
@@ -582,7 +595,7 @@ export function createCodeEditor(
 
   const emitChange = () => {
     onChange({
-      ...block,
+      ...getLatest(),
       content: {
         code: code.value,
         language: language.value.trim() || undefined
@@ -594,12 +607,13 @@ export function createCodeEditor(
   code.addEventListener('input', emitChange);
 
   fields.append(language, code);
-  return editorShell(block, onChange, fields);
+  return editorShell(block, onChange, fields, getLatest);
 }
 
 export function createAudioEditor(
   block: Extract<Block, { block_type: 'audio' }>,
-  onChange: BlockChangeHandler<Extract<Block, { block_type: 'audio' }>>
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'audio' }>>,
+  getLatest: () => Extract<Block, { block_type: 'audio' }> = () => block
 ): HTMLElement {
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
@@ -620,7 +634,7 @@ export function createAudioEditor(
 
   const emitChange = () => {
     onChange({
-      ...block,
+      ...getLatest(),
       content: {
         url: url.value,
         title: title.value.trim() || undefined
@@ -632,12 +646,13 @@ export function createAudioEditor(
   title.addEventListener('input', emitChange);
 
   fields.append(url, title);
-  return editorShell(block, onChange, fields);
+  return editorShell(block, onChange, fields, getLatest);
 }
 
 export function createAttachmentEditor(
   block: Extract<Block, { block_type: 'attachment' }>,
-  onChange: BlockChangeHandler<Extract<Block, { block_type: 'attachment' }>>
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'attachment' }>>,
+  getLatest: () => Extract<Block, { block_type: 'attachment' }> = () => block
 ): HTMLElement {
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
@@ -665,7 +680,7 @@ export function createAttachmentEditor(
 
   const emitChange = () => {
     onChange({
-      ...block,
+      ...getLatest(),
       content: {
         url: url.value,
         title: title.value,
@@ -679,12 +694,13 @@ export function createAttachmentEditor(
   filename.addEventListener('input', emitChange);
 
   fields.append(url, title, filename);
-  return editorShell(block, onChange, fields);
+  return editorShell(block, onChange, fields, getLatest);
 }
 
 export function createAccordionEditor(
   block: Extract<Block, { block_type: 'accordion' }>,
-  onChange: BlockChangeHandler<Extract<Block, { block_type: 'accordion' }>>
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'accordion' }>>,
+  getLatest: () => Extract<Block, { block_type: 'accordion' }> = () => block
 ): HTMLElement {
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
@@ -696,7 +712,7 @@ export function createAccordionEditor(
 
   const emitChange = () => {
     onChange({
-      ...block,
+      ...getLatest(),
       content: { items: items.map((item) => ({ title: item.title, body: item.body })) }
     });
   };
@@ -762,12 +778,13 @@ export function createAccordionEditor(
 
   renderItems();
   fields.append(itemsContainer, addButton);
-  return editorShell(block, onChange, fields);
+  return editorShell(block, onChange, fields, getLatest);
 }
 
 export function createTableEditor(
   block: Extract<Block, { block_type: 'table' }>,
-  onChange: BlockChangeHandler<Extract<Block, { block_type: 'table' }>>
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'table' }>>,
+  getLatest: () => Extract<Block, { block_type: 'table' }> = () => block
 ): HTMLElement {
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
@@ -780,7 +797,7 @@ export function createTableEditor(
 
   const emitChange = () => {
     onChange({
-      ...block,
+      ...getLatest(),
       content: {
         headers: [...headers],
         rows: rows.map((row) => [...row])
@@ -863,12 +880,13 @@ export function createTableEditor(
   actions.append(addRow, addCol);
   renderTable();
   fields.append(tableWrap, actions);
-  return editorShell(block, onChange, fields);
+  return editorShell(block, onChange, fields, getLatest);
 }
 
 export function createQuestionSetEditor(
   block: Extract<Block, { block_type: 'question_set' }>,
-  onChange: BlockChangeHandler<Extract<Block, { block_type: 'question_set' }>>
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'question_set' }>>,
+  getLatest: () => Extract<Block, { block_type: 'question_set' }> = () => block
 ): HTMLElement {
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
@@ -893,7 +911,7 @@ export function createQuestionSetEditor(
 
   const emitChange = () => {
     onChange({
-      ...block,
+      ...getLatest(),
       content: {
         title: title.value.trim() || undefined,
         questions: questions.map((q) => ({
@@ -1022,42 +1040,47 @@ export function createQuestionSetEditor(
 
   renderQuestions();
   fields.append(title, questionsContainer, addButton);
-  return editorShell(block, onChange, fields);
+  return editorShell(block, onChange, fields, getLatest);
 }
 
-export function createBlockEditor(block: Block, onChange: BlockChangeHandler): HTMLElement {
+export function createBlockEditor(
+  block: Block,
+  onChange: BlockChangeHandler,
+  getLatest?: () => Block
+): HTMLElement {
+  const latest = (getLatest ?? (() => block)) as () => Block;
   switch (block.block_type) {
     case 'rich_text':
-      return createRichTextEditor(block, onChange);
+      return createRichTextEditor(block, onChange, latest as () => Extract<Block, { block_type: 'rich_text' }>);
     case 'heading':
-      return createHeadingEditor(block, onChange);
+      return createHeadingEditor(block, onChange, latest as () => Extract<Block, { block_type: 'heading' }>);
     case 'callout':
-      return createCalloutEditor(block, onChange);
+      return createCalloutEditor(block, onChange, latest as () => Extract<Block, { block_type: 'callout' }>);
     case 'image':
-      return createImageEditor(block, onChange);
+      return createImageEditor(block, onChange, latest as () => Extract<Block, { block_type: 'image' }>);
     case 'video':
-      return createVideoEditor(block, onChange);
+      return createVideoEditor(block, onChange, latest as () => Extract<Block, { block_type: 'video' }>);
     case 'embed':
-      return createEmbedEditor(block, onChange);
+      return createEmbedEditor(block, onChange, latest as () => Extract<Block, { block_type: 'embed' }>);
     case 'html':
-      return createHtmlEditor(block, onChange);
+      return createHtmlEditor(block, onChange, latest as () => Extract<Block, { block_type: 'html' }>);
     case 'quote':
-      return createQuoteEditor(block, onChange);
+      return createQuoteEditor(block, onChange, latest as () => Extract<Block, { block_type: 'quote' }>);
     case 'divider':
-      return createDividerEditor(block, onChange);
+      return createDividerEditor(block, onChange, latest as () => Extract<Block, { block_type: 'divider' }>);
     case 'definition':
-      return createDefinitionEditor(block, onChange);
+      return createDefinitionEditor(block, onChange, latest as () => Extract<Block, { block_type: 'definition' }>);
     case 'code':
-      return createCodeEditor(block, onChange);
+      return createCodeEditor(block, onChange, latest as () => Extract<Block, { block_type: 'code' }>);
     case 'audio':
-      return createAudioEditor(block, onChange);
+      return createAudioEditor(block, onChange, latest as () => Extract<Block, { block_type: 'audio' }>);
     case 'attachment':
-      return createAttachmentEditor(block, onChange);
+      return createAttachmentEditor(block, onChange, latest as () => Extract<Block, { block_type: 'attachment' }>);
     case 'accordion':
-      return createAccordionEditor(block, onChange);
+      return createAccordionEditor(block, onChange, latest as () => Extract<Block, { block_type: 'accordion' }>);
     case 'table':
-      return createTableEditor(block, onChange);
+      return createTableEditor(block, onChange, latest as () => Extract<Block, { block_type: 'table' }>);
     case 'question_set':
-      return createQuestionSetEditor(block, onChange);
+      return createQuestionSetEditor(block, onChange, latest as () => Extract<Block, { block_type: 'question_set' }>);
   }
 }

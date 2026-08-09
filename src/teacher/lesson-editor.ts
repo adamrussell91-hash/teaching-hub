@@ -361,10 +361,14 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
 
         controls.append(upButton, downButton, duplicateButton, deleteButton);
 
-        const editor = createBlockEditor(block, (updated) => {
-          lesson.blocks[index] = updated;
-          markDirty();
-        });
+        const editor = createBlockEditor(
+          block,
+          (updated) => {
+            lesson.blocks[index] = updated;
+            markDirty();
+          },
+          () => lesson.blocks[index]!
+        );
 
         row.append(controls, editor);
         blocksContainer.append(row);
