@@ -22,6 +22,16 @@ function publishBlockIssues(blocks: z.infer<typeof BlockSchema>[]): string | nul
         return 'Image blocks need alt text to publish';
       }
     }
+    if (block.block_type === 'gallery') {
+      for (const entry of block.content.items) {
+        if (!isHttpUrl(entry.url)) {
+          return 'Gallery images need a valid http(s) URL to publish';
+        }
+        if (entry.alt_text.trim().length === 0) {
+          return 'Gallery images need alt text to publish';
+        }
+      }
+    }
     if (block.block_type === 'video') {
       if (!block.content.external_id.trim()) {
         return 'Video blocks need a recognised YouTube or Vimeo id to publish';
