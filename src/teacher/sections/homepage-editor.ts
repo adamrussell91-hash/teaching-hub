@@ -3,18 +3,59 @@ import { createBlockEditor, renderBlock } from '@/blocks/registry';
 import type { Block } from '@/schemas/block';
 import type { ClassHomepage } from '@/schemas/class';
 
-const NEW_BLOCK_TYPES = ['rich_text', 'heading', 'callout', 'image', 'video', 'embed', 'html'] as const;
+const NEW_BLOCK_TYPES = [
+  'rich_text',
+  'heading',
+  'callout',
+  'quote',
+  'divider',
+  'definition',
+  'code',
+  'html',
+  'image',
+  'video',
+  'embed',
+  'audio',
+  'attachment',
+  'accordion',
+  'table',
+  'question_set'
+] as const;
 type NewBlockType = (typeof NEW_BLOCK_TYPES)[number];
 
 const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   rich_text: 'Rich text',
   heading: 'Heading',
   callout: 'Callout',
+  quote: 'Quote',
+  divider: 'Divider',
+  definition: 'Definition',
+  code: 'Code',
+  html: 'HTML',
   image: 'Image',
   video: 'Video',
   embed: 'Embed',
-  html: 'HTML'
+  audio: 'Audio',
+  attachment: 'Attachment',
+  accordion: 'Accordion',
+  table: 'Table',
+  question_set: 'Question set'
 };
+
+const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[] }> = [
+  {
+    label: 'Basic',
+    types: ['rich_text', 'heading', 'callout', 'quote', 'divider', 'definition', 'code', 'html']
+  },
+  {
+    label: 'Media',
+    types: ['image', 'video', 'embed', 'audio', 'attachment']
+  },
+  {
+    label: 'Teaching',
+    types: ['accordion', 'table', 'question_set']
+  }
+];
 
 export const HOMEPAGE_REGIONS = [
   { key: 'announcements', title: 'Announcements', emptyCopy: 'No announcements yet.' },
@@ -82,6 +123,74 @@ function createBlock(type: NewBlockType, id: string): Block {
         block_type: 'html',
         variant: 'medium',
         content: { html: '' }
+      };
+    case 'quote':
+      return {
+        ...shared,
+        block_type: 'quote',
+        variant: 'medium',
+        content: { quote: '' }
+      };
+    case 'divider':
+      return {
+        ...shared,
+        block_type: 'divider',
+        variant: 'medium',
+        content: {}
+      };
+    case 'definition':
+      return {
+        ...shared,
+        block_type: 'definition',
+        variant: 'medium',
+        content: { term: '', definition: '' }
+      };
+    case 'code':
+      return {
+        ...shared,
+        block_type: 'code',
+        variant: 'medium',
+        content: { code: '' }
+      };
+    case 'audio':
+      return {
+        ...shared,
+        block_type: 'audio',
+        variant: 'medium',
+        content: { url: '' }
+      };
+    case 'attachment':
+      return {
+        ...shared,
+        block_type: 'attachment',
+        variant: 'medium',
+        content: { url: '', title: '' }
+      };
+    case 'accordion':
+      return {
+        ...shared,
+        block_type: 'accordion',
+        variant: 'medium',
+        content: { items: [{ title: '', body: '' }] }
+      };
+    case 'table':
+      return {
+        ...shared,
+        block_type: 'table',
+        variant: 'large',
+        content: {
+          headers: ['Column 1', 'Column 2', 'Column 3'],
+          rows: [['', '', '']]
+        }
+      };
+    case 'question_set':
+      return {
+        ...shared,
+        block_type: 'question_set',
+        variant: 'medium',
+        content: {
+          questions: [{ id: `${id}_q1`, prompt: '', kind: 'short_answer' }]
+        }
       };
   }
 }
@@ -277,11 +386,16 @@ export function mountHomepageEditor(
       const addSelect = document.createElement('select');
       addSelect.id = addSelectId;
       addSelect.className = 'homepage-editor__add-block-select';
-      for (const type of NEW_BLOCK_TYPES) {
-        const opt = document.createElement('option');
-        opt.value = type;
-        opt.textContent = NEW_BLOCK_LABEL[type];
-        addSelect.append(opt);
+      for (const group of BLOCK_GROUPS) {
+        const optgroup = document.createElement('optgroup');
+        optgroup.label = group.label;
+        for (const type of group.types) {
+          const opt = document.createElement('option');
+          opt.value = type;
+          opt.textContent = NEW_BLOCK_LABEL[type];
+          optgroup.append(opt);
+        }
+        addSelect.append(optgroup);
       }
 
       const addButton = document.createElement('button');

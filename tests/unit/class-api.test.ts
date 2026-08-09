@@ -166,8 +166,8 @@ describe('PATCH /api/classes/:id (mock)', () => {
           announcements: [
             {
               ...validHeadingBlock,
-              block_type: 'quote',
-              content: { quote: 'test' }
+              block_type: 'slideshow',
+              content: { slides: [] }
             }
           ],
           resources: [],

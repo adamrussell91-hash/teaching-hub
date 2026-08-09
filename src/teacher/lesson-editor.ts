@@ -5,18 +5,59 @@ import type { Lesson } from '@/schemas/lesson';
 import { renderContextBar, type TeacherShellRefs } from '@/teacher/shell';
 import { mountSavePublishControls, SaveController, type SavePublishHandle } from '@/teacher/save-publish';
 
-const NEW_BLOCK_TYPES = ['rich_text', 'heading', 'callout', 'image', 'video', 'embed', 'html'] as const;
+const NEW_BLOCK_TYPES = [
+  'rich_text',
+  'heading',
+  'callout',
+  'quote',
+  'divider',
+  'definition',
+  'code',
+  'html',
+  'image',
+  'video',
+  'embed',
+  'audio',
+  'attachment',
+  'accordion',
+  'table',
+  'question_set'
+] as const;
 type NewBlockType = (typeof NEW_BLOCK_TYPES)[number];
 
 const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   rich_text: 'Rich text',
   heading: 'Heading',
   callout: 'Callout',
+  quote: 'Quote',
+  divider: 'Divider',
+  definition: 'Definition',
+  code: 'Code',
+  html: 'HTML',
   image: 'Image',
   video: 'Video',
   embed: 'Embed',
-  html: 'HTML'
+  audio: 'Audio',
+  attachment: 'Attachment',
+  accordion: 'Accordion',
+  table: 'Table',
+  question_set: 'Question set'
 };
+
+const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[] }> = [
+  {
+    label: 'Basic',
+    types: ['rich_text', 'heading', 'callout', 'quote', 'divider', 'definition', 'code', 'html']
+  },
+  {
+    label: 'Media',
+    types: ['image', 'video', 'embed', 'audio', 'attachment']
+  },
+  {
+    label: 'Teaching',
+    types: ['accordion', 'table', 'question_set']
+  }
+];
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -74,6 +115,74 @@ function createBlock(type: NewBlockType, id: string): Block {
         block_type: 'html',
         variant: 'medium',
         content: { html: '' }
+      };
+    case 'quote':
+      return {
+        ...shared,
+        block_type: 'quote',
+        variant: 'medium',
+        content: { quote: '' }
+      };
+    case 'divider':
+      return {
+        ...shared,
+        block_type: 'divider',
+        variant: 'medium',
+        content: {}
+      };
+    case 'definition':
+      return {
+        ...shared,
+        block_type: 'definition',
+        variant: 'medium',
+        content: { term: '', definition: '' }
+      };
+    case 'code':
+      return {
+        ...shared,
+        block_type: 'code',
+        variant: 'medium',
+        content: { code: '' }
+      };
+    case 'audio':
+      return {
+        ...shared,
+        block_type: 'audio',
+        variant: 'medium',
+        content: { url: '' }
+      };
+    case 'attachment':
+      return {
+        ...shared,
+        block_type: 'attachment',
+        variant: 'medium',
+        content: { url: '', title: '' }
+      };
+    case 'accordion':
+      return {
+        ...shared,
+        block_type: 'accordion',
+        variant: 'medium',
+        content: { items: [{ title: '', body: '' }] }
+      };
+    case 'table':
+      return {
+        ...shared,
+        block_type: 'table',
+        variant: 'large',
+        content: {
+          headers: ['Column 1', 'Column 2', 'Column 3'],
+          rows: [['', '', '']]
+        }
+      };
+    case 'question_set':
+      return {
+        ...shared,
+        block_type: 'question_set',
+        variant: 'medium',
+        content: {
+          questions: [{ id: `${id}_q1`, prompt: '', kind: 'short_answer' }]
+        }
       };
   }
 }
@@ -177,11 +286,16 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     const addSelect = document.createElement('select');
     addSelect.id = addSelectId;
     addSelect.className = 'lesson-editor__add-block-select';
-    for (const type of NEW_BLOCK_TYPES) {
-      const opt = document.createElement('option');
-      opt.value = type;
-      opt.textContent = NEW_BLOCK_LABEL[type];
-      addSelect.append(opt);
+    for (const group of BLOCK_GROUPS) {
+      const optgroup = document.createElement('optgroup');
+      optgroup.label = group.label;
+      for (const type of group.types) {
+        const opt = document.createElement('option');
+        opt.value = type;
+        opt.textContent = NEW_BLOCK_LABEL[type];
+        optgroup.append(opt);
+      }
+      addSelect.append(optgroup);
     }
 
     const addButton = document.createElement('button');
@@ -231,7 +345,21 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         downButton.disabled = index === lesson.blocks.length - 1;
         downButton.addEventListener('click', () => moveBlock(index, 1));
 
-        controls.append(upButton, downButton);
+        const duplicateButton = document.createElement('button');
+        duplicateButton.type = 'button';
+        duplicateButton.className = 'btn btn--ghost lesson-editor__duplicate';
+        duplicateButton.textContent = 'Duplicate';
+        duplicateButton.setAttribute('aria-label', `Duplicate block ${index + 1}`);
+        duplicateButton.addEventListener('click', () => duplicateBlock(index));
+
+        const deleteButton = document.createElement('button');
+        deleteButton.type = 'button';
+        deleteButton.className = 'btn btn--ghost lesson-editor__delete';
+        deleteButton.textContent = 'Delete';
+        deleteButton.setAttribute('aria-label', `Delete block ${index + 1}`);
+        deleteButton.addEventListener('click', () => deleteBlock(index));
+
+        controls.append(upButton, downButton, duplicateButton, deleteButton);
 
         const editor = createBlockEditor(block, (updated) => {
           lesson.blocks[index] = updated;
@@ -250,6 +378,26 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       const temp = blocks[index]!;
       blocks[index] = blocks[target]!;
       blocks[target] = temp;
+      markDirty();
+      renderBlocksList();
+    }
+
+    function deleteBlock(index: number): void {
+      lesson.blocks.splice(index, 1);
+      markDirty();
+      renderBlocksList();
+    }
+
+    function duplicateBlock(index: number): void {
+      const source = lesson.blocks[index];
+      if (!source) return;
+      blockCounter += 1;
+      const id = `block_${lesson.id}_${blockCounter}`;
+      const clone = structuredClone(source) as Block;
+      clone.id = id;
+      clone.created_at = nowIso();
+      clone.updated_at = nowIso();
+      lesson.blocks.splice(index + 1, 0, clone);
       markDirty();
       renderBlocksList();
     }

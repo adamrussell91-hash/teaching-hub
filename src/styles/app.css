@@ -429,7 +429,23 @@ a:hover {
 .block-editor__heading-text,
 .block-editor__heading-variant,
 .block-editor__callout-style,
-.block-editor__callout-title {
+.block-editor__callout-title,
+.block-editor__media-size,
+.block-editor__quote-attribution,
+.block-editor__quote-source,
+.block-editor__quote-reference,
+.block-editor__definition-term,
+.block-editor__code-language,
+.block-editor__audio-url,
+.block-editor__audio-title,
+.block-editor__attachment-url,
+.block-editor__attachment-title,
+.block-editor__attachment-filename,
+.block-editor__accordion-title,
+.block-editor__question-set-title,
+.block-editor__question-kind,
+.block-editor__table-header,
+.block-editor__table-cell {
   padding: 0.55rem 0.75rem;
   font: inherit;
   font-family: var(--font-ui);
@@ -438,6 +454,98 @@ a:hover {
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid var(--line);
   border-radius: calc(var(--radius-md) * 0.5);
+}
+
+.block-editor__quote-text,
+.block-editor__definition-body,
+.block-editor__code,
+.block-editor__accordion-body,
+.block-editor__question-prompt,
+.block-editor__question-options {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  font: inherit;
+  font-family: var(--font-ui);
+  font-size: 0.92rem;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius-md) * 0.5);
+  resize: vertical;
+}
+
+.block-editor__code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.85rem;
+}
+
+.block-editor__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.block-editor__toolbar-btn {
+  font-size: 0.78rem;
+  padding: 0.25rem 0.55rem;
+}
+
+.block-editor__hint {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.block-editor__accordion-items,
+.block-editor__questions {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.block-editor__accordion-item,
+.block-editor__question {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius-md) * 0.5);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.block-editor__table-wrap {
+  display: grid;
+  gap: 0.4rem;
+  overflow-x: auto;
+}
+
+.block-editor__table-header-row,
+.block-editor__table-row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(7rem, 1fr);
+  gap: 0.35rem;
+}
+
+.block-editor__table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.lesson-editor__block-controls,
+.homepage-editor__block-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  align-items: flex-start;
+}
+
+.lesson-editor__block-row,
+.homepage-editor__block-row {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
 }
 
 /* ── Student reading surface ──────────────────────────────────────────── */
@@ -1745,6 +1853,173 @@ a.home-class-tile:hover {
   margin-top: 0.5rem;
   font-family: var(--font-ui);
   font-size: 0.85rem;
+}
+
+.block-image--small img,
+.block-video--small {
+  max-width: 18rem;
+}
+
+.block-image--medium img,
+.block-video--medium {
+  max-width: 32rem;
+}
+
+.block-image--large img,
+.block-video--large {
+  max-width: 100%;
+}
+
+.block-quote {
+  margin: 0;
+}
+
+.block-quote__text {
+  margin: 0;
+  padding: 0.75rem 0 0.75rem 1rem;
+  border-left: 3px solid var(--wave);
+  font-family: var(--font-ui);
+  font-size: 1.05rem;
+  line-height: 1.55;
+  color: var(--ink);
+}
+
+.block-quote__attribution {
+  margin-top: 0.5rem;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.block-divider {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 0.75rem 0;
+}
+
+.block-definition {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  background: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius-md) * 0.5);
+}
+
+.block-definition__term {
+  font-family: var(--font-ui);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.block-definition__definition {
+  margin: 0.35rem 0 0;
+  font-family: var(--font-ui);
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+.block-code {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  overflow-x: auto;
+  background: rgba(20, 43, 81, 0.04);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius-md) * 0.5);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.block-audio__title,
+.block-attachment__unavailable,
+.block-audio__unavailable {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.block-audio__player {
+  width: 100%;
+  max-width: 28rem;
+}
+
+.block-attachment__link {
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+}
+
+.block-accordion {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.block-accordion__item {
+  padding: 0.55rem 0.75rem;
+  background: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius-md) * 0.5);
+}
+
+.block-accordion__title {
+  font-family: var(--font-ui);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.block-accordion__body {
+  margin-top: 0.45rem;
+  font-family: var(--font-ui);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--ink);
+  white-space: pre-wrap;
+}
+
+.block-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-ui);
+  font-size: 0.92rem;
+}
+
+.block-table th,
+.block-table td {
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.block-table th {
+  background: rgba(20, 43, 81, 0.04);
+  font-weight: 600;
+}
+
+.block-question-set__title {
+  margin: 0 0 0.65rem;
+  font-family: var(--font-ui);
+  font-weight: 600;
+}
+
+.block-question-set__list {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.block-question-set__prompt {
+  margin: 0;
+  font-family: var(--font-ui);
+  line-height: 1.45;
+}
+
+.block-question-set__options {
+  margin: 0.4rem 0 0;
+  padding-left: 1.1rem;
+  font-family: var(--font-ui);
+  color: var(--ink);
 }
 
 /* ── Scope & Sequence timeline ────────────────────────────────────────── */

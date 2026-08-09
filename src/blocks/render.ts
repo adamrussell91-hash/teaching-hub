@@ -87,7 +87,7 @@ export function renderImageBlock(
   mode: RenderMode
 ): HTMLElement {
   const figure = document.createElement('figure');
-  figure.className = 'block-image';
+  figure.className = `block-image block-image--${block.variant}`;
   if (isHttpUrl(block.content.url)) {
     const img = document.createElement('img');
     img.src = block.content.url;
@@ -114,7 +114,7 @@ export function renderVideoBlock(
   mode: RenderMode
 ): HTMLElement {
   const wrap = document.createElement('div');
-  wrap.className = 'block-video';
+  wrap.className = `block-video block-video--${block.variant}`;
   if (block.content.title) {
     const title = document.createElement('p');
     title.className = 'block-video__title';
@@ -187,6 +187,237 @@ export function renderHtmlBlock(
   return wrapBlock(body, block, mode);
 }
 
+export function renderQuoteBlock(
+  block: Extract<Block, { block_type: 'quote' }>,
+  mode: RenderMode
+): HTMLElement {
+  const figure = document.createElement('figure');
+  figure.className = 'block-quote';
+
+  const quote = document.createElement('blockquote');
+  quote.className = 'block-quote__text';
+  quote.textContent = block.content.quote;
+  figure.append(quote);
+
+  const attribution = block.content.attribution?.trim();
+  const source = block.content.source?.trim();
+  const reference = block.content.reference?.trim();
+  if (attribution || source || reference) {
+    const caption = document.createElement('figcaption');
+    caption.className = 'block-quote__attribution';
+    const parts = [attribution, source, reference].filter(Boolean);
+    caption.textContent = parts.join(' — ');
+    figure.append(caption);
+  }
+
+  return wrapBlock(figure, block, mode);
+}
+
+export function renderDividerBlock(
+  block: Extract<Block, { block_type: 'divider' }>,
+  mode: RenderMode
+): HTMLElement {
+  const hr = document.createElement('hr');
+  hr.className = 'block-divider';
+  return wrapBlock(hr, block, mode);
+}
+
+export function renderDefinitionBlock(
+  block: Extract<Block, { block_type: 'definition' }>,
+  mode: RenderMode
+): HTMLElement {
+  const dl = document.createElement('dl');
+  dl.className = 'block-definition';
+
+  const dt = document.createElement('dt');
+  dt.className = 'block-definition__term';
+  dt.textContent = block.content.term;
+
+  const dd = document.createElement('dd');
+  dd.className = 'block-definition__definition';
+  dd.textContent = block.content.definition;
+
+  dl.append(dt, dd);
+  return wrapBlock(dl, block, mode);
+}
+
+export function renderCodeBlock(
+  block: Extract<Block, { block_type: 'code' }>,
+  mode: RenderMode
+): HTMLElement {
+  const pre = document.createElement('pre');
+  pre.className = 'block-code';
+  if (block.content.language) {
+    pre.dataset.language = block.content.language;
+  }
+
+  const code = document.createElement('code');
+  code.textContent = block.content.code;
+  pre.append(code);
+
+  return wrapBlock(pre, block, mode);
+}
+
+export function renderAudioBlock(
+  block: Extract<Block, { block_type: 'audio' }>,
+  mode: RenderMode
+): HTMLElement {
+  const wrap = document.createElement('div');
+  wrap.className = 'block-audio';
+
+  if (block.content.title?.trim()) {
+    const title = document.createElement('p');
+    title.className = 'block-audio__title';
+    title.textContent = block.content.title;
+    wrap.append(title);
+  }
+
+  if (isHttpUrl(block.content.url)) {
+    const audio = document.createElement('audio');
+    audio.className = 'block-audio__player';
+    audio.controls = true;
+    audio.src = block.content.url.trim();
+    wrap.append(audio);
+  } else {
+    const unavailable = document.createElement('p');
+    unavailable.className = 'block-audio__unavailable';
+    unavailable.textContent = 'Audio unavailable.';
+    wrap.append(unavailable);
+  }
+
+  return wrapBlock(wrap, block, mode);
+}
+
+export function renderAttachmentBlock(
+  block: Extract<Block, { block_type: 'attachment' }>,
+  mode: RenderMode
+): HTMLElement {
+  const wrap = document.createElement('div');
+  wrap.className = 'block-attachment';
+
+  if (isHttpUrl(block.content.url)) {
+    const link = document.createElement('a');
+    link.className = 'block-attachment__link';
+    link.href = block.content.url.trim();
+    link.download = block.content.filename?.trim() || '';
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = block.content.title.trim() || block.content.filename?.trim() || 'Download';
+    wrap.append(link);
+  } else {
+    const unavailable = document.createElement('p');
+    unavailable.className = 'block-attachment__unavailable';
+    unavailable.textContent = block.content.title.trim() || 'Attachment unavailable.';
+    wrap.append(unavailable);
+  }
+
+  return wrapBlock(wrap, block, mode);
+}
+
+export function renderAccordionBlock(
+  block: Extract<Block, { block_type: 'accordion' }>,
+  mode: RenderMode
+): HTMLElement {
+  const wrap = document.createElement('div');
+  wrap.className = 'block-accordion';
+
+  for (const item of block.content.items) {
+    const details = document.createElement('details');
+    details.className = 'block-accordion__item';
+
+    const summary = document.createElement('summary');
+    summary.className = 'block-accordion__title';
+    summary.textContent = item.title;
+
+    const body = document.createElement('div');
+    body.className = 'block-accordion__body';
+    body.textContent = item.body;
+
+    details.append(summary, body);
+    wrap.append(details);
+  }
+
+  return wrapBlock(wrap, block, mode);
+}
+
+export function renderTableBlock(
+  block: Extract<Block, { block_type: 'table' }>,
+  mode: RenderMode
+): HTMLElement {
+  const table = document.createElement('table');
+  table.className = 'block-table';
+
+  const thead = document.createElement('thead');
+  const headerRow = document.createElement('tr');
+  for (const header of block.content.headers) {
+    const th = document.createElement('th');
+    th.scope = 'col';
+    th.textContent = header;
+    headerRow.append(th);
+  }
+  thead.append(headerRow);
+  table.append(thead);
+
+  const tbody = document.createElement('tbody');
+  for (const row of block.content.rows) {
+    const tr = document.createElement('tr');
+    const cellCount = Math.max(block.content.headers.length, row.length);
+    for (let i = 0; i < cellCount; i += 1) {
+      const td = document.createElement('td');
+      td.textContent = row[i] ?? '';
+      tr.append(td);
+    }
+    tbody.append(tr);
+  }
+  table.append(tbody);
+
+  return wrapBlock(table, block, mode);
+}
+
+export function renderQuestionSetBlock(
+  block: Extract<Block, { block_type: 'question_set' }>,
+  mode: RenderMode
+): HTMLElement {
+  const wrap = document.createElement('div');
+  wrap.className = 'block-question-set';
+
+  if (block.content.title?.trim()) {
+    const title = document.createElement('p');
+    title.className = 'block-question-set__title';
+    title.textContent = block.content.title;
+    wrap.append(title);
+  }
+
+  const list = document.createElement('ol');
+  list.className = 'block-question-set__list';
+
+  for (const question of block.content.questions) {
+    const li = document.createElement('li');
+    li.className = 'block-question-set__question';
+
+    const prompt = document.createElement('p');
+    prompt.className = 'block-question-set__prompt';
+    prompt.textContent = question.prompt;
+    li.append(prompt);
+
+    if (question.kind === 'multiple_choice' && question.options?.length) {
+      const options = document.createElement('ul');
+      options.className = 'block-question-set__options';
+      for (const option of question.options) {
+        const optionItem = document.createElement('li');
+        optionItem.textContent = option;
+        options.append(optionItem);
+      }
+      li.append(options);
+    }
+
+    list.append(li);
+  }
+
+  wrap.append(list);
+  return wrapBlock(wrap, block, mode);
+}
+
 export function renderBlock(block: Block, mode: RenderMode): HTMLElement {
   switch (block.block_type) {
     case 'rich_text':
@@ -203,5 +434,23 @@ export function renderBlock(block: Block, mode: RenderMode): HTMLElement {
       return renderEmbedBlock(block, mode);
     case 'html':
       return renderHtmlBlock(block, mode);
+    case 'quote':
+      return renderQuoteBlock(block, mode);
+    case 'divider':
+      return renderDividerBlock(block, mode);
+    case 'definition':
+      return renderDefinitionBlock(block, mode);
+    case 'code':
+      return renderCodeBlock(block, mode);
+    case 'audio':
+      return renderAudioBlock(block, mode);
+    case 'attachment':
+      return renderAttachmentBlock(block, mode);
+    case 'accordion':
+      return renderAccordionBlock(block, mode);
+    case 'table':
+      return renderTableBlock(block, mode);
+    case 'question_set':
+      return renderQuestionSetBlock(block, mode);
   }
 }

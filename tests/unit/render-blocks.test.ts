@@ -320,12 +320,21 @@ describe('block editors', () => {
 describe('blockRegistry', () => {
   it('maps every block_type to render and editor helpers', () => {
     expect(Object.keys(blockRegistry).sort()).toEqual([
+      'accordion',
+      'attachment',
+      'audio',
       'callout',
+      'code',
+      'definition',
+      'divider',
       'embed',
       'heading',
       'html',
       'image',
+      'question_set',
+      'quote',
       'rich_text',
+      'table',
       'video'
     ]);
 

@@ -9,11 +9,21 @@ export const BlockTypeSchema = z.enum([
   'image',
   'video',
   'embed',
-  'html'
+  'html',
+  'quote',
+  'divider',
+  'definition',
+  'code',
+  'audio',
+  'attachment',
+  'accordion',
+  'table',
+  'question_set'
 ]);
 
 export const VideoProviderSchema = z.enum(['youtube', 'vimeo']);
 export const HeadingVariantSchema = z.enum(['page', 'section', 'subsection']);
+export const MediaSizeVariantSchema = z.enum(['small', 'medium', 'large']);
 export const CalloutStyleSchema = z.enum([
   'information',
   'important',
@@ -24,6 +34,7 @@ export const CalloutStyleSchema = z.enum([
   'remember',
   'teacher'
 ]);
+export const QuestionKindSchema = z.enum(['short_answer', 'multiple_choice']);
 
 const blockTimestamps = {
   created_at: IsoDateSchema,
@@ -78,7 +89,7 @@ export const ImageBlockSchema = z.object({
   id: z.string().min(1),
   type: z.literal('block'),
   block_type: z.literal('image'),
-  variant: z.string().default('large'),
+  variant: MediaSizeVariantSchema.default('large'),
   visibility: VisibilitySchema,
   content: z.object({
     url: z.string(),
@@ -93,7 +104,7 @@ export const VideoBlockSchema = z.object({
   id: z.string().min(1),
   type: z.literal('block'),
   block_type: z.literal('video'),
-  variant: z.string().default('large'),
+  variant: MediaSizeVariantSchema.default('large'),
   visibility: VisibilitySchema,
   content: z.object({
     provider: VideoProviderSchema,
@@ -131,6 +142,143 @@ export const HtmlBlockSchema = z.object({
   ...blockTimestamps
 });
 
+export const QuoteBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('quote'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    quote: z.string(),
+    attribution: z.string().optional(),
+    source: z.string().optional(),
+    reference: z.string().optional()
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
+export const DividerBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('divider'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({}).default({}),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
+export const DefinitionBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('definition'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    term: z.string(),
+    definition: z.string()
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
+export const CodeBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('code'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    code: z.string(),
+    language: z.string().optional()
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
+export const AudioBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('audio'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    url: z.string(),
+    title: z.string().optional()
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
+export const AttachmentBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('attachment'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    url: z.string(),
+    title: z.string(),
+    filename: z.string().optional()
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
+export const AccordionItemSchema = z.object({
+  title: z.string(),
+  body: z.string()
+});
+
+export const AccordionBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('accordion'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    items: z.array(AccordionItemSchema)
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
+export const TableBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('table'),
+  variant: z.string().default('large'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    headers: z.array(z.string()),
+    rows: z.array(z.array(z.string()))
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
+export const QuestionItemSchema = z.object({
+  id: z.string().min(1),
+  prompt: z.string(),
+  kind: QuestionKindSchema,
+  options: z.array(z.string()).optional()
+});
+
+export const QuestionSetBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('question_set'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    title: z.string().optional(),
+    questions: z.array(QuestionItemSchema)
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
 export const BlockSchema = z.discriminatedUnion('block_type', [
   RichTextBlockSchema,
   HeadingBlockSchema,
@@ -138,7 +286,16 @@ export const BlockSchema = z.discriminatedUnion('block_type', [
   ImageBlockSchema,
   VideoBlockSchema,
   EmbedBlockSchema,
-  HtmlBlockSchema
+  HtmlBlockSchema,
+  QuoteBlockSchema,
+  DividerBlockSchema,
+  DefinitionBlockSchema,
+  CodeBlockSchema,
+  AudioBlockSchema,
+  AttachmentBlockSchema,
+  AccordionBlockSchema,
+  TableBlockSchema,
+  QuestionSetBlockSchema
 ]);
 
 export type Block = z.infer<typeof BlockSchema>;

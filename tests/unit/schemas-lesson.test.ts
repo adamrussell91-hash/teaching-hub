@@ -69,10 +69,49 @@ describe('BlockSchema', () => {
     expect(() =>
       BlockSchema.parse({
         ...baseBlock,
-        block_type: 'quote',
-        content: { quote: 'test' }
+        block_type: 'slideshow',
+        content: { slides: [] }
       })
     ).toThrow();
+  });
+
+  it('parses quote, table, accordion, and question_set blocks', () => {
+    expect(
+      BlockSchema.parse({
+        ...baseBlock,
+        block_type: 'quote',
+        content: { quote: 'Stillness.', attribution: 'Ishiguro' }
+      }).block_type
+    ).toBe('quote');
+
+    expect(
+      BlockSchema.parse({
+        ...baseBlock,
+        id: 'block_table',
+        block_type: 'table',
+        content: { headers: ['A', 'B'], rows: [['1', '2']] }
+      }).block_type
+    ).toBe('table');
+
+    expect(
+      BlockSchema.parse({
+        ...baseBlock,
+        id: 'block_acc',
+        block_type: 'accordion',
+        content: { items: [{ title: 'One', body: 'Body' }] }
+      }).block_type
+    ).toBe('accordion');
+
+    expect(
+      BlockSchema.parse({
+        ...baseBlock,
+        id: 'block_qs',
+        block_type: 'question_set',
+        content: {
+          questions: [{ id: 'q1', prompt: 'Why?', kind: 'short_answer' }]
+        }
+      }).block_type
+    ).toBe('question_set');
   });
 
   it('rejects heading with invalid variant', () => {
@@ -308,6 +347,59 @@ describe('PublishableLessonSchema media rules', () => {
     const result = PublishableLessonSchema.safeParse({
       ...baseLesson,
       blocks: [{ ...baseBlock, block_type: 'html', content: { html: '   ' } }]
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects empty quote on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [{ ...baseBlock, block_type: 'quote', content: { quote: '   ' } }]
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects audio without http url on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [{ ...baseBlock, block_type: 'audio', content: { url: 'ftp://x' } }]
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects attachment without title on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [
+        {
+          ...baseBlock,
+          block_type: 'attachment',
+          content: { url: 'https://example.com/a.pdf', title: '  ' }
+        }
+      ]
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects question_set with insufficient MC options on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [
+        {
+          ...baseBlock,
+          block_type: 'question_set',
+          content: {
+            questions: [
+              {
+                id: 'q1',
+                prompt: 'Pick one',
+                kind: 'multiple_choice',
+                options: ['Only one']
+              }
+            ]
+          }
+        }
+      ]
     });
     expect(result.success).toBe(false);
   });
