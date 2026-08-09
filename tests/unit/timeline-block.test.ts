@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { BlockSchema } from '@/schemas/block';
+import { BlockSchema, type Block } from '@/schemas/block';
 import { createBlock, cloneBlockWithNewIds, COLUMN_CHILD_TYPES } from '@/blocks/create-block';
 import { createBlockEditor } from '@/blocks/editors';
 import { renderBlock } from '@/blocks/render';
@@ -47,6 +47,7 @@ describe('TimelineBlockSchema', () => {
       }
     });
     expect(block.block_type).toBe('timeline');
+    if (block.block_type !== 'timeline') throw new Error('expected timeline');
     expect(block.content.events).toHaveLength(1);
   });
 
@@ -116,6 +117,8 @@ describe('TimelineBlockSchema', () => {
         ]
       }
     });
+    expect(block.block_type).toBe('section');
+    if (block.block_type !== 'section') throw new Error('expected section');
     expect(block.content.blocks[0]?.block_type).toBe('timeline');
   });
 });
@@ -135,7 +138,7 @@ describe('createBlock timeline', () => {
   });
 
   it('COLUMN_CHILD_TYPES excludes timeline', () => {
-    expect(COLUMN_CHILD_TYPES.includes('timeline')).toBe(false);
+    expect((COLUMN_CHILD_TYPES as readonly string[]).includes('timeline')).toBe(false);
   });
 
   it('clone regenerates event ids', () => {
@@ -154,7 +157,7 @@ describe('createBlock timeline', () => {
 describe('timeline editor', () => {
   it('updates when and label on input', () => {
     const block = createBlock('timeline', 'tl1');
-    let latest = block;
+    let latest: Block = block;
     const editor = createBlockEditor(block, (next) => {
       latest = next;
     });
@@ -176,7 +179,7 @@ describe('timeline editor', () => {
 
   it('adds up to 12 and removes down to 1', () => {
     const block = createBlock('timeline', 'tl1');
-    let latest = block;
+    let latest: Block = block;
     const mount = document.createElement('div');
     const rebuild = () => {
       mount.replaceChildren(
@@ -209,7 +212,7 @@ describe('timeline editor', () => {
     block.content.events[0]!.label = 'A';
     block.content.events[1]!.label = 'B';
     block.content.events[2]!.label = 'C';
-    let latest = block;
+    let latest: Block = block;
     const mount = document.createElement('div');
     const rebuild = () => {
       mount.replaceChildren(
