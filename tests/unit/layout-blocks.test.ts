@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { createBlock, cloneBlockWithNewIds } from '@/blocks/create-block';
+import {
+  renderSpacerBlock,
+  renderSectionBlock,
+  renderColumnsBlock,
+  renderBlock
+} from '@/blocks/registry';
 import { sanitizeBlocksDeep } from '@/blocks/sanitize-blocks';
 import { BlockSchema } from '@/schemas/block';
 
@@ -242,5 +248,52 @@ describe('cloneBlockWithNewIds', () => {
     if (clonedCols.block_type !== 'columns') throw new Error('expected columns');
     expect(clonedCols.content.columns[0]!.blocks[0]!.id).toBe('id_3');
     expect(section.id).toBe('sec'); // original untouched
+  });
+});
+
+describe('layout block renderers', () => {
+  it('renderSpacerBlock applies size class', () => {
+    const block = createBlock('spacer', 'sp');
+    if (block.block_type !== 'spacer') throw new Error('expected spacer');
+    block.content.size = 'large';
+    const el = renderSpacerBlock(block, 'student');
+    expect(el.querySelector('.block-spacer')?.classList.contains('block-spacer--large')).toBe(
+      true
+    );
+  });
+
+  it('renderSectionBlock shows title and nested children', () => {
+    const section = createBlock('section', 'sec');
+    if (section.block_type !== 'section') throw new Error('expected section');
+    section.content.title = 'Inquiry';
+    section.content.blocks = [
+      createBlock('heading', 'h1') as (typeof section.content.blocks)[number]
+    ];
+    const el = renderSectionBlock(section, 'student');
+    expect(el.querySelector('.block-section__title')?.textContent).toBe('Inquiry');
+    expect(el.querySelector('[data-block-type="heading"]')).toBeTruthy();
+  });
+
+  it('renderColumnsBlock builds grid with width style and children', () => {
+    const columns = createBlock('columns', 'cols');
+    if (columns.block_type !== 'columns') throw new Error('expected columns');
+    columns.content.columns[0]!.blocks = [
+      createBlock('rich_text', 'l')
+    ] as (typeof columns.content.columns)[number]['blocks'];
+    columns.content.columns[1]!.blocks = [
+      createBlock('rich_text', 'r')
+    ] as (typeof columns.content.columns)[number]['blocks'];
+    const el = renderColumnsBlock(columns, 'student');
+    const grid = el.querySelector('.block-columns');
+    expect(grid).toBeTruthy();
+    expect((grid as HTMLElement).style.gridTemplateColumns).toContain('6fr');
+    expect(el.querySelectorAll('.block-columns__col').length).toBe(2);
+    expect(el.querySelectorAll('[data-block-type="rich_text"]').length).toBe(2);
+  });
+
+  it('renderBlock dispatches layout types', () => {
+    expect(renderBlock(createBlock('spacer', 'sp'), 'student').dataset.blockType).toBe(
+      'spacer'
+    );
   });
 });

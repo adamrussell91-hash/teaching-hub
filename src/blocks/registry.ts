@@ -25,6 +25,7 @@ import {
   renderBlock,
   renderCalloutBlock,
   renderCodeBlock,
+  renderColumnsBlock,
   renderDefinitionBlock,
   renderDividerBlock,
   renderEmbedBlock,
@@ -34,6 +35,8 @@ import {
   renderQuestionSetBlock,
   renderQuoteBlock,
   renderRichTextBlock,
+  renderSectionBlock,
+  renderSpacerBlock,
   renderTableBlock,
   renderVideoBlock,
   type RenderMode
@@ -96,6 +99,10 @@ export const blockRegistry: {
     render: renderCodeBlock,
     createEditor: createCodeEditor
   },
+  columns: {
+    render: renderColumnsBlock,
+    createEditor: () => document.createElement('div')
+  },
   audio: {
     render: renderAudioBlock,
     createEditor: createAudioEditor
@@ -115,6 +122,14 @@ export const blockRegistry: {
   question_set: {
     render: renderQuestionSetBlock,
     createEditor: createQuestionSetEditor
+  },
+  section: {
+    render: renderSectionBlock,
+    createEditor: () => document.createElement('div')
+  },
+  spacer: {
+    render: renderSpacerBlock,
+    createEditor: () => document.createElement('div')
   }
 };
 
@@ -142,6 +157,7 @@ export {
   renderBlock,
   renderCalloutBlock,
   renderCodeBlock,
+  renderColumnsBlock,
   renderDefinitionBlock,
   renderDividerBlock,
   renderEmbedBlock,
@@ -151,6 +167,8 @@ export {
   renderQuestionSetBlock,
   renderQuoteBlock,
   renderRichTextBlock,
+  renderSectionBlock,
+  renderSpacerBlock,
   renderTableBlock,
   renderVideoBlock
 };

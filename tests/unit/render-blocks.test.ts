@@ -325,6 +325,7 @@ describe('blockRegistry', () => {
       'audio',
       'callout',
       'code',
+      'columns',
       'definition',
       'divider',
       'embed',
@@ -334,6 +335,8 @@ describe('blockRegistry', () => {
       'question_set',
       'quote',
       'rich_text',
+      'section',
+      'spacer',
       'table',
       'video'
     ]);

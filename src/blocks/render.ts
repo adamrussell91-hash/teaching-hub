@@ -418,6 +418,61 @@ export function renderQuestionSetBlock(
   return wrapBlock(wrap, block, mode);
 }
 
+export function renderSpacerBlock(
+  block: Extract<Block, { block_type: 'spacer' }>,
+  mode: RenderMode
+): HTMLElement {
+  const el = document.createElement('div');
+  el.className = `block-spacer block-spacer--${block.content.size}`;
+  el.setAttribute('aria-hidden', 'true');
+  return wrapBlock(el, block, mode);
+}
+
+export function renderSectionBlock(
+  block: Extract<Block, { block_type: 'section' }>,
+  mode: RenderMode
+): HTMLElement {
+  const section = document.createElement('section');
+  section.className = 'block-section';
+
+  const title = document.createElement('h2');
+  title.className = 'block-section__title';
+  title.textContent = block.content.title;
+
+  const body = document.createElement('div');
+  body.className = 'block-section__body';
+  for (const child of block.content.blocks) {
+    body.append(renderBlock(child, mode));
+  }
+
+  section.append(title, body);
+  return wrapBlock(section, block, mode);
+}
+
+export function renderColumnsBlock(
+  block: Extract<Block, { block_type: 'columns' }>,
+  mode: RenderMode
+): HTMLElement {
+  const grid = document.createElement('div');
+  grid.className = 'block-columns';
+  grid.dataset.preset = block.content.preset;
+  grid.style.gridTemplateColumns = block.content.columns
+    .map((col) => `${col.width}fr`)
+    .join(' ');
+
+  for (const col of block.content.columns) {
+    const cell = document.createElement('div');
+    cell.className = 'block-columns__col';
+    cell.dataset.width = String(col.width);
+    for (const child of col.blocks) {
+      cell.append(renderBlock(child, mode));
+    }
+    grid.append(cell);
+  }
+
+  return wrapBlock(grid, block, mode);
+}
+
 export function renderBlock(block: Block, mode: RenderMode): HTMLElement {
   switch (block.block_type) {
     case 'rich_text':
@@ -452,5 +507,11 @@ export function renderBlock(block: Block, mode: RenderMode): HTMLElement {
       return renderTableBlock(block, mode);
     case 'question_set':
       return renderQuestionSetBlock(block, mode);
+    case 'spacer':
+      return renderSpacerBlock(block, mode);
+    case 'section':
+      return renderSectionBlock(block, mode);
+    case 'columns':
+      return renderColumnsBlock(block, mode);
   }
 }
