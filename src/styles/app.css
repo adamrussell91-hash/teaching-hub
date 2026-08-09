@@ -2128,6 +2128,18 @@ a.home-class-tile:hover {
 }
 
 /* Gallery */
+.block-gallery--small {
+  max-width: 18rem;
+}
+
+.block-gallery--medium {
+  max-width: 32rem;
+}
+
+.block-gallery--large {
+  max-width: 100%;
+}
+
 .block-gallery__list {
   display: grid;
   gap: 0.75rem;
