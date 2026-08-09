@@ -2,7 +2,7 @@ import { draftLessonKey, getContentStore, getJSON, publishedLessonKey, setJSON }
 import { getTeacherSession } from './_shared/session.mts';
 import { PublishedLessonSchema, toPublishedLesson, validatePublishableLesson, type Lesson } from './_shared/validate.mts';
 import { filterBlocksForStudent } from '../../src/blocks/visibility';
-import { sanitizeRichTextHtml } from '../../src/blocks/sanitize';
+import { sanitizeBlocksDeep } from '../../src/blocks/sanitize-blocks';
 import {
   errorResponse,
   guardRequestOrigin,
@@ -71,12 +71,7 @@ export default async function handler(request: Request, context: FunctionContext
 
   const publishedAt = new Date().toISOString();
   const fullSnapshot = toPublishedLesson(validated.data, publishedAt);
-  const studentBlocks = filterBlocksForStudent(fullSnapshot.blocks).map((block) => {
-    if (block.block_type === 'rich_text' || block.block_type === 'html') {
-      return { ...block, content: { html: sanitizeRichTextHtml(block.content.html) } };
-    }
-    return block;
-  });
+  const studentBlocks = sanitizeBlocksDeep(filterBlocksForStudent(fullSnapshot.blocks));
   const studentSnapshot = PublishedLessonSchema.parse({ ...fullSnapshot, blocks: studentBlocks });
 
   await setJSON(store, publishedLessonKey(id), studentSnapshot);

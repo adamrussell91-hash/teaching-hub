@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createBlock, cloneBlockWithNewIds } from '@/blocks/create-block';
+import { sanitizeBlocksDeep } from '@/blocks/sanitize-blocks';
 import { BlockSchema } from '@/schemas/block';
 
 const timestamps = {
@@ -199,6 +200,23 @@ describe('createBlock layout defaults', () => {
       block_type: 'spacer',
       content: { size: 'medium' }
     });
+  });
+});
+
+describe('sanitizeBlocksDeep', () => {
+  it('sanitises rich_text nested under columns', () => {
+    const columns = createBlock('columns', 'cols');
+    if (columns.block_type !== 'columns') throw new Error('expected columns');
+    const rt = createBlock('rich_text', 'rt');
+    if (rt.block_type !== 'rich_text') throw new Error('expected rich_text');
+    rt.content.html = '<p>Hi<script>alert(1)</script></p>';
+    columns.content.columns[0]!.blocks = [rt] as typeof columns.content.columns[0]['blocks'];
+
+    const [out] = sanitizeBlocksDeep([columns]);
+    if (out?.block_type !== 'columns') throw new Error('expected columns');
+    const child = out.content.columns[0]!.blocks[0]!;
+    if (child.block_type !== 'rich_text') throw new Error('expected rich_text');
+    expect(child.content.html).not.toContain('<script>');
   });
 });
 
