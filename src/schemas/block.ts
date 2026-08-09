@@ -54,6 +54,14 @@ export const CalloutStyleSchema = z.enum([
   'teacher'
 ]);
 export const QuestionKindSchema = z.enum(['short_answer', 'multiple_choice']);
+export const ResponseSpaceSchema = z.enum([
+  'none',
+  'short',
+  'medium',
+  'long',
+  'extended'
+]);
+export type ResponseSpace = z.infer<typeof ResponseSpaceSchema>;
 
 const blockTimestamps = {
   created_at: IsoDateSchema,
@@ -340,7 +348,8 @@ export const QuestionItemSchema = z.object({
   id: z.string().min(1),
   prompt: z.string(),
   kind: QuestionKindSchema,
-  options: z.array(z.string()).optional()
+  options: z.array(z.string()).optional(),
+  response_space: ResponseSpaceSchema.optional()
 });
 
 export const QuestionSetBlockSchema = z.object({

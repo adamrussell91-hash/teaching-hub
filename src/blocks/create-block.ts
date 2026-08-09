@@ -288,7 +288,9 @@ export function createBlock(type: NewBlockType, id: string): Block {
         block_type: 'question_set',
         variant: 'medium',
         content: {
-          questions: [{ id: `${id}_q1`, prompt: '', kind: 'short_answer' }]
+          questions: [
+            { id: `${id}_q1`, prompt: '', kind: 'short_answer', response_space: 'medium' }
+          ]
         }
       };
     case 'flashcards':

@@ -1045,11 +1045,21 @@ export function createQuestionSetEditor(
   const questionsContainer = document.createElement('div');
   questionsContainer.className = 'block-editor__questions';
 
+  const RESPONSE_SPACE_OPTIONS = [
+    { value: 'none', label: 'None' },
+    { value: 'short', label: 'Short' },
+    { value: 'medium', label: 'Medium' },
+    { value: 'long', label: 'Long' },
+    { value: 'extended', label: 'Extended' }
+  ] as const;
+
   let questions = block.content.questions.map((q) => ({
     id: q.id,
     prompt: q.prompt,
     kind: q.kind,
-    options: q.options ? [...q.options] : undefined as string[] | undefined
+    options: q.options ? [...q.options] : undefined as string[] | undefined,
+    response_space:
+      q.kind === 'short_answer' ? (q.response_space ?? ('medium' as const)) : undefined
   }));
   let questionCounter = questions.length;
 
@@ -1062,7 +1072,10 @@ export function createQuestionSetEditor(
           id: q.id,
           prompt: q.prompt,
           kind: q.kind,
-          options: q.kind === 'multiple_choice' ? [...(q.options ?? [])] : undefined
+          options: q.kind === 'multiple_choice' ? [...(q.options ?? [])] : undefined,
+          ...(q.kind === 'short_answer' && q.response_space
+            ? { response_space: q.response_space }
+            : {})
         }))
       }
     });
@@ -1093,6 +1106,18 @@ export function createQuestionSetEditor(
         kind.append(opt);
       }
 
+      const responseSpace = document.createElement('select');
+      responseSpace.className = 'block-editor__question-response-space';
+      responseSpace.setAttribute('aria-label', `Question ${index + 1} response space`);
+      for (const option of RESPONSE_SPACE_OPTIONS) {
+        const opt = document.createElement('option');
+        opt.value = option.value;
+        opt.textContent = option.label;
+        responseSpace.append(opt);
+      }
+      responseSpace.value = question.response_space ?? 'medium';
+      responseSpace.hidden = question.kind !== 'short_answer';
+
       const options = document.createElement('textarea');
       options.className = 'block-editor__question-options';
       options.rows = 3;
@@ -1115,7 +1140,8 @@ export function createQuestionSetEditor(
               id: `q_${questionCounter}`,
               prompt: '',
               kind: 'short_answer' as const,
-              options: undefined
+              options: undefined,
+              response_space: 'medium' as const
             }
           ];
         }
@@ -1139,9 +1165,27 @@ export function createQuestionSetEditor(
                   .split('\n')
                   .map((line) => line.trim())
                   .filter(Boolean)
-              : undefined
+              : undefined,
+          response_space: nextKind === 'short_answer' ? 'medium' : undefined
         };
         options.hidden = nextKind !== 'multiple_choice';
+        responseSpace.hidden = nextKind !== 'short_answer';
+        if (nextKind === 'short_answer') {
+          responseSpace.value = 'medium';
+        }
+        emitChange();
+      });
+
+      responseSpace.addEventListener('change', () => {
+        questions[index] = {
+          ...questions[index]!,
+          response_space: responseSpace.value as
+            | 'none'
+            | 'short'
+            | 'medium'
+            | 'long'
+            | 'extended'
+        };
         emitChange();
       });
 
@@ -1156,7 +1200,7 @@ export function createQuestionSetEditor(
         emitChange();
       });
 
-      row.append(prompt, kind, options, remove);
+      row.append(prompt, kind, responseSpace, options, remove);
       questionsContainer.append(row);
     });
   }
@@ -1175,7 +1219,8 @@ export function createQuestionSetEditor(
         id: `q_${questionCounter}`,
         prompt: '',
         kind: 'short_answer' as const,
-        options: undefined
+        options: undefined,
+        response_space: 'medium' as const
       }
     ];
     emitChange();
