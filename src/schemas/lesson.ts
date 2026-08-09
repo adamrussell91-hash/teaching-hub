@@ -3,6 +3,8 @@ import { CommonFields, IsoDateSchema } from './common';
 import { BlockSchema } from './block';
 import { isHttpUrl } from '../blocks/url-safety';
 import { parseClozeText } from '../blocks/learning-activity';
+import { sanitizeSvgMarkup } from '../blocks/sanitize-svg';
+import { validateMindMap, validateConceptMap } from '../blocks/graph-layout';
 
 export const LessonSchema = z.object({
   ...CommonFields,
@@ -164,6 +166,46 @@ function publishBlockIssues(blocks: z.infer<typeof BlockSchema>[]): string | nul
           return 'Self check checklists need at least one item to publish';
         }
       }
+    }
+    if (block.block_type === 'chart') {
+      for (const series of block.content.series) {
+        if (series.points.length === 0) {
+          return 'Chart series need at least one point to publish';
+        }
+        for (const point of series.points) {
+          if (!Number.isFinite(point.y)) {
+            return 'Chart points need finite y values to publish';
+          }
+        }
+      }
+    }
+    if (block.block_type === 'equation') {
+      if (block.content.latex.trim().length === 0) {
+        return 'Equation blocks need LaTeX to publish';
+      }
+    }
+    if (block.block_type === 'diagram') {
+      if (block.content.source === 'image') {
+        if (!isHttpUrl(block.content.image_url ?? '')) {
+          return 'Diagram image needs a valid http(s) URL to publish';
+        }
+        if ((block.content.image_alt ?? '').trim().length === 0) {
+          return 'Diagram image needs alt text to publish';
+        }
+      } else {
+        const cleaned = sanitizeSvgMarkup(block.content.svg_markup ?? '');
+        if (cleaned.trim().length === 0) {
+          return 'Diagram SVG needs safe SVG markup to publish';
+        }
+      }
+    }
+    if (block.block_type === 'mind_map') {
+      const issue = validateMindMap(block.content);
+      if (issue) return issue;
+    }
+    if (block.block_type === 'concept_map') {
+      const issue = validateConceptMap(block.content);
+      if (issue) return issue;
     }
   }
   return null;

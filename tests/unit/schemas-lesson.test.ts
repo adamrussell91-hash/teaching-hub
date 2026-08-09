@@ -1000,3 +1000,261 @@ describe('PublishableLessonSchema learning activity rules', () => {
     expect(result.success).toBe(true);
   });
 });
+
+describe('PublishableLessonSchema visualisation rules', () => {
+  const baseLesson = {
+    id: 'lesson_1',
+    type: 'lesson' as const,
+    title: 'Lesson',
+    slug: 'lesson',
+    status: 'active' as const,
+    unit_id: 'unit_aotfw',
+    sequence: 1,
+    created_at: '2026-01-01T00:00:00.000Z',
+    updated_at: '2026-01-01T00:00:00.000Z',
+    schema_version: 1 as const
+  };
+
+  const okChart = {
+    ...baseBlock,
+    block_type: 'chart' as const,
+    content: {
+      chart_type: 'bar' as const,
+      title: 'Demo',
+      series: [
+        {
+          id: 's1',
+          name: 'Series 1',
+          points: [
+            { x: 'A', y: 3 },
+            { x: 'B', y: 5 }
+          ]
+        }
+      ]
+    }
+  };
+
+  const okEquation = {
+    ...baseBlock,
+    id: 'eq1',
+    block_type: 'equation' as const,
+    content: { latex: 'E = mc^2' }
+  };
+
+  const okDiagramImage = {
+    ...baseBlock,
+    id: 'dg1',
+    block_type: 'diagram' as const,
+    content: {
+      source: 'image' as const,
+      image_url: 'https://cdn.example.com/diagram.png',
+      image_alt: 'Cell diagram'
+    }
+  };
+
+  const okDiagramSvg = {
+    ...baseBlock,
+    id: 'dg2',
+    block_type: 'diagram' as const,
+    content: {
+      source: 'svg' as const,
+      svg_markup: '<svg xmlns="http://www.w3.org/2000/svg"><circle r="5"/></svg>'
+    }
+  };
+
+  const okMindMap = {
+    ...baseBlock,
+    id: 'mm1',
+    block_type: 'mind_map' as const,
+    content: {
+      nodes: [
+        { id: 'n1', label: 'Centre', parent_id: null },
+        { id: 'n2', label: 'Idea 1', parent_id: 'n1' },
+        { id: 'n3', label: 'Idea 2', parent_id: 'n1' }
+      ],
+      edges: []
+    }
+  };
+
+  const okConceptMap = {
+    ...baseBlock,
+    id: 'cm1',
+    block_type: 'concept_map' as const,
+    content: {
+      nodes: [
+        { id: 'a', label: 'Concept A' },
+        { id: 'b', label: 'Concept B' }
+      ],
+      edges: [{ id: 'e1', from: 'a', to: 'b', label: 'relates to' }]
+    }
+  };
+
+  it('rejects chart with non-finite y on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [
+        {
+          ...okChart,
+          content: {
+            ...okChart.content,
+            series: [
+              {
+                id: 's1',
+                name: 'Series 1',
+                points: [
+                  { x: 'A', y: 3 },
+                  { x: 'B', y: Number.POSITIVE_INFINITY }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.message.includes('finite y'))).toBe(true);
+    }
+  });
+
+  it('rejects equation with empty latex on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [{ ...okEquation, content: { latex: '   ' } }]
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.message.includes('LaTeX'))).toBe(true);
+    }
+  });
+
+  it('rejects diagram image with bad url on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [
+        {
+          ...okDiagramImage,
+          content: {
+            source: 'image',
+            image_url: 'not-a-url',
+            image_alt: 'Alt text'
+          }
+        }
+      ]
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.message.includes('http(s) URL'))).toBe(true);
+    }
+  });
+
+  it('rejects diagram image with missing alt on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [
+        {
+          ...okDiagramImage,
+          content: {
+            source: 'image',
+            image_url: 'https://cdn.example.com/diagram.png',
+            image_alt: '   '
+          }
+        }
+      ]
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.message.includes('alt text'))).toBe(true);
+    }
+  });
+
+  it('rejects diagram svg with empty markup on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [
+        {
+          ...okDiagramSvg,
+          content: { source: 'svg', svg_markup: '' }
+        }
+      ]
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.message.includes('safe SVG'))).toBe(true);
+    }
+  });
+
+  it('rejects mind map with multiple roots on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [
+        {
+          ...okMindMap,
+          content: {
+            nodes: [
+              { id: 'n1', label: 'A', parent_id: null },
+              { id: 'n2', label: 'B', parent_id: null }
+            ],
+            edges: []
+          }
+        }
+      ]
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.message.includes('root'))).toBe(true);
+    }
+  });
+
+  it('rejects mind map with cycle on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [
+        {
+          ...okMindMap,
+          content: {
+            nodes: [
+              { id: 'n1', label: 'A', parent_id: 'n2' },
+              { id: 'n2', label: 'B', parent_id: 'n1' }
+            ],
+            edges: []
+          }
+        }
+      ]
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.message.includes('cycle'))).toBe(true);
+    }
+  });
+
+  it('rejects concept map with missing edge label on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [
+        {
+          ...okConceptMap,
+          content: {
+            nodes: [
+              { id: 'a', label: 'Concept A' },
+              { id: 'b', label: 'Concept B' }
+            ],
+            edges: [{ id: 'e1', from: 'a', to: 'b', label: '   ' }]
+          }
+        }
+      ]
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.message.includes('label'))).toBe(true);
+    }
+  });
+
+  it('accepts valid visualisation blocks on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [okChart, okEquation, okDiagramImage, okDiagramSvg, okMindMap, okConceptMap]
+    });
+    expect(result.success).toBe(true);
+  });
+});
