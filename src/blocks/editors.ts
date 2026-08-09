@@ -2,7 +2,8 @@ import { parseVideoInput } from '@/blocks/video-url';
 import {
   createColumnsEditor,
   createSectionEditor,
-  createSpacerEditor
+  createSpacerEditor,
+  createTabsEditor
 } from '@/blocks/layout-editors';
 import type { Block } from '@/schemas/block';
 
@@ -1093,5 +1094,7 @@ export function createBlockEditor(
       return createSectionEditor(block, onChange, latest as () => Extract<Block, { block_type: 'section' }>);
     case 'columns':
       return createColumnsEditor(block, onChange, latest as () => Extract<Block, { block_type: 'columns' }>);
+    case 'tabs':
+      return createTabsEditor(block, onChange, latest as () => Extract<Block, { block_type: 'tabs' }>);
   }
 }

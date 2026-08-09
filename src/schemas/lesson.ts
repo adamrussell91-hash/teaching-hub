@@ -94,6 +94,15 @@ function publishBlockIssues(blocks: z.infer<typeof BlockSchema>[]): string | nul
         if (nested) return nested;
       }
     }
+    if (block.block_type === 'tabs') {
+      for (const panel of block.content.tabs) {
+        if (panel.label.trim().length === 0) {
+          return 'Tabs blocks need a label on every tab to publish';
+        }
+        const nested = publishBlockIssues(panel.blocks);
+        if (nested) return nested;
+      }
+    }
   }
   return null;
 }

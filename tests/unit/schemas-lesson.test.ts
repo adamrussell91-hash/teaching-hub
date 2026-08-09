@@ -501,4 +501,44 @@ describe('PublishableLessonSchema layout rules', () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it('rejects tabs with empty label on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...validLesson,
+      blocks: [
+        {
+          ...baseBlock,
+          id: 'tabs1',
+          block_type: 'tabs',
+          content: {
+            tabs: [
+              { id: 'a', label: '   ', blocks: [] },
+              { id: 'b', label: 'OK', blocks: [] }
+            ]
+          }
+        }
+      ]
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('allows tabs with empty panels when labels are set', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...validLesson,
+      blocks: [
+        {
+          ...baseBlock,
+          id: 'tabs1',
+          block_type: 'tabs',
+          content: {
+            tabs: [
+              { id: 'a', label: 'One', blocks: [] },
+              { id: 'b', label: 'Two', blocks: [] }
+            ]
+          }
+        }
+      ]
+    });
+    expect(result.success).toBe(true);
+  });
 });

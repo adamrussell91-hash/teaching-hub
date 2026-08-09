@@ -21,7 +21,8 @@ export const BlockTypeSchema = z.enum([
   'question_set',
   'columns',
   'section',
-  'spacer'
+  'spacer',
+  'tabs'
 ]);
 
 export const ColumnPresetSchema = z.enum(['50-50', '33-67', '67-33', '33-33-33']);
@@ -353,11 +354,43 @@ export const ColumnsBlockSchema = z.object({
   ...blockTimestamps
 });
 
-export const SectionChildBlockSchema = z.lazy(() =>
+/** Allowed inside a tabs panel: leaves, spacer, columns — not tabs or section */
+export const TabChildBlockSchema = z.lazy(() =>
   z.discriminatedUnion('block_type', [
     ...leafBlockSchemas,
     SpacerBlockSchema,
     ColumnsBlockSchema
+  ])
+);
+
+export const TabsBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('tabs'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    tabs: z
+      .array(
+        z.object({
+          id: z.string().min(1),
+          label: z.string(),
+          blocks: z.array(TabChildBlockSchema)
+        })
+      )
+      .min(2)
+      .max(8)
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
+export const SectionChildBlockSchema = z.lazy(() =>
+  z.discriminatedUnion('block_type', [
+    ...leafBlockSchemas,
+    SpacerBlockSchema,
+    ColumnsBlockSchema,
+    TabsBlockSchema
   ])
 );
 
@@ -381,7 +414,8 @@ export const BlockSchema = z.lazy(() =>
     ...leafBlockSchemas,
     SpacerBlockSchema,
     ColumnsBlockSchema,
-    SectionBlockSchema
+    SectionBlockSchema,
+    TabsBlockSchema
   ])
 );
 

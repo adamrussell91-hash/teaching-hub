@@ -473,6 +473,89 @@ export function renderColumnsBlock(
   return wrapBlock(grid, block, mode);
 }
 
+export function renderTabsBlock(
+  block: Extract<Block, { block_type: 'tabs' }>,
+  mode: RenderMode
+): HTMLElement {
+  const root = document.createElement('div');
+  root.className = 'block-tabs';
+
+  const tablist = document.createElement('div');
+  tablist.className = 'block-tabs__tablist';
+  tablist.setAttribute('role', 'tablist');
+  tablist.setAttribute('aria-label', 'Content tabs');
+
+  const panels: HTMLElement[] = [];
+  const buttons: HTMLButtonElement[] = [];
+  let selected = 0;
+
+  function selectTab(index: number): void {
+    selected = index;
+    buttons.forEach((btn, i) => {
+      const active = i === selected;
+      btn.setAttribute('aria-selected', active ? 'true' : 'false');
+      btn.tabIndex = active ? 0 : -1;
+      btn.classList.toggle('block-tabs__tab--active', active);
+    });
+    panels.forEach((panel, i) => {
+      const active = i === selected;
+      panel.hidden = !active;
+      panel.replaceChildren();
+      if (active) {
+        for (const child of block.content.tabs[i]!.blocks) {
+          panel.append(renderBlock(child, mode));
+        }
+      }
+    });
+  }
+
+  block.content.tabs.forEach((panelData, index) => {
+    const tabId = `${block.id}-tab-${panelData.id}`;
+    const panelId = `${block.id}-panel-${panelData.id}`;
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'block-tabs__tab';
+    btn.setAttribute('role', 'tab');
+    btn.id = tabId;
+    btn.setAttribute('aria-controls', panelId);
+    btn.textContent = panelData.label || `Tab ${index + 1}`;
+    btn.addEventListener('click', () => selectTab(index));
+    buttons.push(btn);
+    tablist.append(btn);
+
+    const panel = document.createElement('div');
+    panel.className = 'block-tabs__panel';
+    panel.setAttribute('role', 'tabpanel');
+    panel.id = panelId;
+    panel.setAttribute('aria-labelledby', tabId);
+    panels.push(panel);
+  });
+
+  tablist.addEventListener('keydown', (event) => {
+    if (buttons.length === 0) return;
+    let next = selected;
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      next = (selected + 1) % buttons.length;
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      next = (selected - 1 + buttons.length) % buttons.length;
+    } else if (event.key === 'Home') {
+      next = 0;
+    } else if (event.key === 'End') {
+      next = buttons.length - 1;
+    } else {
+      return;
+    }
+    event.preventDefault();
+    selectTab(next);
+    buttons[next]!.focus();
+  });
+
+  root.append(tablist, ...panels);
+  selectTab(0);
+  return wrapBlock(root, block, mode);
+}
+
 export function renderBlock(block: Block, mode: RenderMode): HTMLElement {
   switch (block.block_type) {
     case 'rich_text':
@@ -513,5 +596,7 @@ export function renderBlock(block: Block, mode: RenderMode): HTMLElement {
       return renderSectionBlock(block, mode);
     case 'columns':
       return renderColumnsBlock(block, mode);
+    case 'tabs':
+      return renderTabsBlock(block, mode);
   }
 }

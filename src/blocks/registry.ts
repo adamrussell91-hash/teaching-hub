@@ -21,7 +21,8 @@ import {
 import {
   createColumnsEditor,
   createSectionEditor,
-  createSpacerEditor
+  createSpacerEditor,
+  createTabsEditor
 } from '@/blocks/layout-editors';
 import {
   renderAccordionBlock,
@@ -43,6 +44,7 @@ import {
   renderSectionBlock,
   renderSpacerBlock,
   renderTableBlock,
+  renderTabsBlock,
   renderVideoBlock,
   type RenderMode
 } from '@/blocks/render';
@@ -135,6 +137,10 @@ export const blockRegistry: {
   spacer: {
     render: renderSpacerBlock,
     createEditor: createSpacerEditor
+  },
+  tabs: {
+    render: renderTabsBlock,
+    createEditor: createTabsEditor
   }
 };
 
@@ -158,6 +164,7 @@ export {
   createSectionEditor,
   createSpacerEditor,
   createTableEditor,
+  createTabsEditor,
   createVideoEditor,
   renderAccordionBlock,
   renderAttachmentBlock,
@@ -178,6 +185,7 @@ export {
   renderSectionBlock,
   renderSpacerBlock,
   renderTableBlock,
+  renderTabsBlock,
   renderVideoBlock
 };
 

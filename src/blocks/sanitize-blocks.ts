@@ -3,6 +3,7 @@ import type { Block } from '../schemas/block';
 
 type ColumnsBlock = Extract<Block, { block_type: 'columns' }>;
 type SectionBlock = Extract<Block, { block_type: 'section' }>;
+type TabsBlock = Extract<Block, { block_type: 'tabs' }>;
 
 export function sanitizeBlocksDeep(blocks: Block[]): Block[] {
   return blocks.map((block) => {
@@ -29,6 +30,17 @@ export function sanitizeBlocksDeep(blocks: Block[]): Block[] {
           columns: block.content.columns.map((col) => ({
             ...col,
             blocks: sanitizeBlocksDeep(col.blocks) as ColumnsBlock['content']['columns'][number]['blocks']
+          }))
+        }
+      };
+    }
+    if (block.block_type === 'tabs') {
+      return {
+        ...block,
+        content: {
+          tabs: block.content.tabs.map((panel) => ({
+            ...panel,
+            blocks: sanitizeBlocksDeep(panel.blocks) as TabsBlock['content']['tabs'][number]['blocks']
           }))
         }
       };

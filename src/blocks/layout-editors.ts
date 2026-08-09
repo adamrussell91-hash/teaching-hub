@@ -3,10 +3,16 @@ import {
   remapColumnsPreset,
   type ColumnPreset
 } from '@/blocks/column-presets';
-import { COLUMN_CHILD_TYPES, SECTION_CHILD_TYPES } from '@/blocks/create-block';
+import {
+  COLUMN_CHILD_TYPES,
+  SECTION_CHILD_TYPES,
+  TAB_CHILD_TYPES
+} from '@/blocks/create-block';
 import { editorShell, type BlockChangeHandler } from '@/blocks/editors';
 import { createNestedBlocksEditor } from '@/blocks/nested-blocks-editor';
 import type { Block } from '@/schemas/block';
+
+type TabsBlock = Extract<Block, { block_type: 'tabs' }>;
 
 export function createSpacerEditor(
   block: Extract<Block, { block_type: 'spacer' }>,
@@ -176,5 +182,140 @@ export function createColumnsEditor(
 
   rebuildPanes();
   fields.append(preset, panes);
+  return editorShell(block, onChange, fields, getLatest);
+}
+
+export function createTabsEditor(
+  block: TabsBlock,
+  onChange: BlockChangeHandler<TabsBlock>,
+  getLatest: () => TabsBlock = () => block
+): HTMLElement {
+  const fields = document.createElement('div');
+  fields.className = 'block-editor__fields block-editor__tabs';
+
+  const panelsRoot = document.createElement('div');
+  panelsRoot.className = 'block-editor__tabs-panels';
+
+  const addBtn = document.createElement('button');
+  addBtn.type = 'button';
+  addBtn.className = 'btn btn--ghost block-editor__tabs-add';
+  addBtn.textContent = 'Add tab';
+
+  function emitTabs(tabs: TabsBlock['content']['tabs']): void {
+    onChange({
+      ...getLatest(),
+      content: { tabs }
+    });
+    rebuild();
+  }
+
+  function rebuild(): void {
+    const current = getLatest();
+    panelsRoot.replaceChildren();
+    addBtn.disabled = current.content.tabs.length >= 8;
+
+    current.content.tabs.forEach((panel, panelIndex) => {
+      const pane = document.createElement('div');
+      pane.className = 'block-editor__tabs-panel';
+
+      const header = document.createElement('div');
+      header.className = 'block-editor__tabs-panel-header';
+
+      const label = document.createElement('input');
+      label.type = 'text';
+      label.className = 'block-editor__tab-label';
+      label.value = panel.label;
+      label.placeholder = `Tab ${panelIndex + 1} label`;
+      label.setAttribute('aria-label', `Tab ${panelIndex + 1} label`);
+      label.addEventListener('input', () => {
+        const latest = getLatest();
+        const tabs = latest.content.tabs.map((t, i) =>
+          i === panelIndex ? { ...t, label: label.value } : t
+        );
+        onChange({
+          ...latest,
+          content: { tabs }
+        });
+      });
+
+      const up = document.createElement('button');
+      up.type = 'button';
+      up.className = 'btn btn--ghost';
+      up.textContent = '↑';
+      up.disabled = panelIndex === 0;
+      up.addEventListener('click', () => {
+        if (panelIndex === 0) return;
+        const tabs = [...getLatest().content.tabs];
+        const tmp = tabs[panelIndex - 1]!;
+        tabs[panelIndex - 1] = tabs[panelIndex]!;
+        tabs[panelIndex] = tmp;
+        emitTabs(tabs);
+      });
+
+      const down = document.createElement('button');
+      down.type = 'button';
+      down.className = 'btn btn--ghost';
+      down.textContent = '↓';
+      down.disabled = panelIndex === current.content.tabs.length - 1;
+      down.addEventListener('click', () => {
+        const tabs = [...getLatest().content.tabs];
+        if (panelIndex >= tabs.length - 1) return;
+        const tmp = tabs[panelIndex + 1]!;
+        tabs[panelIndex + 1] = tabs[panelIndex]!;
+        tabs[panelIndex] = tmp;
+        emitTabs(tabs);
+      });
+
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'btn btn--ghost block-editor__tabs-remove';
+      remove.textContent = 'Remove tab';
+      remove.disabled = current.content.tabs.length <= 2;
+      remove.addEventListener('click', () => {
+        const latest = getLatest();
+        if (latest.content.tabs.length <= 2) return;
+        emitTabs(latest.content.tabs.filter((_, i) => i !== panelIndex));
+      });
+
+      header.append(label, up, down, remove);
+
+      const nested = createNestedBlocksEditor({
+        blocks: panel.blocks,
+        allowedTypes: TAB_CHILD_TYPES,
+        idFactory: () => `${getLatest().id}_t${panelIndex}`,
+        onChange: (nextBlocks) => {
+          const latest = getLatest();
+          const tabs = latest.content.tabs.map((t, i) =>
+            i === panelIndex
+              ? {
+                  ...t,
+                  blocks: nextBlocks as TabsBlock['content']['tabs'][number]['blocks']
+                }
+              : t
+          );
+          onChange({
+            ...latest,
+            content: { tabs }
+          });
+        }
+      });
+
+      pane.append(header, nested);
+      panelsRoot.append(pane);
+    });
+  }
+
+  addBtn.addEventListener('click', () => {
+    const latest = getLatest();
+    if (latest.content.tabs.length >= 8) return;
+    const n = latest.content.tabs.length + 1;
+    emitTabs([
+      ...latest.content.tabs,
+      { id: `${latest.id}_t${n}_${Date.now()}`, label: '', blocks: [] }
+    ]);
+  });
+
+  rebuild();
+  fields.append(panelsRoot, addBtn);
   return editorShell(block, onChange, fields, getLatest);
 }
