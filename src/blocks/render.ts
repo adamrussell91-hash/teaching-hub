@@ -14,6 +14,13 @@ import { sanitizeSvgMarkup } from '@/blocks/sanitize-svg';
 import { isHttpUrl } from '@/blocks/url-safety';
 import { embedFrameSrc, embedUsesIframe } from '@/blocks/embed-url';
 import { videoEmbedSrc } from '@/blocks/video-url';
+import {
+  loadActivityState,
+  parseClozeText,
+  saveActivityState,
+  shuffleArray,
+  storageKey
+} from '@/blocks/learning-activity';
 import type { Block, EmbedProvider } from '@/schemas/block';
 
 export type RenderMode = 'teacher' | 'student';

@@ -20,11 +20,10 @@ Block primitives: [`docs/specs/03_BLOCK_SYSTEM.md`](specs/03_BLOCK_SYSTEM.md)
 
 Suggested order for continuing builder / teaching-page work (adjust as needed):
 
-1. **Map / Slides / Document viewer** — behaviours as needed (or jump to A4 / Drive)
+1. **A4 print pipeline** — preview + printable worksheet output (or jump to Drive / templates)
 
 Larger product tracks (not “next block”, but still ahead):
 
-- A4 print render
 - Google Drive / media library uploads
 - Templates & reuse
 - Search / nav acceleration
@@ -61,6 +60,7 @@ Larger product tracks (not “next block”, but still ahead):
 | 2026-08-09 | **HTML app** | Sandboxed inline `html_app` + optional laned OpenAI/Anthropic proxy — [`design`](superpowers/specs/2026-08-09-html-app-design.md) / [`plan`](superpowers/plans/2026-08-09-html-app.md) |
 | 2026-08-09 | **Builder UX** | Columns: Custom 12-grid widths + Move-to / HTML5 DnD between columns — [`design`](superpowers/specs/2026-08-09-builder-ux-columns-design.md) / [`plan`](superpowers/plans/2026-08-09-builder-ux-columns.md) |
 | 2026-08-09 | **Response space** | `response_space` on short-answer `question_set` items (schema + builder); student UI unchanged; print deferred — [`design`](superpowers/specs/2026-08-09-response-space-design.md) / [`plan`](superpowers/plans/2026-08-09-response-space.md) |
+| 2026-08-09 | **Embed viewers** | Map / Slides / Document / PDF via provider-aware `embed` (menu presets + URL detect; iframe vs card) — [`design`](superpowers/specs/2026-08-09-embed-viewers-design.md) / [`plan`](superpowers/plans/2026-08-09-embed-viewers.md) |
 
 ### Block types live today (32)
 
@@ -71,7 +71,7 @@ Larger product tracks (not “next block”, but still ahead):
 | Spec phase | Status |
 |------------|--------|
 | 0–4 Foundation → basic builder → publish | Done (core) |
-| 5 Block system expansion | **In progress** — layout + timeline + tabs + gallery + activities + viz + collection + html_app + columns UX + response space done; Map/Slides/Document next (or A4) |
+| 5 Block system expansion | **In progress** — layout + timeline + tabs + gallery + activities + viz + collection + html_app + columns UX + response space + embed viewers done; A4 print next |
 | 6–8 Unit/class pages, scheduling, scope | Largely done for v1 |
 | 9 A4 print | Not started |
 | 10 Google Drive | Not started |
@@ -95,7 +95,7 @@ Unchecked = not built yet.
 ### Content / media (remaining)
 - [x] Timeline (in-lesson)
 - [x] Gallery
-- [ ] Map / Slides / Document viewer behaviours (as needed)
+- [x] Map / Slides / Document viewer behaviours (as needed)
 - [x] `html_app` (sandboxed apps)
 
 ### Learning activities
@@ -123,4 +123,4 @@ Unchecked = not built yet.
 
 ## Latest note
 
-**2026-08-09** — Response space shipped (optional enum on short-answer questions + builder control). Student view unchanged; A4 lines later. Next: **Map / Slides / Document viewer** or jump to A4 print.
+**2026-08-09** — Embed viewers shipped (Map / Slides / Document / PDF presets + URL detection; Slides/Maps iframe, Docs/PDF card). Next: **A4 print pipeline**.
