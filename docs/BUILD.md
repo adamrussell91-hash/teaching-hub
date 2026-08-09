@@ -20,13 +20,12 @@ Block primitives: [`docs/specs/03_BLOCK_SYSTEM.md`](specs/03_BLOCK_SYSTEM.md)
 
 Suggested order for continuing builder / teaching-page work (adjust as needed):
 
-1. **Block: Gallery** — multi-image set (grid / carousel / comparison + lightbox)  
+1. **Learning activities pack** — flashcards, cloze, self_check  
 2. **Block: Timeline** — in-lesson chronology (not Scope & Sequence)  
-3. **Learning activities pack** — flashcards, cloze, self_check  
-4. **Visualisation pack** — chart, equation (diagram / mind_map / concept_map after)  
-5. **Structure: Collection** — nav / resource collections  
-6. **html_app** — sandboxed interactive HTML apps (separate from sanitised `html`)  
-7. **Builder UX** — drag-and-drop between columns; free-form column widths  
+3. **Visualisation pack** — chart, equation (diagram / mind_map / concept_map after)  
+4. **Structure: Collection** — nav / resource collections  
+5. **html_app** — sandboxed interactive HTML apps (separate from sanitised `html`)  
+6. **Builder UX** — drag-and-drop between columns; free-form column widths  
 
 Larger product tracks (not “next block”, but still ahead):
 
@@ -59,17 +58,18 @@ Larger product tracks (not “next block”, but still ahead):
 | 2026-08-09 | Builder variety | `quote`, `divider`, `definition`, `code`, `audio`, `attachment`, `accordion`, `table`, `question_set` + richer controls |
 | 2026-08-09 | **Layout Phase A** | Nested `columns` (4 presets), `section`, `spacer`; recursive schema/render/editor/publish |
 | 2026-08-09 | **Tabs** | Nested `tabs` panels (2–8); columns allowed in panels; stacked editor; student tablist — [`design`](superpowers/specs/2026-08-09-tabs-block-design.md) / [`plan`](superpowers/plans/2026-08-09-tabs-block.md) |
+| 2026-08-09 | **Gallery** | Multi-image set (grid / carousel / comparison + lightbox) — [`design`](superpowers/specs/2026-08-09-gallery-block-design.md) / [`plan`](superpowers/plans/2026-08-09-gallery-block.md) |
 
-### Block types live today (20)
+### Block types live today (21)
 
-`rich_text`, `heading`, `callout`, `image`, `video`, `embed`, `html`, `quote`, `divider`, `definition`, `code`, `audio`, `attachment`, `accordion`, `table`, `question_set`, `columns`, `section`, `spacer`, `tabs`
+`rich_text`, `heading`, `callout`, `image`, `video`, `embed`, `html`, `quote`, `divider`, `definition`, `code`, `audio`, `attachment`, `accordion`, `table`, `question_set`, `columns`, `section`, `spacer`, `tabs`, `gallery`
 
 ### Product phases (rough map)
 
 | Spec phase | Status |
 |------------|--------|
 | 0–4 Foundation → basic builder → publish | Done (core) |
-| 5 Block system expansion | **In progress** — layout + tabs done; gallery/activities/viz remain |
+| 5 Block system expansion | **In progress** — layout + tabs + gallery done; timeline/activities/viz remain |
 | 6–8 Unit/class pages, scheduling, scope | Largely done for v1 |
 | 9 A4 print | Not started |
 | 10 Google Drive | Not started |
@@ -92,7 +92,7 @@ Unchecked = not built yet.
 
 ### Content / media (remaining)
 - [ ] Timeline (in-lesson)
-- [ ] Gallery
+- [x] Gallery
 - [ ] Map / Slides / Document viewer behaviours (as needed)
 - [ ] `html_app` (sandboxed apps)
 
@@ -121,4 +121,4 @@ Unchecked = not built yet.
 
 ## Latest note
 
-**2026-08-09** — Tabs block added (nested panels, stacked editor, student tablist). Next builder slice: **Gallery** (priority over Timeline).
+**2026-08-09** — Gallery block shipped (grid / carousel / comparison + lightbox). Next builder slice: **Learning activities pack** unless priority shifts.
