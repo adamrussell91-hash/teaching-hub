@@ -110,6 +110,35 @@ describe('Visualisation schemas', () => {
       })
     ).toThrow();
   });
+
+  it('rejects chart series with more than 24 points', () => {
+    expect(() =>
+      BlockSchema.parse({
+        ...baseBlock,
+        block_type: 'chart',
+        content: {
+          chart_type: 'bar',
+          series: [
+            {
+              id: 's1',
+              name: 'A',
+              points: Array.from({ length: 25 }, (_, i) => ({ x: `p${i}`, y: i }))
+            }
+          ]
+        }
+      })
+    ).toThrow();
+  });
+
+  it('rejects mind_map with zero nodes', () => {
+    expect(() =>
+      BlockSchema.parse({
+        ...baseBlock,
+        block_type: 'mind_map',
+        content: { nodes: [], edges: [] }
+      })
+    ).toThrow();
+  });
 });
 
 describe('createBlock visualisation defaults', () => {
@@ -150,16 +179,44 @@ describe('createBlock visualisation defaults', () => {
   it('clone regenerates nested ids for chart and maps', () => {
     const chart = createBlock('chart', 'c1');
     const mind = createBlock('mind_map', 'm1');
+    const concept = createBlock('concept_map', 'cm1');
     let n = 0;
     const nextId = () => `id_${++n}`;
     const c2 = cloneBlockWithNewIds(chart, nextId);
     const m2 = cloneBlockWithNewIds(mind, nextId);
+    const cm2 = cloneBlockWithNewIds(concept, nextId);
+
     expect(c2.id).not.toBe(chart.id);
     if (c2.block_type === 'chart' && chart.block_type === 'chart') {
       expect(c2.content.series[0].id).not.toBe(chart.content.series[0].id);
     }
+
+    expect(m2.block_type).toBe('mind_map');
+    expect(mind.block_type).toBe('mind_map');
     if (m2.block_type === 'mind_map' && mind.block_type === 'mind_map') {
-      expect(m2.content.nodes[0].id).not.toBe(mind.content.nodes[0].id);
+      const [origRoot, ...origChildren] = mind.content.nodes;
+      const [clonedRoot, ...clonedChildren] = m2.content.nodes;
+      expect(clonedRoot.id).not.toBe(origRoot.id);
+      expect(clonedRoot.parent_id).toBeNull();
+      for (let i = 0; i < origChildren.length; i++) {
+        expect(clonedChildren[i].id).not.toBe(origChildren[i].id);
+        expect(clonedChildren[i].parent_id).toBe(clonedRoot.id);
+        expect(clonedChildren[i].parent_id).not.toBe(origRoot.id);
+      }
+    }
+
+    expect(cm2.block_type).toBe('concept_map');
+    expect(concept.block_type).toBe('concept_map');
+    if (cm2.block_type === 'concept_map' && concept.block_type === 'concept_map') {
+      expect(cm2.content.nodes).toHaveLength(2);
+      expect(cm2.content.edges).toHaveLength(1);
+      expect(cm2.content.nodes[0].id).not.toBe(concept.content.nodes[0].id);
+      expect(cm2.content.nodes[1].id).not.toBe(concept.content.nodes[1].id);
+      expect(cm2.content.edges[0].id).not.toBe(concept.content.edges[0].id);
+      expect(cm2.content.edges[0].from).toBe(cm2.content.nodes[0].id);
+      expect(cm2.content.edges[0].to).toBe(cm2.content.nodes[1].id);
+      expect(cm2.content.edges[0].from).not.toBe(concept.content.nodes[0].id);
+      expect(cm2.content.edges[0].to).not.toBe(concept.content.nodes[1].id);
     }
   });
 });
