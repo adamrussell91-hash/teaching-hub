@@ -338,6 +338,7 @@ describe('blockRegistry', () => {
       'section',
       'spacer',
       'table',
+      'timeline',
       'video'
     ]);
 

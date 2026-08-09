@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { BlockSchema } from '@/schemas/block';
 import { createBlock, cloneBlockWithNewIds, COLUMN_CHILD_TYPES } from '@/blocks/create-block';
 import { createBlockEditor } from '@/blocks/editors';
+import { renderBlock } from '@/blocks/render';
+import { blockRegistry } from '@/blocks/registry';
 
 const timestamps = {
   created_at: '2026-01-01T00:00:00.000Z',
@@ -225,5 +227,64 @@ describe('timeline editor', () => {
       'A',
       'C'
     ]);
+  });
+});
+
+describe('timeline render', () => {
+  it('renders ordered list with when, label, description', () => {
+    const block = createBlock('timeline', 'tl1');
+    if (block.block_type !== 'timeline') throw new Error('expected timeline');
+    block.content.events = [
+      {
+        id: 'e1',
+        when: '1788',
+        label: 'First Fleet',
+        description: 'Arrival at Sydney Cove',
+        image_url: 'https://example.com/a.png',
+        image_alt: 'Fleet',
+        link_url: 'https://example.com/more',
+        link_label: 'Read more'
+      }
+    ];
+    const el = renderBlock(block, 'student');
+    expect(el.dataset.blockType).toBe('timeline');
+    expect(el.querySelector('.block-timeline')).toBeTruthy();
+    expect(el.querySelectorAll('.block-timeline__event')).toHaveLength(1);
+    expect(el.querySelector('.block-timeline__when')?.textContent).toBe('1788');
+    expect(el.querySelector('.block-timeline__label')?.textContent).toBe('First Fleet');
+    expect(el.querySelector('.block-timeline__description')?.textContent).toBe(
+      'Arrival at Sydney Cove'
+    );
+    const img = el.querySelector('.block-timeline__image') as HTMLImageElement;
+    expect(img.src).toContain('https://example.com/a.png');
+    expect(img.alt).toBe('Fleet');
+    const link = el.querySelector('.block-timeline__link') as HTMLAnchorElement;
+    expect(link.href).toBe('https://example.com/more');
+    expect(link.textContent).toBe('Read more');
+    expect(link.target).toBe('_blank');
+    expect(link.rel).toContain('noopener');
+  });
+
+  it('uses Open link when link_label empty', () => {
+    const block = createBlock('timeline', 'tl1');
+    if (block.block_type !== 'timeline') throw new Error('expected timeline');
+    block.content.events = [
+      {
+        id: 'e1',
+        when: '1',
+        label: 'A',
+        description: '',
+        link_url: 'https://example.com'
+      }
+    ];
+    const el = renderBlock(block, 'student');
+    expect(el.querySelector('.block-timeline__link')?.textContent).toBe('Open link');
+  });
+
+  it('registry includes timeline', () => {
+    expect(blockRegistry.timeline).toBeDefined();
+    expect(renderBlock(createBlock('timeline', 't'), 'student').dataset.blockType).toBe(
+      'timeline'
+    );
   });
 });

@@ -1976,6 +1976,129 @@ a.home-class-tile:hover {
   white-space: pre-wrap;
 }
 
+.block-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  position: relative;
+}
+
+.block-timeline::before {
+  content: '';
+  position: absolute;
+  top: 0.35rem;
+  bottom: 0.35rem;
+  left: 0.35rem;
+  width: 2px;
+  background: color-mix(in srgb, var(--marine) 55%, transparent);
+}
+
+.block-timeline__event {
+  position: relative;
+  padding-left: 1.5rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.block-timeline__event::before {
+  content: '';
+  position: absolute;
+  left: 0.1rem;
+  top: 0.45rem;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--wave);
+  border: 2px solid var(--shore, #fff);
+  box-sizing: border-box;
+}
+
+.block-timeline__when {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--ink) 65%, transparent);
+}
+
+.block-timeline__label {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 1.05rem;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.block-timeline__description {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--ink);
+  white-space: pre-wrap;
+}
+
+.block-timeline__image {
+  display: block;
+  max-width: min(100%, 22rem);
+  border-radius: calc(var(--radius-md) * 0.5);
+  border: 1px solid var(--line);
+}
+
+.block-timeline__link {
+  font-family: var(--font-ui);
+  font-size: 0.92rem;
+  color: var(--wave);
+}
+
+.block-editor__timeline-items {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.block-editor__timeline-item {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius-md) * 0.5);
+  background: var(--glass);
+}
+
+@media (min-width: 48rem) {
+  .block-timeline {
+    flex-direction: row;
+    align-items: stretch;
+    gap: 1rem;
+    overflow-x: auto;
+    padding-top: 1.25rem;
+  }
+
+  .block-timeline::before {
+    top: 0.45rem;
+    bottom: auto;
+    left: 0;
+    right: 0;
+    width: auto;
+    height: 2px;
+  }
+
+  .block-timeline__event {
+    flex: 0 0 min(16rem, 70vw);
+    padding-left: 0;
+    padding-top: 1rem;
+  }
+
+  .block-timeline__event::before {
+    left: 0;
+    top: -0.05rem;
+  }
+}
+
 .block-table {
   width: 100%;
   border-collapse: collapse;

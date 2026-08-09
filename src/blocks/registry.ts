@@ -15,6 +15,7 @@ import {
   createQuoteEditor,
   createRichTextEditor,
   createTableEditor,
+  createTimelineEditor,
   createVideoEditor,
   type BlockChangeHandler
 } from '@/blocks/editors';
@@ -43,6 +44,7 @@ import {
   renderSectionBlock,
   renderSpacerBlock,
   renderTableBlock,
+  renderTimelineBlock,
   renderVideoBlock,
   type RenderMode
 } from '@/blocks/render';
@@ -128,6 +130,10 @@ export const blockRegistry: {
     render: renderQuestionSetBlock,
     createEditor: createQuestionSetEditor
   },
+  timeline: {
+    render: renderTimelineBlock,
+    createEditor: createTimelineEditor
+  },
   section: {
     render: renderSectionBlock,
     createEditor: createSectionEditor
@@ -158,6 +164,7 @@ export {
   createSectionEditor,
   createSpacerEditor,
   createTableEditor,
+  createTimelineEditor,
   createVideoEditor,
   renderAccordionBlock,
   renderAttachmentBlock,
@@ -178,6 +185,7 @@ export {
   renderSectionBlock,
   renderSpacerBlock,
   renderTableBlock,
+  renderTimelineBlock,
   renderVideoBlock
 };
 

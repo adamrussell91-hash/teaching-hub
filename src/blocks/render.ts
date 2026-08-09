@@ -473,6 +473,58 @@ export function renderColumnsBlock(
   return wrapBlock(grid, block, mode);
 }
 
+export function renderTimelineBlock(
+  block: Extract<Block, { block_type: 'timeline' }>,
+  mode: RenderMode
+): HTMLElement {
+  const list = document.createElement('ol');
+  list.className = 'block-timeline';
+
+  for (const event of block.content.events) {
+    const item = document.createElement('li');
+    item.className = 'block-timeline__event';
+
+    const when = document.createElement('p');
+    when.className = 'block-timeline__when';
+    when.textContent = event.when;
+
+    const label = document.createElement('h3');
+    label.className = 'block-timeline__label';
+    label.textContent = event.label;
+
+    item.append(when, label);
+
+    if (event.description.trim()) {
+      const description = document.createElement('p');
+      description.className = 'block-timeline__description';
+      description.textContent = event.description;
+      item.append(description);
+    }
+
+    if (event.image_url?.trim()) {
+      const img = document.createElement('img');
+      img.className = 'block-timeline__image';
+      img.src = event.image_url.trim();
+      img.alt = event.image_alt ?? '';
+      item.append(img);
+    }
+
+    if (event.link_url?.trim()) {
+      const link = document.createElement('a');
+      link.className = 'block-timeline__link';
+      link.href = event.link_url.trim();
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = event.link_label?.trim() || 'Open link';
+      item.append(link);
+    }
+
+    list.append(item);
+  }
+
+  return wrapBlock(list, block, mode);
+}
+
 export function renderBlock(block: Block, mode: RenderMode): HTMLElement {
   switch (block.block_type) {
     case 'rich_text':
@@ -507,6 +559,8 @@ export function renderBlock(block: Block, mode: RenderMode): HTMLElement {
       return renderTableBlock(block, mode);
     case 'question_set':
       return renderQuestionSetBlock(block, mode);
+    case 'timeline':
+      return renderTimelineBlock(block, mode);
     case 'spacer':
       return renderSpacerBlock(block, mode);
     case 'section':
