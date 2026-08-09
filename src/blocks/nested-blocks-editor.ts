@@ -1,9 +1,10 @@
 import { createBlockEditor } from '@/blocks/editors';
 import {
   BLOCK_GROUPS,
-  NEW_BLOCK_LABEL,
-  createBlock,
+  INSERT_MENU_LABEL,
+  createFromInsertMenu,
   cloneBlockWithNewIds,
+  expandGroupTypesForMenu,
   type NewBlockType
 } from '@/blocks/create-block';
 import type { Block } from '@/schemas/block';
@@ -153,14 +154,15 @@ export function createNestedBlocksEditor(options: NestedBlocksEditorOptions): HT
     const select = document.createElement('select');
     select.setAttribute('aria-label', 'Add nested block type');
     for (const group of BLOCK_GROUPS) {
-      const types = group.types.filter((t) => options.allowedTypes.includes(t));
-      if (types.length === 0) continue;
+      const baseTypes = group.types.filter((t) => options.allowedTypes.includes(t));
+      const menuTypes = expandGroupTypesForMenu(baseTypes);
+      if (menuTypes.length === 0) continue;
       const og = document.createElement('optgroup');
       og.label = group.label;
-      for (const type of types) {
+      for (const type of menuTypes) {
         const opt = document.createElement('option');
         opt.value = type;
-        opt.textContent = NEW_BLOCK_LABEL[type];
+        opt.textContent = INSERT_MENU_LABEL[type];
         og.append(opt);
       }
       select.append(og);
@@ -171,8 +173,7 @@ export function createNestedBlocksEditor(options: NestedBlocksEditorOptions): HT
     addBtn.className = 'btn btn--ghost block-editor__nested-add';
     addBtn.textContent = 'Add block';
     addBtn.addEventListener('click', () => {
-      const type = select.value as NewBlockType;
-      emit([...blocks, createBlock(type, nextId())]);
+      emit([...blocks, createFromInsertMenu(select.value, nextId())]);
     });
 
     addRow.append(select, addBtn);

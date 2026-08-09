@@ -1,5 +1,5 @@
 import { emptyColumnsForPreset } from '@/blocks/column-presets';
-import type { Block } from '@/schemas/block';
+import type { Block, EmbedProvider } from '@/schemas/block';
 
 type ColumnsBlock = Extract<Block, { block_type: 'columns' }>;
 type SectionBlock = Extract<Block, { block_type: 'section' }>;
@@ -77,6 +77,37 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   collection: 'Collection'
 };
 
+export const EMBED_INSERT_PRESETS = [
+  { value: 'embed:google_maps', label: 'Map', provider: 'google_maps' as const },
+  { value: 'embed:google_slides', label: 'Slides', provider: 'google_slides' as const },
+  { value: 'embed:google_docs', label: 'Document', provider: 'google_docs' as const },
+  { value: 'embed:pdf', label: 'PDF', provider: 'pdf' as const }
+] as const;
+
+export type EmbedInsertValue = (typeof EMBED_INSERT_PRESETS)[number]['value'];
+export type InsertMenuValue = NewBlockType | EmbedInsertValue;
+
+export const INSERT_MENU_LABEL: Record<InsertMenuValue, string> = {
+  ...NEW_BLOCK_LABEL,
+  'embed:google_maps': 'Map',
+  'embed:google_slides': 'Slides',
+  'embed:google_docs': 'Document',
+  'embed:pdf': 'PDF'
+};
+
+export function expandGroupTypesForMenu(
+  types: readonly NewBlockType[]
+): InsertMenuValue[] {
+  const out: InsertMenuValue[] = [];
+  for (const t of types) {
+    out.push(t);
+    if (t === 'embed') {
+      for (const preset of EMBED_INSERT_PRESETS) out.push(preset.value);
+    }
+  }
+  return out;
+}
+
 export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[] }> = [
   {
     label: 'Basic',
@@ -149,8 +180,8 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-export function createBlock(type: NewBlockType, id: string): Block {
-  const shared = {
+function sharedBlockFields(id: string) {
+  return {
     id,
     type: 'block' as const,
     visibility: 'student_teacher' as const,
@@ -161,6 +192,27 @@ export function createBlock(type: NewBlockType, id: string): Block {
     updated_at: nowIso(),
     schema_version: 1 as const
   };
+}
+
+export function createEmbedBlock(id: string, provider: EmbedProvider): Extract<Block, { block_type: 'embed' }> {
+  return {
+    ...sharedBlockFields(id),
+    block_type: 'embed',
+    variant: 'large',
+    content: { url: '', provider }
+  };
+}
+
+export function createFromInsertMenu(value: string, id: string): Block {
+  const preset = EMBED_INSERT_PRESETS.find((p) => p.value === value);
+  if (preset) {
+    return createEmbedBlock(id, preset.provider);
+  }
+  return createBlock(value as NewBlockType, id);
+}
+
+export function createBlock(type: NewBlockType, id: string): Block {
+  const shared = sharedBlockFields(id);
 
   switch (type) {
     case 'rich_text':
@@ -203,12 +255,7 @@ export function createBlock(type: NewBlockType, id: string): Block {
         content: { provider: 'youtube', external_id: '' }
       };
     case 'embed':
-      return {
-        ...shared,
-        block_type: 'embed',
-        variant: 'large',
-        content: { url: '' }
-      };
+      return createEmbedBlock(id, 'generic');
     case 'html':
       return {
         ...shared,

@@ -1,9 +1,10 @@
 import { ApiClientError } from '@/api/client';
 import {
   HOMEPAGE_BLOCK_GROUPS,
-  NEW_BLOCK_LABEL,
-  createBlock,
-  type NewBlockType
+  INSERT_MENU_LABEL,
+  createFromInsertMenu,
+  expandGroupTypesForMenu,
+  type InsertMenuValue
 } from '@/blocks/create-block';
 import {
   emptyMessageForCollection,
@@ -262,10 +263,10 @@ export function mountHomepageEditor(
       for (const group of HOMEPAGE_BLOCK_GROUPS) {
         const optgroup = document.createElement('optgroup');
         optgroup.label = group.label;
-        for (const type of group.types) {
+        for (const type of expandGroupTypesForMenu(group.types)) {
           const opt = document.createElement('option');
           opt.value = type;
-          opt.textContent = NEW_BLOCK_LABEL[type];
+          opt.textContent = INSERT_MENU_LABEL[type];
           optgroup.append(opt);
         }
         addSelect.append(optgroup);
@@ -276,7 +277,7 @@ export function mountHomepageEditor(
       addButton.className = 'btn btn--secondary homepage-editor__add-block-button';
       addButton.textContent = 'Add block';
       addButton.addEventListener('click', () => {
-        addBlock(region.key, addSelect.value as NewBlockType);
+        addBlock(region.key, addSelect.value as InsertMenuValue);
       });
 
       addBlockBar.append(addLabel, addSelect, addButton);
@@ -307,10 +308,10 @@ export function mountHomepageEditor(
     renderRegions();
   }
 
-  function addBlock(regionKey: keyof ClassHomepage, type: NewBlockType): void {
+  function addBlock(regionKey: keyof ClassHomepage, type: InsertMenuValue): void {
     blockCounter += 1;
     const id = `block_homepage_${regionKey}_${blockCounter}`;
-    homepage[regionKey].push(createBlock(type, id));
+    homepage[regionKey].push(createFromInsertMenu(type, id));
     renderRegions();
   }
 

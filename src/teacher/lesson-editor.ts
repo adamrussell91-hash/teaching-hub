@@ -1,10 +1,11 @@
 import { apiGet, ApiClientError } from '@/api/client';
 import {
   LESSON_BLOCK_GROUPS,
-  NEW_BLOCK_LABEL,
+  INSERT_MENU_LABEL,
   cloneBlockWithNewIds,
-  createBlock,
-  type NewBlockType
+  createFromInsertMenu,
+  expandGroupTypesForMenu,
+  type InsertMenuValue
 } from '@/blocks/create-block';
 import { createBlockEditor } from '@/blocks/registry';
 import type { Lesson } from '@/schemas/lesson';
@@ -113,10 +114,10 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     for (const group of LESSON_BLOCK_GROUPS) {
       const optgroup = document.createElement('optgroup');
       optgroup.label = group.label;
-      for (const type of group.types) {
+      for (const type of expandGroupTypesForMenu(group.types)) {
         const opt = document.createElement('option');
         opt.value = type;
-        opt.textContent = NEW_BLOCK_LABEL[type];
+        opt.textContent = INSERT_MENU_LABEL[type];
         optgroup.append(opt);
       }
       addSelect.append(optgroup);
@@ -228,10 +229,10 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       renderBlocksList();
     }
 
-    function addBlock(type: NewBlockType): void {
+    function addBlock(type: InsertMenuValue): void {
       blockCounter += 1;
       const id = `block_${lesson.id}_${blockCounter}`;
-      lesson.blocks.push(createBlock(type, id));
+      lesson.blocks.push(createFromInsertMenu(type, id));
       markDirty();
       renderBlocksList();
     }
@@ -242,7 +243,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     });
 
     addButton.addEventListener('click', () => {
-      addBlock(addSelect.value as NewBlockType);
+      addBlock(addSelect.value as InsertMenuValue);
     });
 
     renderBlocksList();
