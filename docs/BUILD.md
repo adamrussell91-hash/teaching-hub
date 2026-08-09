@@ -20,10 +20,9 @@ Block primitives: [`docs/specs/03_BLOCK_SYSTEM.md`](specs/03_BLOCK_SYSTEM.md)
 
 Suggested order for continuing builder / teaching-page work (adjust as needed):
 
-1. **Visualisation pack** — chart, equation (diagram / mind_map / concept_map after)
-2. **Structure: Collection** — nav / resource collections
-3. **html_app** — sandboxed interactive HTML apps (separate from sanitised `html`)
-4. **Builder UX** — drag-and-drop between columns; free-form column widths
+1. **Structure: Collection** — nav / resource collections
+2. **html_app** — sandboxed interactive HTML apps (separate from sanitised `html`)
+3. **Builder UX** — drag-and-drop between columns; free-form column widths
 
 Larger product tracks (not “next block”, but still ahead):
 
@@ -59,17 +58,18 @@ Larger product tracks (not “next block”, but still ahead):
 | 2026-08-09 | **Tabs** | Nested `tabs` panels (2–8); columns allowed in panels; stacked editor; student tablist — [`design`](superpowers/specs/2026-08-09-tabs-block-design.md) / [`plan`](superpowers/plans/2026-08-09-tabs-block.md) |
 | 2026-08-09 | **Gallery** | Multi-image set (grid / carousel / comparison + lightbox) — [`design`](superpowers/specs/2026-08-09-gallery-block-design.md) / [`plan`](superpowers/plans/2026-08-09-gallery-block.md) |
 | 2026-08-09 | **Learning activities pack** | `flashcards`, `cloze`, `self_check` — thin v1 with local student state, flip/shuffle, sized blanks + shuffled word bank — [`design`](superpowers/specs/2026-08-09-learning-activities-pack-design.md) / [`plan`](superpowers/plans/2026-08-09-learning-activities-pack.md) |
+| 2026-08-09 | **Visualisation pack** | `chart`, `equation`, `diagram`, `mind_map`, `concept_map` + KaTeX + custom SVG — [`design`](superpowers/specs/2026-08-09-visualisation-pack-design.md) / [`plan`](superpowers/plans/2026-08-09-visualisation-pack.md) |
 
-### Block types live today (25)
+### Block types live today (30)
 
-`rich_text`, `heading`, `callout`, `image`, `video`, `embed`, `html`, `quote`, `divider`, `definition`, `code`, `audio`, `attachment`, `accordion`, `table`, `question_set`, `columns`, `section`, `spacer`, `timeline`, `tabs`, `gallery`, `flashcards`, `cloze`, `self_check`
+`rich_text`, `heading`, `callout`, `image`, `video`, `embed`, `html`, `quote`, `divider`, `definition`, `code`, `audio`, `attachment`, `accordion`, `table`, `question_set`, `columns`, `section`, `spacer`, `timeline`, `tabs`, `gallery`, `flashcards`, `cloze`, `self_check`, `chart`, `equation`, `diagram`, `mind_map`, `concept_map`
 
 ### Product phases (rough map)
 
 | Spec phase | Status |
 |------------|--------|
 | 0–4 Foundation → basic builder → publish | Done (core) |
-| 5 Block system expansion | **In progress** — layout + timeline + tabs + gallery + activities done; viz remain |
+| 5 Block system expansion | **In progress** — layout + timeline + tabs + gallery + activities + viz done; Collection next |
 | 6–8 Unit/class pages, scheduling, scope | Largely done for v1 |
 | 9 A4 print | Not started |
 | 10 Google Drive | Not started |
@@ -103,11 +103,11 @@ Unchecked = not built yet.
 - [ ] Response space (if still distinct from question_set)
 
 ### Visualisation
-- [ ] Chart
-- [ ] Equation (standalone)
-- [ ] Diagram
-- [ ] Mind map
-- [ ] Concept map
+- [x] Chart
+- [x] Equation (standalone)
+- [x] Diagram
+- [x] Mind map
+- [x] Concept map
 
 ### Platform (later)
 - [ ] A4 print pipeline
@@ -121,4 +121,4 @@ Unchecked = not built yet.
 
 ## Latest note
 
-**2026-08-09** — Learning activities pack shipped (`flashcards`, `cloze`, `self_check` — local student state, flip/shuffle, sized blanks + shuffled word bank). Next builder slice: **Visualisation pack** unless priority shifts.
+**2026-08-09** — Visualisation pack shipped (`chart`, `equation`, `diagram`, `mind_map`, `concept_map` + KaTeX + custom SVG). Next builder slice: **Collection** unless priority shifts.
