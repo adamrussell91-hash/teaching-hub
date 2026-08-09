@@ -1486,11 +1486,20 @@ export function renderDiagramBlock(
   root.className = 'block-diagram';
 
   if (block.content.source === 'image') {
-    const img = document.createElement('img');
-    img.className = 'block-diagram__image';
-    img.src = block.content.image_url ?? '';
-    img.alt = block.content.image_alt ?? '';
-    root.append(img);
+    const url = block.content.image_url ?? '';
+    if (isHttpUrl(url)) {
+      const img = document.createElement('img');
+      img.className = 'block-diagram__image';
+      img.src = url;
+      img.alt = block.content.image_alt ?? '';
+      img.loading = 'lazy';
+      root.append(img);
+    } else {
+      const unavailable = document.createElement('p');
+      unavailable.className = 'block-diagram__unavailable';
+      unavailable.textContent = (block.content.image_alt ?? '').trim() || 'Image unavailable.';
+      root.append(unavailable);
+    }
   } else {
     const wrap = document.createElement('div');
     wrap.className = 'block-diagram__svg';

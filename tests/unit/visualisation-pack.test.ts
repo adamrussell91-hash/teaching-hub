@@ -399,6 +399,24 @@ describe('visualisation renderers', () => {
     expect(el.innerHTML).toMatch(/circle/i);
   });
 
+  it('does not set diagram img src for non-http urls', () => {
+    for (const image_url of ['javascript:alert(1)', 'data:text/html,hi', 'not-a-url', '']) {
+      const block = {
+        ...createBlock('diagram', 'd1'),
+        content: {
+          source: 'image' as const,
+          image_url,
+          image_alt: 'Unsafe diagram'
+        }
+      };
+      const el = renderBlock(block as ReturnType<typeof createBlock>, 'student');
+      const img = el.querySelector('img');
+      expect(img).toBeNull();
+      expect(el.querySelector('.block-diagram__unavailable')).toBeTruthy();
+      expect(el.innerHTML).not.toMatch(/javascript:/i);
+    }
+  });
+
   it('renders mind_map and concept_map svg', () => {
     expect(renderBlock(createBlock('mind_map', 'm1'), 'student').querySelector('svg')).toBeTruthy();
     expect(
