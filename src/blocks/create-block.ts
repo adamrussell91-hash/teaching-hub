@@ -23,6 +23,9 @@ export const NEW_BLOCK_TYPES = [
   'accordion',
   'table',
   'question_set',
+  'flashcards',
+  'cloze',
+  'self_check',
   'columns',
   'section',
   'spacer',
@@ -50,6 +53,9 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   accordion: 'Accordion',
   table: 'Table',
   question_set: 'Question set',
+  flashcards: 'Flashcards',
+  cloze: 'Cloze',
+  self_check: 'Self check',
   columns: 'Columns',
   section: 'Section',
   spacer: 'Spacer',
@@ -71,10 +77,16 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
     types: ['accordion', 'table', 'question_set', 'timeline']
   },
   {
+    label: 'Learning',
+    types: ['flashcards', 'cloze', 'self_check']
+  },
+  {
     label: 'Layout',
     types: ['section', 'columns', 'spacer', 'tabs']
   }
 ];
+
+export const HOMEPAGE_BLOCK_GROUPS = BLOCK_GROUPS.filter((group) => group.label !== 'Learning');
 
 /** Block types allowed inside a columns cell */
 export const COLUMN_CHILD_TYPES = NEW_BLOCK_TYPES.filter(
@@ -228,6 +240,40 @@ export function createBlock(type: NewBlockType, id: string): Block {
           questions: [{ id: `${id}_q1`, prompt: '', kind: 'short_answer' }]
         }
       };
+    case 'flashcards':
+      return {
+        ...shared,
+        block_type: 'flashcards',
+        variant: 'medium',
+        content: {
+          cards: [
+            { id: `${id}_c1`, front: '', back: '' },
+            { id: `${id}_c2`, front: '', back: '' }
+          ],
+          shuffle: false
+        }
+      };
+    case 'cloze':
+      return {
+        ...shared,
+        block_type: 'cloze',
+        variant: 'medium',
+        content: {
+          text: 'The capital of France is [[Paris]].',
+          case_sensitive: false
+        }
+      };
+    case 'self_check':
+      return {
+        ...shared,
+        block_type: 'self_check',
+        variant: 'medium',
+        content: {
+          mode: 'reveal',
+          prompt: '',
+          answer: ''
+        }
+      };
     case 'columns':
       return {
         ...shared,
@@ -331,6 +377,22 @@ export function cloneBlockWithNewIds(
       ...cloned.content,
       items: cloned.content.items.map((entry) => ({
         ...entry,
+        id: nextId()
+      }))
+    };
+  } else if (cloned.block_type === 'flashcards') {
+    cloned.content = {
+      ...cloned.content,
+      cards: cloned.content.cards.map((card) => ({
+        ...card,
+        id: nextId()
+      }))
+    };
+  } else if (cloned.block_type === 'self_check' && cloned.content.items) {
+    cloned.content = {
+      ...cloned.content,
+      items: cloned.content.items.map((item) => ({
+        ...item,
         id: nextId()
       }))
     };

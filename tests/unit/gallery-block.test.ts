@@ -11,7 +11,7 @@ const timestamps = {
 const baseBlock = {
   id: 'block_001',
   type: 'block' as const,
-  variant: 'large',
+  variant: 'large' as const,
   visibility: 'student_teacher' as const,
   layout: {},
   print: {},
@@ -47,6 +47,7 @@ describe('GalleryBlockSchema', () => {
       }
     });
     expect(block.block_type).toBe('gallery');
+    if (block.block_type !== 'gallery') throw new Error('expected gallery');
     expect(block.content.layout).toBe('grid');
     expect(block.content.items).toHaveLength(2);
   });
@@ -95,43 +96,43 @@ describe('GalleryBlockSchema', () => {
       content: { layout: 'grid' as const, items: [item('a'), item('b')] }
     };
 
-    expect(
-      BlockSchema.parse({
-        ...baseBlock,
-        id: 'cols',
-        block_type: 'columns',
-        content: {
-          preset: '50-50',
-          columns: [
-            { width: 6, blocks: [gallery] },
-            { width: 6, blocks: [] }
-          ]
-        }
-      }).content.columns[0]!.blocks[0]!.block_type
-    ).toBe('gallery');
+    const columns = BlockSchema.parse({
+      ...baseBlock,
+      id: 'cols',
+      block_type: 'columns',
+      content: {
+        preset: '50-50',
+        columns: [
+          { width: 6, blocks: [gallery] },
+          { width: 6, blocks: [] }
+        ]
+      }
+    });
+    if (columns.block_type !== 'columns') throw new Error('expected columns');
+    expect(columns.content.columns[0]!.blocks[0]!.block_type).toBe('gallery');
 
-    expect(
-      BlockSchema.parse({
-        ...baseBlock,
-        id: 'sec',
-        block_type: 'section',
-        content: { title: 'Media', blocks: [gallery] }
-      }).content.blocks[0]!.block_type
-    ).toBe('gallery');
+    const section = BlockSchema.parse({
+      ...baseBlock,
+      id: 'sec',
+      block_type: 'section',
+      content: { title: 'Media', blocks: [gallery] }
+    });
+    if (section.block_type !== 'section') throw new Error('expected section');
+    expect(section.content.blocks[0]!.block_type).toBe('gallery');
 
-    expect(
-      BlockSchema.parse({
-        ...baseBlock,
-        id: 'tabs',
-        block_type: 'tabs',
-        content: {
-          tabs: [
-            { id: 't1', label: 'One', blocks: [gallery] },
-            { id: 't2', label: 'Two', blocks: [] }
-          ]
-        }
-      }).content.tabs[0]!.blocks[0]!.block_type
-    ).toBe('gallery');
+    const tabs = BlockSchema.parse({
+      ...baseBlock,
+      id: 'tabs',
+      block_type: 'tabs',
+      content: {
+        tabs: [
+          { id: 't1', label: 'One', blocks: [gallery] },
+          { id: 't2', label: 'Two', blocks: [] }
+        ]
+      }
+    });
+    if (tabs.block_type !== 'tabs') throw new Error('expected tabs');
+    expect(tabs.content.tabs[0]!.blocks[0]!.block_type).toBe('gallery');
   });
 });
 

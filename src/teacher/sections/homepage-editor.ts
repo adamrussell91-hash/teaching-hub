@@ -1,6 +1,6 @@
 import { ApiClientError } from '@/api/client';
 import {
-  BLOCK_GROUPS,
+  HOMEPAGE_BLOCK_GROUPS,
   NEW_BLOCK_LABEL,
   createBlock,
   type NewBlockType
@@ -214,7 +214,7 @@ export function mountHomepageEditor(
       const addSelect = document.createElement('select');
       addSelect.id = addSelectId;
       addSelect.className = 'homepage-editor__add-block-select';
-      for (const group of BLOCK_GROUPS) {
+      for (const group of HOMEPAGE_BLOCK_GROUPS) {
         const optgroup = document.createElement('optgroup');
         optgroup.label = group.label;
         for (const type of group.types) {

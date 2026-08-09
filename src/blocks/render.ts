@@ -1,6 +1,13 @@
 import { sanitizeRichTextHtml } from '@/blocks/sanitize';
 import { isHttpUrl } from '@/blocks/url-safety';
 import { videoEmbedSrc } from '@/blocks/video-url';
+import {
+  loadActivityState,
+  parseClozeText,
+  saveActivityState,
+  shuffleArray,
+  storageKey
+} from '@/blocks/learning-activity';
 import type { Block } from '@/schemas/block';
 
 export type RenderMode = 'teacher' | 'student';
@@ -787,6 +794,539 @@ export function renderGalleryBlock(
   return wrapBlock(root, block, mode);
 }
 
+function activityButton(label: string, className: string): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = `btn ${className}`;
+  button.textContent = label;
+  return button;
+}
+
+function prefersReducedMotion(): boolean {
+  return typeof window.matchMedia === 'function'
+    ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    : false;
+}
+
+function shuffledOutOfSourceOrder<T>(items: T[]): T[] {
+  const shuffled = shuffleArray(items);
+  if (items.length > 1 && shuffled.every((item, index) => item === items[index])) {
+    return [...shuffled.slice(1), shuffled[0]!];
+  }
+  return shuffled;
+}
+
+function objectValue(value: unknown): Record<string, unknown> | null {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function isPermutation(value: unknown, expected: string[]): value is string[] {
+  return (
+    Array.isArray(value) &&
+    value.length === expected.length &&
+    value.every((item): item is string => typeof item === 'string' && expected.includes(item)) &&
+    new Set(value).size === expected.length
+  );
+}
+
+type FlashcardItem = Extract<Block, { block_type: 'flashcards' }>['content']['cards'][number];
+
+function flashcardImage(card: FlashcardItem): HTMLImageElement | null {
+  if (!card.image_url || !isHttpUrl(card.image_url)) return null;
+  const image = document.createElement('img');
+  image.className = 'block-flashcards__image';
+  image.src = card.image_url.trim();
+  image.alt = card.image_alt ?? '';
+  image.loading = 'lazy';
+  return image;
+}
+
+function paintFlashcardFace(face: HTMLElement, text: string, card?: FlashcardItem): void {
+  face.replaceChildren();
+  const copy = document.createElement('span');
+  copy.className = 'block-flashcards__copy';
+  copy.textContent = text;
+  const image = card ? flashcardImage(card) : null;
+  face.append(...(image ? [image, copy] : [copy]));
+}
+
+export function renderFlashcardsBlock(
+  block: Extract<Block, { block_type: 'flashcards' }>,
+  mode: RenderMode
+): HTMLElement {
+  const root = document.createElement('div');
+  root.className = 'block-flashcards';
+
+  if (mode === 'teacher') {
+    const preview = document.createElement('div');
+    preview.className = 'block-flashcards__card block-flashcards__card--preview';
+    const front = document.createElement('div');
+    front.className = 'block-flashcards__face block-flashcards__face--front';
+    const firstCard = block.content.cards[0];
+    paintFlashcardFace(front, firstCard?.front ?? '', firstCard);
+    preview.append(front);
+    root.append(preview);
+    return wrapBlock(root, block, mode);
+  }
+
+  type FlashcardsState = { order: string[]; index: number; flipped: boolean };
+  const key = storageKey('local', block.id);
+  const cardIds = block.content.cards.map((card) => card.id);
+  const rawSaved = objectValue(loadActivityState<unknown>(key));
+  const saved: FlashcardsState | null =
+    rawSaved &&
+    isPermutation(rawSaved.order, cardIds) &&
+    typeof rawSaved.index === 'number' &&
+    Number.isInteger(rawSaved.index) &&
+    rawSaved.index >= 0 &&
+    rawSaved.index < cardIds.length &&
+    typeof rawSaved.flipped === 'boolean'
+      ? {
+          order: rawSaved.order,
+          index: rawSaved.index,
+          flipped: rawSaved.flipped
+        }
+      : null;
+  let order = block.content.shuffle
+    ? saved
+      ? [...saved.order]
+      : shuffleArray(cardIds)
+    : [...cardIds];
+  let index = saved?.index ?? 0;
+  let flipped = saved?.flipped ?? false;
+
+  const card = document.createElement('div');
+  card.className = 'block-flashcards__card';
+  const inner = document.createElement('div');
+  inner.className = 'block-flashcards__inner';
+  const front = document.createElement('div');
+  front.className = 'block-flashcards__face block-flashcards__face--front';
+  const back = document.createElement('div');
+  back.className = 'block-flashcards__face block-flashcards__face--back';
+  inner.append(front, back);
+  card.append(inner);
+
+  const status = document.createElement('p');
+  status.className = 'block-flashcards__status';
+  status.setAttribute('aria-live', 'polite');
+  const prev = activityButton('Prev', 'block-flashcards__btn');
+  const flip = activityButton('Flip', 'block-flashcards__btn');
+  const next = activityButton('Next', 'block-flashcards__btn');
+  const reset = activityButton('Reset', 'block-flashcards__btn');
+
+  function persist(): void {
+    saveActivityState(key, { order, index, flipped } satisfies FlashcardsState);
+  }
+
+  function paint(): void {
+    const currentId = order[index]!;
+    const current = block.content.cards.find((item) => item.id === currentId)!;
+    paintFlashcardFace(front, current.front, current);
+    paintFlashcardFace(back, current.back);
+    card.classList.toggle('block-flashcards__card--flipped', flipped);
+    front.setAttribute('aria-hidden', flipped ? 'true' : 'false');
+    back.setAttribute('aria-hidden', flipped ? 'false' : 'true');
+    flip.setAttribute('aria-pressed', flipped ? 'true' : 'false');
+    status.textContent = `${index + 1} / ${order.length}`;
+    prev.disabled = index === 0;
+    next.disabled = index === order.length - 1;
+  }
+
+  function show(nextIndex: number): void {
+    index = nextIndex;
+    flipped = false;
+    paint();
+    persist();
+  }
+
+  prev.addEventListener('click', () => show(Math.max(0, index - 1)));
+  next.addEventListener('click', () => show(Math.min(order.length - 1, index + 1)));
+  flip.addEventListener('click', () => {
+    flipped = !flipped;
+    paint();
+    persist();
+  });
+  reset.addEventListener('click', () => {
+    order = block.content.shuffle ? shuffleArray(cardIds) : [...cardIds];
+    index = 0;
+    flipped = false;
+    if (block.content.shuffle && !prefersReducedMotion()) {
+      root.classList.add('block-flashcards--shuffling');
+      window.setTimeout(() => root.classList.remove('block-flashcards--shuffling'), 280);
+    }
+    paint();
+    persist();
+  });
+
+  const controls = document.createElement('div');
+  controls.className = 'block-flashcards__controls';
+  controls.append(prev, flip, next, reset);
+  const printSummary = document.createElement('ol');
+  printSummary.className = 'block-flashcards__print';
+  printSummary.setAttribute('aria-hidden', 'true');
+  for (const item of block.content.cards) {
+    const entry = document.createElement('li');
+    const frontCopy = document.createElement('p');
+    const backCopy = document.createElement('p');
+    frontCopy.textContent = `Front: ${item.front}`;
+    backCopy.textContent = `Back: ${item.back}`;
+    entry.append(frontCopy, backCopy);
+    printSummary.append(entry);
+  }
+  root.append(card, status, controls, printSummary);
+  paint();
+  persist();
+  if (block.content.shuffle && !saved && !prefersReducedMotion()) {
+    root.classList.add('block-flashcards--shuffling');
+    window.setTimeout(() => root.classList.remove('block-flashcards--shuffling'), 280);
+  }
+  return wrapBlock(root, block, mode);
+}
+
+export function renderClozeBlock(
+  block: Extract<Block, { block_type: 'cloze' }>,
+  mode: RenderMode
+): HTMLElement {
+  const root = document.createElement('div');
+  root.className = 'block-cloze';
+  const { segments, blanks } = parseClozeText(block.content.text);
+
+  if (block.content.title?.trim()) {
+    const title = document.createElement('h3');
+    title.className = 'block-cloze__title';
+    title.textContent = block.content.title;
+    root.append(title);
+  }
+
+  const sentence = document.createElement('p');
+  sentence.className = 'block-cloze__sentence';
+
+  if (mode === 'teacher') {
+    for (const segment of segments) {
+      if (segment.type === 'text') {
+        sentence.append(document.createTextNode(segment.value));
+      } else {
+        const blank = document.createElement('span');
+        blank.className = 'block-cloze__preview-blank';
+        blank.textContent = segment.blank.answer;
+        sentence.append(blank);
+      }
+    }
+    root.append(sentence);
+    return wrapBlock(root, block, mode);
+  }
+
+  type ClozeState = {
+    text: string;
+    caseSensitive: boolean;
+    answers: string[];
+    revealed: boolean;
+    score: number | null;
+  };
+  const key = storageKey('local', block.id);
+  const caseSensitive = block.content.case_sensitive ?? false;
+  const rawSaved = objectValue(loadActivityState<unknown>(key));
+  const rawScore = rawSaved?.score;
+  const saved: ClozeState | null =
+    rawSaved &&
+    rawSaved.text === block.content.text &&
+    rawSaved.caseSensitive === caseSensitive &&
+    Array.isArray(rawSaved.answers) &&
+    rawSaved.answers.length === blanks.length &&
+    rawSaved.answers.every((answer): answer is string => typeof answer === 'string') &&
+    typeof rawSaved.revealed === 'boolean' &&
+    (rawScore === null ||
+      (typeof rawScore === 'number' &&
+        Number.isInteger(rawScore) &&
+        rawScore >= 0 &&
+        rawScore <= blanks.length))
+      ? {
+          text: rawSaved.text,
+          caseSensitive: rawSaved.caseSensitive,
+          answers: rawSaved.answers,
+          revealed: rawSaved.revealed,
+          score: rawScore
+        }
+      : null;
+  const inputs: HTMLInputElement[] = [];
+  let revealed = saved?.revealed ?? false;
+  let scoreValue = saved?.score ?? null;
+  let bankWords = shuffledOutOfSourceOrder(blanks.map((blank) => blank.answer));
+
+  for (const segment of segments) {
+    if (segment.type === 'text') {
+      sentence.append(document.createTextNode(segment.value));
+      continue;
+    }
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'block-cloze__blank';
+    input.style.width = `${Math.max(segment.blank.answer.length, 3)}ch`;
+    input.setAttribute('aria-label', segment.blank.hint || `Blank ${segment.index + 1}`);
+    input.placeholder = segment.blank.hint ?? '';
+    input.value = saved?.answers[segment.index] ?? '';
+    inputs.push(input);
+    sentence.append(input);
+  }
+
+  const bank = document.createElement('div');
+  bank.className = 'block-cloze__word-bank';
+  bank.setAttribute('aria-label', 'Word bank');
+  const score = document.createElement('p');
+  score.className = 'block-cloze__score';
+  score.setAttribute('aria-live', 'polite');
+
+  function answers(): string[] {
+    return inputs.map((input) => input.value);
+  }
+
+  function persist(): void {
+    saveActivityState(key, {
+      text: block.content.text,
+      caseSensitive,
+      answers: answers(),
+      revealed,
+      score: scoreValue
+    } satisfies ClozeState);
+  }
+
+  function paintBank(): void {
+    bank.replaceChildren();
+    for (const word of bankWords) {
+      const chip = document.createElement('span');
+      chip.className = 'block-cloze__word';
+      chip.textContent = word;
+      bank.append(chip);
+    }
+  }
+
+  function paintScore(): void {
+    score.textContent = scoreValue === null ? '' : `${scoreValue} / ${blanks.length}`;
+  }
+
+  inputs.forEach((input) =>
+    input.addEventListener('input', () => {
+      scoreValue = null;
+      revealed = false;
+      inputs.forEach((item) =>
+        item.classList.remove('block-cloze__blank--correct', 'block-cloze__blank--incorrect')
+      );
+      paintScore();
+      persist();
+    })
+  );
+  const check = activityButton('Check', 'block-cloze__btn');
+  const reveal = activityButton('Reveal', 'block-cloze__btn');
+  const reset = activityButton('Reset', 'block-cloze__btn');
+  check.addEventListener('click', () => {
+    scoreValue = inputs.reduce((total, input, i) => {
+      const expected = blanks[i]!.answer.trim();
+      const actual = input.value.trim();
+      const matches = caseSensitive
+        ? actual === expected
+        : actual.toLocaleLowerCase() === expected.toLocaleLowerCase();
+      input.classList.toggle('block-cloze__blank--correct', matches);
+      input.classList.toggle('block-cloze__blank--incorrect', !matches);
+      return total + Number(matches);
+    }, 0);
+    paintScore();
+    persist();
+  });
+  reveal.addEventListener('click', () => {
+    inputs.forEach((input, i) => {
+      input.value = blanks[i]!.answer;
+      input.classList.remove('block-cloze__blank--incorrect');
+      input.classList.add('block-cloze__blank--correct');
+    });
+    revealed = true;
+    scoreValue = blanks.length;
+    paintScore();
+    persist();
+  });
+  reset.addEventListener('click', () => {
+    inputs.forEach((input) => {
+      input.value = '';
+      input.classList.remove('block-cloze__blank--correct', 'block-cloze__blank--incorrect');
+    });
+    revealed = false;
+    scoreValue = null;
+    bankWords = shuffledOutOfSourceOrder(blanks.map((blank) => blank.answer));
+    paintBank();
+    paintScore();
+    persist();
+  });
+
+  const controls = document.createElement('div');
+  controls.className = 'block-cloze__controls';
+  controls.append(check, reveal, reset);
+  const printSummary = document.createElement('p');
+  printSummary.className = 'block-cloze__print';
+  printSummary.setAttribute('aria-hidden', 'true');
+  for (const segment of segments) {
+    if (segment.type === 'text') {
+      printSummary.append(document.createTextNode(segment.value));
+    } else {
+      const blank = document.createElement('span');
+      blank.className = 'block-cloze__print-blank';
+      blank.textContent = segment.blank.answer;
+      printSummary.append(blank);
+    }
+  }
+  root.append(sentence, bank, controls, score, printSummary);
+  paintBank();
+  paintScore();
+  return wrapBlock(root, block, mode);
+}
+
+export function renderSelfCheckBlock(
+  block: Extract<Block, { block_type: 'self_check' }>,
+  mode: RenderMode
+): HTMLElement {
+  const root = document.createElement('div');
+  root.className = `block-self-check block-self-check--${block.content.mode}`;
+
+  if (block.content.title?.trim()) {
+    const title = document.createElement('h3');
+    title.className = 'block-self-check__title';
+    title.textContent = block.content.title;
+    root.append(title);
+  }
+  const prompt = document.createElement('p');
+  prompt.className = 'block-self-check__prompt';
+  prompt.textContent = block.content.prompt;
+  root.append(prompt);
+
+  if (mode === 'teacher') {
+    if (block.content.mode === 'checklist') {
+      const list = document.createElement('ul');
+      list.className = 'block-self-check__preview-list';
+      for (const item of block.content.items ?? []) {
+        const li = document.createElement('li');
+        li.textContent = item.label;
+        list.append(li);
+      }
+      root.append(list);
+    } else if (block.content.answer) {
+      const hidden = document.createElement('p');
+      hidden.className = 'block-self-check__answer-hidden';
+      hidden.textContent = 'Answer hidden';
+      root.append(hidden);
+    }
+    return wrapBlock(root, block, mode);
+  }
+
+  const key = storageKey('local', block.id);
+  const printSummary = document.createElement('div');
+  printSummary.className = 'block-self-check__print';
+  printSummary.setAttribute('aria-hidden', 'true');
+  const printPrompt = document.createElement('p');
+  printPrompt.textContent = block.content.prompt;
+  printSummary.append(printPrompt);
+  if (block.content.mode === 'checklist') {
+    const printList = document.createElement('ul');
+    for (const item of block.content.items ?? []) {
+      const entry = document.createElement('li');
+      entry.textContent = item.label;
+      printList.append(entry);
+    }
+    printSummary.append(printList);
+  } else {
+    const printAnswer = document.createElement('p');
+    printAnswer.textContent = block.content.answer ?? '';
+    printSummary.append(printAnswer);
+  }
+
+  if (block.content.mode === 'checklist') {
+    type ChecklistState = { checkedIds: string[] };
+    const validIds = new Set((block.content.items ?? []).map((item) => item.id));
+    const rawSaved = objectValue(loadActivityState<unknown>(key));
+    const checkedIds =
+      rawSaved &&
+      Array.isArray(rawSaved.checkedIds) &&
+      rawSaved.checkedIds.every((id): id is string => typeof id === 'string')
+        ? rawSaved.checkedIds.filter((id) => validIds.has(id))
+        : [];
+    const checked = new Set(checkedIds);
+    const list = document.createElement('div');
+    list.className = 'block-self-check__checklist';
+    for (const item of block.content.items ?? []) {
+      const label = document.createElement('label');
+      label.className = 'block-self-check__checklist-item';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'block-self-check__checkbox';
+      checkbox.checked = checked.has(item.id);
+      checkbox.addEventListener('click', () => {
+        if (checkbox.checked) checked.add(item.id);
+        else checked.delete(item.id);
+        saveActivityState(key, { checkedIds: [...checked] } satisfies ChecklistState);
+      });
+      label.append(checkbox, document.createTextNode(item.label));
+      list.append(label);
+    }
+    root.append(list, printSummary);
+    return wrapBlock(root, block, mode);
+  }
+
+  type AnswerState = { revealed: boolean; rating?: number };
+  const rawSaved = objectValue(loadActivityState<unknown>(key));
+  let rating =
+    typeof rawSaved?.rating === 'number' &&
+    Number.isInteger(rawSaved.rating) &&
+    rawSaved.rating >= 1 &&
+    rawSaved.rating <= 5
+      ? rawSaved.rating
+      : undefined;
+  let revealed =
+    rawSaved?.revealed === true && (block.content.mode === 'reveal' || rating !== undefined);
+  const answer = document.createElement('div');
+  answer.className = 'block-self-check__answer';
+  answer.textContent = block.content.answer ?? '';
+
+  function paintAnswer(): void {
+    answer.hidden = !revealed;
+  }
+
+  if (block.content.mode === 'reveal') {
+    const toggle = activityButton(revealed ? 'Hide answer' : 'Show answer', 'block-self-check__btn');
+    toggle.addEventListener('click', () => {
+      revealed = !revealed;
+      toggle.textContent = revealed ? 'Hide answer' : 'Show answer';
+      paintAnswer();
+      saveActivityState(key, { revealed } satisfies AnswerState);
+    });
+    root.append(toggle, answer);
+  } else {
+    const scale = document.createElement('div');
+    scale.className = 'block-self-check__confidence';
+    scale.setAttribute('aria-label', 'Confidence from 1 to 5');
+    for (let value = 1; value <= 5; value += 1) {
+      const button = activityButton(String(value), 'block-self-check__confidence-btn');
+      button.dataset.rating = String(value);
+      button.setAttribute('aria-pressed', rating === value ? 'true' : 'false');
+      button.addEventListener('click', () => {
+        rating = value;
+        revealed = true;
+        [...scale.children].forEach((child) =>
+          child.setAttribute(
+            'aria-pressed',
+            (child as HTMLButtonElement).dataset.rating === String(value) ? 'true' : 'false'
+          )
+        );
+        paintAnswer();
+        saveActivityState(key, { rating, revealed } satisfies AnswerState);
+      });
+      scale.append(button);
+    }
+    root.append(scale, answer);
+  }
+  root.append(printSummary);
+  paintAnswer();
+  return wrapBlock(root, block, mode);
+}
+
 export function renderBlock(block: Block, mode: RenderMode): HTMLElement {
   switch (block.block_type) {
     case 'rich_text':
@@ -823,6 +1363,12 @@ export function renderBlock(block: Block, mode: RenderMode): HTMLElement {
       return renderTableBlock(block, mode);
     case 'question_set':
       return renderQuestionSetBlock(block, mode);
+    case 'flashcards':
+      return renderFlashcardsBlock(block, mode);
+    case 'cloze':
+      return renderClozeBlock(block, mode);
+    case 'self_check':
+      return renderSelfCheckBlock(block, mode);
     case 'timeline':
       return renderTimelineBlock(block, mode);
     case 'spacer':

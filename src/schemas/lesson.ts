@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { CommonFields, IsoDateSchema } from './common';
 import { BlockSchema } from './block';
 import { isHttpUrl } from '../blocks/url-safety';
+import { parseClozeText } from '../blocks/learning-activity';
 
 export const LessonSchema = z.object({
   ...CommonFields,
@@ -131,6 +132,37 @@ function publishBlockIssues(blocks: z.infer<typeof BlockSchema>[]): string | nul
         }
         const nested = publishBlockIssues(panel.blocks);
         if (nested) return nested;
+      }
+    }
+    if (block.block_type === 'flashcards') {
+      for (const card of block.content.cards) {
+        if (card.front.trim().length === 0 || card.back.trim().length === 0) {
+          return 'Flashcards need front and back text on every card to publish';
+        }
+      }
+    }
+    if (block.block_type === 'cloze') {
+      const validBlanks = parseClozeText(block.content.text).blanks.filter(
+        (blank) => blank.answer.trim().length > 0
+      );
+      if (validBlanks.length < 1) {
+        return 'Cloze blocks need at least one blank to publish';
+      }
+    }
+    if (block.block_type === 'self_check') {
+      if (block.content.prompt.trim().length === 0) {
+        return 'Self check blocks need a prompt to publish';
+      }
+      if (block.content.mode === 'reveal' || block.content.mode === 'confidence') {
+        if ((block.content.answer ?? '').trim().length === 0) {
+          return 'Self check blocks need an answer to publish';
+        }
+      }
+      if (block.content.mode === 'checklist') {
+        const items = (block.content.items ?? []).filter((item) => item.label.trim().length > 0);
+        if (items.length === 0) {
+          return 'Self check checklists need at least one item to publish';
+        }
       }
     }
   }

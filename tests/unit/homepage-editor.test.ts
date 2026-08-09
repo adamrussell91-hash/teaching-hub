@@ -79,6 +79,21 @@ describe('mountHomepageEditor', () => {
     container = document.createElement('div');
   });
 
+  it('does not offer learning activities in homepage block pickers', () => {
+    mountHomepageEditor(container, emptyHomepage(), {
+      onSave: vi.fn().mockResolvedValue(undefined),
+      onCancel: vi.fn()
+    });
+
+    const select = container.querySelector<HTMLSelectElement>('.homepage-editor__add-block-select')!;
+    expect([...select.querySelectorAll('optgroup')].map((group) => group.label)).not.toContain(
+      'Learning'
+    );
+    expect([...select.options].map((option) => option.value)).not.toEqual(
+      expect.arrayContaining(['flashcards', 'cloze', 'self_check'])
+    );
+  });
+
   it('calls onSave with the edited homepage', async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
     const onCancel = vi.fn();

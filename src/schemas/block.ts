@@ -20,6 +20,9 @@ export const BlockTypeSchema = z.enum([
   'accordion',
   'table',
   'question_set',
+  'flashcards',
+  'cloze',
+  'self_check',
   'columns',
   'section',
   'spacer',
@@ -321,6 +324,67 @@ export const QuestionSetBlockSchema = z.object({
   ...blockTimestamps
 });
 
+export const FlashcardItemSchema = z.object({
+  id: z.string().min(1),
+  front: z.string(),
+  back: z.string(),
+  image_url: z.string().optional(),
+  image_alt: z.string().optional()
+});
+
+export const FlashcardsBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('flashcards'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    cards: z.array(FlashcardItemSchema).min(1).max(20),
+    shuffle: z.boolean().optional()
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
+export const ClozeBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('cloze'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    title: z.string().optional(),
+    text: z.string(),
+    case_sensitive: z.boolean().optional()
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
+export const SelfCheckModeSchema = z.enum(['reveal', 'checklist', 'confidence']);
+
+export const SelfCheckItemSchema = z.object({
+  id: z.string().min(1),
+  label: z.string()
+});
+
+export const SelfCheckBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('self_check'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    title: z.string().optional(),
+    mode: SelfCheckModeSchema,
+    prompt: z.string(),
+    answer: z.string().optional(),
+    items: z.array(SelfCheckItemSchema).max(12).optional()
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
 export const TimelineEventSchema = z.object({
   id: z.string().min(1),
   when: z.string(),
@@ -362,7 +426,10 @@ const leafBlockSchemas = [
   AttachmentBlockSchema,
   AccordionBlockSchema,
   TableBlockSchema,
-  QuestionSetBlockSchema
+  QuestionSetBlockSchema,
+  FlashcardsBlockSchema,
+  ClozeBlockSchema,
+  SelfCheckBlockSchema
 ] as const;
 
 export const SpacerBlockSchema = z.object({

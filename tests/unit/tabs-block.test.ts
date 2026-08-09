@@ -222,8 +222,8 @@ describe('createBlock tabs', () => {
   });
 
   it('TAB_CHILD_TYPES excludes tabs and section', () => {
-    expect(TAB_CHILD_TYPES.includes('tabs')).toBe(false);
-    expect(TAB_CHILD_TYPES.includes('section')).toBe(false);
+    expect((TAB_CHILD_TYPES as readonly string[]).includes('tabs')).toBe(false);
+    expect((TAB_CHILD_TYPES as readonly string[]).includes('section')).toBe(false);
     expect(TAB_CHILD_TYPES.includes('columns')).toBe(true);
   });
 });

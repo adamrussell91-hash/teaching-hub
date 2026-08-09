@@ -1432,6 +1432,390 @@ export function createTimelineEditor(
   return editorShell(block, onChange, fields, getLatest);
 }
 
+type FlashcardDraft = {
+  id: string;
+  front: string;
+  back: string;
+  image_url?: string;
+  image_alt?: string;
+};
+
+export function createFlashcardsEditor(
+  block: Extract<Block, { block_type: 'flashcards' }>,
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'flashcards' }>>,
+  getLatest: () => Extract<Block, { block_type: 'flashcards' }> = () => block
+): HTMLElement {
+  const fields = document.createElement('div');
+  fields.className = 'block-editor__fields';
+
+  let cards: FlashcardDraft[] = block.content.cards.map((card) => ({ ...card }));
+  let cardCounter = cards.length;
+
+  const shuffle = document.createElement('input');
+  shuffle.type = 'checkbox';
+  shuffle.className = 'block-editor__flashcards-shuffle';
+  shuffle.checked = block.content.shuffle ?? false;
+  shuffle.setAttribute('aria-label', 'Shuffle cards for students');
+
+  const shuffleLabel = document.createElement('label');
+  shuffleLabel.className = 'block-editor__flashcards-shuffle-label';
+  shuffleLabel.append(shuffle, document.createTextNode(' Shuffle cards'));
+
+  const cardsContainer = document.createElement('div');
+  cardsContainer.className = 'block-editor__flashcards-items';
+
+  const emitChange = () => {
+    onChange({
+      ...getLatest(),
+      content: {
+        shuffle: shuffle.checked || undefined,
+        cards: cards.map((card) => ({
+          id: card.id,
+          front: card.front,
+          back: card.back,
+          image_url: card.image_url?.trim() ? card.image_url : undefined,
+          image_alt: card.image_alt?.trim() ? card.image_alt : undefined
+        }))
+      }
+    });
+  };
+
+  function renderCards(): void {
+    cardsContainer.replaceChildren();
+    const atMin = cards.length <= 1;
+    const atMax = cards.length >= 20;
+
+    cards.forEach((card, index) => {
+      const row = document.createElement('div');
+      row.className = 'block-editor__flashcards-item';
+
+      const front = document.createElement('input');
+      front.type = 'text';
+      front.className = 'block-editor__flashcards-front';
+      front.value = card.front;
+      front.placeholder = 'Front';
+      front.setAttribute('aria-label', `Flashcard ${index + 1} front`);
+
+      const back = document.createElement('input');
+      back.type = 'text';
+      back.className = 'block-editor__flashcards-back';
+      back.value = card.back;
+      back.placeholder = 'Back';
+      back.setAttribute('aria-label', `Flashcard ${index + 1} back`);
+
+      const imageUrl = document.createElement('input');
+      imageUrl.type = 'url';
+      imageUrl.className = 'block-editor__flashcards-image-url';
+      imageUrl.value = card.image_url ?? '';
+      imageUrl.placeholder = 'Image URL (optional)';
+      imageUrl.setAttribute('aria-label', `Flashcard ${index + 1} image URL`);
+
+      const imageAlt = document.createElement('input');
+      imageAlt.type = 'text';
+      imageAlt.className = 'block-editor__flashcards-image-alt';
+      imageAlt.value = card.image_alt ?? '';
+      imageAlt.placeholder = 'Image alt (required if URL set)';
+      imageAlt.setAttribute('aria-label', `Flashcard ${index + 1} image alt`);
+
+      const up = document.createElement('button');
+      up.type = 'button';
+      up.className = 'btn btn--ghost block-editor__flashcards-up';
+      up.textContent = 'Up';
+      up.disabled = index === 0;
+      up.addEventListener('click', () => {
+        if (index === 0) return;
+        const next = [...cards];
+        const current = next[index]!;
+        next[index] = next[index - 1]!;
+        next[index - 1] = current;
+        cards = next;
+        emitChange();
+        renderCards();
+      });
+
+      const down = document.createElement('button');
+      down.type = 'button';
+      down.className = 'btn btn--ghost block-editor__flashcards-down';
+      down.textContent = 'Down';
+      down.disabled = index >= cards.length - 1;
+      down.addEventListener('click', () => {
+        if (index >= cards.length - 1) return;
+        const next = [...cards];
+        const current = next[index]!;
+        next[index] = next[index + 1]!;
+        next[index + 1] = current;
+        cards = next;
+        emitChange();
+        renderCards();
+      });
+
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'btn btn--ghost block-editor__flashcards-remove';
+      remove.textContent = 'Remove';
+      remove.disabled = atMin;
+      remove.addEventListener('click', () => {
+        if (cards.length <= 1) return;
+        cards = cards.filter((_, i) => i !== index);
+        emitChange();
+        renderCards();
+      });
+
+      const patch = (partial: Partial<FlashcardDraft>) => {
+        cards[index] = { ...cards[index]!, ...partial };
+        emitChange();
+      };
+
+      front.addEventListener('input', () => patch({ front: front.value }));
+      back.addEventListener('input', () => patch({ back: back.value }));
+      imageUrl.addEventListener('input', () => patch({ image_url: imageUrl.value }));
+      imageAlt.addEventListener('input', () => patch({ image_alt: imageAlt.value }));
+
+      row.append(front, back, imageUrl, imageAlt, up, down, remove);
+      cardsContainer.append(row);
+    });
+
+    addButton.disabled = atMax;
+  }
+
+  const addButton = document.createElement('button');
+  addButton.type = 'button';
+  addButton.className = 'btn btn--secondary block-editor__flashcards-add';
+  addButton.textContent = 'Add card';
+  addButton.addEventListener('click', () => {
+    if (cards.length >= 20) return;
+    cardCounter += 1;
+    cards = [
+      ...cards,
+      {
+        id: `${getLatest().id}_c${cardCounter}`,
+        front: '',
+        back: ''
+      }
+    ];
+    emitChange();
+    renderCards();
+  });
+
+  shuffle.addEventListener('change', emitChange);
+
+  renderCards();
+  fields.append(shuffleLabel, cardsContainer, addButton);
+  return editorShell(block, onChange, fields, getLatest);
+}
+
+export function createClozeEditor(
+  block: Extract<Block, { block_type: 'cloze' }>,
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'cloze' }>>,
+  getLatest: () => Extract<Block, { block_type: 'cloze' }> = () => block
+): HTMLElement {
+  const fields = document.createElement('div');
+  fields.className = 'block-editor__fields';
+
+  const title = document.createElement('input');
+  title.type = 'text';
+  title.className = 'block-editor__cloze-title';
+  title.value = block.content.title ?? '';
+  title.placeholder = 'Title (optional)';
+  title.setAttribute('aria-label', 'Cloze title');
+
+  const text = document.createElement('textarea');
+  text.className = 'block-editor__cloze-text';
+  text.value = block.content.text;
+  text.rows = 6;
+  text.setAttribute('aria-label', 'Cloze text');
+
+  const hint = document.createElement('p');
+  hint.className = 'block-editor__hint';
+  hint.textContent = 'Use [[answer]] or [[answer|hint]] for blanks.';
+
+  const caseSensitive = document.createElement('input');
+  caseSensitive.type = 'checkbox';
+  caseSensitive.className = 'block-editor__cloze-case-sensitive';
+  caseSensitive.checked = block.content.case_sensitive ?? false;
+  caseSensitive.setAttribute('aria-label', 'Case sensitive answers');
+
+  const caseLabel = document.createElement('label');
+  caseLabel.className = 'block-editor__cloze-case-label';
+  caseLabel.append(caseSensitive, document.createTextNode(' Case sensitive'));
+
+  const emitChange = () => {
+    const titleValue = title.value.trim();
+    onChange({
+      ...getLatest(),
+      content: {
+        title: titleValue.length > 0 ? titleValue : undefined,
+        text: text.value,
+        case_sensitive: caseSensitive.checked || undefined
+      }
+    });
+  };
+
+  title.addEventListener('input', emitChange);
+  text.addEventListener('input', emitChange);
+  caseSensitive.addEventListener('change', emitChange);
+
+  fields.append(title, text, hint, caseLabel);
+  return editorShell(block, onChange, fields, getLatest);
+}
+
+type SelfCheckItemDraft = {
+  id: string;
+  label: string;
+};
+
+export function createSelfCheckEditor(
+  block: Extract<Block, { block_type: 'self_check' }>,
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'self_check' }>>,
+  getLatest: () => Extract<Block, { block_type: 'self_check' }> = () => block
+): HTMLElement {
+  const fields = document.createElement('div');
+  fields.className = 'block-editor__fields';
+
+  let mode = block.content.mode;
+  let items: SelfCheckItemDraft[] = (block.content.items ?? []).map((item) => ({ ...item }));
+  let itemCounter = items.length;
+
+  const title = document.createElement('input');
+  title.type = 'text';
+  title.className = 'block-editor__self-check-title';
+  title.value = block.content.title ?? '';
+  title.placeholder = 'Title (optional)';
+  title.setAttribute('aria-label', 'Self check title');
+
+  const modeSelect = document.createElement('select');
+  modeSelect.className = 'block-editor__self-check-mode';
+  modeSelect.setAttribute('aria-label', 'Self check mode');
+  for (const [value, label] of [
+    ['reveal', 'Reveal answer'],
+    ['checklist', 'Checklist'],
+    ['confidence', 'Confidence rating']
+  ] as const) {
+    const opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = label;
+    opt.selected = mode === value;
+    modeSelect.append(opt);
+  }
+
+  const prompt = document.createElement('textarea');
+  prompt.className = 'block-editor__self-check-prompt';
+  prompt.value = block.content.prompt;
+  prompt.rows = 3;
+  prompt.placeholder = 'Prompt';
+  prompt.setAttribute('aria-label', 'Self check prompt');
+
+  const answer = document.createElement('textarea');
+  answer.className = 'block-editor__self-check-answer';
+  answer.value = block.content.answer ?? '';
+  answer.rows = 3;
+  answer.placeholder = 'Answer';
+  answer.setAttribute('aria-label', 'Self check answer');
+
+  const itemsContainer = document.createElement('div');
+  itemsContainer.className = 'block-editor__self-check-items';
+
+  const emitChange = () => {
+    onChange({
+      ...getLatest(),
+      content: {
+        title: title.value.trim() || undefined,
+        mode,
+        prompt: prompt.value,
+        answer: mode === 'checklist' ? undefined : answer.value,
+        items:
+          mode === 'checklist'
+            ? items.map((item) => ({ id: item.id, label: item.label }))
+            : undefined
+      }
+    });
+  };
+
+  function renderItems(): void {
+    itemsContainer.replaceChildren();
+
+    items.forEach((item, index) => {
+      const row = document.createElement('div');
+      row.className = 'block-editor__self-check-item';
+
+      const label = document.createElement('input');
+      label.type = 'text';
+      label.className = 'block-editor__self-check-item-label';
+      label.value = item.label;
+      label.placeholder = 'Checklist item';
+      label.setAttribute('aria-label', `Checklist item ${index + 1}`);
+
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'btn btn--ghost block-editor__self-check-item-remove';
+      remove.textContent = 'Remove';
+      remove.disabled = items.length <= 1;
+      remove.addEventListener('click', () => {
+        items = items.filter((_, i) => i !== index);
+        if (items.length === 0) {
+          itemCounter += 1;
+          items = [{ id: `${getLatest().id}_i${itemCounter}`, label: '' }];
+        }
+        emitChange();
+        renderItems();
+      });
+
+      label.addEventListener('input', () => {
+        items[index] = { ...items[index]!, label: label.value };
+        emitChange();
+      });
+
+      row.append(label, remove);
+      itemsContainer.append(row);
+    });
+
+    addItemButton.disabled = items.length >= 12;
+  }
+
+  const addItemButton = document.createElement('button');
+  addItemButton.type = 'button';
+  addItemButton.className = 'btn btn--secondary block-editor__self-check-item-add';
+  addItemButton.textContent = 'Add item';
+  addItemButton.addEventListener('click', () => {
+    if (items.length >= 12) return;
+    itemCounter += 1;
+    items = [...items, { id: `${getLatest().id}_i${itemCounter}`, label: '' }];
+    emitChange();
+    renderItems();
+  });
+
+  function renderModeFields(): void {
+    const showAnswer = mode === 'reveal' || mode === 'confidence';
+    const showItems = mode === 'checklist';
+
+    answer.hidden = !showAnswer;
+    itemsContainer.hidden = !showItems;
+    addItemButton.hidden = !showItems;
+
+    if (showItems && items.length === 0) {
+      itemCounter += 1;
+      items = [{ id: `${getLatest().id}_i${itemCounter}`, label: '' }];
+      renderItems();
+    } else if (showItems) {
+      renderItems();
+    }
+  }
+
+  modeSelect.addEventListener('change', () => {
+    mode = modeSelect.value as typeof mode;
+    renderModeFields();
+    emitChange();
+  });
+
+  title.addEventListener('input', emitChange);
+  prompt.addEventListener('input', emitChange);
+  answer.addEventListener('input', emitChange);
+
+  renderModeFields();
+  fields.append(title, modeSelect, prompt, answer, itemsContainer, addItemButton);
+  return editorShell(block, onChange, fields, getLatest);
+}
+
 export function createBlockEditor(
   block: Block,
   onChange: BlockChangeHandler,
@@ -1475,6 +1859,12 @@ export function createBlockEditor(
       return createQuestionSetEditor(block, onChange, latest as () => Extract<Block, { block_type: 'question_set' }>);
     case 'timeline':
       return createTimelineEditor(block, onChange, latest as () => Extract<Block, { block_type: 'timeline' }>);
+    case 'flashcards':
+      return createFlashcardsEditor(block, onChange, latest as () => Extract<Block, { block_type: 'flashcards' }>);
+    case 'cloze':
+      return createClozeEditor(block, onChange, latest as () => Extract<Block, { block_type: 'cloze' }>);
+    case 'self_check':
+      return createSelfCheckEditor(block, onChange, latest as () => Extract<Block, { block_type: 'self_check' }>);
     case 'spacer':
       return createSpacerEditor(block, onChange, latest as () => Extract<Block, { block_type: 'spacer' }>);
     case 'section':

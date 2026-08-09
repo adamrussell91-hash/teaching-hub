@@ -20,19 +20,18 @@ Block primitives: [`docs/specs/03_BLOCK_SYSTEM.md`](specs/03_BLOCK_SYSTEM.md)
 
 Suggested order for continuing builder / teaching-page work (adjust as needed):
 
-1. **Learning activities pack** — flashcards, cloze, self_check  
-2. **Visualisation pack** — chart, equation (diagram / mind_map / concept_map after)  
-3. **Structure: Collection** — nav / resource collections  
-4. **html_app** — sandboxed interactive HTML apps (separate from sanitised `html`)  
-5. **Builder UX** — drag-and-drop between columns; free-form column widths  
+1. **Visualisation pack** — chart, equation (diagram / mind_map / concept_map after)
+2. **Structure: Collection** — nav / resource collections
+3. **html_app** — sandboxed interactive HTML apps (separate from sanitised `html`)
+4. **Builder UX** — drag-and-drop between columns; free-form column widths
 
 Larger product tracks (not “next block”, but still ahead):
 
-- A4 print render  
-- Google Drive / media library uploads  
-- Templates & reuse  
-- Search / nav acceleration  
-- AI agent integration  
+- A4 print render
+- Google Drive / media library uploads
+- Templates & reuse
+- Search / nav acceleration
+- AI agent integration
 - Versioning, archive, recovery  
 
 ---
@@ -59,17 +58,18 @@ Larger product tracks (not “next block”, but still ahead):
 | 2026-08-09 | **Timeline** | In-lesson chronology events (`when`/label/description + optional image/link); stacked editor; vertical→horizontal CSS — [`design`](superpowers/specs/2026-08-09-timeline-block-design.md) / [`plan`](superpowers/plans/2026-08-09-timeline-block.md) |
 | 2026-08-09 | **Tabs** | Nested `tabs` panels (2–8); columns allowed in panels; stacked editor; student tablist — [`design`](superpowers/specs/2026-08-09-tabs-block-design.md) / [`plan`](superpowers/plans/2026-08-09-tabs-block.md) |
 | 2026-08-09 | **Gallery** | Multi-image set (grid / carousel / comparison + lightbox) — [`design`](superpowers/specs/2026-08-09-gallery-block-design.md) / [`plan`](superpowers/plans/2026-08-09-gallery-block.md) |
+| 2026-08-09 | **Learning activities pack** | `flashcards`, `cloze`, `self_check` — thin v1 with local student state, flip/shuffle, sized blanks + shuffled word bank — [`design`](superpowers/specs/2026-08-09-learning-activities-pack-design.md) / [`plan`](superpowers/plans/2026-08-09-learning-activities-pack.md) |
 
-### Block types live today (22)
+### Block types live today (25)
 
-`rich_text`, `heading`, `callout`, `image`, `video`, `embed`, `html`, `quote`, `divider`, `definition`, `code`, `audio`, `attachment`, `accordion`, `table`, `question_set`, `columns`, `section`, `spacer`, `timeline`, `tabs`, `gallery`
+`rich_text`, `heading`, `callout`, `image`, `video`, `embed`, `html`, `quote`, `divider`, `definition`, `code`, `audio`, `attachment`, `accordion`, `table`, `question_set`, `columns`, `section`, `spacer`, `timeline`, `tabs`, `gallery`, `flashcards`, `cloze`, `self_check`
 
 ### Product phases (rough map)
 
 | Spec phase | Status |
 |------------|--------|
 | 0–4 Foundation → basic builder → publish | Done (core) |
-| 5 Block system expansion | **In progress** — layout + timeline + tabs + gallery done; activities/viz remain |
+| 5 Block system expansion | **In progress** — layout + timeline + tabs + gallery + activities done; viz remain |
 | 6–8 Unit/class pages, scheduling, scope | Largely done for v1 |
 | 9 A4 print | Not started |
 | 10 Google Drive | Not started |
@@ -97,9 +97,9 @@ Unchecked = not built yet.
 - [ ] `html_app` (sandboxed apps)
 
 ### Learning activities
-- [ ] Flashcards
-- [ ] Cloze
-- [ ] Self check
+- [x] Flashcards
+- [x] Cloze
+- [x] Self check
 - [ ] Response space (if still distinct from question_set)
 
 ### Visualisation
@@ -121,4 +121,4 @@ Unchecked = not built yet.
 
 ## Latest note
 
-**2026-08-09** — Gallery + Tabs merged with Timeline already on main (grid/carousel/comparison + lightbox; nested tab panels; in-lesson chronology). Next builder slice: **Learning activities pack** unless priority shifts.
+**2026-08-09** — Learning activities pack shipped (`flashcards`, `cloze`, `self_check` — local student state, flip/shuffle, sized blanks + shuffled word bank). Next builder slice: **Visualisation pack** unless priority shifts.

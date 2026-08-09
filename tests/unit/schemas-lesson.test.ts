@@ -748,3 +748,255 @@ describe('PublishableLessonSchema timeline rules', () => {
     expect(result.success).toBe(true);
   });
 });
+
+describe('PublishableLessonSchema learning activity rules', () => {
+  const baseLesson = {
+    id: 'lesson_1',
+    type: 'lesson' as const,
+    title: 'Lesson',
+    slug: 'lesson',
+    status: 'active' as const,
+    unit_id: 'unit_aotfw',
+    sequence: 1,
+    created_at: '2026-01-01T00:00:00.000Z',
+    updated_at: '2026-01-01T00:00:00.000Z',
+    schema_version: 1 as const
+  };
+
+  function flashcard(id: string, front: string, back: string) {
+    return { id, front, back };
+  }
+
+  const okFlashcards = {
+    ...baseBlock,
+    block_type: 'flashcards' as const,
+    content: {
+      cards: [
+        flashcard('c1', 'Term', 'Definition'),
+        flashcard('c2', 'Q', 'A')
+      ]
+    }
+  };
+
+  const okCloze = {
+    ...baseBlock,
+    id: 'cl1',
+    block_type: 'cloze' as const,
+    content: { text: 'The capital of France is [[Paris]].' }
+  };
+
+  it('rejects flashcards with empty front on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [
+        {
+          ...okFlashcards,
+          content: {
+            cards: [flashcard('c1', '   ', 'Back'), flashcard('c2', 'Front', 'Back')]
+          }
+        }
+      ]
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.message.includes('front and back'))).toBe(true);
+    }
+  });
+
+  it('rejects flashcards with empty back on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [
+        {
+          ...okFlashcards,
+          content: {
+            cards: [flashcard('c1', 'Front', ''), flashcard('c2', 'Front', 'Back')]
+          }
+        }
+      ]
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.message.includes('front and back'))).toBe(true);
+    }
+  });
+
+  it('rejects cloze without blanks on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [{ ...okCloze, content: { text: 'No blanks here.' } }]
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.message.includes('at least one blank'))).toBe(true);
+    }
+  });
+
+  it('rejects cloze with whitespace-only blank on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [{ ...okCloze, content: { text: 'The capital is [[ ]].' } }]
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.message.includes('Cloze blocks need at least one blank'))).toBe(
+        true
+      );
+    }
+  });
+
+  it('rejects self_check with empty prompt on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [
+        {
+          ...baseBlock,
+          block_type: 'self_check',
+          content: { mode: 'reveal', prompt: '   ', answer: 'Answer' }
+        }
+      ]
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.message.includes('need a prompt'))).toBe(true);
+    }
+  });
+
+  it('rejects self_check reveal with empty answer on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [
+        {
+          ...baseBlock,
+          block_type: 'self_check',
+          content: { mode: 'reveal', prompt: 'What is it?', answer: '' }
+        }
+      ]
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.message.includes('need an answer'))).toBe(true);
+    }
+  });
+
+  it('rejects self_check confidence with empty answer on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [
+        {
+          ...baseBlock,
+          block_type: 'self_check',
+          content: { mode: 'confidence', prompt: 'Rate yourself', answer: '   ' }
+        }
+      ]
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.message.includes('need an answer'))).toBe(true);
+    }
+  });
+
+  it('rejects self_check checklist with no valid items on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [
+        {
+          ...baseBlock,
+          block_type: 'self_check',
+          content: {
+            mode: 'checklist',
+            prompt: 'Check off what you know',
+            items: [{ id: 'i1', label: '   ' }]
+          }
+        }
+      ]
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.message.includes('at least one item'))).toBe(true);
+    }
+  });
+
+  it('rejects self_check checklist with empty items array on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [
+        {
+          ...baseBlock,
+          block_type: 'self_check',
+          content: {
+            mode: 'checklist',
+            prompt: 'Check off what you know',
+            items: []
+          }
+        }
+      ]
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.message.includes('at least one item'))).toBe(true);
+    }
+  });
+
+  it('accepts valid flashcards on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [okFlashcards]
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts valid cloze on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [okCloze]
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts valid self_check reveal on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [
+        {
+          ...baseBlock,
+          block_type: 'self_check',
+          content: { mode: 'reveal', prompt: 'What is it?', answer: 'The answer' }
+        }
+      ]
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts valid self_check confidence on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [
+        {
+          ...baseBlock,
+          block_type: 'self_check',
+          content: { mode: 'confidence', prompt: 'How confident are you?', answer: 'Key point' }
+        }
+      ]
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts valid self_check checklist on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [
+        {
+          ...baseBlock,
+          block_type: 'self_check',
+          content: {
+            mode: 'checklist',
+            prompt: 'What did you learn?',
+            items: [{ id: 'i1', label: 'I can explain the concept' }]
+          }
+        }
+      ]
+    });
+    expect(result.success).toBe(true);
+  });
+});
