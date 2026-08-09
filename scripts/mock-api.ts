@@ -1322,6 +1322,25 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     if (method === 'POST' && path === '/api/logout') return handleLogout();
     if (method === 'GET' && path === '/api/curriculum') return handleGetCurriculum(cookie);
 
+    if (method === 'POST' && path === '/api/html-app-ai') {
+      if (!body || typeof body !== 'object') {
+        return errorResponse(400, 'bad_request', 'Invalid JSON body');
+      }
+      const req = body as {
+        lesson_id?: unknown;
+        block_id?: unknown;
+        messages?: unknown;
+      };
+      if (
+        typeof req.lesson_id !== 'string' ||
+        typeof req.block_id !== 'string' ||
+        !Array.isArray(req.messages)
+      ) {
+        return errorResponse(400, 'bad_request', 'lesson_id, block_id, and messages are required');
+      }
+      return okResponse(200, { text: 'mock-ai-reply' });
+    }
+
     if (method === 'POST' && path === '/api/classes') return handlePostClass(cookie, body);
     if (method === 'POST' && path === '/api/units') return handlePostUnit(cookie, body);
     if (method === 'POST' && path === '/api/lessons') return handlePostLesson(cookie, body);
