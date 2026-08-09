@@ -23,6 +23,11 @@ export const BlockTypeSchema = z.enum([
   'flashcards',
   'cloze',
   'self_check',
+  'chart',
+  'equation',
+  'diagram',
+  'mind_map',
+  'concept_map',
   'columns',
   'section',
   'spacer',
@@ -385,6 +390,112 @@ export const SelfCheckBlockSchema = z.object({
   ...blockTimestamps
 });
 
+export const ChartTypeSchema = z.enum(['bar', 'line', 'pie', 'scatter']);
+
+export const ChartPointSchema = z.object({
+  x: z.union([z.string(), z.number()]),
+  y: z.number()
+});
+
+export const ChartSeriesSchema = z.object({
+  id: z.string().min(1),
+  name: z.string(),
+  points: z.array(ChartPointSchema).min(1).max(24)
+});
+
+export const ChartBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('chart'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    chart_type: ChartTypeSchema,
+    title: z.string().optional(),
+    x_label: z.string().optional(),
+    y_label: z.string().optional(),
+    series: z.array(ChartSeriesSchema).min(1).max(6)
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
+export const EquationBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('equation'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    latex: z.string(),
+    caption: z.string().optional()
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
+export const DiagramSourceSchema = z.enum(['image', 'svg']);
+
+export const DiagramBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('diagram'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    source: DiagramSourceSchema,
+    image_url: z.string().optional(),
+    image_alt: z.string().optional(),
+    svg_markup: z.string().optional(),
+    caption: z.string().optional()
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
+export const GraphNodeSchema = z.object({
+  id: z.string().min(1),
+  label: z.string(),
+  parent_id: z.string().nullable().optional()
+});
+
+export const GraphEdgeSchema = z.object({
+  id: z.string().min(1),
+  from: z.string().min(1),
+  to: z.string().min(1),
+  label: z.string().optional()
+});
+
+export const MindMapBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('mind_map'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    title: z.string().optional(),
+    nodes: z.array(GraphNodeSchema).min(1).max(24),
+    edges: z.array(GraphEdgeSchema).max(40)
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
+export const ConceptMapBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('concept_map'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    title: z.string().optional(),
+    nodes: z.array(GraphNodeSchema).min(1).max(24),
+    edges: z.array(GraphEdgeSchema).max(40)
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
 export const TimelineEventSchema = z.object({
   id: z.string().min(1),
   when: z.string(),
@@ -429,7 +540,12 @@ const leafBlockSchemas = [
   QuestionSetBlockSchema,
   FlashcardsBlockSchema,
   ClozeBlockSchema,
-  SelfCheckBlockSchema
+  SelfCheckBlockSchema,
+  ChartBlockSchema,
+  EquationBlockSchema,
+  DiagramBlockSchema,
+  MindMapBlockSchema,
+  ConceptMapBlockSchema
 ] as const;
 
 export const SpacerBlockSchema = z.object({

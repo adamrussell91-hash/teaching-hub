@@ -26,6 +26,11 @@ export const NEW_BLOCK_TYPES = [
   'flashcards',
   'cloze',
   'self_check',
+  'chart',
+  'equation',
+  'diagram',
+  'mind_map',
+  'concept_map',
   'columns',
   'section',
   'spacer',
@@ -56,6 +61,11 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   flashcards: 'Flashcards',
   cloze: 'Cloze',
   self_check: 'Self check',
+  chart: 'Chart',
+  equation: 'Equation',
+  diagram: 'Diagram',
+  mind_map: 'Mind map',
+  concept_map: 'Concept map',
   columns: 'Columns',
   section: 'Section',
   spacer: 'Spacer',
@@ -79,6 +89,10 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
   {
     label: 'Learning',
     types: ['flashcards', 'cloze', 'self_check']
+  },
+  {
+    label: 'Visualisation',
+    types: ['chart', 'equation', 'diagram', 'mind_map', 'concept_map']
   },
   {
     label: 'Layout',
@@ -274,6 +288,68 @@ export function createBlock(type: NewBlockType, id: string): Block {
           answer: ''
         }
       };
+    case 'chart':
+      return {
+        ...shared,
+        block_type: 'chart',
+        variant: 'medium',
+        content: {
+          chart_type: 'bar',
+          title: '',
+          series: [
+            {
+              id: `${id}_s1`,
+              name: 'Series 1',
+              points: [
+                { x: 'A', y: 3 },
+                { x: 'B', y: 5 },
+                { x: 'C', y: 2 }
+              ]
+            }
+          ]
+        }
+      };
+    case 'equation':
+      return {
+        ...shared,
+        block_type: 'equation',
+        variant: 'medium',
+        content: { latex: 'E = mc^2' }
+      };
+    case 'diagram':
+      return {
+        ...shared,
+        block_type: 'diagram',
+        variant: 'medium',
+        content: { source: 'image', image_url: '', image_alt: '' }
+      };
+    case 'mind_map':
+      return {
+        ...shared,
+        block_type: 'mind_map',
+        variant: 'medium',
+        content: {
+          nodes: [
+            { id: `${id}_n1`, label: 'Centre', parent_id: null },
+            { id: `${id}_n2`, label: 'Idea 1', parent_id: `${id}_n1` },
+            { id: `${id}_n3`, label: 'Idea 2', parent_id: `${id}_n1` }
+          ],
+          edges: []
+        }
+      };
+    case 'concept_map':
+      return {
+        ...shared,
+        block_type: 'concept_map',
+        variant: 'medium',
+        content: {
+          nodes: [
+            { id: `${id}_n1`, label: 'Concept A' },
+            { id: `${id}_n2`, label: 'Concept B' }
+          ],
+          edges: [{ id: `${id}_e1`, from: `${id}_n1`, to: `${id}_n2`, label: 'relates to' }]
+        }
+      };
     case 'columns':
       return {
         ...shared,
@@ -394,6 +470,34 @@ export function cloneBlockWithNewIds(
       items: cloned.content.items.map((item) => ({
         ...item,
         id: nextId()
+      }))
+    };
+  } else if (cloned.block_type === 'chart') {
+    cloned.content = {
+      ...cloned.content,
+      series: cloned.content.series.map((series) => ({
+        ...series,
+        id: nextId()
+      }))
+    };
+  } else if (cloned.block_type === 'mind_map' || cloned.block_type === 'concept_map') {
+    const idMap = new Map<string, string>();
+    for (const node of cloned.content.nodes) {
+      idMap.set(node.id, nextId());
+    }
+    cloned.content = {
+      ...cloned.content,
+      nodes: cloned.content.nodes.map((node) => ({
+        ...node,
+        id: idMap.get(node.id)!,
+        parent_id:
+          node.parent_id == null ? node.parent_id : (idMap.get(node.parent_id) ?? null)
+      })),
+      edges: cloned.content.edges.map((edge) => ({
+        ...edge,
+        id: nextId(),
+        from: idMap.get(edge.from) ?? edge.from,
+        to: idMap.get(edge.to) ?? edge.to
       }))
     };
   }
