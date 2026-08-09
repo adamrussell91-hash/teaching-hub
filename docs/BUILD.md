@@ -57,19 +57,18 @@ Larger product tracks (not “next block”, but still ahead):
 | 2026-08-09 | Image publish fix | Live-field emit so alt edit doesn’t wipe URL |
 | 2026-08-09 | Builder variety | `quote`, `divider`, `definition`, `code`, `audio`, `attachment`, `accordion`, `table`, `question_set` + richer controls |
 | 2026-08-09 | **Layout Phase A** | Nested `columns` (4 presets), `section`, `spacer`; recursive schema/render/editor/publish |
-| 2026-08-09 | **Tabs** | Nested `tabs` panels (2–8); columns allowed in panels; stacked editor; student tablist |
 | 2026-08-09 | **Timeline** | In-lesson chronology events (`when`/label/description + optional image/link); stacked editor; vertical→horizontal CSS — [`design`](superpowers/specs/2026-08-09-timeline-block-design.md) / [`plan`](superpowers/plans/2026-08-09-timeline-block.md) |
 
-### Block types live today (21)
+### Block types live today (20)
 
-`rich_text`, `heading`, `callout`, `image`, `video`, `embed`, `html`, `quote`, `divider`, `definition`, `code`, `audio`, `attachment`, `accordion`, `table`, `question_set`, `columns`, `section`, `spacer`, `tabs`, `timeline`
+`rich_text`, `heading`, `callout`, `image`, `video`, `embed`, `html`, `quote`, `divider`, `definition`, `code`, `audio`, `attachment`, `accordion`, `table`, `question_set`, `columns`, `section`, `spacer`, `timeline`
 
 ### Product phases (rough map)
 
 | Spec phase | Status |
 |------------|--------|
 | 0–4 Foundation → basic builder → publish | Done (core) |
-| 5 Block system expansion | **In progress** — layout + tabs + timeline done; gallery/activities/viz remain |
+| 5 Block system expansion | **In progress** — layout + timeline done; tabs/gallery/activities/viz remain |
 | 6–8 Unit/class pages, scheduling, scope | Largely done for v1 |
 | 9 A4 print | Not started |
 | 10 Google Drive | Not started |
@@ -86,7 +85,7 @@ Unchecked = not built yet.
 
 ### Structure / layout
 - [x] Section, Columns, Spacer (Phase A — nested model)
-- [x] Tabs
+- [ ] Tabs
 - [ ] Collection (navigation / resource lists)
 - [ ] Columns UX: drag between columns; non-preset widths
 
