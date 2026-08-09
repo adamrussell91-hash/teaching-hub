@@ -1861,6 +1861,19 @@ a.home-class-tile:hover {
   font-size: 0.85rem;
 }
 
+.block-html-app__frame {
+  display: block;
+  width: 100%;
+  background: var(--glass);
+}
+
+.block-html-app__ai-note {
+  margin: 0.35rem 0 0;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
 .block-image--small img,
 .block-video--small {
   max-width: 18rem;

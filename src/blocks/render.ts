@@ -1,4 +1,5 @@
 import katex from 'katex';
+import { getApiBaseUrl } from '@/api/config';
 import { buildChartSvg, buildChartTableRows, escapeXml } from '@/blocks/chart-svg';
 import {
   layoutConceptMap,
@@ -7,6 +8,7 @@ import {
   type MindMapContent
 } from '@/blocks/graph-layout';
 import type { CollectionLink } from '@/blocks/collection-resolve';
+import { buildHtmlAppSrcdoc } from '@/blocks/html-app-srcdoc';
 import { sanitizeRichTextHtml } from '@/blocks/sanitize';
 import { sanitizeSvgMarkup } from '@/blocks/sanitize-svg';
 import { isHttpUrl } from '@/blocks/url-safety';
@@ -21,6 +23,7 @@ import {
 import type { Block } from '@/schemas/block';
 
 export type RenderMode = 'teacher' | 'student';
+export type RenderContext = { lessonId?: string };
 
 const HEADING_TAG = {
   page: 'h1',
@@ -202,6 +205,49 @@ export function renderHtmlBlock(
   body.className = 'block-html';
   body.innerHTML = sanitizeRichTextHtml(block.content.html);
   return wrapBlock(body, block, mode);
+}
+
+export function renderHtmlAppBlock(
+  block: Extract<Block, { block_type: 'html_app' }>,
+  mode: RenderMode,
+  ctx: RenderContext = {}
+): HTMLElement {
+  const root = document.createElement('div');
+  root.className = 'block-html-app';
+
+  const height = block.content.height_px ?? 480;
+  const iframe = document.createElement('iframe');
+  iframe.className = 'block-html-app__frame';
+  iframe.setAttribute('sandbox', 'allow-scripts allow-forms');
+  iframe.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+  iframe.title = block.content.title?.trim() || 'HTML app';
+  iframe.style.height = `${height}px`;
+  iframe.style.width = '100%';
+  iframe.style.border = '0';
+
+  const ai = block.content.ai;
+  const injectAi = Boolean(ai && ctx.lessonId);
+  iframe.srcdoc = buildHtmlAppSrcdoc(
+    block.content.html,
+    injectAi
+      ? {
+          injectAi: true,
+          lessonId: ctx.lessonId!,
+          blockId: block.id,
+          apiBaseUrl: getApiBaseUrl()
+        }
+      : { injectAi: false }
+  );
+  root.append(iframe);
+
+  if (ai) {
+    const note = document.createElement('p');
+    note.className = 'block-html-app__ai-note';
+    note.textContent = 'Uses class AI lane';
+    root.append(note);
+  }
+
+  return wrapBlock(root, block, mode);
 }
 
 export function renderQuoteBlock(
@@ -447,7 +493,8 @@ export function renderSpacerBlock(
 
 export function renderSectionBlock(
   block: Extract<Block, { block_type: 'section' }>,
-  mode: RenderMode
+  mode: RenderMode,
+  ctx: RenderContext = {}
 ): HTMLElement {
   const section = document.createElement('section');
   section.className = 'block-section';
@@ -459,7 +506,7 @@ export function renderSectionBlock(
   const body = document.createElement('div');
   body.className = 'block-section__body';
   for (const child of block.content.blocks) {
-    body.append(renderBlock(child, mode));
+    body.append(renderBlock(child, mode, ctx));
   }
 
   section.append(title, body);
@@ -468,7 +515,8 @@ export function renderSectionBlock(
 
 export function renderColumnsBlock(
   block: Extract<Block, { block_type: 'columns' }>,
-  mode: RenderMode
+  mode: RenderMode,
+  ctx: RenderContext = {}
 ): HTMLElement {
   const grid = document.createElement('div');
   grid.className = 'block-columns';
@@ -482,7 +530,7 @@ export function renderColumnsBlock(
     cell.className = 'block-columns__col';
     cell.dataset.width = String(col.width);
     for (const child of col.blocks) {
-      cell.append(renderBlock(child, mode));
+      cell.append(renderBlock(child, mode, ctx));
     }
     grid.append(cell);
   }
@@ -585,7 +633,8 @@ export function renderCollectionBlock(
 
 export function renderTabsBlock(
   block: Extract<Block, { block_type: 'tabs' }>,
-  mode: RenderMode
+  mode: RenderMode,
+  ctx: RenderContext = {}
 ): HTMLElement {
   const root = document.createElement('div');
   root.className = 'block-tabs';
@@ -613,7 +662,7 @@ export function renderTabsBlock(
       panel.replaceChildren();
       if (active) {
         for (const child of block.content.tabs[i]!.blocks) {
-          panel.append(renderBlock(child, mode));
+          panel.append(renderBlock(child, mode, ctx));
         }
       }
     });
@@ -1603,7 +1652,11 @@ export function renderConceptMapBlock(
   return wrapBlock(root, block, mode);
 }
 
-export function renderBlock(block: Block, mode: RenderMode): HTMLElement {
+export function renderBlock(
+  block: Block,
+  mode: RenderMode,
+  ctx: RenderContext = {}
+): HTMLElement {
   switch (block.block_type) {
     case 'rich_text':
       return renderRichTextBlock(block, mode);
@@ -1621,6 +1674,8 @@ export function renderBlock(block: Block, mode: RenderMode): HTMLElement {
       return renderEmbedBlock(block, mode);
     case 'html':
       return renderHtmlBlock(block, mode);
+    case 'html_app':
+      return renderHtmlAppBlock(block, mode, ctx);
     case 'quote':
       return renderQuoteBlock(block, mode);
     case 'divider':
@@ -1652,11 +1707,11 @@ export function renderBlock(block: Block, mode: RenderMode): HTMLElement {
     case 'spacer':
       return renderSpacerBlock(block, mode);
     case 'section':
-      return renderSectionBlock(block, mode);
+      return renderSectionBlock(block, mode, ctx);
     case 'columns':
-      return renderColumnsBlock(block, mode);
+      return renderColumnsBlock(block, mode, ctx);
     case 'tabs':
-      return renderTabsBlock(block, mode);
+      return renderTabsBlock(block, mode, ctx);
     case 'chart':
       return renderChartBlock(block, mode);
     case 'equation':
