@@ -41,6 +41,14 @@ export const ColumnPresetSchema = z.enum(['50-50', '33-67', '67-33', '33-33-33',
 export const SpacerSizeSchema = z.enum(['small', 'medium', 'large']);
 
 export const VideoProviderSchema = z.enum(['youtube', 'vimeo']);
+export const EmbedProviderSchema = z.enum([
+  'google_maps',
+  'google_slides',
+  'google_docs',
+  'pdf',
+  'generic'
+]);
+export type EmbedProvider = z.infer<typeof EmbedProviderSchema>;
 export const HeadingVariantSchema = z.enum(['page', 'section', 'subsection']);
 export const MediaSizeVariantSchema = z.enum(['small', 'medium', 'large']);
 export const CalloutStyleSchema = z.enum([
@@ -185,7 +193,9 @@ export const EmbedBlockSchema = z.object({
   visibility: VisibilitySchema,
   content: z.object({
     url: z.string(),
-    title: z.string().optional()
+    title: z.string().optional(),
+    provider: EmbedProviderSchema.optional(),
+    embed_url: z.string().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
