@@ -1861,6 +1861,32 @@ a.home-class-tile:hover {
   font-size: 0.85rem;
 }
 
+.block-embed__card {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  border-radius: calc(var(--radius-md) * 0.5);
+  background: var(--glass);
+}
+
+.block-embed__card-title {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-weight: 600;
+}
+
+.block-embed__card-meta {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.block-embed__card .block-embed__open {
+  margin-top: 0.25rem;
+}
+
 .block-html-app__frame {
   display: block;
   width: 100%;

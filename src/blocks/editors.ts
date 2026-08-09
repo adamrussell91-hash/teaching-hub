@@ -11,8 +11,9 @@ import {
 import { renderCollectionBlock } from '@/blocks/render';
 import { sanitizeSvgMarkup } from '@/blocks/sanitize-svg';
 import { isHttpUrl } from '@/blocks/url-safety';
+import { parseEmbedInput } from '@/blocks/embed-url';
 import { parseVideoInput } from '@/blocks/video-url';
-import type { Block } from '@/schemas/block';
+import type { Block, EmbedProvider } from '@/schemas/block';
 
 export type BlockChangeHandler<T extends Block = Block> = (block: T) => void;
 
@@ -450,21 +451,67 @@ export function createEmbedEditor(
   title.value = block.content.title ?? '';
   title.setAttribute('aria-label', 'Embed title');
 
-  const emitChange = () => {
+  const provider = document.createElement('select');
+  provider.className = 'block-editor__embed-provider';
+  provider.setAttribute('aria-label', 'Embed provider');
+  const providerOptions: Array<{ value: EmbedProvider; label: string }> = [
+    { value: 'google_maps', label: 'Google Maps' },
+    { value: 'google_slides', label: 'Google Slides' },
+    { value: 'google_docs', label: 'Google Docs' },
+    { value: 'pdf', label: 'PDF' },
+    { value: 'generic', label: 'Generic' }
+  ];
+  for (const opt of providerOptions) {
+    const option = document.createElement('option');
+    option.value = opt.value;
+    option.textContent = opt.label;
+    provider.append(option);
+  }
+  provider.value = block.content.provider ?? 'generic';
+
+  const hint = document.createElement('p');
+  hint.className = 'block-editor__hint';
+  hint.textContent =
+    'Share settings must allow viewers. Docs and PDFs open as a link card.';
+
+  const emitChange = (embedUrl?: string) => {
+    const selected = provider.value as EmbedProvider;
     onChange({
       ...getLatest(),
       content: {
-        ...block.content,
         url: url.value,
-        title: title.value || undefined
+        title: title.value || undefined,
+        provider: selected,
+        ...(embedUrl ? { embed_url: embedUrl } : {})
       }
     });
   };
 
-  url.addEventListener('input', emitChange);
-  title.addEventListener('input', emitChange);
+  const applyUrlDetection = () => {
+    const parsed = parseEmbedInput(url.value);
+    if (parsed) {
+      provider.value = parsed.provider;
+      emitChange(parsed.embed_url);
+      return;
+    }
+    emitChange(undefined);
+  };
 
-  fields.append(url, title);
+  url.addEventListener('input', applyUrlDetection);
+  title.addEventListener('input', () => {
+    const latest = getLatest();
+    emitChange(latest.content.embed_url);
+  });
+  provider.addEventListener('change', () => {
+    const parsed = parseEmbedInput(url.value);
+    if (parsed && parsed.provider === provider.value) {
+      emitChange(parsed.embed_url);
+      return;
+    }
+    emitChange(undefined);
+  });
+
+  fields.append(url, title, provider, hint);
   return editorShell(block, onChange, fields, getLatest);
 }
 

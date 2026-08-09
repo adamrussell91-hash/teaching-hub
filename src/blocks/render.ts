@@ -12,15 +12,9 @@ import { buildHtmlAppSrcdoc } from '@/blocks/html-app-srcdoc';
 import { sanitizeRichTextHtml } from '@/blocks/sanitize';
 import { sanitizeSvgMarkup } from '@/blocks/sanitize-svg';
 import { isHttpUrl } from '@/blocks/url-safety';
+import { embedFrameSrc, embedUsesIframe } from '@/blocks/embed-url';
 import { videoEmbedSrc } from '@/blocks/video-url';
-import {
-  loadActivityState,
-  parseClozeText,
-  saveActivityState,
-  shuffleArray,
-  storageKey
-} from '@/blocks/learning-activity';
-import type { Block } from '@/schemas/block';
+import type { Block, EmbedProvider } from '@/schemas/block';
 
 export type RenderMode = 'teacher' | 'student';
 export type RenderContext = { lessonId?: string };
@@ -162,6 +156,36 @@ export function renderVideoBlock(
   return wrapBlock(wrap, block, mode);
 }
 
+function embedProviderLabel(provider: EmbedProvider): string {
+  switch (provider) {
+    case 'google_maps':
+      return 'Google Maps';
+    case 'google_slides':
+      return 'Google Slides';
+    case 'google_docs':
+      return 'Google Doc';
+    case 'pdf':
+      return 'PDF';
+    default:
+      return 'Embedded resource';
+  }
+}
+
+function embedDefaultTitle(provider: EmbedProvider): string {
+  switch (provider) {
+    case 'google_maps':
+      return 'Map';
+    case 'google_slides':
+      return 'Slides';
+    case 'google_docs':
+      return 'Google Doc';
+    case 'pdf':
+      return 'PDF';
+    default:
+      return 'Embedded content';
+  }
+}
+
 export function renderEmbedBlock(
   block: Extract<Block, { block_type: 'embed' }>,
   mode: RenderMode
@@ -170,14 +194,25 @@ export function renderEmbedBlock(
   wrap.className = 'block-embed';
   const safeUrl = isHttpUrl(block.content.url) ? block.content.url.trim() : undefined;
 
-  if (safeUrl) {
+  if (!safeUrl) {
+    const unavailable = document.createElement('p');
+    unavailable.className = 'block-embed__unavailable';
+    unavailable.textContent = 'Embed unavailable.';
+    wrap.append(unavailable);
+    return wrapBlock(wrap, block, mode);
+  }
+
+  const provider = block.content.provider ?? 'generic';
+  const frameSrc = embedFrameSrc(block.content);
+
+  if (embedUsesIframe(provider) && frameSrc) {
     const iframe = document.createElement('iframe');
     iframe.className = 'block-embed__frame';
-    iframe.src = safeUrl;
+    iframe.src = frameSrc;
     iframe.setAttribute('loading', 'lazy');
     iframe.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
     iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-popups allow-forms');
-    iframe.title = block.content.title || 'Embedded content';
+    iframe.title = block.content.title || embedDefaultTitle(provider);
     wrap.append(iframe);
 
     const link = document.createElement('a');
@@ -188,10 +223,26 @@ export function renderEmbedBlock(
     link.textContent = block.content.title?.trim() || 'Open in new tab';
     wrap.append(link);
   } else {
-    const unavailable = document.createElement('p');
-    unavailable.className = 'block-embed__unavailable';
-    unavailable.textContent = 'Embed unavailable.';
-    wrap.append(unavailable);
+    const card = document.createElement('div');
+    card.className = 'block-embed__card';
+
+    const title = document.createElement('p');
+    title.className = 'block-embed__card-title';
+    title.textContent = block.content.title?.trim() || embedDefaultTitle(provider);
+
+    const meta = document.createElement('p');
+    meta.className = 'block-embed__card-meta';
+    meta.textContent = embedProviderLabel(provider);
+
+    const link = document.createElement('a');
+    link.className = 'block-embed__open';
+    link.href = safeUrl;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = 'Open in new tab';
+
+    card.append(title, meta, link);
+    wrap.append(card);
   }
 
   return wrapBlock(wrap, block, mode);

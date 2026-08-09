@@ -8,6 +8,8 @@ import {
   INSERT_MENU_LABEL,
   expandGroupTypesForMenu
 } from '@/blocks/create-block';
+import { createEmbedEditor } from '@/blocks/editors';
+import { renderBlock } from '@/blocks/render';
 
 const timestamps = {
   created_at: '2026-01-01T00:00:00.000Z',
@@ -90,5 +92,81 @@ describe('embed insert presets', () => {
       'audio'
     ]);
     expect(INSERT_MENU_LABEL['embed:google_slides']).toBe('Slides');
+  });
+});
+
+describe('embed editor detect', () => {
+  it('updates provider and embed_url when URL changes', () => {
+    const block = createBlock('embed', 'e1') as Extract<Block, { block_type: 'embed' }>;
+    let latest = block;
+    const root = createEmbedEditor(
+      block,
+      (next) => {
+        latest = next;
+      },
+      () => latest
+    );
+
+    const url = root.querySelector('.block-editor__embed-url') as HTMLInputElement;
+    url.value = 'https://docs.google.com/presentation/d/abc123XYZ/edit';
+    url.dispatchEvent(new Event('input'));
+
+    expect(latest.content.provider).toBe('google_slides');
+    expect(latest.content.embed_url).toBe(
+      'https://docs.google.com/presentation/d/abc123XYZ/embed'
+    );
+  });
+});
+
+describe('embed hybrid render', () => {
+  const base = {
+    id: 'b1',
+    type: 'block' as const,
+    variant: 'large',
+    visibility: 'student_teacher' as const,
+    layout: {},
+    print: {},
+    settings: {},
+    created_at: '2026-01-01T00:00:00.000Z',
+    updated_at: '2026-01-01T00:00:00.000Z',
+    schema_version: 1 as const
+  };
+
+  it('renders slides iframe from embed_url', () => {
+    const el = renderBlock(
+      {
+        ...base,
+        block_type: 'embed',
+        content: {
+          url: 'https://docs.google.com/presentation/d/abc/edit',
+          provider: 'google_slides',
+          embed_url: 'https://docs.google.com/presentation/d/abc/embed',
+          title: 'Deck'
+        }
+      },
+      'student'
+    );
+    expect(el.querySelector('iframe')?.getAttribute('src')).toBe(
+      'https://docs.google.com/presentation/d/abc/embed'
+    );
+    expect(el.querySelector('a')?.getAttribute('href')).toContain('presentation');
+  });
+
+  it('renders docs as resource card without iframe', () => {
+    const el = renderBlock(
+      {
+        ...base,
+        block_type: 'embed',
+        content: {
+          url: 'https://docs.google.com/document/d/doc1/edit',
+          provider: 'google_docs',
+          title: 'Worksheet'
+        }
+      },
+      'student'
+    );
+    expect(el.querySelector('iframe')).toBeNull();
+    expect(el.querySelector('.block-embed__card')).toBeTruthy();
+    expect(el.querySelector('a')?.textContent).toMatch(/Open/i);
   });
 });
