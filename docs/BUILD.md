@@ -20,8 +20,7 @@ Block primitives: [`docs/specs/03_BLOCK_SYSTEM.md`](specs/03_BLOCK_SYSTEM.md)
 
 Suggested order for continuing builder / teaching-page work (adjust as needed):
 
-1. **html_app** — sandboxed interactive HTML apps (separate from sanitised `html`)
-2. **Builder UX** — drag-and-drop between columns; free-form column widths
+1. **Builder UX** — drag-and-drop between columns; free-form column widths
 
 Larger product tracks (not “next block”, but still ahead):
 
@@ -59,17 +58,18 @@ Larger product tracks (not “next block”, but still ahead):
 | 2026-08-09 | **Learning activities pack** | `flashcards`, `cloze`, `self_check` — thin v1 with local student state, flip/shuffle, sized blanks + shuffled word bank — [`design`](superpowers/specs/2026-08-09-learning-activities-pack-design.md) / [`plan`](superpowers/plans/2026-08-09-learning-activities-pack.md) |
 | 2026-08-09 | **Visualisation pack** | `chart`, `equation`, `diagram`, `mind_map`, `concept_map` + KaTeX + custom SVG — [`design`](superpowers/specs/2026-08-09-visualisation-pack-design.md) / [`plan`](superpowers/plans/2026-08-09-visualisation-pack.md) |
 | 2026-08-09 | **Collection** | Unit lessons + recent on class homepage — [`design`](superpowers/specs/2026-08-09-collection-block-design.md) / [`plan`](superpowers/plans/2026-08-09-collection-block.md) |
+| 2026-08-09 | **HTML app** | Sandboxed inline `html_app` + optional laned OpenAI/Anthropic proxy — [`design`](superpowers/specs/2026-08-09-html-app-design.md) / [`plan`](superpowers/plans/2026-08-09-html-app.md) |
 
-### Block types live today (31)
+### Block types live today (32)
 
-`rich_text`, `heading`, `callout`, `image`, `video`, `embed`, `html`, `quote`, `divider`, `definition`, `code`, `audio`, `attachment`, `accordion`, `table`, `question_set`, `columns`, `section`, `spacer`, `timeline`, `tabs`, `gallery`, `flashcards`, `cloze`, `self_check`, `chart`, `equation`, `diagram`, `mind_map`, `concept_map`, `collection`
+`rich_text`, `heading`, `callout`, `image`, `video`, `embed`, `html`, `html_app`, `quote`, `divider`, `definition`, `code`, `audio`, `attachment`, `accordion`, `table`, `question_set`, `columns`, `section`, `spacer`, `timeline`, `tabs`, `gallery`, `flashcards`, `cloze`, `self_check`, `chart`, `equation`, `diagram`, `mind_map`, `concept_map`, `collection`
 
 ### Product phases (rough map)
 
 | Spec phase | Status |
 |------------|--------|
 | 0–4 Foundation → basic builder → publish | Done (core) |
-| 5 Block system expansion | **In progress** — layout + timeline + tabs + gallery + activities + viz + collection done; `html_app` next |
+| 5 Block system expansion | **In progress** — layout + timeline + tabs + gallery + activities + viz + collection + html_app done; Builder UX next |
 | 6–8 Unit/class pages, scheduling, scope | Largely done for v1 |
 | 9 A4 print | Not started |
 | 10 Google Drive | Not started |
@@ -94,7 +94,7 @@ Unchecked = not built yet.
 - [x] Timeline (in-lesson)
 - [x] Gallery
 - [ ] Map / Slides / Document viewer behaviours (as needed)
-- [ ] `html_app` (sandboxed apps)
+- [x] `html_app` (sandboxed apps)
 
 ### Learning activities
 - [x] Flashcards
@@ -121,4 +121,4 @@ Unchecked = not built yet.
 
 ## Latest note
 
-**2026-08-09** — Collection block shipped (unit lessons + recent on class homepage). Next builder slice: **html_app** unless priority shifts.
+**2026-08-09** — HTML app shipped (sandboxed `srcdoc` + optional laned AI proxy). Next builder slice: **Builder UX** (column drag / free widths).
