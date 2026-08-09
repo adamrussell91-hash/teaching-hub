@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { createBlock, cloneBlockWithNewIds } from '@/blocks/create-block';
 import { BlockSchema } from '@/schemas/block';
 
 const timestamps = {
@@ -174,5 +175,52 @@ describe('layout block schemas', () => {
       }
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('createBlock layout defaults', () => {
+  it('creates empty columns for 50-50', () => {
+    const block = createBlock('columns', 'c1');
+    expect(block.block_type).toBe('columns');
+    if (block.block_type !== 'columns') throw new Error('expected columns');
+    expect(block.content.preset).toBe('50-50');
+    expect(block.content.columns).toEqual([
+      { width: 6, blocks: [] },
+      { width: 6, blocks: [] }
+    ]);
+  });
+
+  it('creates section and spacer defaults', () => {
+    expect(createBlock('section', 's1')).toMatchObject({
+      block_type: 'section',
+      content: { title: '', blocks: [] }
+    });
+    expect(createBlock('spacer', 'sp1')).toMatchObject({
+      block_type: 'spacer',
+      content: { size: 'medium' }
+    });
+  });
+});
+
+describe('cloneBlockWithNewIds', () => {
+  it('assigns new ids to nested descendants', () => {
+    let n = 0;
+    const nextId = () => `id_${++n}`;
+
+    const section = createBlock('section', 'sec');
+    if (section.block_type !== 'section') throw new Error('expected section');
+    const columns = createBlock('columns', 'cols');
+    if (columns.block_type !== 'columns') throw new Error('expected columns');
+    columns.content.columns[0]!.blocks.push(createBlock('rich_text', 'rt'));
+    section.content.blocks = [columns];
+
+    const clone = cloneBlockWithNewIds(section, nextId);
+    expect(clone.id).toBe('id_1');
+    if (clone.block_type !== 'section') throw new Error('expected section');
+    const clonedCols = clone.content.blocks[0]!;
+    expect(clonedCols.id).toBe('id_2');
+    if (clonedCols.block_type !== 'columns') throw new Error('expected columns');
+    expect(clonedCols.content.columns[0]!.blocks[0]!.id).toBe('id_3');
+    expect(section.id).toBe('sec'); // original untouched
   });
 });

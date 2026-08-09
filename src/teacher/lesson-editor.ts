@@ -1,191 +1,15 @@
 import { apiGet, ApiClientError } from '@/api/client';
+import {
+  BLOCK_GROUPS,
+  NEW_BLOCK_LABEL,
+  cloneBlockWithNewIds,
+  createBlock,
+  type NewBlockType
+} from '@/blocks/create-block';
 import { createBlockEditor } from '@/blocks/registry';
-import type { Block } from '@/schemas/block';
 import type { Lesson } from '@/schemas/lesson';
 import { renderContextBar, type TeacherShellRefs } from '@/teacher/shell';
 import { mountSavePublishControls, SaveController, type SavePublishHandle } from '@/teacher/save-publish';
-
-const NEW_BLOCK_TYPES = [
-  'rich_text',
-  'heading',
-  'callout',
-  'quote',
-  'divider',
-  'definition',
-  'code',
-  'html',
-  'image',
-  'video',
-  'embed',
-  'audio',
-  'attachment',
-  'accordion',
-  'table',
-  'question_set'
-] as const;
-type NewBlockType = (typeof NEW_BLOCK_TYPES)[number];
-
-const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
-  rich_text: 'Rich text',
-  heading: 'Heading',
-  callout: 'Callout',
-  quote: 'Quote',
-  divider: 'Divider',
-  definition: 'Definition',
-  code: 'Code',
-  html: 'HTML',
-  image: 'Image',
-  video: 'Video',
-  embed: 'Embed',
-  audio: 'Audio',
-  attachment: 'Attachment',
-  accordion: 'Accordion',
-  table: 'Table',
-  question_set: 'Question set'
-};
-
-const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[] }> = [
-  {
-    label: 'Basic',
-    types: ['rich_text', 'heading', 'callout', 'quote', 'divider', 'definition', 'code', 'html']
-  },
-  {
-    label: 'Media',
-    types: ['image', 'video', 'embed', 'audio', 'attachment']
-  },
-  {
-    label: 'Teaching',
-    types: ['accordion', 'table', 'question_set']
-  }
-];
-
-function nowIso(): string {
-  return new Date().toISOString();
-}
-
-function createBlock(type: NewBlockType, id: string): Block {
-  const shared = {
-    id,
-    type: 'block' as const,
-    visibility: 'student_teacher' as const,
-    layout: {},
-    print: {},
-    settings: {},
-    created_at: nowIso(),
-    updated_at: nowIso(),
-    schema_version: 1 as const
-  };
-
-  switch (type) {
-    case 'rich_text':
-      return { ...shared, block_type: 'rich_text', variant: 'medium', content: { html: '' } };
-    case 'heading':
-      return { ...shared, block_type: 'heading', variant: 'section', content: { text: '' } };
-    case 'callout':
-      return {
-        ...shared,
-        block_type: 'callout',
-        variant: 'medium',
-        content: { style: 'information', body: '' }
-      };
-    case 'image':
-      return {
-        ...shared,
-        block_type: 'image',
-        variant: 'large',
-        content: { url: '', alt_text: '' }
-      };
-    case 'video':
-      return {
-        ...shared,
-        block_type: 'video',
-        variant: 'large',
-        content: { provider: 'youtube', external_id: '' }
-      };
-    case 'embed':
-      return {
-        ...shared,
-        block_type: 'embed',
-        variant: 'large',
-        content: { url: '' }
-      };
-    case 'html':
-      return {
-        ...shared,
-        block_type: 'html',
-        variant: 'medium',
-        content: { html: '' }
-      };
-    case 'quote':
-      return {
-        ...shared,
-        block_type: 'quote',
-        variant: 'medium',
-        content: { quote: '' }
-      };
-    case 'divider':
-      return {
-        ...shared,
-        block_type: 'divider',
-        variant: 'medium',
-        content: {}
-      };
-    case 'definition':
-      return {
-        ...shared,
-        block_type: 'definition',
-        variant: 'medium',
-        content: { term: '', definition: '' }
-      };
-    case 'code':
-      return {
-        ...shared,
-        block_type: 'code',
-        variant: 'medium',
-        content: { code: '' }
-      };
-    case 'audio':
-      return {
-        ...shared,
-        block_type: 'audio',
-        variant: 'medium',
-        content: { url: '' }
-      };
-    case 'attachment':
-      return {
-        ...shared,
-        block_type: 'attachment',
-        variant: 'medium',
-        content: { url: '', title: '' }
-      };
-    case 'accordion':
-      return {
-        ...shared,
-        block_type: 'accordion',
-        variant: 'medium',
-        content: { items: [{ title: '', body: '' }] }
-      };
-    case 'table':
-      return {
-        ...shared,
-        block_type: 'table',
-        variant: 'large',
-        content: {
-          headers: ['Column 1', 'Column 2', 'Column 3'],
-          rows: [['', '', '']]
-        }
-      };
-    case 'question_set':
-      return {
-        ...shared,
-        block_type: 'question_set',
-        variant: 'medium',
-        content: {
-          questions: [{ id: `${id}_q1`, prompt: '', kind: 'short_answer' }]
-        }
-      };
-  }
-}
 
 export interface LessonEditorHandle {
   /**
@@ -395,12 +219,10 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     function duplicateBlock(index: number): void {
       const source = lesson.blocks[index];
       if (!source) return;
-      blockCounter += 1;
-      const id = `block_${lesson.id}_${blockCounter}`;
-      const clone = structuredClone(source) as Block;
-      clone.id = id;
-      clone.created_at = nowIso();
-      clone.updated_at = nowIso();
+      const clone = cloneBlockWithNewIds(source, () => {
+        blockCounter += 1;
+        return `block_${lesson.id}_${blockCounter}`;
+      });
       lesson.blocks.splice(index + 1, 0, clone);
       markDirty();
       renderBlocksList();
