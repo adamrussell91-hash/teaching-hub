@@ -53,6 +53,19 @@ function publishBlockIssues(blocks: z.infer<typeof BlockSchema>[]): string | nul
         return 'HTML blocks need content to publish';
       }
     }
+    if (block.block_type === 'html_app') {
+      if (block.content.html.trim().length === 0) {
+        return 'HTML app blocks need content to publish';
+      }
+      if (block.content.ai) {
+        if (block.content.ai.system.trim().length === 0) {
+          return 'HTML app AI lanes need a system / focus prompt to publish';
+        }
+        if (block.content.ai.model.trim().length === 0) {
+          return 'HTML app AI lanes need a model to publish';
+        }
+      }
+    }
     if (block.block_type === 'audio') {
       if (!isHttpUrl(block.content.url)) {
         return 'Audio blocks need a valid http(s) URL to publish';
