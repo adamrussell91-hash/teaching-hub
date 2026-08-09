@@ -11,6 +11,7 @@ export const BlockTypeSchema = z.enum([
   'video',
   'embed',
   'html',
+  'html_app',
   'quote',
   'divider',
   'definition',
@@ -189,6 +190,32 @@ export const HtmlBlockSchema = z.object({
   variant: z.string().default('medium'),
   visibility: VisibilitySchema,
   content: z.object({ html: z.string() }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
+export const HtmlAppAiProviderSchema = z.enum(['openai', 'anthropic']);
+
+export const HtmlAppAiSchema = z.object({
+  enabled: z.literal(true),
+  provider: HtmlAppAiProviderSchema,
+  model: z.string().min(1),
+  system: z.string(),
+  max_tokens: z.number().int().positive().max(2000)
+});
+
+export const HtmlAppBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('html_app'),
+  variant: z.string().default('large'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    title: z.string().optional(),
+    html: z.string(),
+    height_px: z.number().int().positive().max(4000).optional(),
+    ai: HtmlAppAiSchema.optional()
+  }),
   ...blockLayout,
   ...blockTimestamps
 });
@@ -546,6 +573,7 @@ const leafBlockSchemas = [
   VideoBlockSchema,
   EmbedBlockSchema,
   HtmlBlockSchema,
+  HtmlAppBlockSchema,
   QuoteBlockSchema,
   DividerBlockSchema,
   DefinitionBlockSchema,

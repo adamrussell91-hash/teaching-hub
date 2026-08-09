@@ -14,6 +14,7 @@ export const NEW_BLOCK_TYPES = [
   'definition',
   'code',
   'html',
+  'html_app',
   'image',
   'gallery',
   'video',
@@ -50,6 +51,7 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   definition: 'Definition',
   code: 'Code',
   html: 'HTML',
+  html_app: 'HTML app',
   image: 'Image',
   gallery: 'Gallery',
   video: 'Video',
@@ -78,7 +80,17 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
 export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[] }> = [
   {
     label: 'Basic',
-    types: ['rich_text', 'heading', 'callout', 'quote', 'divider', 'definition', 'code', 'html']
+    types: [
+      'rich_text',
+      'heading',
+      'callout',
+      'quote',
+      'divider',
+      'definition',
+      'code',
+      'html',
+      'html_app'
+    ]
   },
   {
     label: 'Media',
@@ -203,6 +215,13 @@ export function createBlock(type: NewBlockType, id: string): Block {
         block_type: 'html',
         variant: 'medium',
         content: { html: '' }
+      };
+    case 'html_app':
+      return {
+        ...shared,
+        block_type: 'html_app',
+        variant: 'large',
+        content: { html: '', height_px: 480 }
       };
     case 'quote':
       return {
