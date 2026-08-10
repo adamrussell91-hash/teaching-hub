@@ -1,5 +1,5 @@
 import 'katex/dist/katex.min.css';
-import { ApiClientError } from '@/api/client';
+import { apiGet, ApiClientError } from '@/api/client';
 import { fetchSession, logout, renderSignIn, type SessionInfo } from '@/auth/gate';
 import {
   renderCanvasStatus,
@@ -26,6 +26,10 @@ import { renderClassesIndex, renderClassPage, type ClassPageOptions } from '@/te
 import { openScheduleUnitModal } from '@/teacher/sections/schedule-unit-modal';
 import { renderUnitsIndex, renderUnitStub } from '@/teacher/sections/units';
 import { renderLessonsIndex } from '@/teacher/sections/lessons';
+import { fetchContentSearch } from '@/teacher/search/api';
+import { resolveTodayClassId } from '@/teacher/search/actions';
+import { openSearchPanel } from '@/teacher/search/panel';
+import { pushRecent } from '@/teacher/search/recent';
 import {
   mountStudentLessonView,
   type StudentLessonViewHandle
@@ -61,6 +65,9 @@ let curriculumPromise: Promise<CurriculumResponse> | null = null;
 // The lesson editor mounted for the current route, if any. Torn down (with a
 // best-effort save flush) whenever the route changes.
 let lessonEditorHandle: LessonEditorHandle | null = null;
+
+// Latest teacher shell refs (for search create-modal callbacks).
+let teacherShellRefs: TeacherShellRefs | null = null;
 
 // The student lesson view mounted for the current public route, if any.
 let studentLessonViewHandle: StudentLessonViewHandle | null = null;
@@ -204,6 +211,116 @@ function railCreateClassHandler(
   };
 }
 
+function studentPathForTeacherPath(pathname: string): string | null {
+  const match = pathname.match(/^\/(lessons|units|classes)\/([^/]+)\/?$/);
+  if (!match) return null;
+  return `/s/${match[1]}/${match[2]}`;
+}
+
+function createKindForSearchAction(actionId: string): CreateKind | null {
+  switch (actionId) {
+    case 'new-lesson':
+      return 'lesson';
+    case 'new-unit':
+      return 'unit';
+    case 'new-class':
+      return 'class';
+    case 'new-scope':
+      return 'scope_sequence';
+    default:
+      return null;
+  }
+}
+
+function openTeacherSearch(): void {
+  if (!session.authenticated) return;
+  if (location.pathname.startsWith('/s/')) return;
+
+  void getCurriculum().then(async (curriculum) => {
+    let compositions: Array<{ id: string; title: string }> = [];
+    try {
+      const res = await apiGet<{ compositions: Array<{ id: string; title: string }> }>(
+        '/api/compositions'
+      );
+      compositions = res.compositions;
+    } catch {
+      compositions = [];
+    }
+
+    const todayClassId = resolveTodayClassId(curriculum);
+
+    openSearchPanel({
+      curriculum,
+      compositions,
+      path: location.pathname,
+      hasLessonEditor: Boolean(lessonEditorHandle),
+      todayClassId,
+      fetchContentSearch,
+      onNavigate: (path) => {
+        navigate(path);
+      },
+      onAction: (actionId) => {
+        const createKind = createKindForSearchAction(actionId);
+        if (createKind) {
+          const refs = teacherShellRefs;
+          openCreateModal({
+            kind: createKind,
+            curriculum,
+            onCreated: (kind, id) => {
+              if (refs) {
+                void handleEntityCreated(refs, renderToken, kind, id);
+                return;
+              }
+              curriculumPromise = null;
+              void getCurriculum()
+                .then((next) => navigate(pathForCreatedEntity(kind, id, next)))
+                .catch(() => navigate(pathForCreatedEntity(kind, id, curriculum)));
+            }
+          });
+          return;
+        }
+
+        switch (actionId) {
+          case 'open-home':
+            navigate('/');
+            break;
+          case 'open-today-class':
+            if (todayClassId) navigate(`/classes/${todayClassId}`);
+            break;
+          case 'open-student-view': {
+            const studentPath = studentPathForTeacherPath(location.pathname);
+            if (studentPath) window.open(studentPath, '_blank', 'noopener,noreferrer');
+            break;
+          }
+          case 'open-a4':
+            lessonEditorHandle?.openA4Preview();
+            break;
+          case 'publish-lesson':
+            lessonEditorHandle?.publish();
+            break;
+          default:
+            break;
+        }
+      }
+    });
+  });
+}
+
+function mountTeacherRail(
+  refs: TeacherShellRefs,
+  curriculum: CurriculumResponse,
+  token: number,
+  activeSection: TeacherSection,
+  activeClassId?: string
+): void {
+  renderTeacherRail(refs.railNav, curriculum, {
+    activeSection,
+    activeClassId,
+    onCreateClass: railCreateClassHandler(curriculum, refs, token),
+    onOpenSearch: openTeacherSearch
+  });
+}
+
 function getCurriculum(): Promise<CurriculumResponse> {
   if (!curriculumPromise) {
     curriculumPromise = fetchCurriculum().catch((error: unknown) => {
@@ -227,7 +344,9 @@ async function handleLogout(): Promise<void> {
 }
 
 function mountTeacherShell(): TeacherShellRefs {
-  return renderTeacherShell(appRoot, { onLogout: () => handleLogout() });
+  const refs = renderTeacherShell(appRoot, { onLogout: () => handleLogout() });
+  teacherShellRefs = refs;
+  return refs;
 }
 
 async function loadNavAndHandleErrors(
@@ -240,11 +359,7 @@ async function loadNavAndHandleErrors(
   try {
     const curriculum = await getCurriculum();
     if (token !== renderToken) return;
-    renderTeacherRail(refs.railNav, curriculum, {
-      activeSection,
-      activeClassId,
-      onCreateClass: railCreateClassHandler(curriculum, refs, token)
-    });
+    mountTeacherRail(refs, curriculum, token, activeSection, activeClassId);
     onLoaded(curriculum);
   } catch (error) {
     if (token !== renderToken) return;
@@ -303,11 +418,7 @@ function renderTeacherClassRoute(classId: string, token: number): void {
       const curriculum = await getCurriculum();
       if (token !== renderToken) return;
       currentCurriculum = curriculum;
-      renderTeacherRail(refs.railNav, curriculum, {
-        activeSection: 'classes',
-        activeClassId: classId,
-        onCreateClass: railCreateClassHandler(curriculum, refs, token)
-      });
+      mountTeacherRail(refs, curriculum, token, 'classes', classId);
       const cls = curriculum.classes.find((entry) => entry.id === classId);
       if (cls) {
         renderContextBar(refs, { title: cls.code || cls.title });
@@ -343,6 +454,12 @@ function renderTeacherClassRoute(classId: string, token: number): void {
     const cls = curriculum.classes.find((entry) => entry.id === classId);
     if (cls) {
       renderContextBar(refs, { title: cls.code || cls.title });
+      pushRecent({
+        type: 'class',
+        id: cls.id,
+        title: cls.code || cls.title,
+        opened_at: new Date().toISOString()
+      });
     }
     renderClassPage(refs.canvas, curriculum, classId, classPageOptions);
   });
@@ -361,11 +478,7 @@ function renderTeacherResourcesRoute(token: number): void {
           curriculumPromise = null;
           const next = await getCurriculum();
           if (token !== renderToken) return;
-          renderTeacherRail(refs.railNav, next, {
-            activeSection: 'resources',
-            activeClassId: undefined,
-            onCreateClass: railCreateClassHandler(next, refs, token)
-          });
+          mountTeacherRail(refs, next, token, 'resources');
           mount(next);
         },
         onDrivePick: async () => {
@@ -451,6 +564,12 @@ function renderTeacherUnitRoute(unitId: string, token: number): void {
     const unit = curriculum.units.find((entry) => entry.id === unitId);
     if (unit) {
       renderContextBar(refs, { title: unit.title });
+      pushRecent({
+        type: 'unit',
+        id: unit.id,
+        title: unit.title,
+        opened_at: new Date().toISOString()
+      });
     }
     renderUnitStub(refs.canvas, curriculum, unitId);
   });
@@ -483,7 +602,16 @@ function renderTeacherLessonRoute(lessonId: string, token: number): void {
     isStale: () => token !== renderToken
   });
 
-  void loadNavAndHandleErrors(refs, token, 'lessons', undefined, () => {});
+  void loadNavAndHandleErrors(refs, token, 'lessons', undefined, (curriculum) => {
+    const lesson = curriculum.lessons.find((entry) => entry.id === lessonId);
+    if (!lesson) return;
+    pushRecent({
+      type: 'lesson',
+      id: lesson.id,
+      title: lesson.title || 'Untitled lesson',
+      opened_at: new Date().toISOString()
+    });
+  });
 }
 
 function renderStudentLessonRoute(
@@ -616,6 +744,14 @@ async function init(): Promise<void> {
     // remains a best-effort attempt for an actual tab close/reload; the
     // awaited flush in `teardownLessonEditor` covers in-app navigation.
     void lessonEditorHandle?.flush();
+  });
+
+  window.addEventListener('keydown', (event) => {
+    if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'k') return;
+    if (!session.authenticated) return;
+    if (location.pathname.startsWith('/s/')) return;
+    event.preventDefault();
+    openTeacherSearch();
   });
 
   start((match) => {

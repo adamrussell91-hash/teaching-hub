@@ -946,6 +946,38 @@ a:hover {
   white-space: nowrap;
 }
 
+.rail-search {
+  display: block;
+  width: 100%;
+  margin-bottom: 0.65rem;
+  min-height: 2.25rem;
+  padding: 0.5rem 0.65rem;
+  font-family: var(--font-ui);
+  font-size: var(--font-size-card);
+  font-weight: 500;
+  color: var(--muted);
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius-md) * 0.5);
+  background: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    color 150ms ease,
+    border-color 150ms ease;
+}
+
+.rail-search:hover {
+  color: var(--marine);
+  border-color: color-mix(in srgb, var(--marine) 35%, var(--line));
+  background: var(--glass);
+}
+
+.rail-search:focus-visible {
+  outline: 3px solid rgba(55, 111, 183, 0.35);
+  outline-offset: 2px;
+}
+
 .primary-nav {
   display: flex;
   flex-direction: column;

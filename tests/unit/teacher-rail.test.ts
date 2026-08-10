@@ -75,4 +75,18 @@ describe('renderTeacherRail', () => {
     (railNav.querySelector('button.rail-classes__new') as HTMLButtonElement).click();
     expect(onCreateClass).toHaveBeenCalledOnce();
   });
+
+  it('calls onOpenSearch when Search is clicked', () => {
+    const onOpenSearch = vi.fn();
+    const railNav = document.createElement('div');
+    renderTeacherRail(railNav, curriculum, {
+      activeSection: 'home',
+      onOpenSearch
+    });
+
+    const search = railNav.querySelector('button.rail-search') as HTMLButtonElement;
+    expect(search.textContent).toBe('Search');
+    search.click();
+    expect(onOpenSearch).toHaveBeenCalledOnce();
+  });
 });

@@ -27,6 +27,10 @@ export interface LessonEditorHandle {
   flush(): Promise<void>;
   /** Tears down subscriptions/timers. Only call after awaiting `flush`. */
   dispose(): void;
+  /** Scrolls/focuses the mounted A4 preview host when present. */
+  openA4Preview(): void;
+  /** Runs the existing save/publish control path when the editor is ready. */
+  publish(): void;
 }
 
 export interface MountLessonEditorOptions {
@@ -480,6 +484,27 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       a4Preview?.dispose();
       savePublishHandle?.dispose();
       saveController?.dispose();
+    },
+    openA4Preview() {
+      if (disposed) return;
+      const preview = refs.canvas.querySelector('.a4-preview');
+      if (!(preview instanceof HTMLElement)) return;
+      if (!preview.hasAttribute('tabindex')) {
+        preview.tabIndex = -1;
+      }
+      preview.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      preview.focus({ preventScroll: true });
+    },
+    publish() {
+      if (disposed) return;
+      const publishButton = refs.contextBar.querySelector<HTMLButtonElement>(
+        '.context-bar__publish'
+      );
+      if (publishButton) {
+        publishButton.click();
+        return;
+      }
+      void saveController?.publish();
     }
   };
 }
