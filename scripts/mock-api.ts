@@ -13,8 +13,14 @@ import {
   scheduleAnchorKey,
   scopeSequenceKey,
   mediaKey,
+  mediaFileKey,
   compositionKey
 } from '../src/storage/keys';
+import {
+  ALLOWED_MEDIA_MIME,
+  MAX_MEDIA_BYTES,
+  mediaTypeFromMime
+} from '../src/media/upload-rules';
 import {
   ClassHomepageSchema,
   ClassSchema,
@@ -84,6 +90,8 @@ export interface MockResponse {
   };
   json(): Promise<any>;
   text(): Promise<string>;
+  /** Present for binary file responses (used by the Node HTTP adapter). */
+  bodyBytes?: Uint8Array;
 }
 
 export interface MockApi {
@@ -184,6 +192,32 @@ function unauthorizedResponse(): MockResponse {
 
 function notFoundResponse(message: string): MockResponse {
   return errorResponse(404, 'not_found', message);
+}
+
+function binaryResponse(
+  status: number,
+  bytes: Uint8Array,
+  contentType: string,
+  extraHeaders?: Record<string, string>
+): MockResponse {
+  const headers = new MockHeaders();
+  headers.set('content-type', contentType);
+  if (extraHeaders) {
+    for (const [name, value] of Object.entries(extraHeaders)) {
+      headers.set(name, value);
+    }
+  }
+  return {
+    status,
+    headers,
+    bodyBytes: bytes,
+    async json() {
+      throw new Error('Response body is not JSON');
+    },
+    async text() {
+      return Buffer.from(bytes).toString('utf-8');
+    }
+  };
 }
 
 function slugify(title: string): string {
@@ -1653,6 +1687,113 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     return okResponse(200, validated.data);
   }
 
+  async function handlePostMediaUpload(
+    cookie: string | null | undefined,
+    body: unknown
+  ): Promise<MockResponse> {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+
+    if (!(body instanceof FormData)) {
+      return errorResponse(400, 'validation_error', 'Request body must be multipart form data');
+    }
+
+    const fileEntry = body.get('file');
+    if (!(fileEntry instanceof File) && !(fileEntry instanceof Blob)) {
+      return errorResponse(400, 'validation_error', 'file is required');
+    }
+
+    const file = fileEntry as Blob & { name?: string };
+    const mime = (file.type || '').trim();
+    if (!mime || !ALLOWED_MEDIA_MIME.has(mime)) {
+      return errorResponse(400, 'validation_error', 'File MIME type is not allowed');
+    }
+
+    if (file.size > MAX_MEDIA_BYTES) {
+      return errorResponse(
+        400,
+        'validation_error',
+        `File exceeds maximum size of ${MAX_MEDIA_BYTES} bytes`
+      );
+    }
+
+    const titleField = body.get('title');
+    const titleFromForm =
+      typeof titleField === 'string' && titleField.trim() ? titleField.trim() : '';
+    const fileName = typeof file.name === 'string' ? file.name : '';
+    const title = titleFromForm || fileName.trim() || 'Untitled';
+
+    const providerFileIdField = body.get('provider_file_id');
+    let provider_file_id: string | undefined;
+    if (providerFileIdField !== null && providerFileIdField !== undefined) {
+      if (typeof providerFileIdField !== 'string' || !providerFileIdField.trim()) {
+        return errorResponse(
+          400,
+          'validation_error',
+          'provider_file_id must be a non-empty string when provided'
+        );
+      }
+      provider_file_id = providerFileIdField.trim();
+    }
+
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const id = newId('media');
+    const fileUrl = `http://localhost/api/media/${id}/file`;
+    const timestamp = nowIso();
+
+    const candidate: Media = {
+      id,
+      type: 'media',
+      title,
+      slug: slugify(title),
+      status: 'active',
+      provider: 'direct',
+      media_type: mediaTypeFromMime(mime),
+      mime_type: mime,
+      ...(fileName ? { file_name: fileName } : {}),
+      preview_url: fileUrl,
+      download_url: fileUrl,
+      sharing: 'public_link',
+      created_at: timestamp,
+      updated_at: timestamp,
+      schema_version: 1,
+      ...(provider_file_id !== undefined ? { provider_file_id } : {})
+    };
+
+    const validated = MediaSchema.safeParse(candidate);
+    if (!validated.success) {
+      return errorResponse(
+        400,
+        'validation_error',
+        'Media data is invalid',
+        validated.error.flatten()
+      );
+    }
+
+    store.setBinary(mediaFileKey(id), bytes, mime);
+    store.setJSON(mediaKey(id), validated.data);
+    seedIds.media.push(id);
+    return okResponse(201, validated.data);
+  }
+
+  function handleGetMediaFile(id: string): MockResponse {
+    const raw = store.getJSON(mediaKey(id));
+    if (!raw) return notFoundResponse('Media file not found');
+
+    const parsed = MediaSchema.safeParse(raw);
+    if (!parsed.success || parsed.data.status !== 'active') {
+      return notFoundResponse('Media file not found');
+    }
+
+    const binary = store.getBinary(mediaFileKey(id));
+    if (!binary) return notFoundResponse('Media file not found');
+
+    const contentType = parsed.data.mime_type || binary.contentType || 'application/octet-stream';
+    return binaryResponse(200, binary.bytes, contentType, {
+      'cache-control': 'public, max-age=86400'
+    });
+  }
+
   const LESSON_ID_RE = /^\/api\/lessons\/([^/]+)$/;
   const LESSON_PUBLISH_RE = /^\/api\/lessons\/([^/]+)\/publish$/;
   const PUBLISHED_LESSON_RE = /^\/api\/published\/lessons\/([^/]+)$/;
@@ -1663,6 +1804,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
   const SCHEDULE_UNIT_RE = /^\/api\/classes\/([^/]+)\/schedule-unit$/;
   const SCHEDULED_LESSON_RE = /^\/api\/scheduled-lessons\/([^/]+)$/;
   const COMPOSITION_ID_RE = /^\/api\/compositions\/([^/]+)$/;
+  const MEDIA_FILE_RE = /^\/api\/media\/([^/]+)\/file$/;
   const MEDIA_ID_RE = /^\/api\/media\/([^/]+)$/;
 
   async function handle(
@@ -1703,11 +1845,19 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     }
     if (method === 'GET' && path === '/api/compositions') return handleGetCompositions(cookie);
     if (method === 'POST' && path === '/api/compositions') return handlePostComposition(cookie, body);
+    if (method === 'POST' && path === '/api/media/upload') {
+      return handlePostMediaUpload(cookie, body);
+    }
     if (method === 'POST' && path === '/api/media') return handlePostMedia(cookie, body);
 
     const compositionMatch = COMPOSITION_ID_RE.exec(path);
     if (compositionMatch && method === 'GET') {
       return handleGetComposition(cookie, compositionMatch[1]!);
+    }
+
+    const mediaFileMatch = MEDIA_FILE_RE.exec(path);
+    if (mediaFileMatch && method === 'GET') {
+      return handleGetMediaFile(mediaFileMatch[1]!);
     }
 
     const mediaMatch = MEDIA_ID_RE.exec(path);
@@ -1774,12 +1924,24 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
   }
 
   async function readNodeRequestBody(req: IncomingMessage): Promise<unknown> {
+    const contentType = req.headers['content-type'] ?? '';
     const chunks: Buffer[] = [];
     for await (const chunk of req) {
       chunks.push(chunk as Buffer);
     }
     if (chunks.length === 0) return undefined;
-    const raw = Buffer.concat(chunks).toString('utf-8');
+    const buf = Buffer.concat(chunks);
+
+    if (contentType.includes('multipart/form-data')) {
+      const request = new Request(`http://localhost${req.url ?? '/'}`, {
+        method: req.method,
+        headers: { 'content-type': contentType },
+        body: buf
+      });
+      return request.formData();
+    }
+
+    const raw = buf.toString('utf-8');
     if (raw.trim().length === 0) return undefined;
     try {
       return JSON.parse(raw);
@@ -1810,6 +1972,10 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const response = await handle(method, path, cookie, body);
     res.statusCode = response.status;
     response.headers.forEach((value, key) => res.setHeader(key, value));
+    if (response.bodyBytes) {
+      res.end(Buffer.from(response.bodyBytes));
+      return;
+    }
     res.end(await response.text());
   }
 

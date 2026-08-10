@@ -24,6 +24,7 @@ export type SeedData = {
 
 export class MockStore {
   private readonly blobs = new Map<string, string>();
+  private readonly binaries = new Map<string, { bytes: Uint8Array; contentType: string }>();
 
   get(key: string): string | undefined {
     return this.blobs.get(key);
@@ -34,7 +35,16 @@ export class MockStore {
   }
 
   delete(key: string): boolean {
+    this.binaries.delete(key);
     return this.blobs.delete(key);
+  }
+
+  setBinary(key: string, bytes: Uint8Array, contentType: string): void {
+    this.binaries.set(key, { bytes, contentType });
+  }
+
+  getBinary(key: string): { bytes: Uint8Array; contentType: string } | undefined {
+    return this.binaries.get(key);
   }
 
   getJSON<T = unknown>(key: string): T | undefined {

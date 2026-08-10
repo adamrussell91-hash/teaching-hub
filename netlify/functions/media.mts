@@ -17,19 +17,9 @@ import {
   MediaTypeSchema,
   type Media
 } from '../../src/schemas';
+import { optionalNonEmptyString } from './_shared/media-fields.mts';
 
 const CREATE_PROVIDERS = new Set(['external', 'google_drive']);
-
-function optionalNonEmptyString(
-  record: Record<string, unknown>,
-  key: string
-): string | undefined | { error: string } {
-  if (record[key] === undefined) return undefined;
-  if (typeof record[key] !== 'string' || !(record[key] as string).trim()) {
-    return { error: `${key} must be a non-empty string when provided` };
-  }
-  return (record[key] as string).trim();
-}
 
 export default async function handler(request: Request): Promise<Response> {
   const env = process.env;
