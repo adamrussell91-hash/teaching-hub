@@ -39,6 +39,7 @@ import {
   TimelineItemSchema,
   UnitSchema,
   toPublishedLesson,
+  type Block,
   type Class,
   type ClassHomepage,
   type CompositionSummary,
@@ -53,6 +54,7 @@ import {
 import { orderLessonsByUnitIds } from '../src/schemas/published-unit';
 import { filterBlocksForStudent } from '../src/blocks/visibility';
 import { sanitizeBlocksDeep } from '../src/blocks/sanitize-blocks';
+import { runContentSearch } from '../src/search/run-content-search';
 import { applyScheduleUnit } from '../src/schedule/schedule-unit';
 import { reorderScheduledLesson } from '../src/schedule/reorder';
 import { buildPublishedClass } from '../src/schedule/build-published-class';
@@ -1366,6 +1368,37 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     return okResponse(200, { compositions: listCompositionSummaries() });
   }
 
+  function handleGetSearch(cookie: string | null | undefined, q: string): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+
+    const lessons = store
+      .listKeys('lessons/')
+      .map((key) => store.getJSON<Lesson>(key))
+      .filter((entry): entry is Lesson => entry !== null)
+      .map((lesson) => ({ id: lesson.id, blocks: lesson.blocks ?? [] }));
+
+    const units = store
+      .listKeys('units/')
+      .map((key) => store.getJSON<Unit & { blocks?: Block[] }>(key))
+      .filter((entry): entry is Unit & { blocks?: Block[] } => entry !== null)
+      .map((unit) => ({ id: unit.id, blocks: unit.blocks ?? [] }));
+
+    const compositions = store
+      .listKeys('templates/compositions/')
+      .map((key) => store.getJSON<CompositionTemplate>(key))
+      .filter((entry): entry is CompositionTemplate => {
+        if (!entry) return false;
+        const parsed = CompositionTemplateSchema.safeParse(entry);
+        return parsed.success && parsed.data.status === 'active';
+      })
+      .map((composition) => ({ id: composition.id, blocks: [composition.root] }));
+
+    return okResponse(200, {
+      hits: runContentSearch(q, { lessons, units, compositions })
+    });
+  }
+
   function handlePostComposition(cookie: string | null | undefined, body: unknown): MockResponse {
     const session = getSession(cookie);
     if (!session.authenticated) return unauthorizedResponse();
@@ -1809,14 +1842,22 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
 
   async function handle(
     method: string,
-    path: string,
+    pathWithQuery: string,
     cookie: string | null | undefined,
     body: unknown
   ): Promise<MockResponse> {
+    const qIndex = pathWithQuery.indexOf('?');
+    const path = qIndex >= 0 ? pathWithQuery.slice(0, qIndex) : pathWithQuery;
+    const search = qIndex >= 0 ? pathWithQuery.slice(qIndex + 1) : '';
+    const query = new URLSearchParams(search);
+
     if (method === 'POST' && path === '/api/auth') return handleAuth(body);
     if (method === 'GET' && path === '/api/session') return handleSession(cookie);
     if (method === 'POST' && path === '/api/logout') return handleLogout();
     if (method === 'GET' && path === '/api/curriculum') return handleGetCurriculum(cookie);
+    if (method === 'GET' && path === '/api/search') {
+      return handleGetSearch(cookie, query.get('q') ?? '');
+    }
 
     if (method === 'POST' && path === '/api/html-app-ai') {
       if (!body || typeof body !== 'object') {
@@ -1953,7 +1994,6 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
   async function handleNodeRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const method = (req.method ?? 'GET').toUpperCase();
     const url = req.url ?? '/';
-    const path = url.split('?')[0];
     const cookie = req.headers.cookie ?? null;
 
     let body: unknown;
@@ -1969,7 +2009,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       return;
     }
 
-    const response = await handle(method, path, cookie, body);
+    const response = await handle(method, url, cookie, body);
     res.statusCode = response.status;
     response.headers.forEach((value, key) => res.setHeader(key, value));
     if (response.bodyBytes) {
