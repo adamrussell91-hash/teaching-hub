@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { estimatePageCount, A4 } from '@/print/a4';
 import { renderPrintLesson } from '@/print/render-print-lesson';
+import { renderBlock } from '@/blocks/render';
 import { createBlock } from '@/blocks/create-block';
 import type { Lesson } from '@/schemas/lesson';
 
@@ -69,5 +70,75 @@ describe('renderPrintLesson', () => {
 
     expect(root.querySelector(`[data-block-id="${visible.id}"]`)).not.toBeNull();
     expect(root.querySelector(`[data-block-id="${hidden.id}"]`)).toBeNull();
+  });
+});
+
+describe('print mode blocks', () => {
+  it('draws response_space lines for short_answer questions', () => {
+    const block = createBlock('question_set', 'qs_print_1');
+    if (block.block_type !== 'question_set') throw new Error('expected question_set');
+    block.content.questions = [
+      {
+        id: 'q1',
+        prompt: 'Explain gravity',
+        kind: 'short_answer',
+        response_space: 'short'
+      },
+      {
+        id: 'q2',
+        prompt: 'Pick one',
+        kind: 'multiple_choice',
+        options: ['A', 'B']
+      }
+    ];
+
+    const el = renderBlock(block, 'print');
+    const lines = el.querySelectorAll('.block-question-set__response-lines .block-question-set__line');
+    expect(lines.length).toBeGreaterThan(0);
+    const items = el.querySelectorAll('.block-question-set__question');
+    expect(items[0]?.querySelector('.block-question-set__response-lines')).toBeTruthy();
+    expect(items[1]?.querySelector('.block-question-set__response-lines')).toBeNull();
+  });
+
+  it('defaults missing response_space to medium line count', () => {
+    const block = createBlock('question_set', 'qs_print_2');
+    if (block.block_type !== 'question_set') throw new Error('expected question_set');
+    block.content.questions = [
+      { id: 'q1', prompt: 'Legacy', kind: 'short_answer' }
+    ];
+    const medium = renderBlock(
+      {
+        ...block,
+        content: {
+          questions: [
+            { id: 'q1', prompt: 'Legacy', kind: 'short_answer', response_space: 'medium' }
+          ]
+        }
+      },
+      'print'
+    );
+    const legacy = renderBlock(block, 'print');
+    expect(
+      legacy.querySelectorAll('.block-question-set__line').length
+    ).toBe(medium.querySelectorAll('.block-question-set__line').length);
+  });
+
+  it('renders short response_space as exactly 2 lines', () => {
+    const block = createBlock('question_set', 'qs_print_3');
+    if (block.block_type !== 'question_set') throw new Error('expected question_set');
+    block.content.questions = [
+      { id: 'q1', prompt: 'Brief', kind: 'short_answer', response_space: 'short' }
+    ];
+    const el = renderBlock(block, 'print');
+    expect(el.querySelectorAll('.block-question-set__line').length).toBe(2);
+  });
+
+  it('renders video as static title + url without iframe', () => {
+    const block = createBlock('video', 'video_print_1');
+    if (block.block_type !== 'video') throw new Error('expected video');
+    block.content.title = 'Demo';
+    const el = renderBlock(block, 'print');
+    expect(el.querySelector('iframe')).toBeNull();
+    expect(el.querySelector('.block-print-fallback')).toBeTruthy();
   });
 });

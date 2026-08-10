@@ -58,6 +58,46 @@ function wrapBlock(content: HTMLElement, block: Block, mode: RenderMode): HTMLEl
   return wrapper;
 }
 
+function renderPrintFallback(opts: {
+  label: string;
+  title?: string;
+  url?: string;
+}): HTMLElement {
+  const el = document.createElement('div');
+  el.className = 'block-print-fallback';
+  const heading = document.createElement('p');
+  heading.className = 'block-print-fallback__label';
+  heading.textContent = opts.title?.trim() || opts.label;
+  el.append(heading);
+  if (opts.url) {
+    const link = document.createElement('p');
+    link.className = 'block-print-fallback__url';
+    link.textContent = opts.url;
+    el.append(link);
+  }
+  return el;
+}
+
+function responseSpaceLineCount(
+  space: 'none' | 'short' | 'medium' | 'long' | 'extended'
+): number {
+  if (space === 'none') return 0;
+  if (space === 'short') return 2;
+  if (space === 'medium') return 4;
+  if (space === 'long') return 6;
+  return 10;
+}
+
+function videoWatchUrl(
+  provider: Extract<Block, { block_type: 'video' }>['content']['provider'],
+  externalId: string
+): string {
+  if (provider === 'youtube') {
+    return `https://www.youtube.com/watch?v=${encodeURIComponent(externalId)}`;
+  }
+  return `https://vimeo.com/${encodeURIComponent(externalId)}`;
+}
+
 export function renderRichTextBlock(
   block: Extract<Block, { block_type: 'rich_text' }>,
   mode: RenderMode
@@ -136,6 +176,27 @@ export function renderVideoBlock(
 ): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = `block-video block-video--${block.variant}`;
+
+  if (mode === 'print') {
+    const watchUrl = block.content.external_id.trim()
+      ? videoWatchUrl(block.content.provider, block.content.external_id)
+      : undefined;
+    wrap.append(
+      renderPrintFallback({
+        label: 'Video',
+        title: block.content.title,
+        url: watchUrl
+      })
+    );
+    if (block.content.caption) {
+      const cap = document.createElement('p');
+      cap.className = 'block-video__caption';
+      cap.textContent = block.content.caption;
+      wrap.append(cap);
+    }
+    return wrapBlock(wrap, block, mode);
+  }
+
   if (block.content.title) {
     const title = document.createElement('p');
     title.className = 'block-video__title';
@@ -200,6 +261,18 @@ export function renderEmbedBlock(
   const wrap = document.createElement('div');
   wrap.className = 'block-embed';
   const safeUrl = isHttpUrl(block.content.url) ? block.content.url.trim() : undefined;
+
+  if (mode === 'print') {
+    const provider = block.content.provider ?? 'generic';
+    wrap.append(
+      renderPrintFallback({
+        label: embedProviderLabel(provider),
+        title: block.content.title,
+        url: safeUrl
+      })
+    );
+    return wrapBlock(wrap, block, mode);
+  }
 
   if (!safeUrl) {
     const unavailable = document.createElement('p');
@@ -272,6 +345,16 @@ export function renderHtmlAppBlock(
 ): HTMLElement {
   const root = document.createElement('div');
   root.className = 'block-html-app';
+
+  if (mode === 'print') {
+    root.append(
+      renderPrintFallback({
+        label: 'Interactive app',
+        title: block.content.title
+      })
+    );
+    return wrapBlock(root, block, mode);
+  }
 
   const height = block.content.height_px ?? 480;
   const iframe = document.createElement('iframe');
@@ -386,6 +469,17 @@ export function renderAudioBlock(
   const wrap = document.createElement('div');
   wrap.className = 'block-audio';
 
+  if (mode === 'print') {
+    wrap.append(
+      renderPrintFallback({
+        label: 'Audio',
+        title: block.content.title,
+        url: isHttpUrl(block.content.url) ? block.content.url.trim() : undefined
+      })
+    );
+    return wrapBlock(wrap, block, mode);
+  }
+
   if (block.content.title?.trim()) {
     const title = document.createElement('p');
     title.className = 'block-audio__title';
@@ -415,6 +509,18 @@ export function renderAttachmentBlock(
 ): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = 'block-attachment';
+
+  if (mode === 'print') {
+    const safeUrl = isHttpUrl(block.content.url) ? block.content.url.trim() : undefined;
+    wrap.append(
+      renderPrintFallback({
+        label: 'Attachment',
+        title: block.content.title?.trim() || block.content.filename?.trim(),
+        url: safeUrl
+      })
+    );
+    return wrapBlock(wrap, block, mode);
+  }
 
   if (isHttpUrl(block.content.url)) {
     const link = document.createElement('a');
@@ -530,6 +636,22 @@ export function renderQuestionSetBlock(
         options.append(optionItem);
       }
       li.append(options);
+    }
+
+    if (mode === 'print' && question.kind === 'short_answer') {
+      const space = question.response_space ?? 'medium';
+      const lineCount = responseSpaceLineCount(space);
+      if (lineCount > 0) {
+        const lines = document.createElement('div');
+        lines.className = 'block-question-set__response-lines';
+        lines.setAttribute('aria-hidden', 'true');
+        for (let i = 0; i < lineCount; i += 1) {
+          const line = document.createElement('div');
+          line.className = 'block-question-set__line';
+          lines.append(line);
+        }
+        li.append(lines);
+      }
     }
 
     list.append(li);
