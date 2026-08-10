@@ -560,6 +560,8 @@ export function renderAccordionBlock(
     body.className = 'block-accordion__body';
     body.textContent = item.body;
 
+    if (mode === 'print') details.open = true;
+
     details.append(summary, body);
     wrap.append(details);
   }
@@ -701,6 +703,7 @@ export function renderColumnsBlock(
   const grid = document.createElement('div');
   grid.className = 'block-columns';
   grid.dataset.preset = block.content.preset;
+  if (mode === 'print') grid.classList.add('block-columns--print-stack');
   grid.style.gridTemplateColumns = block.content.columns
     .map((col) => `${col.width}fr`)
     .join(' ');
@@ -818,6 +821,26 @@ export function renderTabsBlock(
 ): HTMLElement {
   const root = document.createElement('div');
   root.className = 'block-tabs';
+
+  if (mode === 'print') {
+    for (const panelData of block.content.tabs) {
+      const section = document.createElement('section');
+      section.className = 'block-tabs__print-panel';
+
+      const heading = document.createElement('h3');
+      heading.className = 'block-tabs__print-panel-label';
+      heading.textContent = panelData.label || 'Tab';
+      section.append(heading);
+
+      for (const child of panelData.blocks) {
+        section.append(renderBlock(child, mode, ctx));
+      }
+
+      root.append(section);
+    }
+
+    return wrapBlock(root, block, mode);
+  }
 
   const tablist = document.createElement('div');
   tablist.className = 'block-tabs__tablist';

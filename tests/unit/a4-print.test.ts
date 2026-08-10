@@ -141,4 +141,30 @@ describe('print mode blocks', () => {
     expect(el.querySelector('iframe')).toBeNull();
     expect(el.querySelector('.block-print-fallback')).toBeTruthy();
   });
+
+  it('expands accordion items in print mode', () => {
+    const block = createBlock('accordion', 'acc_print_1');
+    if (block.block_type !== 'accordion') throw new Error('expected accordion');
+    const el = renderBlock(block, 'print');
+    for (const details of el.querySelectorAll('details')) {
+      expect(details.open).toBe(true);
+    }
+  });
+
+  it('renders tabs as sequential sections in print mode', () => {
+    const block = createBlock('tabs', 'tabs_print_1');
+    if (block.block_type !== 'tabs') throw new Error('expected tabs');
+    const el = renderBlock(block, 'print');
+    expect(el.querySelector('.block-tabs__tablist')).toBeNull();
+    expect(el.querySelectorAll('.block-tabs__print-panel').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('stacks columns vertically in print mode', () => {
+    const block = createBlock('columns', 'cols_print_1');
+    if (block.block_type !== 'columns') throw new Error('expected columns');
+    const el = renderBlock(block, 'print');
+    expect(el.querySelector('.block-columns')?.classList.contains('block-columns--print-stack')).toBe(
+      true
+    );
+  });
 });
