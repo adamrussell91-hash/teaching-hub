@@ -16,6 +16,8 @@ import type { CreateKind } from '@/teacher/create/types';
 import { mountLessonEditor, type LessonEditorHandle } from '@/teacher/lesson-editor';
 import type { TeacherSection } from '@/teacher/section';
 import { renderResourcesIndex } from '@/teacher/sections/resources';
+import { openDrivePicker } from '@/teacher/drive-picker';
+import { createMedia, uploadMediaFile } from '@/teacher/media-api';
 import {
   renderScopeSequencesIndex,
   renderScopeTimelineEditor
@@ -365,6 +367,25 @@ function renderTeacherResourcesRoute(token: number): void {
             onCreateClass: railCreateClassHandler(next, refs, token)
           });
           mount(next);
+        },
+        onDrivePick: async () => {
+          const pick = await openDrivePicker();
+          if (!pick) return;
+          if (pick.kind === 'mirror') {
+            await uploadMediaFile(pick.file, {
+              title: pick.title,
+              provider_file_id: pick.provider_file_id
+            });
+          } else {
+            await createMedia({
+              title: pick.title,
+              provider: 'google_drive',
+              media_type: pick.media_type,
+              provider_file_id: pick.provider_file_id,
+              preview_url: pick.preview_url,
+              sharing: pick.sharing
+            });
+          }
         }
       });
     };

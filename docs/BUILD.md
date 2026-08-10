@@ -124,4 +124,4 @@ Unchecked = not built yet.
 
 ## Latest note
 
-**2026-08-10** — A4 print v1 shipped (teacher preview + Print, shared renderer, response-space lines). Next: **Google Drive / media library uploads**.
+**2026-08-10** — Drive picker client uses `VITE_GOOGLE_CLIENT_ID`, `VITE_GOOGLE_PICKER_API_KEY`, optional `VITE_GOOGLE_APP_ID`. Next: finish media library wiring (image editor / publish warnings).

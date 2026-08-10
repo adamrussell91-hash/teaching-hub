@@ -176,4 +176,32 @@ describe('resources section', () => {
       'Google Drive picker coming soon'
     );
   });
+
+  it('awaits onDrivePick then refreshes', async () => {
+    const onDrivePick = vi.fn().mockResolvedValue(undefined);
+    const refresh = vi.fn().mockResolvedValue(undefined);
+    renderResourcesIndex(canvas, curriculum, { onDrivePick, refresh });
+
+    canvas.querySelector<HTMLButtonElement>('[data-drive-pick]')!.click();
+
+    await vi.waitFor(() => {
+      expect(onDrivePick).toHaveBeenCalled();
+      expect(refresh).toHaveBeenCalled();
+    });
+  });
+
+  it('shows Drive errors on status without refreshing', async () => {
+    const onDrivePick = vi.fn().mockRejectedValue(new Error('Google Drive is not configured'));
+    const refresh = vi.fn().mockResolvedValue(undefined);
+    renderResourcesIndex(canvas, curriculum, { onDrivePick, refresh });
+
+    canvas.querySelector<HTMLButtonElement>('[data-drive-pick]')!.click();
+
+    await vi.waitFor(() => {
+      expect(canvas.querySelector('[role="alert"]')?.textContent).toContain(
+        'Google Drive is not configured'
+      );
+    });
+    expect(refresh).not.toHaveBeenCalled();
+  });
 });

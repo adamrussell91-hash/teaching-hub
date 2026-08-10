@@ -196,9 +196,9 @@ export function renderResourcesIndex(
         setStatus(null);
         try {
           await options.onDrivePick();
+          await options.refresh?.();
         } catch (error) {
           setStatus(errorMessage(error), true);
-        } finally {
           setBusy(false);
         }
         return;
