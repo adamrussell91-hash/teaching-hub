@@ -142,6 +142,16 @@ describe('searchCurriculumTitles', () => {
     expect(lesson?.href).toBe('/lessons/l1');
   });
 
+  it('matches unit title and builds full hierarchy', () => {
+    const hits = searchCurriculumTitles(curriculumFixture(), 'floating', []);
+    const unit = hits.find((h) => h.type === 'unit' && h.id === 'u1');
+    expect(unit).toBeTruthy();
+    expect(unit?.hierarchy).toMatch(/Year 12/i);
+    expect(unit?.hierarchy).toMatch(/English/i);
+    expect(unit?.hierarchy).toMatch(/Floating World/i);
+    expect(unit?.href).toBe('/units/u1');
+  });
+
   it('matches class code', () => {
     const hits = searchCurriculumTitles(curriculumFixture(), '12eng', []);
     expect(hits.some((h) => h.type === 'class' && h.match === 'code')).toBe(true);

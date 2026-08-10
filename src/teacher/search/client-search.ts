@@ -36,8 +36,8 @@ function lessonHierarchy(curriculum: CurriculumResponse, lesson: CurriculumLesso
 }
 
 function unitSearchHierarchy(curriculum: CurriculumResponse, unitId: string): string | undefined {
-  const { yearTitle, subjectTitle } = unitHierarchy(curriculum, unitId);
-  return formatHierarchy([yearTitle, subjectTitle]);
+  const { yearTitle, subjectTitle, unitTitle } = unitHierarchy(curriculum, unitId);
+  return formatHierarchy([yearTitle, subjectTitle, unitTitle]);
 }
 
 function scopeSequenceHref(subjectId: string): string {
