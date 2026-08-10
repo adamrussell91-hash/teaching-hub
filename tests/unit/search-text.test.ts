@@ -5,8 +5,7 @@ import { blocksToSearchText, htmlToPlainText, snippetAround } from '@/blocks/sea
 describe('htmlToPlainText', () => {
   it('strips tags and decodes basic entities', () => {
     expect(htmlToPlainText('<p>Hello <strong>world</strong></p>')).toBe('Hello world');
-    expect(htmlToPlainText('A &amp; B')).toContain('A');
-    expect(htmlToPlainText('A &amp; B')).toContain('B');
+    expect(htmlToPlainText('A &amp; B')).toBe('A & B');
   });
 });
 
@@ -37,6 +36,26 @@ describe('blocksToSearchText', () => {
       }
     };
     expect(blocksToSearchText([columns]).toLowerCase()).toContain('hidden gem');
+  });
+
+  it('walks tabs children', () => {
+    const inner = {
+      ...createBlock('heading', 'h3'),
+      variant: 'subsection' as const,
+      content: { text: 'Tab secret' }
+    };
+    const tabs = {
+      ...createBlock('tabs', 'tabs1'),
+      content: {
+        tabs: [
+          { id: 'tabs1_t1', label: 'Overview', blocks: [inner] },
+          { id: 'tabs1_t2', label: 'Details', blocks: [] }
+        ]
+      }
+    };
+    const text = blocksToSearchText([tabs]).toLowerCase();
+    expect(text).toContain('tab secret');
+    expect(text).toContain('overview');
   });
 });
 
