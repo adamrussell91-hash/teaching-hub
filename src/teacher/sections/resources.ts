@@ -1,6 +1,8 @@
 import type { Media } from '@/schemas';
 import type { CurriculumResponse } from '@/teacher/nav';
 import { isHttpUrl } from '@/blocks/url-safety';
+import { createMedia, patchMedia, uploadMediaFile } from '@/teacher/media-api';
+import { ApiClientError } from '@/api/client';
 
 export function openUrlForMedia(media: Media): string | undefined {
   const url = media.preview_url ?? media.download_url;
@@ -9,13 +11,201 @@ export function openUrlForMedia(media: Media): string | undefined {
   return isHttpUrl(trimmed) ? trimmed : undefined;
 }
 
-export function renderResourcesIndex(canvas: HTMLElement, curriculum: CurriculumResponse): void {
+export interface ResourcesIndexOptions {
+  /** Called after successful create/upload/archive to reload curriculum and remount. */
+  refresh?: () => Promise<void>;
+  /** Optional Drive picker hook (Task 5). */
+  onDrivePick?: () => void | Promise<void>;
+}
+
+function inferMediaTypeFromUrl(url: string): Media['media_type'] {
+  const path = url.split('?')[0]?.toLowerCase() ?? '';
+  if (/\.(jpe?g|png|webp|gif)$/.test(path)) return 'image';
+  if (path.endsWith('.pdf')) return 'pdf';
+  return 'link';
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof ApiClientError) return error.message;
+  if (error instanceof Error) return error.message;
+  return 'Something went wrong.';
+}
+
+export function renderResourcesIndex(
+  canvas: HTMLElement,
+  curriculum: CurriculumResponse,
+  options?: ResourcesIndexOptions
+): void {
   canvas.replaceChildren();
 
   const heading = document.createElement('h1');
   heading.className = 'home-heading';
   heading.textContent = 'Resource Library';
   canvas.append(heading);
+
+  const status = document.createElement('p');
+  status.className = 'resources-status';
+  status.hidden = true;
+  canvas.append(status);
+
+  const setStatus = (message: string | null, isError = false): void => {
+    if (!message) {
+      status.hidden = true;
+      status.textContent = '';
+      status.removeAttribute('role');
+      status.classList.remove('resources-status--error');
+      return;
+    }
+    status.hidden = false;
+    status.textContent = message;
+    if (isError) {
+      status.setAttribute('role', 'alert');
+      status.classList.add('resources-status--error');
+    } else {
+      status.removeAttribute('role');
+      status.classList.remove('resources-status--error');
+    }
+  };
+
+  const toolbar = document.createElement('div');
+  toolbar.className = 'resources-toolbar';
+
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.hidden = true;
+  fileInput.setAttribute('aria-hidden', 'true');
+
+  const uploadBtn = document.createElement('button');
+  uploadBtn.type = 'button';
+  uploadBtn.className = 'btn btn--secondary';
+  uploadBtn.dataset.resourcesUpload = '';
+  uploadBtn.textContent = 'Upload';
+
+  const addUrlBtn = document.createElement('button');
+  addUrlBtn.type = 'button';
+  addUrlBtn.className = 'btn btn--secondary';
+  addUrlBtn.dataset.resourcesAddUrl = '';
+  addUrlBtn.textContent = 'Add URL';
+
+  const driveBtn = document.createElement('button');
+  driveBtn.type = 'button';
+  driveBtn.className = 'btn btn--secondary';
+  driveBtn.dataset.drivePick = '';
+  driveBtn.textContent = 'Add from Drive';
+
+  toolbar.append(uploadBtn, addUrlBtn, driveBtn, fileInput);
+  canvas.append(toolbar);
+
+  const urlForm = document.createElement('div');
+  urlForm.className = 'resources-url-form';
+  urlForm.hidden = true;
+
+  const titleInput = document.createElement('input');
+  titleInput.type = 'text';
+  titleInput.className = 'resources-url-form__input';
+  titleInput.placeholder = 'Title';
+  titleInput.setAttribute('aria-label', 'Resource title');
+
+  const urlInput = document.createElement('input');
+  urlInput.type = 'url';
+  urlInput.className = 'resources-url-form__input';
+  urlInput.placeholder = 'https://…';
+  urlInput.setAttribute('aria-label', 'Resource URL');
+
+  const saveUrlBtn = document.createElement('button');
+  saveUrlBtn.type = 'button';
+  saveUrlBtn.className = 'btn btn--primary';
+  saveUrlBtn.textContent = 'Save URL';
+
+  urlForm.append(titleInput, urlInput, saveUrlBtn);
+  canvas.append(urlForm);
+
+  const actionButtons: HTMLButtonElement[] = [uploadBtn, addUrlBtn, driveBtn, saveUrlBtn];
+
+  const setBusy = (busy: boolean): void => {
+    for (const btn of actionButtons) {
+      btn.disabled = busy;
+    }
+    for (const btn of canvas.querySelectorAll<HTMLButtonElement>('[data-resources-archive]')) {
+      btn.disabled = busy;
+    }
+    fileInput.disabled = busy;
+  };
+
+  uploadBtn.addEventListener('click', () => {
+    fileInput.click();
+  });
+
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files?.[0];
+    fileInput.value = '';
+    if (!file) return;
+
+    void (async () => {
+      setBusy(true);
+      setStatus(null);
+      try {
+        await uploadMediaFile(file, { title: file.name });
+        await options?.refresh?.();
+      } catch (error) {
+        setStatus(errorMessage(error), true);
+        setBusy(false);
+      }
+    })();
+  });
+
+  addUrlBtn.addEventListener('click', () => {
+    urlForm.hidden = !urlForm.hidden;
+    if (!urlForm.hidden) titleInput.focus();
+  });
+
+  saveUrlBtn.addEventListener('click', () => {
+    const title = titleInput.value.trim();
+    const preview_url = urlInput.value.trim();
+    if (!title || !preview_url) {
+      setStatus('Title and URL are required.', true);
+      return;
+    }
+    if (!isHttpUrl(preview_url)) {
+      setStatus('URL must start with http:// or https://.', true);
+      return;
+    }
+
+    void (async () => {
+      setBusy(true);
+      setStatus(null);
+      try {
+        await createMedia({
+          title,
+          provider: 'external',
+          media_type: inferMediaTypeFromUrl(preview_url),
+          preview_url
+        });
+        await options?.refresh?.();
+      } catch (error) {
+        setStatus(errorMessage(error), true);
+        setBusy(false);
+      }
+    })();
+  });
+
+  driveBtn.addEventListener('click', () => {
+    void (async () => {
+      if (options?.onDrivePick) {
+        setBusy(true);
+        setStatus(null);
+        try {
+          await options.onDrivePick();
+        } catch (error) {
+          setStatus(errorMessage(error), true);
+        } finally {
+          setBusy(false);
+        }
+        return;
+      }
+      setStatus('Google Drive picker coming soon', true);
+    })();
+  });
 
   const media = curriculum.media
     .filter((entry) => entry.status === 'active')
@@ -50,6 +240,9 @@ export function renderResourcesIndex(canvas: HTMLElement, curriculum: Curriculum
     info.append(title, meta);
     item.append(info);
 
+    const actions = document.createElement('div');
+    actions.className = 'resources-row-actions';
+
     const url = openUrlForMedia(entry);
     if (url) {
       const open = document.createElement('a');
@@ -58,9 +251,30 @@ export function renderResourcesIndex(canvas: HTMLElement, curriculum: Curriculum
       open.textContent = 'Open';
       open.target = '_blank';
       open.rel = 'noopener noreferrer';
-      item.append(open);
+      actions.append(open);
     }
 
+    const archive = document.createElement('button');
+    archive.type = 'button';
+    archive.className = 'btn btn--ghost';
+    archive.dataset.resourcesArchive = entry.id;
+    archive.textContent = 'Archive';
+    archive.addEventListener('click', () => {
+      void (async () => {
+        setBusy(true);
+        setStatus(null);
+        try {
+          await patchMedia(entry.id, { status: 'archived' });
+          await options?.refresh?.();
+        } catch (error) {
+          setStatus(errorMessage(error), true);
+          setBusy(false);
+        }
+      })();
+    });
+    actions.append(archive);
+
+    item.append(actions);
     list.append(item);
   }
 

@@ -353,7 +353,22 @@ function renderTeacherResourcesRoute(token: number): void {
   renderCanvasStatus(refs.canvas, 'Loading…');
 
   void loadNavAndHandleErrors(refs, token, 'resources', undefined, (curriculum) => {
-    renderResourcesIndex(refs.canvas, curriculum);
+    const mount = (data: CurriculumResponse): void => {
+      renderResourcesIndex(refs.canvas, data, {
+        refresh: async () => {
+          curriculumPromise = null;
+          const next = await getCurriculum();
+          if (token !== renderToken) return;
+          renderTeacherRail(refs.railNav, next, {
+            activeSection: 'resources',
+            activeClassId: undefined,
+            onCreateClass: railCreateClassHandler(next, refs, token)
+          });
+          mount(next);
+        }
+      });
+    };
+    mount(curriculum);
   });
 }
 

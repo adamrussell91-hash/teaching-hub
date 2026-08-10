@@ -1,5 +1,13 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+vi.mock('@/teacher/media-api', () => ({
+  createMedia: vi.fn().mockResolvedValue({}),
+  patchMedia: vi.fn().mockResolvedValue({}),
+  uploadMediaFile: vi.fn().mockResolvedValue({})
+}));
+
 import { openUrlForMedia, renderResourcesIndex } from '@/teacher/sections/resources';
+import { patchMedia } from '@/teacher/media-api';
 import type { CurriculumResponse } from '@/teacher/nav';
 import type { Media } from '@/schemas';
 
@@ -57,6 +65,7 @@ describe('resources section', () => {
 
   beforeEach(() => {
     canvas = document.createElement('div');
+    vi.mocked(patchMedia).mockClear();
   });
 
   it('prefers preview_url over download_url', () => {
@@ -118,8 +127,53 @@ describe('resources section', () => {
     expect(meta?.textContent).toBe('pdf · external');
   });
 
-  it('shows empty copy when no active media', () => {
+  it('shows Upload, Add URL, and Add from Drive controls', () => {
+    renderResourcesIndex(canvas, curriculum);
+
+    expect(canvas.querySelector('[data-resources-upload]')?.textContent).toBe('Upload');
+    expect(canvas.querySelector('input[type="file"]')).toBeTruthy();
+    expect(canvas.querySelector('[data-resources-add-url]')?.textContent).toBe('Add URL');
+    expect(canvas.querySelector('[data-drive-pick]')?.textContent).toBe('Add from Drive');
+  });
+
+  it('shows Archive buttons for each active item', () => {
+    renderResourcesIndex(canvas, curriculum);
+
+    const archiveButtons = [...canvas.querySelectorAll('[data-resources-archive]')];
+    expect(archiveButtons).toHaveLength(2);
+    expect(archiveButtons.every((btn) => btn.textContent === 'Archive')).toBe(true);
+    expect(archiveButtons.every((btn) => btn.classList.contains('btn--ghost'))).toBe(true);
+  });
+
+  it('shows empty copy with toolbar when no active media', () => {
     renderResourcesIndex(canvas, { ...curriculum, media: [] });
     expect(canvas.textContent).toContain('No resources yet.');
+    expect(canvas.querySelector('[data-resources-upload]')).toBeTruthy();
+    expect(canvas.querySelector('[data-resources-add-url]')).toBeTruthy();
+    expect(canvas.querySelector('[data-drive-pick]')).toBeTruthy();
+  });
+
+  it('archives media then calls refresh', async () => {
+    const refresh = vi.fn().mockResolvedValue(undefined);
+    renderResourcesIndex(canvas, curriculum, { refresh });
+
+    const archiveBtn = canvas.querySelector<HTMLButtonElement>(
+      '[data-resources-archive="media_ono_extract"]'
+    );
+    expect(archiveBtn).toBeTruthy();
+    archiveBtn!.click();
+
+    await vi.waitFor(() => {
+      expect(patchMedia).toHaveBeenCalledWith('media_ono_extract', { status: 'archived' });
+      expect(refresh).toHaveBeenCalled();
+    });
+  });
+
+  it('shows Drive stub message when onDrivePick is not provided', () => {
+    renderResourcesIndex(canvas, curriculum);
+    canvas.querySelector<HTMLButtonElement>('[data-drive-pick]')!.click();
+    expect(canvas.querySelector('[role="alert"]')?.textContent).toContain(
+      'Google Drive picker coming soon'
+    );
   });
 });
