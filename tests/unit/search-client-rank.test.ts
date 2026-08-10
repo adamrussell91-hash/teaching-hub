@@ -161,6 +161,31 @@ describe('searchCurriculumTitles', () => {
     const hits = searchCurriculumTitles(curriculumFixture(), 'trial', []);
     expect(hits.some((h) => h.type === 'scope_note')).toBe(true);
   });
+
+  it('emits hierarchy matches when year/subject/unit labels match but title does not', () => {
+    const hits = searchCurriculumTitles(curriculumFixture(), 'english', []);
+    const lesson = hits.find((h) => h.type === 'lesson' && h.id === 'l1');
+    expect(lesson).toBeTruthy();
+    expect(lesson?.match).toBe('hierarchy');
+    expect(lesson?.hierarchy).toMatch(/English/i);
+    expect(lesson?.title).toBe('Memory and Identity');
+
+    const unit = hits.find((h) => h.type === 'unit' && h.id === 'u1');
+    expect(unit).toBeTruthy();
+    expect(unit?.match).toBe('hierarchy');
+    expect(unit?.hierarchy).toMatch(/English/i);
+    expect(unit?.title).toBe('Artist of the Floating World');
+  });
+
+  it('prefers title match over hierarchy when both would match', () => {
+    const hits = searchCurriculumTitles(curriculumFixture(), 'floating', []);
+    const unit = hits.find((h) => h.type === 'unit' && h.id === 'u1');
+    expect(unit?.match).toBe('title');
+
+    const lesson = hits.find((h) => h.type === 'lesson' && h.id === 'l1');
+    expect(lesson?.match).toBe('hierarchy');
+    expect(lesson?.hierarchy).toMatch(/Floating World/i);
+  });
 });
 
 describe('mergeAndRankHits', () => {

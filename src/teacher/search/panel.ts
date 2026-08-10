@@ -1,6 +1,6 @@
 import type { CurriculumResponse } from '@/teacher/nav';
 import { filterActions, listSearchActions } from './actions';
-import { searchCurriculumTitles } from './client-search';
+import { lessonHierarchy, searchCurriculumTitles, unitSearchHierarchy } from './client-search';
 import { readRecent } from './recent';
 import { mergeAndRankHits } from './rank';
 import type { ContentSearchHit, SearchHit } from './types';
@@ -53,6 +53,7 @@ function enrichBodyHit(
       type: 'lesson',
       id: hit.id,
       title: lesson?.title ?? hit.id,
+      hierarchy: lesson ? lessonHierarchy(curriculum, lesson) : undefined,
       match: 'body',
       snippet: hit.snippet,
       href: `/lessons/${hit.id}`
@@ -64,6 +65,7 @@ function enrichBodyHit(
       type: 'unit',
       id: hit.id,
       title: unit?.title ?? hit.id,
+      hierarchy: unit ? unitSearchHierarchy(curriculum, unit.id) : undefined,
       match: 'body',
       snippet: hit.snippet,
       href: `/units/${hit.id}`
@@ -219,7 +221,18 @@ export function openSearchPanel(options: SearchPanelOptions): void {
 
       const meta = document.createElement('div');
       meta.className = 'search-palette__meta';
-      meta.textContent = row.hit.hierarchy ?? typeLabel(row.hit.type);
+
+      const typeBadge = document.createElement('span');
+      typeBadge.className = 'search-palette__type';
+      typeBadge.textContent = typeLabel(row.hit.type);
+      meta.append(typeBadge);
+
+      if (row.hit.hierarchy) {
+        const hierarchy = document.createElement('span');
+        hierarchy.className = 'search-palette__hierarchy';
+        hierarchy.textContent = row.hit.hierarchy;
+        meta.append(hierarchy);
+      }
 
       option.append(title, meta);
 

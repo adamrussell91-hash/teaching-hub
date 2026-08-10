@@ -229,6 +229,171 @@ describe('openSearchPanel', () => {
     expect(text).toContain('Content search unavailable');
   });
 
+  it('shows type badge and hierarchy together on result rows', async () => {
+    vi.useFakeTimers();
+    const curriculum = emptyCurriculum();
+    curriculum.years = [
+      {
+        id: 'y12',
+        type: 'year',
+        title: 'Year 12',
+        slug: 'year-12',
+        year_level: 12,
+        subject_ids: ['eng'],
+        status: 'active',
+        created_at: '2026-01-01T00:00:00.000Z',
+        updated_at: '2026-01-01T00:00:00.000Z',
+        schema_version: 1
+      }
+    ];
+    curriculum.subjects = [
+      {
+        id: 'eng',
+        type: 'subject',
+        title: 'English Advanced',
+        display_title: 'English Advanced',
+        slug: 'english-advanced',
+        year_id: 'y12',
+        unit_ids: ['u1'],
+        outcome_ids: [],
+        class_ids: [],
+        status: 'active',
+        created_at: '2026-01-01T00:00:00.000Z',
+        updated_at: '2026-01-01T00:00:00.000Z',
+        schema_version: 1
+      }
+    ];
+    curriculum.units = [
+      {
+        id: 'u1',
+        type: 'unit',
+        title: 'Artist of the Floating World',
+        slug: 'aotfw',
+        year_id: 'y12',
+        subject_id: 'eng',
+        lesson_ids: ['l1'],
+        status: 'active',
+        created_at: '2026-01-01T00:00:00.000Z',
+        updated_at: '2026-01-01T00:00:00.000Z',
+        schema_version: 1
+      }
+    ];
+    curriculum.lessons = [
+      {
+        id: 'l1',
+        title: 'Memory and Identity',
+        slug: 'memory',
+        unit_id: 'u1',
+        sequence: 1,
+        status: 'active',
+        published: true,
+        updated_at: '2026-01-01T00:00:00.000Z'
+      }
+    ];
+
+    openSearchPanel(baseOptions({ curriculum }));
+
+    const input = document.querySelector<HTMLInputElement>('.search-palette__input');
+    input!.value = 'memory';
+    input!.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(150);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const row = document.querySelector('.search-palette__row');
+    expect(row).toBeTruthy();
+    expect(row?.querySelector('.search-palette__type')?.textContent).toBe('Lesson');
+    expect(row?.querySelector('.search-palette__hierarchy')?.textContent).toMatch(/Year 12/);
+    expect(row?.querySelector('.search-palette__hierarchy')?.textContent).toMatch(/English/);
+  });
+
+  it('populates hierarchy on body-only enrich hits', async () => {
+    vi.useFakeTimers();
+    const curriculum = emptyCurriculum();
+    curriculum.years = [
+      {
+        id: 'y12',
+        type: 'year',
+        title: 'Year 12',
+        slug: 'year-12',
+        year_level: 12,
+        subject_ids: ['eng'],
+        status: 'active',
+        created_at: '2026-01-01T00:00:00.000Z',
+        updated_at: '2026-01-01T00:00:00.000Z',
+        schema_version: 1
+      }
+    ];
+    curriculum.subjects = [
+      {
+        id: 'eng',
+        type: 'subject',
+        title: 'English Advanced',
+        display_title: 'English Advanced',
+        slug: 'english-advanced',
+        year_id: 'y12',
+        unit_ids: ['u1'],
+        outcome_ids: [],
+        class_ids: [],
+        status: 'active',
+        created_at: '2026-01-01T00:00:00.000Z',
+        updated_at: '2026-01-01T00:00:00.000Z',
+        schema_version: 1
+      }
+    ];
+    curriculum.units = [
+      {
+        id: 'u1',
+        type: 'unit',
+        title: 'Artist of the Floating World',
+        slug: 'aotfw',
+        year_id: 'y12',
+        subject_id: 'eng',
+        lesson_ids: ['l2'],
+        status: 'active',
+        created_at: '2026-01-01T00:00:00.000Z',
+        updated_at: '2026-01-01T00:00:00.000Z',
+        schema_version: 1
+      }
+    ];
+    curriculum.lessons = [
+      {
+        id: 'l2',
+        title: 'Body Only Lesson',
+        slug: 'body-only',
+        unit_id: 'u1',
+        sequence: 1,
+        status: 'active',
+        published: true,
+        updated_at: '2026-01-01T00:00:00.000Z'
+      }
+    ];
+
+    openSearchPanel(
+      baseOptions({
+        curriculum,
+        fetchContentSearch: async () => ({
+          hits: [{ type: 'lesson' as const, id: 'l2', snippet: '…newton laws…' }]
+        })
+      })
+    );
+
+    const input = document.querySelector<HTMLInputElement>('.search-palette__input');
+    input!.value = 'newton';
+    input!.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(150);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const row = [...document.querySelectorAll('.search-palette__row')].find((el) =>
+      (el.textContent ?? '').includes('Body Only Lesson')
+    );
+    expect(row).toBeTruthy();
+    expect(row?.querySelector('.search-palette__type')?.textContent).toBe('Lesson');
+    expect(row?.querySelector('.search-palette__hierarchy')?.textContent).toMatch(/Year 12/);
+    expect(row?.querySelector('.search-palette__snippet')?.textContent).toContain('newton');
+  });
+
   it('shows No matches when search finishes with zero hits', async () => {
     vi.useFakeTimers();
     openSearchPanel(baseOptions());

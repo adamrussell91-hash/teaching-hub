@@ -30,12 +30,15 @@ function formatHierarchy(parts: Array<string | undefined>): string | undefined {
   return labels.length > 0 ? labels.join(' › ') : undefined;
 }
 
-function lessonHierarchy(curriculum: CurriculumResponse, lesson: CurriculumLessonSummary): string | undefined {
+export function lessonHierarchy(
+  curriculum: CurriculumResponse,
+  lesson: CurriculumLessonSummary
+): string | undefined {
   const { yearTitle, subjectTitle, unitTitle } = unitHierarchy(curriculum, lesson.unit_id);
   return formatHierarchy([yearTitle, subjectTitle, unitTitle]);
 }
 
-function unitSearchHierarchy(curriculum: CurriculumResponse, unitId: string): string | undefined {
+export function unitSearchHierarchy(curriculum: CurriculumResponse, unitId: string): string | undefined {
   const { yearTitle, subjectTitle, unitTitle } = unitHierarchy(curriculum, unitId);
   return formatHierarchy([yearTitle, subjectTitle, unitTitle]);
 }
@@ -55,26 +58,32 @@ export function searchCurriculumTitles(
   const hits: SearchHit[] = [];
 
   for (const lesson of curriculum.lessons) {
-    if (includesQuery(lesson.title, q)) {
+    const hierarchy = lessonHierarchy(curriculum, lesson);
+    const titleMatch = includesQuery(lesson.title, q);
+    const hierarchyMatch = !titleMatch && includesQuery(hierarchy, q);
+    if (titleMatch || hierarchyMatch) {
       hits.push({
         type: 'lesson',
         id: lesson.id,
         title: lesson.title,
-        hierarchy: lessonHierarchy(curriculum, lesson),
-        match: 'title',
+        hierarchy,
+        match: titleMatch ? 'title' : 'hierarchy',
         href: `/lessons/${lesson.id}`
       });
     }
   }
 
   for (const unit of curriculum.units) {
-    if (includesQuery(unit.title, q)) {
+    const hierarchy = unitSearchHierarchy(curriculum, unit.id);
+    const titleMatch = includesQuery(unit.title, q);
+    const hierarchyMatch = !titleMatch && includesQuery(hierarchy, q);
+    if (titleMatch || hierarchyMatch) {
       hits.push({
         type: 'unit',
         id: unit.id,
         title: unit.title,
-        hierarchy: unitSearchHierarchy(curriculum, unit.id),
-        match: 'title',
+        hierarchy,
+        match: titleMatch ? 'title' : 'hierarchy',
         href: `/units/${unit.id}`
       });
     }
