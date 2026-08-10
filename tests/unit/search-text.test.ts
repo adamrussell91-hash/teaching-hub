@@ -1,0 +1,50 @@
+import { describe, expect, it } from 'vitest';
+import { createBlock } from '@/blocks/create-block';
+import { blocksToSearchText, htmlToPlainText, snippetAround } from '@/blocks/search-text';
+
+describe('htmlToPlainText', () => {
+  it('strips tags and decodes basic entities', () => {
+    expect(htmlToPlainText('<p>Hello <strong>world</strong></p>')).toBe('Hello world');
+    expect(htmlToPlainText('A &amp; B')).toContain('A');
+    expect(htmlToPlainText('A &amp; B')).toContain('B');
+  });
+});
+
+describe('blocksToSearchText', () => {
+  it('concatenates text from nested blocks', () => {
+    const heading = { ...createBlock('heading', 'h1'), content: { text: 'Forces' } };
+    const rich = {
+      ...createBlock('rich_text', 'r1'),
+      content: { html: '<p>Newton&apos;s laws of motion</p>' }
+    };
+    const text = blocksToSearchText([heading, rich]);
+    expect(text.toLowerCase()).toContain('forces');
+    expect(text.toLowerCase()).toContain('newton');
+    expect(text.toLowerCase()).toContain('laws');
+  });
+
+  it('walks columns and tabs children', () => {
+    const inner = {
+      ...createBlock('heading', 'h2'),
+      variant: 'subsection' as const,
+      content: { text: 'Hidden gem' }
+    };
+    const columns = {
+      ...createBlock('columns', 'col1'),
+      content: {
+        preset: '50-50' as const,
+        columns: [{ width: 6, blocks: [inner] }, { width: 6, blocks: [] }]
+      }
+    };
+    expect(blocksToSearchText([columns]).toLowerCase()).toContain('hidden gem');
+  });
+});
+
+describe('snippetAround', () => {
+  it('returns a short excerpt around the first match', () => {
+    const hay = 'aaa ' + 'word '.repeat(40) + 'TARGET phrase here ' + 'zzz '.repeat(40);
+    const snip = snippetAround(hay, 'target');
+    expect(snip.toLowerCase()).toContain('target');
+    expect(snip.length).toBeLessThan(160);
+  });
+});
