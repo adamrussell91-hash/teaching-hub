@@ -228,4 +228,47 @@ describe('openSearchPanel', () => {
     expect(text).toContain('Memory and Identity');
     expect(text).toContain('Content search unavailable');
   });
+
+  it('shows No matches when search finishes with zero hits', async () => {
+    vi.useFakeTimers();
+    openSearchPanel(baseOptions());
+
+    const input = document.querySelector<HTMLInputElement>('.search-palette__input');
+    input!.value = 'zzzznonexistent';
+    input!.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(150);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(document.body.textContent ?? '').toContain('No matches');
+    expect(document.querySelectorAll('.search-palette__row')).toHaveLength(0);
+  });
+
+  it('does not navigate or close when Enter activates href-less hit', async () => {
+    vi.useFakeTimers();
+    const onNavigate = vi.fn();
+    const onAction = vi.fn();
+    openSearchPanel(
+      baseOptions({
+        compositions: [{ id: 'comp1', title: 'Template Pack' }],
+        onNavigate,
+        onAction,
+        fetchContentSearch: async () => ({ hits: [] })
+      })
+    );
+
+    const input = document.querySelector<HTMLInputElement>('.search-palette__input');
+    input!.value = 'template';
+    input!.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(150);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(document.body.textContent ?? '').toContain('Template Pack');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+    expect(onNavigate).not.toHaveBeenCalled();
+    expect(onAction).not.toHaveBeenCalled();
+    expect(document.querySelector('.search-palette')).toBeTruthy();
+  });
 });

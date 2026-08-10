@@ -304,7 +304,7 @@ export function openSearchPanel(options: SearchPanelOptions): void {
       selectedIndex = 0;
       renderRows(
         baseHits.map((hit) => ({ kind: 'hit' as const, hit })),
-        ''
+        baseHits.length === 0 ? 'No matches' : ''
       );
       return;
     }
@@ -323,7 +323,7 @@ export function openSearchPanel(options: SearchPanelOptions): void {
       );
       renderRows(
         merged.map((hit) => ({ kind: 'hit' as const, hit })),
-        ''
+        merged.length === 0 ? 'No matches' : ''
       );
     } catch {
       if (generation !== searchGeneration) return;
