@@ -3,6 +3,7 @@ import { Window } from 'happy-dom';
 import { estimatePageCount, A4 } from '@/print/a4';
 import { openPrintLesson } from '@/print/open-print';
 import { renderPrintLesson } from '@/print/render-print-lesson';
+import { mountA4Preview } from '@/teacher/a4-preview';
 import { renderBlock } from '@/blocks/render';
 import { createBlock } from '@/blocks/create-block';
 import type { Lesson } from '@/schemas/lesson';
@@ -168,6 +169,21 @@ describe('print mode blocks', () => {
     expect(el.querySelector('.block-columns')?.classList.contains('block-columns--print-stack')).toBe(
       true
     );
+  });
+});
+
+describe('mountA4Preview', () => {
+  it('update renders a print document in the preview panel', () => {
+    const host = document.createElement('div');
+    const preview = mountA4Preview(host);
+
+    preview.update(minimalLesson());
+
+    expect(host.classList.contains('a4-preview')).toBe(true);
+    expect(host.querySelector('.print-document')).not.toBeNull();
+    expect(host.querySelector('.a4-preview__pages')?.textContent).toMatch(/page/);
+
+    preview.dispose();
   });
 });
 

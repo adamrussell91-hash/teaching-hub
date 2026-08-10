@@ -11,6 +11,7 @@ import { insertCompositionRoot } from '@/blocks/composition-insert';
 import { createBlockEditor } from '@/blocks/registry';
 import type { CompositionSummary, CompositionTemplate } from '@/schemas/composition';
 import type { Lesson } from '@/schemas/lesson';
+import { mountA4Preview, type A4PreviewHandle } from '@/teacher/a4-preview';
 import { renderContextBar, type TeacherShellRefs } from '@/teacher/shell';
 import { mountSavePublishControls, SaveController, type SavePublishHandle } from '@/teacher/save-publish';
 
@@ -52,6 +53,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
   let disposed = false;
   let saveController: SaveController | null = null;
   let savePublishHandle: SavePublishHandle | null = null;
+  let a4Preview: A4PreviewHandle | null = null;
 
   renderStatus(refs.canvas, 'Loading lesson…');
 
@@ -158,10 +160,25 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       compositionButton
     );
 
-    refs.canvas.append(publishPanel, titleField, blocksContainer, addBlockBar, compositionStatus);
+    const root = document.createElement('div');
+    root.className = 'lesson-editor';
+
+    const main = document.createElement('div');
+    main.className = 'lesson-editor__main';
+    main.append(publishPanel, titleField, blocksContainer, addBlockBar, compositionStatus);
+
+    const previewHost = document.createElement('div');
+    previewHost.className = 'lesson-editor__preview';
+
+    root.append(main, previewHost);
+    refs.canvas.append(root);
+
+    a4Preview = mountA4Preview(previewHost);
+    a4Preview.update(lesson);
 
     function markDirty(): void {
       saveController?.notifyChange();
+      a4Preview?.update(lesson);
     }
 
     function setCompositionStatus(text: string | null): void {
@@ -442,6 +459,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     },
     dispose() {
       disposed = true;
+      a4Preview?.dispose();
       savePublishHandle?.dispose();
       saveController?.dispose();
     }
