@@ -20,11 +20,10 @@ Block primitives: [`docs/specs/03_BLOCK_SYSTEM.md`](specs/03_BLOCK_SYSTEM.md)
 
 Suggested order for continuing builder / teaching-page work (adjust as needed):
 
-1. **Search / nav acceleration** — find lessons, units, and classes faster
+1. **Lesson / unit templates & linked reuse** — save/insert lesson & unit templates; linked reuse beyond compositions v1
 
 Larger product tracks (not “next block”, but still ahead):
 
-- Lesson / unit templates & linked reuse (compositions v1 shipped)
 - AI agent integration
 - Versioning, archive, recovery  
 
@@ -62,6 +61,7 @@ Larger product tracks (not “next block”, but still ahead):
 | 2026-08-09 | **Templates & reuse** | Composition save/insert (section → independent copy); no linked templates yet — [`design`](superpowers/specs/2026-08-09-templates-reuse-design.md) / [`plan`](superpowers/plans/2026-08-09-templates-reuse.md) |
 | 2026-08-10 | **A4 print pipeline** | Teacher A4 portrait preview + Print via shared renderer; `response_space` lines; minimal media fallbacks — [`design`](superpowers/specs/2026-08-10-a4-print-pipeline-design.md) / [`plan`](superpowers/plans/2026-08-10-a4-print-pipeline.md) |
 | 2026-08-10 | **Google Drive / media library uploads** | Hosted uploads + Drive picker mirror + Resources library + publish warnings — [`design`](superpowers/specs/2026-08-10-media-library-drive-design.md) / [`plan`](superpowers/plans/2026-08-10-media-library-drive.md) |
+| 2026-08-11 | **Search / nav acceleration** | Rail search + ⌘K panel; client title/metadata + server body scan; ranked results with snippets — [`design`](superpowers/specs/2026-08-11-search-nav-acceleration-design.md) / [`plan`](superpowers/plans/2026-08-11-search-nav-acceleration.md) |
 
 ### Block types live today (32)
 
@@ -77,7 +77,7 @@ Larger product tracks (not “next block”, but still ahead):
 | 9 A4 print | **v1 done** — preview + print; metadata/tools polish later |
 | 10 Google Drive | **v1 done** — mirror + picker + library |
 | 11 Templates / reuse | **Compositions v1** — save/insert section; lesson/unit/linked templates later |
-| 12 Search | Not started |
+| 12 Search | **v1 done** — rail + ⌘K panel; client titles + server body scan |
 | 13 AI | Not started |
 | 14–15 Versioning / hardening | Not started |
 
@@ -116,7 +116,7 @@ Unchecked = not built yet.
 - [x] A4 print pipeline
 - [x] Media library + uploads / Drive
 - [x] Templates & compositions (compositions v1: save section + insert independent copy; lesson/unit/linked later)
-- [ ] Search
+- [x] Search
 - [ ] AI agent
 - [ ] Versioning / archive / recovery
 
@@ -124,4 +124,4 @@ Unchecked = not built yet.
 
 ## Latest note
 
-**2026-08-10** — Media library + Drive slice shipped (upload, picker mirror, Resources, library pick, publish warnings). Smoke: upload works in mock; Drive needs `VITE_GOOGLE_*` env. Next up: Search / nav acceleration.
+**2026-08-11** — Search / nav acceleration slice shipped (rail search + ⌘K panel, client + server index, ranked results). Next up: Lesson / unit templates & linked reuse.
