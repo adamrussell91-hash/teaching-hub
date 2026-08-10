@@ -23,7 +23,7 @@ import {
 } from '@/blocks/learning-activity';
 import type { Block, EmbedProvider } from '@/schemas/block';
 
-export type RenderMode = 'teacher' | 'student';
+export type RenderMode = 'teacher' | 'student' | 'print';
 export type RenderContext = { lessonId?: string };
 
 const HEADING_TAG = {
