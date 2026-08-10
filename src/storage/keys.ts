@@ -38,6 +38,10 @@ export function mediaKey(id: string): string {
   return `media/${id}`;
 }
 
+export function mediaFileKey(id: string): string {
+  return `media_files/${id}`;
+}
+
 export function compositionKey(id: string): string {
   return `templates/compositions/${id}`;
 }

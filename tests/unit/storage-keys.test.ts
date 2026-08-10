@@ -13,6 +13,7 @@ import {
   scheduledLessonKey,
   scheduleAnchorKey,
   mediaKey,
+  mediaFileKey,
   compositionKey
 } from '@/storage/keys';
 import { MockStore } from '../../scripts/mock-store';
@@ -59,6 +60,7 @@ describe('storage key helpers', () => {
 
   it('builds media keys', () => {
     expect(mediaKey('media_ono_extract')).toBe('media/media_ono_extract');
+    expect(mediaFileKey('media_1')).toBe('media_files/media_1');
   });
 
   it('builds composition keys', () => {

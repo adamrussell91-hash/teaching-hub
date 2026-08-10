@@ -10,6 +10,7 @@ import {
   scheduleAnchorKey,
   scopeSequenceKey,
   mediaKey,
+  mediaFileKey,
   compositionKey
 } from '../../../src/storage/keys';
 
@@ -27,6 +28,7 @@ export {
   scheduleAnchorKey,
   scopeSequenceKey,
   mediaKey,
+  mediaFileKey,
   compositionKey
 };
 
