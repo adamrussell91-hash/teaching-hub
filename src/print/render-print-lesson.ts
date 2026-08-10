@@ -1,4 +1,5 @@
 import { renderBlock } from '@/blocks/render';
+import { filterBlocksForStudent } from '@/blocks/visibility';
 import type { Lesson } from '@/schemas/lesson';
 
 export function renderPrintLesson(lesson: Lesson): HTMLElement {
@@ -14,8 +15,7 @@ export function renderPrintLesson(lesson: Lesson): HTMLElement {
   const body = document.createElement('div');
   body.className = 'print-document__body';
 
-  for (const block of lesson.blocks) {
-    if (block.visibility === 'teacher_only') continue;
+  for (const block of filterBlocksForStudent(lesson.blocks)) {
     body.append(renderBlock(block, 'print', { lessonId: lesson.id }));
   }
 

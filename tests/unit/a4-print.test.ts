@@ -55,4 +55,19 @@ describe('renderPrintLesson', () => {
     expect(root.querySelectorAll('[data-block-id]').length).toBe(1);
     expect(root.querySelector(`[data-block-id="${hidden.id}"]`)).toBeNull();
   });
+
+  it('omits nested teacher_only blocks inside section', () => {
+    const section = createBlock('section', 'sec_print');
+    if (section.block_type !== 'section') throw new Error('expected section');
+    const visible = createBlock('heading', 'block_nested_visible');
+    if (visible.block_type === 'heading') visible.content.text = 'Student content';
+    const hidden = createBlock('callout', 'block_nested_hidden');
+    hidden.visibility = 'teacher_only';
+    section.content.blocks = [visible, hidden] as typeof section.content.blocks;
+
+    const root = renderPrintLesson(minimalLesson({ blocks: [section] }));
+
+    expect(root.querySelector(`[data-block-id="${visible.id}"]`)).not.toBeNull();
+    expect(root.querySelector(`[data-block-id="${hidden.id}"]`)).toBeNull();
+  });
 });
