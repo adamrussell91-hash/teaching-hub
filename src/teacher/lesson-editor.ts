@@ -11,7 +11,9 @@ import { insertCompositionRoot } from '@/blocks/composition-insert';
 import { createBlockEditor } from '@/blocks/registry';
 import type { CompositionSummary, CompositionTemplate } from '@/schemas/composition';
 import type { Lesson } from '@/schemas/lesson';
+import type { Media } from '@/schemas/media';
 import { mountA4Preview, type A4PreviewHandle } from '@/teacher/a4-preview';
+import { fetchCurriculum } from '@/teacher/nav';
 import { renderContextBar, type TeacherShellRefs } from '@/teacher/shell';
 import { mountSavePublishControls, SaveController, type SavePublishHandle } from '@/teacher/save-publish';
 
@@ -74,6 +76,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
   function renderEditor(initialLesson: Lesson): void {
     const lesson: Lesson = initialLesson;
     let blockCounter = lesson.blocks.length;
+    let mediaList: Media[] = [];
 
     renderContextBar(refs, { title: lesson.title || 'Untitled lesson' });
     refs.canvas.replaceChildren();
@@ -295,7 +298,8 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
             lesson.blocks[index] = updated;
             markDirty();
           },
-          () => lesson.blocks[index]!
+          () => lesson.blocks[index]!,
+          { media: mediaList }
         );
 
         row.append(controls, editor);
@@ -395,6 +399,16 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     });
 
     renderBlocksList();
+
+    void fetchCurriculum()
+      .then((curriculum) => {
+        if (disposed || isStale()) return;
+        mediaList = curriculum.media;
+        renderBlocksList();
+      })
+      .catch(() => {
+        /* library picker stays empty */
+      });
 
     function showPublishSuccess(studentPath: string): void {
       const publishedAt = new Date().toISOString();

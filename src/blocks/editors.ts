@@ -14,6 +14,11 @@ import { isHttpUrl } from '@/blocks/url-safety';
 import { parseEmbedInput } from '@/blocks/embed-url';
 import { parseVideoInput } from '@/blocks/video-url';
 import type { Block, EmbedProvider } from '@/schemas/block';
+import type { Media } from '@/schemas/media';
+import {
+  mountMediaLibraryPicker,
+  resolveMediaLibraryUrl
+} from '@/teacher/media-library-picker';
 
 export type BlockChangeHandler<T extends Block = Block> = (block: T) => void;
 
@@ -21,6 +26,7 @@ export type BlockEditorContext = {
   resolveCollection?: (
     block: Extract<Block, { block_type: 'collection' }>
   ) => { links: CollectionLink[]; emptyMessage?: string };
+  media?: ReadonlyArray<Media>;
 };
 
 const VISIBILITY_OPTIONS = [
@@ -317,7 +323,8 @@ export function createCalloutEditor(
 export function createImageEditor(
   block: Extract<Block, { block_type: 'image' }>,
   onChange: BlockChangeHandler<Extract<Block, { block_type: 'image' }>>,
-  getLatest: () => Extract<Block, { block_type: 'image' }> = () => block
+  getLatest: () => Extract<Block, { block_type: 'image' }> = () => block,
+  context: BlockEditorContext = {}
 ): HTMLElement {
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
@@ -343,6 +350,15 @@ export function createImageEditor(
   caption.placeholder = 'Caption (optional)';
   caption.setAttribute('aria-label', 'Caption');
 
+  const libraryBtn = document.createElement('button');
+  libraryBtn.type = 'button';
+  libraryBtn.className = 'btn btn--ghost block-editor__library-btn';
+  libraryBtn.textContent = 'Choose from library';
+
+  const libraryHost = document.createElement('div');
+  libraryHost.className = 'block-editor__library';
+  libraryHost.hidden = true;
+
   const emitChange = () => {
     onChange({
       ...getLatest(),
@@ -357,11 +373,32 @@ export function createImageEditor(
 
   const sizeSelect = createMediaSizeSelect(block.variant, emitChange);
 
+  libraryBtn.addEventListener('click', () => {
+    libraryHost.hidden = !libraryHost.hidden;
+    if (!libraryHost.hidden) {
+      mountMediaLibraryPicker(libraryHost, {
+        media: context.media ?? [],
+        mediaTypes: ['image'],
+        emptyMessage: 'No images in library',
+        onPick: (media) => {
+          const resolved = resolveMediaLibraryUrl(media);
+          if (!resolved) return;
+          url.value = resolved;
+          if (!alt.value.trim() && media.title) {
+            alt.value = media.title;
+          }
+          libraryHost.hidden = true;
+          emitChange();
+        }
+      });
+    }
+  });
+
   url.addEventListener('input', emitChange);
   alt.addEventListener('input', emitChange);
   caption.addEventListener('input', emitChange);
 
-  fields.append(url, alt, caption, sizeSelect);
+  fields.append(url, alt, caption, sizeSelect, libraryBtn, libraryHost);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -843,7 +880,8 @@ export function createAudioEditor(
 export function createAttachmentEditor(
   block: Extract<Block, { block_type: 'attachment' }>,
   onChange: BlockChangeHandler<Extract<Block, { block_type: 'attachment' }>>,
-  getLatest: () => Extract<Block, { block_type: 'attachment' }> = () => block
+  getLatest: () => Extract<Block, { block_type: 'attachment' }> = () => block,
+  context: BlockEditorContext = {}
 ): HTMLElement {
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
@@ -869,6 +907,15 @@ export function createAttachmentEditor(
   filename.placeholder = 'Filename (optional)';
   filename.setAttribute('aria-label', 'Filename');
 
+  const libraryBtn = document.createElement('button');
+  libraryBtn.type = 'button';
+  libraryBtn.className = 'btn btn--ghost block-editor__library-btn';
+  libraryBtn.textContent = 'Choose from library';
+
+  const libraryHost = document.createElement('div');
+  libraryHost.className = 'block-editor__library';
+  libraryHost.hidden = true;
+
   const emitChange = () => {
     onChange({
       ...getLatest(),
@@ -880,11 +927,34 @@ export function createAttachmentEditor(
     });
   };
 
+  libraryBtn.addEventListener('click', () => {
+    libraryHost.hidden = !libraryHost.hidden;
+    if (!libraryHost.hidden) {
+      mountMediaLibraryPicker(libraryHost, {
+        media: context.media ?? [],
+        emptyMessage: 'No media in library',
+        onPick: (media) => {
+          const resolved = resolveMediaLibraryUrl(media);
+          if (!resolved) return;
+          url.value = resolved;
+          if (!title.value.trim() && media.title) {
+            title.value = media.title;
+          }
+          if (!filename.value.trim()) {
+            filename.value = media.file_name ?? media.title;
+          }
+          libraryHost.hidden = true;
+          emitChange();
+        }
+      });
+    }
+  });
+
   url.addEventListener('input', emitChange);
   title.addEventListener('input', emitChange);
   filename.addEventListener('input', emitChange);
 
-  fields.append(url, title, filename);
+  fields.append(url, title, filename, libraryBtn, libraryHost);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -2995,7 +3065,12 @@ export function createBlockEditor(
     case 'callout':
       return createCalloutEditor(block, onChange, latest as () => Extract<Block, { block_type: 'callout' }>);
     case 'image':
-      return createImageEditor(block, onChange, latest as () => Extract<Block, { block_type: 'image' }>);
+      return createImageEditor(
+        block,
+        onChange,
+        latest as () => Extract<Block, { block_type: 'image' }>,
+        context
+      );
     case 'video':
       return createVideoEditor(block, onChange, latest as () => Extract<Block, { block_type: 'video' }>);
     case 'embed':
@@ -3019,7 +3094,12 @@ export function createBlockEditor(
     case 'audio':
       return createAudioEditor(block, onChange, latest as () => Extract<Block, { block_type: 'audio' }>);
     case 'attachment':
-      return createAttachmentEditor(block, onChange, latest as () => Extract<Block, { block_type: 'attachment' }>);
+      return createAttachmentEditor(
+        block,
+        onChange,
+        latest as () => Extract<Block, { block_type: 'attachment' }>,
+        context
+      );
     case 'accordion':
       return createAccordionEditor(block, onChange, latest as () => Extract<Block, { block_type: 'accordion' }>);
     case 'gallery':
