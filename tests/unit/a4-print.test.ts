@@ -170,6 +170,50 @@ describe('print mode blocks', () => {
       true
     );
   });
+
+  it('renders flashcards as static print summary without controls', () => {
+    const block = createBlock('flashcards', 'fc_print_1');
+    if (block.block_type !== 'flashcards') throw new Error('expected flashcards');
+    block.content.cards = [
+      { id: 'c1', front: 'Term', back: 'Definition' },
+      { id: 'c2', front: 'Force', back: 'A push or pull' }
+    ];
+
+    const el = renderBlock(block, 'print');
+
+    expect(el.querySelector('.block-flashcards__print')).not.toBeNull();
+    expect(el.querySelector('.block-flashcards__controls')).toBeNull();
+    expect(el.querySelector('.block-flashcards__card')).toBeNull();
+    expect(el.querySelector('button')).toBeNull();
+  });
+
+  it('renders gallery as static grid without carousel or lightbox controls', () => {
+    const block = createBlock('gallery', 'gal_print_1');
+    if (block.block_type !== 'gallery') throw new Error('expected gallery');
+    block.content.layout = 'carousel';
+    block.content.items = [
+      {
+        id: 'i1',
+        url: 'https://example.com/a.jpg',
+        alt_text: 'Photo A',
+        caption: 'First'
+      },
+      {
+        id: 'i2',
+        url: 'https://example.com/b.jpg',
+        alt_text: 'Photo B'
+      }
+    ];
+
+    const el = renderBlock(block, 'print');
+
+    expect(el.querySelector('.block-gallery--print')).not.toBeNull();
+    expect(el.querySelector('.block-gallery__controls')).toBeNull();
+    expect(el.querySelector('.block-gallery__prev')).toBeNull();
+    expect(el.querySelector('.block-gallery__next')).toBeNull();
+    expect(el.querySelector('.block-gallery__open')).toBeNull();
+    expect(el.querySelectorAll('.block-gallery__item img').length).toBe(2);
+  });
 });
 
 describe('mountA4Preview', () => {
@@ -192,22 +236,23 @@ describe('openPrintLesson', () => {
     vi.restoreAllMocks();
   });
 
-  it('appends a print document to the new window and triggers print', () => {
+  it('appends a print document to the new window and triggers print', async () => {
     const printWindow = new Window();
     const printSpy = vi.fn();
     printWindow.print = printSpy;
-    vi.spyOn(printWindow, 'setTimeout').mockImplementation((handler) => {
-      if (typeof handler === 'function') handler();
-      return 0 as unknown as ReturnType<typeof setTimeout>;
-    });
 
     vi.spyOn(window, 'open').mockReturnValue(printWindow as unknown as WindowProxy);
 
     openPrintLesson(minimalLesson());
 
+    await vi.waitUntil(() => printSpy.mock.calls.length > 0);
+
     expect(printWindow.document.querySelector('.print-document')).not.toBeNull();
     expect(printWindow.document.title).toBe('Forces worksheet');
-    expect(printWindow.document.querySelector('style')?.textContent).toContain('@page');
+    const styleText = printWindow.document.querySelector('style')?.textContent ?? '';
+    expect(styleText).toContain('@page');
+    expect(styleText).toContain('.block-flashcards__print');
+    expect(styleText).toContain('.block-gallery__controls');
     expect(printSpy).toHaveBeenCalledOnce();
   });
 

@@ -1019,6 +1019,18 @@ export function renderGalleryBlock(
   mode: RenderMode
 ): HTMLElement {
   const root = document.createElement('div');
+
+  if (mode === 'print') {
+    root.className = `block-gallery block-gallery--print block-gallery--${block.variant}`;
+    const list = document.createElement('div');
+    list.className = 'block-gallery__list';
+    for (const entry of block.content.items) {
+      list.append(galleryFigure(entry, false));
+    }
+    root.append(list);
+    return wrapBlock(root, block, mode);
+  }
+
   root.className = `block-gallery block-gallery--${block.content.layout} block-gallery--${block.variant}`;
 
   if (block.content.layout === 'carousel') {
@@ -1174,6 +1186,22 @@ export function renderFlashcardsBlock(
     return wrapBlock(root, block, mode);
   }
 
+  if (mode === 'print') {
+    const printSummary = document.createElement('ol');
+    printSummary.className = 'block-flashcards__print';
+    for (const item of block.content.cards) {
+      const entry = document.createElement('li');
+      const frontCopy = document.createElement('p');
+      const backCopy = document.createElement('p');
+      frontCopy.textContent = `Front: ${item.front}`;
+      backCopy.textContent = `Back: ${item.back}`;
+      entry.append(frontCopy, backCopy);
+      printSummary.append(entry);
+    }
+    root.append(printSummary);
+    return wrapBlock(root, block, mode);
+  }
+
   type FlashcardsState = { order: string[]; index: number; flipped: boolean };
   const key = storageKey('local', block.id);
   const cardIds = block.content.cards.map((card) => card.id);
@@ -1318,6 +1346,23 @@ export function renderClozeBlock(
       }
     }
     root.append(sentence);
+    return wrapBlock(root, block, mode);
+  }
+
+  if (mode === 'print') {
+    const printSummary = document.createElement('p');
+    printSummary.className = 'block-cloze__print';
+    for (const segment of segments) {
+      if (segment.type === 'text') {
+        printSummary.append(document.createTextNode(segment.value));
+      } else {
+        const blank = document.createElement('span');
+        blank.className = 'block-cloze__print-blank';
+        blank.textContent = segment.blank.answer;
+        printSummary.append(blank);
+      }
+    }
+    root.append(printSummary);
     return wrapBlock(root, block, mode);
   }
 
@@ -1483,44 +1528,9 @@ export function renderClozeBlock(
   return wrapBlock(root, block, mode);
 }
 
-export function renderSelfCheckBlock(
-  block: Extract<Block, { block_type: 'self_check' }>,
-  mode: RenderMode
+function buildSelfCheckPrintSummary(
+  block: Extract<Block, { block_type: 'self_check' }>
 ): HTMLElement {
-  const root = document.createElement('div');
-  root.className = `block-self-check block-self-check--${block.content.mode}`;
-
-  if (block.content.title?.trim()) {
-    const title = document.createElement('h3');
-    title.className = 'block-self-check__title';
-    title.textContent = block.content.title;
-    root.append(title);
-  }
-  const prompt = document.createElement('p');
-  prompt.className = 'block-self-check__prompt';
-  prompt.textContent = block.content.prompt;
-  root.append(prompt);
-
-  if (mode === 'teacher') {
-    if (block.content.mode === 'checklist') {
-      const list = document.createElement('ul');
-      list.className = 'block-self-check__preview-list';
-      for (const item of block.content.items ?? []) {
-        const li = document.createElement('li');
-        li.textContent = item.label;
-        list.append(li);
-      }
-      root.append(list);
-    } else if (block.content.answer) {
-      const hidden = document.createElement('p');
-      hidden.className = 'block-self-check__answer-hidden';
-      hidden.textContent = 'Answer hidden';
-      root.append(hidden);
-    }
-    return wrapBlock(root, block, mode);
-  }
-
-  const key = storageKey('local', block.id);
   const printSummary = document.createElement('div');
   printSummary.className = 'block-self-check__print';
   printSummary.setAttribute('aria-hidden', 'true');
@@ -1540,6 +1550,57 @@ export function renderSelfCheckBlock(
     printAnswer.textContent = block.content.answer ?? '';
     printSummary.append(printAnswer);
   }
+  return printSummary;
+}
+
+export function renderSelfCheckBlock(
+  block: Extract<Block, { block_type: 'self_check' }>,
+  mode: RenderMode
+): HTMLElement {
+  const root = document.createElement('div');
+  root.className = `block-self-check block-self-check--${block.content.mode}`;
+
+  if (block.content.title?.trim()) {
+    const title = document.createElement('h3');
+    title.className = 'block-self-check__title';
+    title.textContent = block.content.title;
+    root.append(title);
+  }
+
+  if (mode === 'teacher') {
+    const prompt = document.createElement('p');
+    prompt.className = 'block-self-check__prompt';
+    prompt.textContent = block.content.prompt;
+    root.append(prompt);
+    if (block.content.mode === 'checklist') {
+      const list = document.createElement('ul');
+      list.className = 'block-self-check__preview-list';
+      for (const item of block.content.items ?? []) {
+        const li = document.createElement('li');
+        li.textContent = item.label;
+        list.append(li);
+      }
+      root.append(list);
+    } else if (block.content.answer) {
+      const hidden = document.createElement('p');
+      hidden.className = 'block-self-check__answer-hidden';
+      hidden.textContent = 'Answer hidden';
+      root.append(hidden);
+    }
+    return wrapBlock(root, block, mode);
+  }
+
+  if (mode === 'print') {
+    root.append(buildSelfCheckPrintSummary(block));
+    return wrapBlock(root, block, mode);
+  }
+
+  const prompt = document.createElement('p');
+  prompt.className = 'block-self-check__prompt';
+  prompt.textContent = block.content.prompt;
+  root.append(prompt);
+
+  const key = storageKey('local', block.id);
 
   if (block.content.mode === 'checklist') {
     type ChecklistState = { checkedIds: string[] };
@@ -1569,7 +1630,7 @@ export function renderSelfCheckBlock(
       label.append(checkbox, document.createTextNode(item.label));
       list.append(label);
     }
-    root.append(list, printSummary);
+    root.append(list, buildSelfCheckPrintSummary(block));
     return wrapBlock(root, block, mode);
   }
 
@@ -1625,7 +1686,7 @@ export function renderSelfCheckBlock(
     }
     root.append(scale, answer);
   }
-  root.append(printSummary);
+  root.append(buildSelfCheckPrintSummary(block));
   paintAnswer();
   return wrapBlock(root, block, mode);
 }
