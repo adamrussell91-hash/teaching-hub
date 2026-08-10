@@ -58,8 +58,10 @@ export {
 export {
   MediaProviderSchema,
   MediaTypeSchema,
+  MediaSharingSchema,
   MediaSchema,
-  type Media
+  type Media,
+  type MediaSharing
 } from './media';
 export {
   CompositionTemplateSchema,

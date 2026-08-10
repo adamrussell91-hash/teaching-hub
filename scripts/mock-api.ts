@@ -27,6 +27,9 @@ import {
   SectionBlockSchema,
   SubjectSchema,
   MediaSchema,
+  MediaSharingSchema,
+  MediaTypeSchema,
+  StatusSchema,
   TimelineItemSchema,
   UnitSchema,
   toPublishedLesson,
@@ -1396,6 +1399,259 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     return okResponse(200, parsed.data);
   }
 
+  function optionalNonEmptyString(
+    record: Record<string, unknown>,
+    key: string
+  ): string | undefined | { error: string } {
+    if (record[key] === undefined) return undefined;
+    if (typeof record[key] !== 'string' || !(record[key] as string).trim()) {
+      return { error: `${key} must be a non-empty string when provided` };
+    }
+    return (record[key] as string).trim();
+  }
+
+  function handlePostMedia(cookie: string | null | undefined, body: unknown): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+
+    if (typeof body !== 'object' || body === null) {
+      return errorResponse(400, 'validation_error', 'Request body must be a JSON object');
+    }
+
+    const record = body as Record<string, unknown>;
+    const title = typeof record.title === 'string' ? record.title.trim() : '';
+    if (!title) {
+      return errorResponse(400, 'validation_error', 'title is required');
+    }
+
+    const provider = typeof record.provider === 'string' ? record.provider : '';
+    if (provider !== 'external' && provider !== 'google_drive') {
+      return errorResponse(
+        400,
+        'validation_error',
+        'provider must be external or google_drive (direct uploads use /api/media/upload)'
+      );
+    }
+
+    const mediaTypeParsed = MediaTypeSchema.safeParse(record.media_type);
+    if (!mediaTypeParsed.success) {
+      return errorResponse(
+        400,
+        'validation_error',
+        'media_type is required and must be a valid media type'
+      );
+    }
+
+    const optionals: Partial<
+      Pick<
+        Media,
+        | 'preview_url'
+        | 'download_url'
+        | 'thumbnail_url'
+        | 'provider_file_id'
+        | 'mime_type'
+        | 'file_name'
+      >
+    > = {};
+    for (const key of [
+      'preview_url',
+      'download_url',
+      'thumbnail_url',
+      'provider_file_id',
+      'mime_type',
+      'file_name'
+    ] as const) {
+      const value = optionalNonEmptyString(record, key);
+      if (value && typeof value === 'object' && 'error' in value) {
+        return errorResponse(400, 'validation_error', value.error);
+      }
+      if (typeof value === 'string') {
+        optionals[key] = value;
+      }
+    }
+
+    let sharing: Media['sharing'];
+    if (record.sharing !== undefined) {
+      const sharingParsed = MediaSharingSchema.safeParse(record.sharing);
+      if (!sharingParsed.success) {
+        return errorResponse(400, 'validation_error', 'sharing is invalid');
+      }
+      sharing = sharingParsed.data;
+    }
+
+    const timestamp = nowIso();
+    const id = newId('media');
+    const candidate: Media = {
+      id,
+      type: 'media',
+      title,
+      slug: slugify(title),
+      status: 'active',
+      provider,
+      media_type: mediaTypeParsed.data,
+      created_at: timestamp,
+      updated_at: timestamp,
+      schema_version: 1,
+      ...optionals,
+      ...(sharing !== undefined ? { sharing } : {})
+    };
+
+    const validated = MediaSchema.safeParse(candidate);
+    if (!validated.success) {
+      return errorResponse(
+        400,
+        'validation_error',
+        'Media data is invalid',
+        validated.error.flatten()
+      );
+    }
+
+    store.setJSON(mediaKey(id), validated.data);
+    return okResponse(201, validated.data);
+  }
+
+  function handleGetMedia(cookie: string | null | undefined, id: string): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+
+    const raw = store.getJSON<Media>(mediaKey(id));
+    if (!raw) return notFoundResponse('Media not found');
+
+    const parsed = MediaSchema.safeParse(raw);
+    if (!parsed.success) {
+      return errorResponse(500, 'invalid_data', 'Stored media is invalid');
+    }
+
+    return okResponse(200, parsed.data);
+  }
+
+  function handlePatchMedia(
+    cookie: string | null | undefined,
+    id: string,
+    body: unknown
+  ): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+
+    if (typeof body !== 'object' || body === null) {
+      return errorResponse(400, 'validation_error', 'Request body must be a JSON object');
+    }
+
+    const raw = store.getJSON(mediaKey(id));
+    if (!raw) return notFoundResponse('Media not found');
+
+    const existing = MediaSchema.safeParse(raw);
+    if (!existing.success) {
+      return errorResponse(500, 'invalid_data', 'Stored media is invalid');
+    }
+
+    const record = body as Record<string, unknown>;
+    const patch: {
+      title?: string;
+      status?: Media['status'];
+      preview_url?: string;
+      download_url?: string;
+      thumbnail_url?: string;
+      provider_file_id?: string;
+      sharing?: Media['sharing'];
+      mime_type?: string;
+      file_name?: string;
+    } = {};
+
+    if (record.title !== undefined) {
+      if (typeof record.title !== 'string' || !record.title.trim()) {
+        return errorResponse(400, 'validation_error', 'title must be a non-empty string');
+      }
+      patch.title = record.title.trim();
+    }
+
+    if (record.status !== undefined) {
+      const statusParsed = StatusSchema.safeParse(record.status);
+      if (!statusParsed.success) {
+        return errorResponse(
+          400,
+          'validation_error',
+          'status must be active, archived, or trashed'
+        );
+      }
+      patch.status = statusParsed.data;
+    }
+
+    for (const key of [
+      'preview_url',
+      'download_url',
+      'thumbnail_url',
+      'provider_file_id',
+      'mime_type',
+      'file_name'
+    ] as const) {
+      const value = optionalNonEmptyString(record, key);
+      if (value && typeof value === 'object' && 'error' in value) {
+        return errorResponse(400, 'validation_error', value.error);
+      }
+      if (typeof value === 'string') {
+        patch[key] = value;
+      }
+    }
+
+    if (record.sharing !== undefined) {
+      const sharingParsed = MediaSharingSchema.safeParse(record.sharing);
+      if (!sharingParsed.success) {
+        return errorResponse(400, 'validation_error', 'sharing is invalid');
+      }
+      patch.sharing = sharingParsed.data;
+    }
+
+    if (
+      patch.title === undefined &&
+      patch.status === undefined &&
+      patch.preview_url === undefined &&
+      patch.download_url === undefined &&
+      patch.thumbnail_url === undefined &&
+      patch.provider_file_id === undefined &&
+      patch.sharing === undefined &&
+      patch.mime_type === undefined &&
+      patch.file_name === undefined
+    ) {
+      return errorResponse(
+        400,
+        'validation_error',
+        'Provide title, status, preview_url, download_url, thumbnail_url, provider_file_id, sharing, mime_type, and/or file_name'
+      );
+    }
+
+    const merged: Media = {
+      ...existing.data,
+      updated_at: nowIso()
+    };
+
+    if (patch.title !== undefined) {
+      merged.title = patch.title;
+      merged.slug = slugify(patch.title);
+    }
+    if (patch.status !== undefined) merged.status = patch.status;
+    if (patch.preview_url !== undefined) merged.preview_url = patch.preview_url;
+    if (patch.download_url !== undefined) merged.download_url = patch.download_url;
+    if (patch.thumbnail_url !== undefined) merged.thumbnail_url = patch.thumbnail_url;
+    if (patch.provider_file_id !== undefined) merged.provider_file_id = patch.provider_file_id;
+    if (patch.sharing !== undefined) merged.sharing = patch.sharing;
+    if (patch.mime_type !== undefined) merged.mime_type = patch.mime_type;
+    if (patch.file_name !== undefined) merged.file_name = patch.file_name;
+
+    const validated = MediaSchema.safeParse(merged);
+    if (!validated.success) {
+      return errorResponse(
+        400,
+        'validation_error',
+        'Media data is invalid',
+        validated.error.flatten()
+      );
+    }
+
+    store.setJSON(mediaKey(id), validated.data);
+    return okResponse(200, validated.data);
+  }
+
   const LESSON_ID_RE = /^\/api\/lessons\/([^/]+)$/;
   const LESSON_PUBLISH_RE = /^\/api\/lessons\/([^/]+)\/publish$/;
   const PUBLISHED_LESSON_RE = /^\/api\/published\/lessons\/([^/]+)$/;
@@ -1406,6 +1662,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
   const SCHEDULE_UNIT_RE = /^\/api\/classes\/([^/]+)\/schedule-unit$/;
   const SCHEDULED_LESSON_RE = /^\/api\/scheduled-lessons\/([^/]+)$/;
   const COMPOSITION_ID_RE = /^\/api\/compositions\/([^/]+)$/;
+  const MEDIA_ID_RE = /^\/api\/media\/([^/]+)$/;
 
   async function handle(
     method: string,
@@ -1445,10 +1702,17 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     }
     if (method === 'GET' && path === '/api/compositions') return handleGetCompositions(cookie);
     if (method === 'POST' && path === '/api/compositions') return handlePostComposition(cookie, body);
+    if (method === 'POST' && path === '/api/media') return handlePostMedia(cookie, body);
 
     const compositionMatch = COMPOSITION_ID_RE.exec(path);
     if (compositionMatch && method === 'GET') {
       return handleGetComposition(cookie, compositionMatch[1]!);
+    }
+
+    const mediaMatch = MEDIA_ID_RE.exec(path);
+    if (mediaMatch) {
+      if (method === 'GET') return handleGetMedia(cookie, mediaMatch[1]!);
+      if (method === 'PATCH') return handlePatchMedia(cookie, mediaMatch[1]!, body);
     }
 
     const publishMatch = LESSON_PUBLISH_RE.exec(path);
