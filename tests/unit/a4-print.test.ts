@@ -1,5 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { Window } from 'happy-dom';
 import { estimatePageCount, A4 } from '@/print/a4';
+import { openPrintLesson } from '@/print/open-print';
 import { renderPrintLesson } from '@/print/render-print-lesson';
 import { renderBlock } from '@/blocks/render';
 import { createBlock } from '@/blocks/create-block';
@@ -166,5 +168,39 @@ describe('print mode blocks', () => {
     expect(el.querySelector('.block-columns')?.classList.contains('block-columns--print-stack')).toBe(
       true
     );
+  });
+});
+
+describe('openPrintLesson', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('appends a print document to the new window and triggers print', () => {
+    const printWindow = new Window();
+    const printSpy = vi.fn();
+    printWindow.print = printSpy;
+    vi.spyOn(printWindow, 'setTimeout').mockImplementation((handler) => {
+      if (typeof handler === 'function') handler();
+      return 0 as unknown as ReturnType<typeof setTimeout>;
+    });
+
+    vi.spyOn(window, 'open').mockReturnValue(printWindow as unknown as WindowProxy);
+
+    openPrintLesson(minimalLesson());
+
+    expect(printWindow.document.querySelector('.print-document')).not.toBeNull();
+    expect(printWindow.document.title).toBe('Forces worksheet');
+    expect(printWindow.document.querySelector('style')?.textContent).toContain('@page');
+    expect(printSpy).toHaveBeenCalledOnce();
+  });
+
+  it('alerts when pop-ups are blocked', () => {
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    vi.spyOn(window, 'open').mockReturnValue(null);
+
+    openPrintLesson(minimalLesson());
+
+    expect(alertSpy).toHaveBeenCalledWith('Allow pop-ups to print this lesson.');
   });
 });
