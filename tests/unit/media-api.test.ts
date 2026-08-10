@@ -113,4 +113,25 @@ describe('media metadata API (mock)', () => {
     const res = await api.request('GET', '/api/media/media_missing', { cookie });
     expect(res.status).toBe(404);
   });
+
+  it('POST /api/media registers id in curriculum media list', async () => {
+    const api = freshApi();
+    const cookie = await signIn(api);
+    const createRes = await api.request('POST', '/api/media', {
+      cookie,
+      body: {
+        title: 'Curriculum PDF',
+        provider: 'external',
+        media_type: 'pdf',
+        preview_url: 'https://example.com/curriculum.pdf'
+      }
+    });
+    expect(createRes.status).toBe(201);
+    const created = (await createRes.json()).data as Media;
+
+    const curriculumRes = await api.request('GET', '/api/curriculum', { cookie });
+    expect(curriculumRes.status).toBe(200);
+    const media = (await curriculumRes.json()).data.media as Media[];
+    expect(media.map((item) => item.id)).toContain(created.id);
+  });
 });

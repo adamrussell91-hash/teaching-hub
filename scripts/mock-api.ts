@@ -1507,6 +1507,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     }
 
     store.setJSON(mediaKey(id), validated.data);
+    seedIds.media.push(id);
     return okResponse(201, validated.data);
   }
 
