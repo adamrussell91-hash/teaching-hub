@@ -20,12 +20,11 @@ Block primitives: [`docs/specs/03_BLOCK_SYSTEM.md`](specs/03_BLOCK_SYSTEM.md)
 
 Suggested order for continuing builder / teaching-page work (adjust as needed):
 
-1. **Google Drive / media library uploads** — hosted assets instead of paste-URL only
+1. **Search / nav acceleration** — find lessons, units, and classes faster
 
 Larger product tracks (not “next block”, but still ahead):
 
 - Lesson / unit templates & linked reuse (compositions v1 shipped)
-- Search / nav acceleration
 - AI agent integration
 - Versioning, archive, recovery  
 
@@ -62,6 +61,7 @@ Larger product tracks (not “next block”, but still ahead):
 | 2026-08-09 | **Embed viewers** | Map / Slides / Document / PDF via provider-aware `embed` (menu presets + URL detect; iframe vs card) — [`design`](superpowers/specs/2026-08-09-embed-viewers-design.md) / [`plan`](superpowers/plans/2026-08-09-embed-viewers.md) |
 | 2026-08-09 | **Templates & reuse** | Composition save/insert (section → independent copy); no linked templates yet — [`design`](superpowers/specs/2026-08-09-templates-reuse-design.md) / [`plan`](superpowers/plans/2026-08-09-templates-reuse.md) |
 | 2026-08-10 | **A4 print pipeline** | Teacher A4 portrait preview + Print via shared renderer; `response_space` lines; minimal media fallbacks — [`design`](superpowers/specs/2026-08-10-a4-print-pipeline-design.md) / [`plan`](superpowers/plans/2026-08-10-a4-print-pipeline.md) |
+| 2026-08-10 | **Google Drive / media library uploads** | Hosted uploads + Drive picker mirror + Resources library + publish warnings — [`design`](superpowers/specs/2026-08-10-media-library-drive-design.md) / [`plan`](superpowers/plans/2026-08-10-media-library-drive.md) |
 
 ### Block types live today (32)
 
@@ -75,7 +75,7 @@ Larger product tracks (not “next block”, but still ahead):
 | 5 Block system expansion | **In progress** — layout + timeline + tabs + gallery + activities + viz + collection + html_app + columns UX + response space + embed viewers + A4 print v1 done |
 | 6–8 Unit/class pages, scheduling, scope | Largely done for v1 |
 | 9 A4 print | **v1 done** — preview + print; metadata/tools polish later |
-| 10 Google Drive | Not started |
+| 10 Google Drive | **v1 done** — mirror + picker + library |
 | 11 Templates / reuse | **Compositions v1** — save/insert section; lesson/unit/linked templates later |
 | 12 Search | Not started |
 | 13 AI | Not started |
@@ -114,7 +114,7 @@ Unchecked = not built yet.
 
 ### Platform (later)
 - [x] A4 print pipeline
-- [ ] Media library + uploads / Drive
+- [x] Media library + uploads / Drive
 - [x] Templates & compositions (compositions v1: save section + insert independent copy; lesson/unit/linked later)
 - [ ] Search
 - [ ] AI agent
@@ -124,4 +124,4 @@ Unchecked = not built yet.
 
 ## Latest note
 
-**2026-08-10** — Drive picker client uses `VITE_GOOGLE_CLIENT_ID`, `VITE_GOOGLE_PICKER_API_KEY`, optional `VITE_GOOGLE_APP_ID`. Next: finish media library wiring (image editor / publish warnings).
+**2026-08-10** — Media library + Drive slice shipped (upload, picker mirror, Resources, library pick, publish warnings). Smoke: upload works in mock; Drive needs `VITE_GOOGLE_*` env. Next up: Search / nav acceleration.

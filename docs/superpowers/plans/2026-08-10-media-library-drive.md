@@ -1,5 +1,7 @@
 # Media Library + Drive Implementation Plan
 
+**Status: Done**
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Teachers add files via upload or Google Drive picker into a Media library; binaries land in Netlify Blobs so students get working URLs without Google login.
