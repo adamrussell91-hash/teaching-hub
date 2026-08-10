@@ -463,7 +463,11 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       contextBar: refs.contextBar,
       controller: saveController,
       onPublishSuccess: showPublishSuccess,
-      onPublishFailure: showPublishIssues
+      onPublishFailure: showPublishIssues,
+      getPublishMediaContext: () => ({
+        blocks: lesson.blocks,
+        media: mediaList
+      })
     });
   }
 

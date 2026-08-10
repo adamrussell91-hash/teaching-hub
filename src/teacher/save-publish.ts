@@ -1,5 +1,10 @@
 import { apiPost, apiPut, ApiClientError } from '@/api/client';
 import type { Lesson } from '@/schemas/lesson';
+import type { Media } from '@/schemas/media';
+import {
+  collectRestrictedDriveMediaWarnings,
+  formatPublishMediaWarnings
+} from '@/teacher/publish-media-warnings';
 
 export type SaveState = 'saved' | 'saving' | 'unpublished_changes' | 'published' | 'save_failed';
 
@@ -231,6 +236,13 @@ export interface SavePublishMountOptions {
   controller: SaveController;
   onPublishSuccess?: (studentPath: string) => void;
   onPublishFailure?: (issues: string[]) => void;
+  /**
+   * Optional context for restricted Drive media warnings shown before publish.
+   * When omitted, publish proceeds without a media accessibility check.
+   */
+  getPublishMediaContext?: () =>
+    | { blocks: unknown; media: ReadonlyArray<Media> }
+    | Promise<{ blocks: unknown; media: ReadonlyArray<Media> }>;
 }
 
 export interface SavePublishHandle {
@@ -265,18 +277,29 @@ export function mountSavePublishControls(options: SavePublishMountOptions): Save
   publishButton.textContent = 'Publish';
   publishButton.addEventListener('click', () => {
     publishButton.disabled = true;
-    void controller
-      .publish()
-      .then((outcome) => {
+    void (async () => {
+      try {
+        if (options.getPublishMediaContext) {
+          const ctx = await options.getPublishMediaContext();
+          const warnings = collectRestrictedDriveMediaWarnings(ctx);
+          if (warnings.length > 0) {
+            const proceed = window.confirm(
+              `${formatPublishMediaWarnings(warnings)}\n\nPublish anyway?`
+            );
+            if (!proceed) return;
+          }
+        }
+
+        const outcome = await controller.publish();
         if (outcome.ok) {
           options.onPublishSuccess?.(outcome.studentPath);
         } else {
           options.onPublishFailure?.(outcome.issues);
         }
-      })
-      .finally(() => {
+      } finally {
         publishButton.disabled = false;
-      });
+      }
+    })();
   });
 
   actions.append(saveButton, publishButton);
