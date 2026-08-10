@@ -20,11 +20,10 @@ Block primitives: [`docs/specs/03_BLOCK_SYSTEM.md`](specs/03_BLOCK_SYSTEM.md)
 
 Suggested order for continuing builder / teaching-page work (adjust as needed):
 
-1. **A4 print pipeline** — preview + printable worksheet output (or jump to Drive)
+1. **Google Drive / media library uploads** — hosted assets instead of paste-URL only
 
 Larger product tracks (not “next block”, but still ahead):
 
-- Google Drive / media library uploads
 - Lesson / unit templates & linked reuse (compositions v1 shipped)
 - Search / nav acceleration
 - AI agent integration
@@ -62,6 +61,7 @@ Larger product tracks (not “next block”, but still ahead):
 | 2026-08-09 | **Response space** | `response_space` on short-answer `question_set` items (schema + builder); student UI unchanged; print deferred — [`design`](superpowers/specs/2026-08-09-response-space-design.md) / [`plan`](superpowers/plans/2026-08-09-response-space.md) |
 | 2026-08-09 | **Embed viewers** | Map / Slides / Document / PDF via provider-aware `embed` (menu presets + URL detect; iframe vs card) — [`design`](superpowers/specs/2026-08-09-embed-viewers-design.md) / [`plan`](superpowers/plans/2026-08-09-embed-viewers.md) |
 | 2026-08-09 | **Templates & reuse** | Composition save/insert (section → independent copy); no linked templates yet — [`design`](superpowers/specs/2026-08-09-templates-reuse-design.md) / [`plan`](superpowers/plans/2026-08-09-templates-reuse.md) |
+| 2026-08-10 | **A4 print pipeline** | Teacher A4 portrait preview + Print via shared renderer; `response_space` lines; minimal media fallbacks — [`design`](superpowers/specs/2026-08-10-a4-print-pipeline-design.md) / [`plan`](superpowers/plans/2026-08-10-a4-print-pipeline.md) |
 
 ### Block types live today (32)
 
@@ -72,9 +72,9 @@ Larger product tracks (not “next block”, but still ahead):
 | Spec phase | Status |
 |------------|--------|
 | 0–4 Foundation → basic builder → publish | Done (core) |
-| 5 Block system expansion | **In progress** — layout + timeline + tabs + gallery + activities + viz + collection + html_app + columns UX + response space + embed viewers done; A4 print next |
+| 5 Block system expansion | **In progress** — layout + timeline + tabs + gallery + activities + viz + collection + html_app + columns UX + response space + embed viewers + A4 print v1 done |
 | 6–8 Unit/class pages, scheduling, scope | Largely done for v1 |
-| 9 A4 print | Not started |
+| 9 A4 print | **v1 done** — preview + print; metadata/tools polish later |
 | 10 Google Drive | Not started |
 | 11 Templates / reuse | **Compositions v1** — save/insert section; lesson/unit/linked templates later |
 | 12 Search | Not started |
@@ -103,7 +103,7 @@ Unchecked = not built yet.
 - [x] Flashcards
 - [x] Cloze
 - [x] Self check
-- [x] Response space (schema + builder on short-answer; print deferred)
+- [x] Response space (schema + builder on short-answer; print lines in A4 pipeline)
 
 ### Visualisation
 - [x] Chart
@@ -113,7 +113,7 @@ Unchecked = not built yet.
 - [x] Concept map
 
 ### Platform (later)
-- [ ] A4 print pipeline
+- [x] A4 print pipeline
 - [ ] Media library + uploads / Drive
 - [x] Templates & compositions (compositions v1: save section + insert independent copy; lesson/unit/linked later)
 - [ ] Search
@@ -124,4 +124,4 @@ Unchecked = not built yet.
 
 ## Latest note
 
-**2026-08-09** — Composition templates shipped (save top-level section → insert independent copy). Next: **A4 print pipeline**.
+**2026-08-10** — A4 print v1 shipped (teacher preview + Print, shared renderer, response-space lines). Next: **Google Drive / media library uploads**.

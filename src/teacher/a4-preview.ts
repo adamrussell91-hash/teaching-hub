@@ -9,7 +9,7 @@ export interface A4PreviewHandle {
 }
 
 export function mountA4Preview(host: HTMLElement): A4PreviewHandle {
-  host.className = 'a4-preview';
+  host.classList.add('a4-preview');
 
   const meta = document.createElement('div');
   meta.className = 'a4-preview__meta';
