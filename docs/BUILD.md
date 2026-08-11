@@ -24,7 +24,8 @@ Suggested order for continuing builder / teaching-page work (adjust as needed):
 
 Larger product tracks (not “next block”, but still ahead):
 
-- Versioning, archive, recovery
+- Export / portable backup follow-up (JSON export, Backup Now / GitHub) — deferred from versioning core
+- Production hardening (Phase 15)
 
 ---
 
@@ -32,6 +33,7 @@ Larger product tracks (not “next block”, but still ahead):
 
 | Date | Slice | Outcome |
 |------|--------|---------|
+| 2026-08-11 | **Versioning / archive / recovery** | Lesson/unit/class-homepage version history (checkpoints, restore draft-only); archive vs trash; dependency-aware permanent delete + Trash UI — [`design`](superpowers/specs/2026-08-11-versioning-archive-recovery-design.md) / [`plan`](superpowers/plans/2026-08-11-versioning-archive-recovery.md) |
 | 2026-08-11 | **Linked template reuse** | Linked composition templates (edit source / detach); propagates updates to linked copies — [`design`](superpowers/specs/2026-08-11-linked-composition-templates-design.md) / [`plan`](superpowers/plans/2026-08-11-linked-composition-templates.md) |
 | 2026-08-11 | **Lesson & unit templates** | Save lesson/unit templates; `/templates` library (use/rename/archive); create new independent entities — [`design`](superpowers/specs/2026-08-11-lesson-unit-templates-design.md) / [`plan`](superpowers/plans/2026-08-11-lesson-unit-templates.md) |
 | 2026-08-11 | **Search / nav acceleration** | Rail search + ⌘K panel; client title/metadata + server body scan; ranked results with snippets — [`design`](superpowers/specs/2026-08-11-search-nav-acceleration-design.md) / [`plan`](superpowers/plans/2026-08-11-search-nav-acceleration.md) |
@@ -80,7 +82,7 @@ Larger product tracks (not “next block”, but still ahead):
 | 11 Templates / reuse | **Done (v1)** — lesson/unit templates + compositions + linked reuse |
 | 12 Search | **v1 done** — rail + ⌘K panel; client titles + server body scan |
 | 13 AI | Not started |
-| 14–15 Versioning / hardening | Not started |
+| 14–15 Versioning / hardening | **Phase 14 core done** — history + archive/trash/restore/permanent delete; export/backup + Phase 15 hardening still ahead |
 
 ---
 
@@ -119,10 +121,10 @@ Unchecked = not built yet.
 - [x] Templates & compositions (compositions + lesson/unit templates + linked reuse)
 - [x] Search
 - [ ] AI agent
-- [ ] Versioning / archive / recovery
+- [x] Versioning / archive / recovery
 
 ---
 
 ## Latest note
 
-**2026-08-11** — Linked composition templates shipped (edit source / detach). Next up: AI agent integration; versioning, archive, recovery on the horizon.
+**2026-08-11** — Versioning / archive / recovery core shipped (history panel, trash, dependency-aware permanent delete). Next up: AI agent integration; export/portable backup and Phase 15 hardening remain deferred.
