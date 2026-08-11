@@ -94,7 +94,7 @@ import {
   scanDependencies,
   type LifecycleEntityType
 } from '../netlify/functions/_shared/lifecycle.mts';
-import type { EntityStatus } from '../src/recovery/lifecycle';
+import { parseStatusPatch } from '../netlify/functions/_shared/lifecycle-routes.mts';
 
 export const SESSION_COOKIE_NAME = 'teaching_hub_session';
 
@@ -254,41 +254,6 @@ function mapLifecycleError(err: unknown): MockResponse {
     return errorResponse(400, err.code, err.message);
   }
   throw err;
-}
-
-function parseStatusFields(
-  body: unknown
-):
-  | { ok: true; status?: EntityStatus; trash_reason?: string; hasStatus: boolean }
-  | { ok: false; code: string; message: string } {
-  if (typeof body !== 'object' || body === null) {
-    return { ok: false, code: 'validation_error', message: 'Request body must be a JSON object' };
-  }
-  const record = body as Record<string, unknown>;
-  let status: EntityStatus | undefined;
-  if (record.status !== undefined) {
-    const parsed = StatusSchema.safeParse(record.status);
-    if (!parsed.success) {
-      return {
-        ok: false,
-        code: 'validation_error',
-        message: 'status must be active, archived, or trashed'
-      };
-    }
-    status = parsed.data;
-  }
-  let trash_reason: string | undefined;
-  if (record.trash_reason !== undefined) {
-    if (typeof record.trash_reason !== 'string' || !record.trash_reason.trim()) {
-      return {
-        ok: false,
-        code: 'validation_error',
-        message: 'trash_reason must be a non-empty string when provided'
-      };
-    }
-    trash_reason = record.trash_reason.trim();
-  }
-  return { ok: true, status, trash_reason, hasStatus: status !== undefined };
 }
 
 function liveKeyForKind(kind: VersionKind, parentId: string): string {
@@ -618,7 +583,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const session = getSession(cookie);
     if (!session.authenticated) return unauthorizedResponse();
 
-    const statusFields = parseStatusFields(body);
+    const statusFields = parseStatusPatch(body);
     if (!statusFields.ok) {
       return errorResponse(400, statusFields.code, statusFields.message);
     }
@@ -1200,7 +1165,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const hasMeetingDays = record.meeting_days !== undefined;
     const hasCurrent = record.current_scheduled_lesson_id !== undefined;
     const hasHomepage = record.homepage !== undefined;
-    const statusFields = parseStatusFields(body);
+    const statusFields = parseStatusPatch(body);
     if (!statusFields.ok) {
       return errorResponse(400, statusFields.code, statusFields.message);
     }
@@ -1352,7 +1317,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const hasDescription = record.description !== undefined;
     const hasBlocks = record.blocks !== undefined;
     const hasLessonIds = record.lesson_ids !== undefined;
-    const statusFields = parseStatusFields(body);
+    const statusFields = parseStatusPatch(body);
     if (!statusFields.ok) {
       return errorResponse(400, statusFields.code, statusFields.message);
     }
@@ -2065,7 +2030,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const record = body as Record<string, unknown>;
     const hasTitle = typeof record.title === 'string';
     const hasRoot = record.root !== undefined;
-    const statusFields = parseStatusFields(body);
+    const statusFields = parseStatusPatch(body);
     if (!statusFields.ok) return errorResponse(400, statusFields.code, statusFields.message);
     const hasStatus = statusFields.hasStatus;
     if (!hasTitle && !hasRoot && !hasStatus) {
@@ -2225,7 +2190,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     }
     const timestamp = nowIso();
     if (record.status !== undefined) {
-      const statusFields = parseStatusFields(body);
+      const statusFields = parseStatusPatch(body);
       if (!statusFields.ok) return errorResponse(400, statusFields.code, statusFields.message);
       try {
         next = applyStatusTransition(next, statusFields.status!, timestamp, statusFields.trash_reason);
@@ -2317,7 +2282,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     }
     const timestamp = nowIso();
     if (record.status !== undefined) {
-      const statusFields = parseStatusFields(body);
+      const statusFields = parseStatusPatch(body);
       if (!statusFields.ok) return errorResponse(400, statusFields.code, statusFields.message);
       try {
         next = applyStatusTransition(next, statusFields.status!, timestamp, statusFields.trash_reason);

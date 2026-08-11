@@ -389,8 +389,9 @@ describe('GET/PUT /api/lessons/:id', () => {
   });
 
   it('rejects unsupported methods', async () => {
+    // DELETE is supported (permanent delete when trashed); POST is not on this handler.
     const response = await lessonHandler(
-      request('/api/lessons/lesson_aotfw_008', { method: 'DELETE', cookie: sessionCookieHeader() }),
+      request('/api/lessons/lesson_aotfw_008', { method: 'POST', cookie: sessionCookieHeader() }),
       { params: { id: 'lesson_aotfw_008' } }
     );
     expect(response.status).toBe(405);
