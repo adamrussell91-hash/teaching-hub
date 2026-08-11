@@ -176,10 +176,10 @@ export function applyStatusTransition<T extends LifecycleFields>(
   reason?: string
 ): T {
   if (nextStatus === 'trashed') {
-    return applyTrash(obj, now, reason);
+    return applyTrash(obj, now, reason) as T;
   }
   if (nextStatus === 'archived') {
-    return applyArchive(obj);
+    return applyArchive(obj) as T;
   }
   // active — unarchive only (not trash restore)
   if (obj.status === 'trashed') {
