@@ -86,7 +86,7 @@ export default async function handler(request: Request): Promise<Response> {
     provider_file_id = providerFileIdField.trim();
   }
 
-  const bytes = new Uint8Array(await fileEntry.arrayBuffer());
+  const bytes = await fileEntry.arrayBuffer();
   const id = newId('media');
   const fileUrl = new URL(`/api/media/${id}/file`, request.url).href;
   const timestamp = new Date().toISOString();

@@ -69,7 +69,7 @@ describe('response_space schema', () => {
 
 describe('response_space create defaults', () => {
   it('createBlock question_set defaults short answer to medium', () => {
-    const block = createBlock('question_set');
+    const block = createBlock('question_set', 'qs_default');
     expect(block.block_type).toBe('question_set');
     if (block.block_type === 'question_set') {
       expect(block.content.questions[0]?.kind).toBe('short_answer');
@@ -80,7 +80,10 @@ describe('response_space create defaults', () => {
 
 describe('response_space editor', () => {
   it('emits response_space for short answer and strips on MC', () => {
-    const block = createBlock('question_set') as Extract<Block, { block_type: 'question_set' }>;
+    const block = createBlock('question_set', 'qs_editor') as Extract<
+      Block,
+      { block_type: 'question_set' }
+    >;
     let latest = block;
     const root = createQuestionSetEditor(
       block,

@@ -1941,7 +1941,11 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     }
 
     const fileEntry = body.get('file');
-    if (!(fileEntry instanceof File) && !(fileEntry instanceof Blob)) {
+    if (
+      fileEntry === null ||
+      typeof fileEntry === 'string' ||
+      typeof (fileEntry as Blob).arrayBuffer !== 'function'
+    ) {
       return errorResponse(400, 'validation_error', 'file is required');
     }
 

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { createBlock } from '@/blocks/create-block';
 import { runContentSearch } from '@/search/run-content-search';
-import type { Lesson } from '@/schemas';
+import type { Block, Lesson } from '@/schemas';
 import { createMockApi } from '../../scripts/mock-api';
 import type { SeedData } from '../../scripts/mock-store';
 
@@ -40,7 +40,9 @@ describe('runContentSearch', () => {
         lessons: [
           {
             id: 'l1',
-            blocks: [{ ...createBlock('heading', 'h1'), content: { text: 'Newton' } }]
+            blocks: [
+              { ...createBlock('heading', 'h1'), content: { text: 'Newton' } } as Block
+            ]
           }
         ],
         units: [],
@@ -58,7 +60,7 @@ describe('runContentSearch', () => {
             {
               ...createBlock('rich_text', 'r1'),
               content: { html: '<p>Isaac Newton changed physics</p>' }
-            }
+            } as Block
           ]
         }
       ],
@@ -80,7 +82,7 @@ describe('runContentSearch', () => {
             {
               ...createBlock('heading', 'h1'),
               content: { text: 'Friction and surfaces' }
-            }
+            } as Block
           ]
         }
       ],
@@ -100,10 +102,10 @@ describe('runContentSearch', () => {
           {
             ...createBlock('rich_text', 'r1'),
             content: { html: '<p>Record your hypothesis carefully</p>' }
-          }
+          } as Block
         ]
       }
-    };
+    } as Block;
     const hits = runContentSearch('hypothesis', {
       lessons: [],
       units: [],

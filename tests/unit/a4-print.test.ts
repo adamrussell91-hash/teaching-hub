@@ -239,7 +239,7 @@ describe('openPrintLesson', () => {
   it('appends a print document to the new window and triggers print', async () => {
     const printWindow = new Window();
     const printSpy = vi.fn();
-    printWindow.print = printSpy;
+    (printWindow as unknown as { print: typeof printSpy }).print = printSpy;
 
     vi.spyOn(window, 'open').mockReturnValue(printWindow as unknown as WindowProxy);
 
