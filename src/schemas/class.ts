@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { BlockSchema } from './block';
-import { CommonFields } from './common';
+import { CommonFields, TrashFields } from './common';
 
 export const ClassHomepageSchema = z.object({
   announcements: z.array(BlockSchema),
@@ -12,6 +12,7 @@ export type ClassHomepage = z.infer<typeof ClassHomepageSchema>;
 
 export const ClassSchema = z.object({
   ...CommonFields,
+  ...TrashFields,
   type: z.literal('class'),
   code: z.string().min(1),
   display_name: z.string().min(1).optional(),

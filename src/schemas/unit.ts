@@ -1,9 +1,10 @@
 import { z } from 'zod';
 import { BlockSchema } from './block';
-import { CommonFields } from './common';
+import { CommonFields, TrashFields } from './common';
 
 export const UnitSchema = z.object({
   ...CommonFields,
+  ...TrashFields,
   type: z.literal('unit'),
   year_id: z.string().min(1),
   subject_id: z.string().min(1),

@@ -1,9 +1,10 @@
 import { z } from 'zod';
 import { BlockSchema } from './block';
-import { CommonFields } from './common';
+import { CommonFields, TrashFields } from './common';
 
 export const LessonTemplateSchema = z.object({
   ...CommonFields,
+  ...TrashFields,
   type: z.literal('lesson_template'),
   blocks: z.array(BlockSchema)
 });

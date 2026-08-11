@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CommonFields } from './common';
+import { CommonFields, TrashFields } from './common';
 
 export const MediaProviderSchema = z.enum(['external', 'google_drive', 'direct']);
 export const MediaTypeSchema = z.enum(['pdf', 'image', 'video', 'link', 'other']);
@@ -12,6 +12,7 @@ export const MediaSharingSchema = z.enum([
 
 export const MediaSchema = z.object({
   ...CommonFields,
+  ...TrashFields,
   type: z.literal('media'),
   provider: MediaProviderSchema,
   media_type: MediaTypeSchema,

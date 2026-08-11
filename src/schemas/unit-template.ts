@@ -1,9 +1,10 @@
 import { z } from 'zod';
 import { BlockSchema } from './block';
-import { CommonFields } from './common';
+import { CommonFields, TrashFields } from './common';
 
 export const UnitTemplateSchema = z.object({
   ...CommonFields,
+  ...TrashFields,
   type: z.literal('unit_template'),
   description: z.string().optional(),
   blocks: z.array(BlockSchema).optional()

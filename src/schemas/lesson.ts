@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CommonFields, IsoDateSchema } from './common';
+import { CommonFields, IsoDateSchema, TrashFields } from './common';
 import { BlockSchema } from './block';
 import { isHttpUrl } from '../blocks/url-safety';
 import { parseClozeText } from '../blocks/learning-activity';
@@ -8,6 +8,7 @@ import { validateMindMap, validateConceptMap } from '../blocks/graph-layout';
 
 export const LessonSchema = z.object({
   ...CommonFields,
+  ...TrashFields,
   type: z.literal('lesson'),
   unit_id: z.string().min(1),
   sequence: z.number().int(),

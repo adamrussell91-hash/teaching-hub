@@ -1,7 +1,9 @@
 export {
   StatusSchema,
   IsoDateSchema,
-  CommonFields
+  CommonFields,
+  TrashFieldsSchema,
+  TrashFields
 } from './common';
 export { YearSchema, type Year } from './year';
 export { SubjectSchema, type Subject } from './subject';

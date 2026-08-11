@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { CommonFields } from './common';
+import { CommonFields, TrashFields } from './common';
 import { SectionBlockSchema } from './block';
 
 export const CompositionTemplateSchema = z.object({
   ...CommonFields,
+  ...TrashFields,
   type: z.literal('composition_template'),
   root: SectionBlockSchema
 });
