@@ -311,7 +311,7 @@ describe('mountLessonEditor', () => {
     await tick();
 
     expect(refs.canvas.querySelector('.lesson-editor__save-composition')).not.toBeNull();
-    expect(refs.canvas.querySelector('.lesson-editor__insert-composition-button')).not.toBeNull();
+    expect(refs.canvas.querySelector('.lesson-editor__insert-composition-copy')).not.toBeNull();
 
     refs.canvas.querySelector<HTMLButtonElement>('.lesson-editor__save-composition')!.click();
     await tick();
@@ -369,12 +369,238 @@ describe('mountLessonEditor', () => {
     const select = refs.canvas.querySelector<HTMLSelectElement>('.lesson-editor__composition-select')!;
     expect(select.disabled).toBe(false);
     select.value = 'composition_1';
-    refs.canvas.querySelector<HTMLButtonElement>('.lesson-editor__insert-composition-button')!.click();
+    refs.canvas.querySelector<HTMLButtonElement>('.lesson-editor__insert-composition-copy')!.click();
     await tick();
 
     const editor = refs.canvas.querySelector<HTMLElement>('.block-editor[data-block-type="section"]');
     expect(editor).not.toBeNull();
     expect(editor?.dataset.blockId).toBe('block_lesson_001_1');
     expect(editor?.dataset.blockId).not.toBe('block_template_root');
+  });
+
+  it('Insert linked appends a linked section stub', async () => {
+    const templateRoot: Block = {
+      id: 'block_template_root',
+      type: 'block',
+      block_type: 'section',
+      variant: 'medium',
+      visibility: 'student_teacher',
+      content: {
+        title: 'Reading pack',
+        blocks: [
+          {
+            id: 'block_child_1',
+            type: 'block',
+            block_type: 'rich_text',
+            variant: 'medium',
+            visibility: 'student_teacher',
+            content: { html: '<p>Read</p>' },
+            layout: {},
+            print: {},
+            settings: {},
+            created_at: ISO,
+            updated_at: ISO,
+            schema_version: 1
+          }
+        ]
+      },
+      layout: {},
+      print: {},
+      settings: {},
+      created_at: ISO,
+      updated_at: ISO,
+      schema_version: 1
+    };
+    const composition = {
+      id: 'composition_1',
+      type: 'composition_template' as const,
+      title: 'Reading pack',
+      slug: 'reading-pack',
+      status: 'active' as const,
+      root: templateRoot,
+      created_at: ISO,
+      updated_at: ISO,
+      schema_version: 1 as const
+    };
+
+    apiGetMock.mockImplementation(async (path: string) => {
+      if (path === '/api/compositions') {
+        return { compositions: [{ id: 'composition_1', title: 'Reading pack', updated_at: ISO }] };
+      }
+      if (path === '/api/compositions/composition_1') {
+        return composition;
+      }
+      if (path.startsWith('/api/lessons/')) {
+        return makeLesson({ blocks: [] });
+      }
+      throw new Error(`Unexpected apiGet path: ${path}`);
+    });
+    apiPutMock.mockResolvedValue(makeLesson());
+
+    const handle = mountLessonEditor({ refs, lessonId: 'lesson_001', isStale: () => false });
+    await tick();
+
+    const select = refs.canvas.querySelector<HTMLSelectElement>('.lesson-editor__composition-select')!;
+    select.value = 'composition_1';
+    refs.canvas.querySelector<HTMLButtonElement>('.lesson-editor__insert-composition-linked')!.click();
+    await tick();
+
+    expect(refs.canvas.querySelector('.lesson-editor__linked-badge')?.textContent).toBe('Linked');
+    expect(refs.canvas.querySelector('.block-editor')).toBeNull();
+
+    await handle.flush();
+    expect(apiPutMock).toHaveBeenCalledWith(
+      '/api/lessons/lesson_001',
+      expect.objectContaining({
+        blocks: [
+          expect.objectContaining({
+            block_type: 'section',
+            content: expect.objectContaining({
+              link: {
+                mode: 'linked',
+                source_composition_id: 'composition_1'
+              }
+            })
+          })
+        ]
+      })
+    );
+  });
+
+  it('Detach expands linked stub into independent section', async () => {
+    const child: Block = {
+      id: 'block_child_1',
+      type: 'block',
+      block_type: 'rich_text',
+      variant: 'medium',
+      visibility: 'student_teacher',
+      content: { html: '<p>Read</p>' },
+      layout: {},
+      print: {},
+      settings: {},
+      created_at: ISO,
+      updated_at: ISO,
+      schema_version: 1
+    };
+    const templateRoot: Block = {
+      id: 'block_template_root',
+      type: 'block',
+      block_type: 'section',
+      variant: 'medium',
+      visibility: 'student_teacher',
+      content: { title: 'Reading pack', blocks: [child] },
+      layout: {},
+      print: {},
+      settings: {},
+      created_at: ISO,
+      updated_at: ISO,
+      schema_version: 1
+    };
+    const linkedStub: Block = {
+      id: 'block_lesson_001_1',
+      type: 'block',
+      block_type: 'section',
+      variant: 'medium',
+      visibility: 'student_teacher',
+      content: {
+        title: 'Reading pack',
+        blocks: [],
+        link: { mode: 'linked', source_composition_id: 'composition_1' }
+      },
+      layout: {},
+      print: {},
+      settings: {},
+      created_at: ISO,
+      updated_at: ISO,
+      schema_version: 1
+    };
+
+    apiGetMock.mockImplementation(async (path: string) => {
+      if (path === '/api/compositions') {
+        return { compositions: [{ id: 'composition_1', title: 'Reading pack', updated_at: ISO }] };
+      }
+      if (path === '/api/compositions/composition_1') {
+        return {
+          id: 'composition_1',
+          type: 'composition_template',
+          title: 'Reading pack',
+          slug: 'reading-pack',
+          status: 'active',
+          root: templateRoot,
+          created_at: ISO,
+          updated_at: ISO,
+          schema_version: 1
+        };
+      }
+      if (path.startsWith('/api/lessons/')) {
+        return makeLesson({ blocks: [linkedStub] });
+      }
+      throw new Error(`Unexpected apiGet path: ${path}`);
+    });
+    apiPutMock.mockResolvedValue(makeLesson());
+
+    const handle = mountLessonEditor({ refs, lessonId: 'lesson_001', isStale: () => false });
+    await tick();
+    await tick();
+
+    refs.canvas.querySelector<HTMLButtonElement>('.lesson-editor__detach-composition')!.click();
+    await tick();
+
+    expect(refs.canvas.querySelector('.lesson-editor__linked-badge')).toBeNull();
+    expect(refs.canvas.querySelector('.block-editor[data-block-type="section"]')).not.toBeNull();
+
+    await handle.flush();
+    const saved = apiPutMock.mock.calls.at(-1)?.[1] as Lesson;
+    const section = saved.blocks[0];
+    expect(section?.block_type).toBe('section');
+    if (section?.block_type === 'section') {
+      expect(section.content.link).toBeUndefined();
+      expect(section.content.title).toBe('Reading pack');
+      expect(section.content.blocks.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('linked row has no Save as composition control', async () => {
+    const linkedStub: Block = {
+      id: 'block_lesson_001_1',
+      type: 'block',
+      block_type: 'section',
+      variant: 'medium',
+      visibility: 'student_teacher',
+      content: {
+        title: 'Reading pack',
+        blocks: [],
+        link: { mode: 'linked', source_composition_id: 'composition_1' }
+      },
+      layout: {},
+      print: {},
+      settings: {},
+      created_at: ISO,
+      updated_at: ISO,
+      schema_version: 1
+    };
+
+    apiGetMock.mockImplementation(async (path: string) => {
+      if (path === '/api/compositions') {
+        return { compositions: [] };
+      }
+      if (path === '/api/compositions/composition_1') {
+        throw new ApiClientError({ code: 'not_found', message: 'Composition not found' });
+      }
+      if (path.startsWith('/api/lessons/')) {
+        return makeLesson({ blocks: [linkedStub] });
+      }
+      throw new Error(`Unexpected apiGet path: ${path}`);
+    });
+
+    mountLessonEditor({ refs, lessonId: 'lesson_001', isStale: () => false });
+    await tick();
+    await tick();
+
+    const row = refs.canvas.querySelector('.lesson-editor__block-row')!;
+    expect(row.querySelector('.lesson-editor__save-composition')).toBeNull();
+    expect(row.querySelector('.lesson-editor__linked-badge')?.textContent).toBe('Linked');
+    expect(row.querySelector('.lesson-editor__edit-source')).not.toBeNull();
+    expect(row.querySelector('.lesson-editor__detach-composition')).not.toBeNull();
   });
 });

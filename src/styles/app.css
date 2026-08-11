@@ -364,6 +364,60 @@ a:hover {
   color: var(--orca);
 }
 
+.lesson-editor__linked-body {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.55rem 0.75rem;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius-md) * 0.65);
+}
+
+.lesson-editor__linked-badge {
+  display: inline-block;
+  width: fit-content;
+  padding: 0.15rem 0.45rem;
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--marine);
+  background: color-mix(in srgb, var(--wave) 14%, var(--glass));
+  border: 1px solid color-mix(in srgb, var(--wave) 30%, transparent);
+  border-radius: calc(var(--radius-md) * 0.4);
+}
+
+.lesson-editor__linked-preview {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.lesson-editor__linked-title {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: var(--depth);
+}
+
+.lesson-editor__linked-summary,
+.lesson-editor__linked-loading {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.84rem;
+  color: var(--orca);
+}
+
+.lesson-editor__linked-broken {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.84rem;
+  color: var(--ink);
+}
+
 .lesson-editor__publish-panel {
   margin-bottom: 1.25rem;
   padding: 0.9rem 1.1rem;

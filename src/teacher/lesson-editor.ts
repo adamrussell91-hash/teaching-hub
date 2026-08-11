@@ -8,6 +8,11 @@ import {
   type InsertMenuValue
 } from '@/blocks/create-block';
 import { insertCompositionRoot } from '@/blocks/composition-insert';
+import {
+  createLinkedSectionStub,
+  isCompositionUsable,
+  isLinkedSection
+} from '@/blocks/composition-link';
 import { cloneBlocksWithNewIds } from '@/blocks/clone-blocks';
 import { createBlockEditor } from '@/blocks/registry';
 import type { CompositionSummary, CompositionTemplate } from '@/schemas/composition';
@@ -156,10 +161,15 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     compositionSelect.id = compositionSelectId;
     compositionSelect.className = 'lesson-editor__composition-select';
 
-    const compositionButton = document.createElement('button');
-    compositionButton.type = 'button';
-    compositionButton.className = 'btn btn--secondary lesson-editor__insert-composition-button';
-    compositionButton.textContent = 'Insert composition';
+    const compositionCopyButton = document.createElement('button');
+    compositionCopyButton.type = 'button';
+    compositionCopyButton.className = 'btn btn--secondary lesson-editor__insert-composition-copy';
+    compositionCopyButton.textContent = 'Insert copy';
+
+    const compositionLinkedButton = document.createElement('button');
+    compositionLinkedButton.type = 'button';
+    compositionLinkedButton.className = 'btn btn--secondary lesson-editor__insert-composition-linked';
+    compositionLinkedButton.textContent = 'Insert linked';
 
     const compositionStatus = document.createElement('p');
     compositionStatus.className = 'lesson-editor__composition-status';
@@ -171,7 +181,8 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       addButton,
       compositionLabel,
       compositionSelect,
-      compositionButton
+      compositionCopyButton,
+      compositionLinkedButton
     );
 
     const root = document.createElement('div');
@@ -202,6 +213,9 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       a4Preview?.update(lesson);
     }
 
+    const compositionCache = new Map<string, CompositionTemplate | 'missing'>();
+    const compositionFetchInFlight = new Set<string>();
+
     function setCompositionStatus(text: string | null): void {
       if (!text) {
         compositionStatus.hidden = true;
@@ -220,11 +234,13 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         empty.textContent = 'No compositions yet';
         compositionSelect.append(empty);
         compositionSelect.disabled = true;
-        compositionButton.disabled = true;
+        compositionCopyButton.disabled = true;
+        compositionLinkedButton.disabled = true;
         return;
       }
       compositionSelect.disabled = false;
-      compositionButton.disabled = false;
+      compositionCopyButton.disabled = false;
+      compositionLinkedButton.disabled = false;
       for (const row of compositions) {
         const opt = document.createElement('option');
         opt.value = row.id;
@@ -245,6 +261,62 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
 
     void refreshCompositions();
 
+    function ensureCompositionCached(compositionId: string): void {
+      if (compositionCache.has(compositionId) || compositionFetchInFlight.has(compositionId)) {
+        return;
+      }
+      compositionFetchInFlight.add(compositionId);
+      void apiGet<CompositionTemplate>(`/api/compositions/${compositionId}`)
+        .then((full) => {
+          compositionCache.set(compositionId, isCompositionUsable(full) ? full : 'missing');
+        })
+        .catch(() => {
+          compositionCache.set(compositionId, 'missing');
+        })
+        .finally(() => {
+          compositionFetchInFlight.delete(compositionId);
+          if (!disposed && !isStale()) {
+            renderBlocksList();
+          }
+        });
+    }
+
+    function renderLinkedPreview(compositionId: string): HTMLElement {
+      const preview = document.createElement('div');
+      preview.className = 'lesson-editor__linked-preview';
+
+      const cached = compositionCache.get(compositionId);
+      if (cached === undefined) {
+        ensureCompositionCached(compositionId);
+        const loading = document.createElement('p');
+        loading.className = 'lesson-editor__linked-loading';
+        loading.textContent = 'Loading composition…';
+        preview.append(loading);
+        return preview;
+      }
+
+      if (cached === 'missing') {
+        const broken = document.createElement('p');
+        broken.className = 'lesson-editor__linked-broken';
+        broken.textContent = 'Linked composition is missing or unavailable.';
+        preview.append(broken);
+        return preview;
+      }
+
+      const title = document.createElement('p');
+      title.className = 'lesson-editor__linked-title';
+      title.textContent = cached.title;
+
+      const summary = document.createElement('p');
+      summary.className = 'lesson-editor__linked-summary';
+      const childCount =
+        cached.root.block_type === 'section' ? cached.root.content.blocks.length : 0;
+      summary.textContent = `${childCount} blocks from composition`;
+
+      preview.append(title, summary);
+      return preview;
+    }
+
     function renderBlocksList(): void {
       blocksContainer.replaceChildren();
 
@@ -259,6 +331,9 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       lesson.blocks.forEach((block, index) => {
         const row = document.createElement('div');
         row.className = 'lesson-editor__block-row';
+        if (isLinkedSection(block)) {
+          row.classList.add('lesson-editor__block-row--linked');
+        }
 
         const controls = document.createElement('div');
         controls.className = 'lesson-editor__block-controls';
@@ -284,7 +359,10 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         duplicateButton.className = 'btn btn--ghost lesson-editor__duplicate';
         duplicateButton.textContent = 'Duplicate';
         duplicateButton.setAttribute('aria-label', `Duplicate block ${index + 1}`);
-        duplicateButton.addEventListener('click', () => duplicateBlock(index));
+        duplicateButton.disabled = isLinkedSection(block);
+        if (!isLinkedSection(block)) {
+          duplicateButton.addEventListener('click', () => duplicateBlock(index));
+        }
 
         const deleteButton = document.createElement('button');
         deleteButton.type = 'button';
@@ -294,6 +372,41 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         deleteButton.addEventListener('click', () => deleteBlock(index));
 
         controls.append(upButton, downButton, duplicateButton, deleteButton);
+
+        if (isLinkedSection(block)) {
+          const editSourceButton = document.createElement('button');
+          editSourceButton.type = 'button';
+          editSourceButton.className = 'btn btn--ghost lesson-editor__edit-source';
+          editSourceButton.textContent = 'Edit Source';
+          editSourceButton.setAttribute('aria-label', `Edit source for block ${index + 1}`);
+          // Task 7 wires Edit Source modal.
+          editSourceButton.addEventListener('click', () => {
+            /* TODO(Task 7): open Edit Source modal */
+          });
+
+          const detachButton = document.createElement('button');
+          detachButton.type = 'button';
+          detachButton.className = 'btn btn--ghost lesson-editor__detach-composition';
+          detachButton.textContent = 'Detach';
+          detachButton.setAttribute('aria-label', `Detach linked composition ${index + 1}`);
+          detachButton.addEventListener('click', () => {
+            void detachLinkedSection(index);
+          });
+
+          controls.append(editSourceButton, detachButton);
+
+          const badge = document.createElement('span');
+          badge.className = 'lesson-editor__linked-badge';
+          badge.textContent = 'Linked';
+
+          const body = document.createElement('div');
+          body.className = 'lesson-editor__linked-body';
+          body.append(badge, renderLinkedPreview(block.content.link.source_composition_id));
+
+          row.append(controls, body);
+          blocksContainer.append(row);
+          return;
+        }
 
         if (block.block_type === 'section') {
           const saveCompositionButton = document.createElement('button');
@@ -415,6 +528,55 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       }
     }
 
+    async function insertLinkedComposition(): Promise<void> {
+      const id = compositionSelect.value;
+      if (!id) return;
+      try {
+        const full = await apiGet<CompositionTemplate>(`/api/compositions/${id}`);
+        if (!isCompositionUsable(full)) {
+          setCompositionStatus('Composition is not available to link.');
+          return;
+        }
+        blockCounter += 1;
+        const stub = createLinkedSectionStub({
+          id: `block_${lesson.id}_${blockCounter}`,
+          sourceCompositionId: full.id,
+          titleHint: full.title
+        });
+        compositionCache.set(full.id, full);
+        lesson.blocks.push(stub);
+        markDirty();
+        renderBlocksList();
+        setCompositionStatus(`Linked “${full.title}”.`);
+      } catch {
+        setCompositionStatus('Unable to link composition.');
+      }
+    }
+
+    async function detachLinkedSection(index: number): Promise<void> {
+      const block = lesson.blocks[index];
+      if (!block || !isLinkedSection(block)) return;
+      try {
+        const full = await apiGet<CompositionTemplate>(
+          `/api/compositions/${block.content.link.source_composition_id}`
+        );
+        if (!isCompositionUsable(full)) {
+          setCompositionStatus('Unable to detach — composition missing or archived.');
+          return;
+        }
+        const independent = insertCompositionRoot(full.root, () => {
+          blockCounter += 1;
+          return `block_${lesson.id}_${blockCounter}`;
+        });
+        lesson.blocks[index] = independent;
+        markDirty();
+        renderBlocksList();
+        setCompositionStatus('Detached composition into this lesson.');
+      } catch {
+        setCompositionStatus('Unable to detach composition.');
+      }
+    }
+
     function addBlock(type: InsertMenuValue): void {
       blockCounter += 1;
       const id = `block_${lesson.id}_${blockCounter}`;
@@ -436,8 +598,12 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       void saveLessonAsTemplate();
     });
 
-    compositionButton.addEventListener('click', () => {
+    compositionCopyButton.addEventListener('click', () => {
       void insertSelectedComposition();
+    });
+
+    compositionLinkedButton.addEventListener('click', () => {
+      void insertLinkedComposition();
     });
 
     renderBlocksList();
