@@ -72,6 +72,18 @@ import { runContentSearch } from '../src/search/run-content-search';
 import { applyScheduleUnit } from '../src/schedule/schedule-unit';
 import { reorderScheduledLesson } from '../src/schedule/reorder';
 import { buildPublishedClass } from '../src/schedule/build-published-class';
+import { unitContentChanged } from '../src/recovery/versions';
+import type { VersionKind, VersionReason } from '../src/schemas';
+import {
+  CHECKPOINT_AFTER_SAVE_WARNING,
+  getVersion,
+  listVersionIndex,
+  restoreVersion,
+  tryWriteCheckpoint,
+  VersionStoreError,
+  writeCheckpoint,
+  type JsonStore
+} from '../netlify/functions/_shared/versions.mts';
 
 export const SESSION_COOKIE_NAME = 'teaching_hub_session';
 
@@ -185,9 +197,62 @@ function jsonResponse(
 function okResponse(
   status: number,
   data: unknown,
-  extraHeaders?: Record<string, string>
+  extraHeaders?: Record<string, string>,
+  extras?: { warning?: string }
 ): MockResponse {
+  if (extras?.warning) {
+    return jsonResponse(status, { ok: true, data, warning: extras.warning }, extraHeaders);
+  }
   return jsonResponse(status, { ok: true, data }, extraHeaders);
+}
+
+function createMockJsonStore(store: MockStore): JsonStore {
+  return {
+    async getJSON<T>(key: string): Promise<T | null> {
+      const value = store.getJSON<T>(key);
+      return value === undefined ? null : value;
+    },
+    async setJSON(key: string, value: unknown): Promise<void> {
+      store.setJSON(key, value);
+    },
+    async delete(key: string): Promise<void> {
+      store.delete(key);
+    },
+    async listKeys(prefix: string): Promise<string[]> {
+      return store.listKeys(prefix);
+    }
+  };
+}
+
+function mapVersionStoreError(err: unknown): MockResponse {
+  if (err instanceof VersionStoreError) {
+    const status = err.code === 'not_found' ? 404 : 400;
+    return errorResponse(status, err.code, err.message, err.details);
+  }
+  throw err;
+}
+
+function liveKeyForKind(kind: VersionKind, parentId: string): string {
+  if (kind === 'lesson') return draftLessonKey(parentId);
+  if (kind === 'unit') return unitKey(parentId);
+  return classKey(parentId);
+}
+
+function parentNotFoundMessage(kind: VersionKind): string {
+  if (kind === 'lesson') return 'Lesson not found';
+  if (kind === 'unit') return 'Unit not found';
+  return 'Class not found';
+}
+
+function liveSnapshotForKind(kind: VersionKind, live: unknown): unknown {
+  if (kind === 'class_homepage') {
+    const homepage =
+      live && typeof live === 'object' && 'homepage' in live
+        ? (live as { homepage?: unknown }).homepage
+        : undefined;
+    return { homepage };
+  }
+  return live;
 }
 
 function errorResponse(
@@ -486,11 +551,11 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     return okResponse(200, lesson);
   }
 
-  function handlePutDraftLesson(
+  async function handlePutDraftLesson(
     cookie: string | null | undefined,
     id: string,
     body: unknown
-  ): MockResponse {
+  ): Promise<MockResponse> {
     const session = getSession(cookie);
     if (!session.authenticated) return unauthorizedResponse();
 
@@ -500,14 +565,18 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
 
     const existing = store.getJSON<Lesson>(draftLessonKey(id));
     const bodyRecord = body as Record<string, unknown>;
+    const checkpointReasonRaw = bodyRecord.checkpoint_reason;
+    const { checkpoint_reason: _checkpointReason, ...bodyWithoutCheckpoint } = bodyRecord;
+    void _checkpointReason;
+
     const candidate = {
-      ...bodyRecord,
+      ...bodyWithoutCheckpoint,
       id,
       updated_at: new Date().toISOString(),
       // Preserve publish timestamp unless the client explicitly sends one.
       published_at:
-        bodyRecord.published_at !== undefined
-          ? bodyRecord.published_at
+        bodyWithoutCheckpoint.published_at !== undefined
+          ? bodyWithoutCheckpoint.published_at
           : existing?.published_at
     };
 
@@ -522,7 +591,19 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     }
 
     store.setJSON(draftLessonKey(id), parsed.data);
-    return okResponse(200, parsed.data);
+
+    let warning: string | undefined;
+    if (checkpointReasonRaw === 'ai_accepted' || checkpointReasonRaw === 'manual_checkpoint') {
+      const checkpointed = await tryWriteCheckpoint(createMockJsonStore(store), {
+        kind: 'lesson',
+        parentId: id,
+        snapshot: parsed.data,
+        reason: checkpointReasonRaw as VersionReason
+      });
+      if (!checkpointed.ok) warning = CHECKPOINT_AFTER_SAVE_WARNING;
+    }
+
+    return okResponse(200, parsed.data, undefined, warning ? { warning } : undefined);
   }
 
   async function handlePublishLesson(
@@ -583,6 +664,23 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       ...fullSnapshot,
       blocks: studentBlocks
     });
+
+    try {
+      await writeCheckpoint(createMockJsonStore(store), {
+        kind: 'lesson',
+        parentId: id,
+        snapshot: parsed.data,
+        reason: 'publish',
+        now: publishedAt
+      });
+    } catch (err) {
+      console.error('publish writeCheckpoint failed', err);
+      return errorResponse(
+        500,
+        'checkpoint_failed',
+        'Publish aborted: version history checkpoint failed before writing the published snapshot.'
+      );
+    }
 
     store.setJSON(publishedLessonKey(id), studentSnapshot);
     // Persist publish timestamp on the draft so reload shows Published / Unpublished changes.
@@ -905,11 +1003,11 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     return okResponse(200, validated.data);
   }
 
-  function handlePatchClass(
+  async function handlePatchClass(
     cookie: string | null | undefined,
     classId: string,
     body: unknown
-  ): MockResponse {
+  ): Promise<MockResponse> {
     const session = getSession(cookie);
     if (!session.authenticated) return unauthorizedResponse();
 
@@ -1021,7 +1119,221 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     }
 
     store.setJSON(classKey(classId), validated.data);
-    return okResponse(200, validated.data);
+
+    let warning: string | undefined;
+    if (homepage !== undefined) {
+      const checkpointed = await tryWriteCheckpoint(createMockJsonStore(store), {
+        kind: 'class_homepage',
+        parentId: classId,
+        snapshot: { homepage: validated.data.homepage },
+        reason: 'save',
+        now: nowIso
+      });
+      if (!checkpointed.ok) warning = CHECKPOINT_AFTER_SAVE_WARNING;
+    }
+
+    return okResponse(200, validated.data, undefined, warning ? { warning } : undefined);
+  }
+
+  async function handlePatchUnit(
+    cookie: string | null | undefined,
+    unitId: string,
+    body: unknown
+  ): Promise<MockResponse> {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+
+    if (typeof body !== 'object' || body === null) {
+      return errorResponse(400, 'validation_error', 'Request body must be a JSON object');
+    }
+
+    const record = body as Record<string, unknown>;
+    const hasTitle = record.title !== undefined;
+    const hasDescription = record.description !== undefined;
+    const hasBlocks = record.blocks !== undefined;
+    const hasLessonIds = record.lesson_ids !== undefined;
+
+    if (!hasTitle && !hasDescription && !hasBlocks && !hasLessonIds) {
+      return errorResponse(
+        400,
+        'validation_error',
+        'Provide title, description, blocks, and/or lesson_ids'
+      );
+    }
+
+    let title: string | undefined;
+    if (hasTitle) {
+      if (typeof record.title !== 'string' || !record.title.trim()) {
+        return errorResponse(400, 'validation_error', 'title must be a non-empty string');
+      }
+      title = record.title.trim();
+    }
+
+    let description: string | undefined;
+    if (hasDescription) {
+      if (typeof record.description !== 'string') {
+        return errorResponse(400, 'validation_error', 'description must be a string');
+      }
+      description = record.description;
+    }
+
+    let blocks: Block[] | undefined;
+    if (hasBlocks) {
+      if (!Array.isArray(record.blocks)) {
+        return errorResponse(400, 'validation_error', 'blocks are invalid');
+      }
+      const parsedBlocks: Block[] = [];
+      for (const block of record.blocks) {
+        const parsed = BlockSchema.safeParse(block);
+        if (!parsed.success) {
+          return errorResponse(400, 'validation_error', 'blocks are invalid');
+        }
+        parsedBlocks.push(parsed.data);
+      }
+      blocks = parsedBlocks;
+    }
+
+    let lesson_ids: string[] | undefined;
+    if (hasLessonIds) {
+      if (!Array.isArray(record.lesson_ids) || record.lesson_ids.some((id) => typeof id !== 'string' || !id)) {
+        return errorResponse(400, 'validation_error', 'lesson_ids are invalid');
+      }
+      lesson_ids = record.lesson_ids as string[];
+    }
+
+    const rawUnit = store.getJSON(unitKey(unitId));
+    if (!rawUnit) return notFoundResponse('Unit not found');
+    const unitParsed = UnitSchema.safeParse(rawUnit);
+    if (!unitParsed.success) {
+      return errorResponse(400, 'validation_error', 'Unit data is invalid');
+    }
+
+    const nowIso = new Date().toISOString();
+    const merged: Record<string, unknown> = {
+      ...unitParsed.data,
+      updated_at: nowIso
+    };
+    if (title !== undefined) merged.title = title;
+    if (description !== undefined) merged.description = description;
+    if (blocks !== undefined) merged.blocks = blocks;
+    if (lesson_ids !== undefined) merged.lesson_ids = lesson_ids;
+
+    const validated = UnitSchema.safeParse(merged);
+    if (!validated.success) {
+      return errorResponse(400, 'validation_error', 'Unit data is invalid');
+    }
+
+    store.setJSON(unitKey(unitId), validated.data);
+
+    let warning: string | undefined;
+    if (unitContentChanged(unitParsed.data, validated.data)) {
+      const checkpointed = await tryWriteCheckpoint(createMockJsonStore(store), {
+        kind: 'unit',
+        parentId: unitId,
+        snapshot: validated.data,
+        reason: 'save',
+        now: nowIso
+      });
+      if (!checkpointed.ok) warning = CHECKPOINT_AFTER_SAVE_WARNING;
+    }
+
+    return okResponse(200, validated.data, undefined, warning ? { warning } : undefined);
+  }
+
+  function parseRevisionParam(raw: string | undefined): number | null {
+    if (!raw) return null;
+    const revision = Number(raw);
+    if (!Number.isInteger(revision) || revision < 1) return null;
+    return revision;
+  }
+
+  async function handleVersionCollection(
+    cookie: string | null | undefined,
+    kind: VersionKind,
+    parentId: string,
+    method: string,
+    body: unknown
+  ): Promise<MockResponse> {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+    if (method !== 'GET' && method !== 'POST') {
+      return errorResponse(405, 'method_not_allowed', 'Method not allowed');
+    }
+
+    const jsonStore = createMockJsonStore(store);
+
+    if (method === 'GET') {
+      const index = await listVersionIndex(jsonStore, kind, parentId);
+      return okResponse(200, index);
+    }
+
+    let label: string | undefined;
+    if (body && typeof body === 'object' && typeof (body as { label?: unknown }).label === 'string') {
+      const trimmed = (body as { label: string }).label.trim();
+      if (trimmed) label = trimmed;
+    }
+
+    const live = store.getJSON(liveKeyForKind(kind, parentId));
+    if (!live) return notFoundResponse(parentNotFoundMessage(kind));
+
+    try {
+      const record = await writeCheckpoint(jsonStore, {
+        kind,
+        parentId,
+        snapshot: liveSnapshotForKind(kind, live),
+        reason: 'manual_checkpoint',
+        label
+      });
+      return okResponse(200, record);
+    } catch (err) {
+      console.error('manual writeCheckpoint failed', err);
+      return errorResponse(
+        500,
+        'checkpoint_failed',
+        'Version history checkpoint failed. The live document was not modified.'
+      );
+    }
+  }
+
+  async function handleVersionItem(
+    cookie: string | null | undefined,
+    kind: VersionKind,
+    parentId: string,
+    revisionRaw: string
+  ): Promise<MockResponse> {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+
+    const revision = parseRevisionParam(revisionRaw);
+    if (revision === null) return notFoundResponse('Version not found');
+
+    const record = await getVersion(createMockJsonStore(store), kind, parentId, revision);
+    if (!record) return notFoundResponse('Version not found');
+    return okResponse(200, record);
+  }
+
+  async function handleVersionRestore(
+    cookie: string | null | undefined,
+    kind: VersionKind,
+    parentId: string,
+    revisionRaw: string
+  ): Promise<MockResponse> {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+
+    const revision = parseRevisionParam(revisionRaw);
+    if (revision === null) return notFoundResponse('Version not found');
+
+    try {
+      const live = await restoreVersion(createMockJsonStore(store), {
+        kind,
+        parentId,
+        revision
+      });
+      return okResponse(200, live);
+    } catch (err) {
+      return mapVersionStoreError(err);
+    }
   }
 
   function handlePatchScopeSequence(
@@ -2148,6 +2460,16 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
 
   const LESSON_ID_RE = /^\/api\/lessons\/([^/]+)$/;
   const LESSON_PUBLISH_RE = /^\/api\/lessons\/([^/]+)\/publish$/;
+  const LESSON_VERSION_RESTORE_RE = /^\/api\/lessons\/([^/]+)\/versions\/([^/]+)\/restore$/;
+  const LESSON_VERSION_ITEM_RE = /^\/api\/lessons\/([^/]+)\/versions\/([^/]+)$/;
+  const LESSON_VERSIONS_RE = /^\/api\/lessons\/([^/]+)\/versions$/;
+  const UNIT_ID_RE = /^\/api\/units\/([^/]+)$/;
+  const UNIT_VERSION_RESTORE_RE = /^\/api\/units\/([^/]+)\/versions\/([^/]+)\/restore$/;
+  const UNIT_VERSION_ITEM_RE = /^\/api\/units\/([^/]+)\/versions\/([^/]+)$/;
+  const UNIT_VERSIONS_RE = /^\/api\/units\/([^/]+)\/versions$/;
+  const CLASS_VERSION_RESTORE_RE = /^\/api\/classes\/([^/]+)\/versions\/([^/]+)\/restore$/;
+  const CLASS_VERSION_ITEM_RE = /^\/api\/classes\/([^/]+)\/versions\/([^/]+)$/;
+  const CLASS_VERSIONS_RE = /^\/api\/classes\/([^/]+)\/versions$/;
   const PUBLISHED_LESSON_RE = /^\/api\/published\/lessons\/([^/]+)$/;
   const PUBLISHED_UNIT_RE = /^\/api\/published\/units\/([^/]+)$/;
   const PUBLISHED_CLASS_RE = /^\/api\/published\/classes\/([^/]+)$/;
@@ -2251,10 +2573,96 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       return handlePublishLesson(cookie, publishMatch[1]);
     }
 
+    const lessonVersionRestoreMatch = LESSON_VERSION_RESTORE_RE.exec(path);
+    if (lessonVersionRestoreMatch && method === 'POST') {
+      return handleVersionRestore(
+        cookie,
+        'lesson',
+        lessonVersionRestoreMatch[1]!,
+        lessonVersionRestoreMatch[2]!
+      );
+    }
+    const lessonVersionItemMatch = LESSON_VERSION_ITEM_RE.exec(path);
+    if (lessonVersionItemMatch && method === 'GET') {
+      return handleVersionItem(
+        cookie,
+        'lesson',
+        lessonVersionItemMatch[1]!,
+        lessonVersionItemMatch[2]!
+      );
+    }
+    const lessonVersionsMatch = LESSON_VERSIONS_RE.exec(path);
+    if (lessonVersionsMatch && (method === 'GET' || method === 'POST')) {
+      return handleVersionCollection(
+        cookie,
+        'lesson',
+        lessonVersionsMatch[1]!,
+        method,
+        body
+      );
+    }
+
+    const unitVersionRestoreMatch = UNIT_VERSION_RESTORE_RE.exec(path);
+    if (unitVersionRestoreMatch && method === 'POST') {
+      return handleVersionRestore(
+        cookie,
+        'unit',
+        unitVersionRestoreMatch[1]!,
+        unitVersionRestoreMatch[2]!
+      );
+    }
+    const unitVersionItemMatch = UNIT_VERSION_ITEM_RE.exec(path);
+    if (unitVersionItemMatch && method === 'GET') {
+      return handleVersionItem(
+        cookie,
+        'unit',
+        unitVersionItemMatch[1]!,
+        unitVersionItemMatch[2]!
+      );
+    }
+    const unitVersionsMatch = UNIT_VERSIONS_RE.exec(path);
+    if (unitVersionsMatch && (method === 'GET' || method === 'POST')) {
+      return handleVersionCollection(cookie, 'unit', unitVersionsMatch[1]!, method, body);
+    }
+
+    const classVersionRestoreMatch = CLASS_VERSION_RESTORE_RE.exec(path);
+    if (classVersionRestoreMatch && method === 'POST') {
+      return handleVersionRestore(
+        cookie,
+        'class_homepage',
+        classVersionRestoreMatch[1]!,
+        classVersionRestoreMatch[2]!
+      );
+    }
+    const classVersionItemMatch = CLASS_VERSION_ITEM_RE.exec(path);
+    if (classVersionItemMatch && method === 'GET') {
+      return handleVersionItem(
+        cookie,
+        'class_homepage',
+        classVersionItemMatch[1]!,
+        classVersionItemMatch[2]!
+      );
+    }
+    const classVersionsMatch = CLASS_VERSIONS_RE.exec(path);
+    if (classVersionsMatch && (method === 'GET' || method === 'POST')) {
+      return handleVersionCollection(
+        cookie,
+        'class_homepage',
+        classVersionsMatch[1]!,
+        method,
+        body
+      );
+    }
+
     const lessonMatch = LESSON_ID_RE.exec(path);
     if (lessonMatch) {
       if (method === 'GET') return handleGetDraftLesson(cookie, lessonMatch[1]);
       if (method === 'PUT') return handlePutDraftLesson(cookie, lessonMatch[1], body);
+    }
+
+    const unitMatch = UNIT_ID_RE.exec(path);
+    if (unitMatch && method === 'PATCH') {
+      return handlePatchUnit(cookie, unitMatch[1]!, body);
     }
 
     const publishedMatch = PUBLISHED_LESSON_RE.exec(path);
