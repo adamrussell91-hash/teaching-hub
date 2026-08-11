@@ -11,7 +11,7 @@ import {
   preflightResponse,
   withCors
 } from './_shared/http.mts';
-import { ClassSchema, type Class } from '../../src/schemas';
+import { ClassSchema, SubjectSchema, type Class } from '../../src/schemas';
 
 export default async function handler(request: Request): Promise<Response> {
   const env = process.env;
@@ -72,7 +72,8 @@ export default async function handler(request: Request): Promise<Response> {
   if (!(await getJSON(store, yearKey(year_id)))) {
     return withCors(errorResponse(404, 'not_found', 'Year not found'), request, env);
   }
-  if (!(await getJSON(store, subjectKey(subject_id)))) {
+  const rawSubject = await getJSON(store, subjectKey(subject_id));
+  if (!rawSubject) {
     return withCors(errorResponse(404, 'not_found', 'Subject not found'), request, env);
   }
 
@@ -102,6 +103,21 @@ export default async function handler(request: Request): Promise<Response> {
       request,
       env
     );
+  }
+
+  const subjectParsed = SubjectSchema.safeParse(rawSubject);
+  if (subjectParsed.success) {
+    const classIds = subjectParsed.data.class_ids.includes(id)
+      ? subjectParsed.data.class_ids
+      : [...subjectParsed.data.class_ids, id];
+    const updatedSubject = SubjectSchema.safeParse({
+      ...subjectParsed.data,
+      class_ids: classIds,
+      updated_at: timestamp
+    });
+    if (updatedSubject.success) {
+      await setJSON(store, subjectKey(subject_id), updatedSubject.data);
+    }
   }
 
   await setJSON(store, classKey(id), validated.data);

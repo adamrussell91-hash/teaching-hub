@@ -16,7 +16,8 @@ import {
   unitTemplateKey,
   versionKey,
   versionIndexKey,
-  versionsPrefix
+  versionsPrefix,
+  aiUsageLogKey
 } from '../../../src/storage/keys';
 
 // Re-exported so function handlers have one place to import key builders from,
@@ -39,7 +40,8 @@ export {
   unitTemplateKey,
   versionKey,
   versionIndexKey,
-  versionsPrefix
+  versionsPrefix,
+  aiUsageLogKey
 };
 
 const CONTENT_STORE_NAME = 'teaching-hub-content';

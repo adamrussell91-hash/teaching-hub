@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { CommonFields, IsoDateSchema, TrashFields } from './common';
 import { BlockSchema } from './block';
+import { CoverSchema } from './cover';
 import { isHttpUrl } from '../blocks/url-safety';
 import { parseClozeText } from '../blocks/learning-activity';
 import { sanitizeSvgMarkup, svgHasMeaningfulContent } from '../blocks/sanitize-svg';
@@ -13,7 +14,8 @@ export const LessonSchema = z.object({
   unit_id: z.string().min(1),
   sequence: z.number().int(),
   blocks: z.array(BlockSchema),
-  published_at: IsoDateSchema.optional()
+  published_at: IsoDateSchema.optional(),
+  cover: CoverSchema.optional()
 });
 
 function publishBlockIssues(blocks: z.infer<typeof BlockSchema>[]): string | null {

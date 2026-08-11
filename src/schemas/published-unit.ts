@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { BlockSchema } from './block';
+import { CoverSchema } from './cover';
 
 export const PublishedUnitLessonSummarySchema = z.object({
   lesson_id: z.string().min(1),
@@ -8,7 +10,9 @@ export const PublishedUnitLessonSummarySchema = z.object({
 export const PublishedUnitSchema = z.object({
   unit_id: z.string().min(1),
   title: z.string().min(1),
-  lessons: z.array(PublishedUnitLessonSummarySchema)
+  lessons: z.array(PublishedUnitLessonSummarySchema),
+  cover: CoverSchema.optional(),
+  blocks: z.array(BlockSchema).optional()
 });
 
 export type PublishedUnitLessonSummary = z.infer<

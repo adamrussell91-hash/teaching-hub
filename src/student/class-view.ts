@@ -5,6 +5,7 @@ import {
   resolveCollection
 } from '@/blocks/collection-resolve';
 import { renderBlock, renderCollectionBlock } from '@/blocks/render';
+import { renderCoverBanner } from '@/teacher/cover-picker';
 import {
   fetchPublishedClass,
   type PublishedClass,
@@ -84,6 +85,8 @@ function renderPublishedClass(content: HTMLElement, cls: PublishedClass): void {
   header.className = 'student-class__header';
   header.dataset.classSection = 'header';
 
+  header.append(renderCoverBanner(cls.cover, [], cls.title));
+
   const code = document.createElement('h1');
   code.className = 'student-surface__title';
   code.textContent = cls.display_name || cls.code;
@@ -94,6 +97,13 @@ function renderPublishedClass(content: HTMLElement, cls: PublishedClass): void {
   title.textContent = cls.title;
   header.append(title);
   content.append(header);
+
+  // Announcements always first (empty region omitted for students only when empty —
+  // still show if present; teacher always shows empty state).
+  const announcementBlocks = cls.homepage.announcements ?? [];
+  if (announcementBlocks.length > 0) {
+    content.append(renderHomepageRegion(cls, 'announcements', 'Announcements'));
+  }
 
   if (cls.current_unit) {
     const section = buildSection('Current unit', 'current-unit');
@@ -187,74 +197,87 @@ function renderPublishedClass(content: HTMLElement, cls: PublishedClass): void {
     empty.textContent = 'No active units.';
     unitsSection.append(empty);
   } else {
-    const list = document.createElement('ul');
-    list.className = 'student-class__unit-list';
+    const grid = document.createElement('div');
+    grid.className = 'class-page__unit-gallery';
 
     for (const unit of cls.active_units) {
-      const item = document.createElement('li');
-      const link = document.createElement('a');
-      link.className = 'student-class__link';
       const href = `/s/units/${unit.id}`;
-      link.href = href;
-      link.textContent = unit.title;
-      link.addEventListener('click', (event) => {
+      const card = document.createElement('a');
+      card.className = 'class-page__unit-card entity-cover-tile';
+      card.href = href;
+      card.addEventListener('click', (event) => {
         event.preventDefault();
         navigate(href);
       });
-      item.append(link);
-      list.append(item);
+      card.append(renderCoverBanner(unit.cover, [], unit.title));
+      const footer = document.createElement('div');
+      footer.className = 'entity-cover-tile__body';
+      const unitTitle = document.createElement('p');
+      unitTitle.className = 'home-class-tile__title';
+      unitTitle.textContent = unit.title;
+      footer.append(unitTitle);
+      card.append(footer);
+      grid.append(card);
     }
 
-    unitsSection.append(list);
+    unitsSection.append(grid);
   }
   content.append(unitsSection);
 
   for (const region of HOMEPAGE_REGIONS) {
+    if (region.key === 'announcements') continue;
     const blocks = cls.homepage[region.key] ?? [];
     if (blocks.length === 0) continue;
-
-    const section = buildSection(region.title, `homepage-${region.key}`);
-    section.dataset.homepageRegion = region.key;
-
-    const list = document.createElement('div');
-    list.className = 'student-class__blocks';
-    for (const block of blocks) {
-      if (block.block_type === 'collection') {
-        const ctx = {
-          currentUnitId: cls.current_unit?.id,
-          unitLessons: (cls.current_unit?.lessons ?? []).map((l) => ({
-            lesson_id: l.id,
-            title: l.title
-          })),
-          schedule: cls.schedule.map((row) => ({
-            lesson_id: row.lesson_id,
-            title: row.title,
-            schedule_order: row.schedule_order,
-            published: row.published
-          }))
-        };
-        const links = resolveCollection(block.content, ctx, { publishedOnly: true });
-        const emptyMessage = emptyMessageForCollection(block.content.source, {
-          hasCurrentUnit: Boolean(cls.current_unit?.id),
-          linkCount: links.length
-        });
-        const collectionEl = renderCollectionBlock(block, 'student', { links, emptyMessage });
-        for (const anchor of collectionEl.querySelectorAll<HTMLAnchorElement>('a.student-class__link')) {
-          const href = anchor.getAttribute('href');
-          if (!href) continue;
-          anchor.addEventListener('click', (event) => {
-            event.preventDefault();
-            navigate(href);
-          });
-        }
-        list.append(collectionEl);
-      } else {
-        list.append(renderBlock(block, 'student'));
-      }
-    }
-    section.append(list);
-    content.append(section);
+    content.append(renderHomepageRegion(cls, region.key, region.title));
   }
+}
+
+function renderHomepageRegion(
+  cls: PublishedClass,
+  key: 'announcements' | 'resources' | 'custom',
+  title: string
+): HTMLElement {
+  const section = buildSection(title, `homepage-${key}`);
+  section.dataset.homepageRegion = key;
+
+  const list = document.createElement('div');
+  list.className = 'student-class__blocks';
+  for (const block of cls.homepage[key] ?? []) {
+    if (block.block_type === 'collection') {
+      const ctx = {
+        currentUnitId: cls.current_unit?.id,
+        unitLessons: (cls.current_unit?.lessons ?? []).map((l) => ({
+          lesson_id: l.id,
+          title: l.title
+        })),
+        schedule: cls.schedule.map((row) => ({
+          lesson_id: row.lesson_id,
+          title: row.title,
+          schedule_order: row.schedule_order,
+          published: row.published
+        }))
+      };
+      const links = resolveCollection(block.content, ctx, { publishedOnly: true });
+      const emptyMessage = emptyMessageForCollection(block.content.source, {
+        hasCurrentUnit: Boolean(cls.current_unit?.id),
+        linkCount: links.length
+      });
+      const collectionEl = renderCollectionBlock(block, 'student', { links, emptyMessage });
+      for (const anchor of collectionEl.querySelectorAll<HTMLAnchorElement>('a.student-class__link')) {
+        const href = anchor.getAttribute('href');
+        if (!href) continue;
+        anchor.addEventListener('click', (event) => {
+          event.preventDefault();
+          navigate(href);
+        });
+      }
+      list.append(collectionEl);
+    } else {
+      list.append(renderBlock(block, 'student'));
+    }
+  }
+  section.append(list);
+  return section;
 }
 
 /**

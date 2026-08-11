@@ -1,5 +1,5 @@
 import { apiGet } from '@/api/client';
-import type { Block } from '@/schemas';
+import type { Block, Cover } from '@/schemas';
 
 export interface PublishedClassScheduleRow {
   id: string;
@@ -15,6 +15,7 @@ export interface PublishedClass {
   code: string;
   title: string;
   display_name?: string;
+  cover?: Cover;
   homepage: {
     announcements: Block[];
     resources: Block[];
@@ -24,10 +25,11 @@ export interface PublishedClass {
     id: string;
     title: string;
     lessons: Array<{ id: string; title: string }>;
+    cover?: Cover;
   };
   current_lesson?: { id: string; title: string; lesson_id: string };
   schedule: PublishedClassScheduleRow[];
-  active_units: Array<{ id: string; title: string }>;
+  active_units: Array<{ id: string; title: string; cover?: Cover }>;
 }
 
 export function fetchPublishedClass(classId: string): Promise<PublishedClass> {

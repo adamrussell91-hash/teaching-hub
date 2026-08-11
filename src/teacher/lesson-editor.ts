@@ -15,6 +15,10 @@ import {
 } from '@/blocks/composition-link';
 import { cloneBlocksWithNewIds } from '@/blocks/clone-blocks';
 import { createBlockEditor } from '@/blocks/registry';
+import { findBlockById } from '@/blocks/find-block';
+import { applyProposalToBlocks } from '@/ai/apply-proposal';
+import type { AiProposal } from '@/ai/proposals';
+import type { AiScope } from '@/ai/proposals';
 import type { CompositionSummary, CompositionTemplate } from '@/schemas/composition';
 import type { Lesson } from '@/schemas/lesson';
 import type { Media } from '@/schemas/media';
@@ -29,8 +33,10 @@ import {
   openEditSourceModal,
   type CompositionCache
 } from '@/teacher/lesson-editor-compositions';
+import { mountAiPanel, type AiPanelHandle } from '@/teacher/ai-panel';
 import { createLessonTemplate } from '@/teacher/template-api';
 import { fetchCurriculum } from '@/teacher/nav';
+import { mountCoverPicker } from '@/teacher/cover-picker';
 import { renderContextBar, type TeacherShellRefs } from '@/teacher/shell';
 import { mountSavePublishControls, SaveController, type SavePublishHandle } from '@/teacher/save-publish';
 
@@ -55,6 +61,8 @@ export interface MountLessonEditorOptions {
   lessonId: string;
   /** Returns true if this mount has been superseded by a newer route render. */
   isStale: () => boolean;
+  /** Image media for cover library picker. */
+  media?: Media[];
 }
 
 function renderStatus(canvas: HTMLElement, text: string): void {
@@ -71,7 +79,7 @@ function renderStatus(canvas: HTMLElement, text: string): void {
  * save/publish controls into the context bar.
  */
 export function mountLessonEditor(options: MountLessonEditorOptions): LessonEditorHandle {
-  const { refs, lessonId, isStale } = options;
+  const { refs, lessonId, isStale, media = [] } = options;
 
   let disposed = false;
   let saveController: SaveController | null = null;
@@ -80,6 +88,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
   let a4Preview: A4PreviewHandle | null = null;
   let closeEditSourceModal: (() => void) | null = null;
   let editSourceOpenSeq = 0;
+  let aiPanel: AiPanelHandle | null = null;
 
   renderStatus(refs.canvas, 'Loading lesson…');
 
@@ -126,6 +135,22 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     titleInput.autocomplete = 'off';
 
     titleField.append(titleLabel, titleInput);
+
+    const coverHost = document.createElement('div');
+    coverHost.className = 'lesson-editor__cover';
+    mountCoverPicker(coverHost, {
+      cover: lesson.cover,
+      media,
+      titleFallback: lesson.title,
+      onSave: async (cover) => {
+        if (cover === null) {
+          delete lesson.cover;
+        } else {
+          lesson.cover = cover;
+        }
+        saveController?.notifyChange();
+      }
+    });
 
     const saveLessonTemplateButton = document.createElement('button');
     saveLessonTemplateButton.type = 'button';
@@ -205,6 +230,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     main.className = 'lesson-editor__main';
     main.append(
       publishPanel,
+      coverHost,
       titleField,
       saveLessonTemplateButton,
       blocksContainer,
@@ -212,14 +238,131 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       compositionStatus
     );
 
+    const side = document.createElement('div');
+    side.className = 'lesson-editor__side';
+
+    const modeTabs = document.createElement('div');
+    modeTabs.className = 'lesson-editor__mode-tabs';
+    modeTabs.setAttribute('role', 'tablist');
+    modeTabs.setAttribute('aria-label', 'Lesson side panel');
+
+    const a4Tab = document.createElement('button');
+    a4Tab.type = 'button';
+    a4Tab.className = 'lesson-editor__mode-tab';
+    a4Tab.setAttribute('role', 'tab');
+    a4Tab.textContent = 'A4';
+
+    const aiTab = document.createElement('button');
+    aiTab.type = 'button';
+    aiTab.className = 'lesson-editor__mode-tab';
+    aiTab.setAttribute('role', 'tab');
+    aiTab.textContent = 'AI';
+
+    modeTabs.append(a4Tab, aiTab);
+
     const previewHost = document.createElement('div');
     previewHost.className = 'lesson-editor__preview';
+    previewHost.setAttribute('role', 'tabpanel');
 
-    root.append(main, previewHost);
+    const aiHost = document.createElement('div');
+    aiHost.className = 'lesson-editor__ai';
+    aiHost.setAttribute('role', 'tabpanel');
+
+    side.append(modeTabs, previewHost, aiHost);
+    root.append(main, side);
     refs.canvas.append(root);
+
+    let selectedBlockId: string | null = null;
+    let sideMode: 'a4' | 'ai' = 'a4';
+    try {
+      const stored = sessionStorage.getItem(`teaching_hub_lesson_side_${lessonId}`);
+      if (stored === 'ai' || stored === 'a4') sideMode = stored;
+    } catch {
+      /* ignore */
+    }
 
     a4Preview = mountA4Preview(previewHost);
     a4Preview.update(lesson);
+
+    aiPanel = mountAiPanel(aiHost, {
+      lessonId,
+      onAcceptProposal: (proposal: AiProposal) => {
+        const result = applyProposalToBlocks(lesson.blocks, proposal, () => {
+          blockCounter += 1;
+          return `block_${lesson.id}_${blockCounter}`;
+        });
+        if (!result.ok) return result;
+        lesson.blocks = result.blocks;
+        renderBlocksList();
+        syncSelectionUi();
+        void saveController?.saveNow({ checkpointReason: 'ai_accepted' });
+        return { ok: true };
+      }
+    });
+
+    function setSideMode(mode: 'a4' | 'ai'): void {
+      sideMode = mode;
+      try {
+        sessionStorage.setItem(`teaching_hub_lesson_side_${lessonId}`, mode);
+      } catch {
+        /* ignore */
+      }
+      const showA4 = mode === 'a4';
+      previewHost.hidden = !showA4;
+      aiHost.hidden = showA4;
+      a4Tab.classList.toggle('lesson-editor__mode-tab--active', showA4);
+      aiTab.classList.toggle('lesson-editor__mode-tab--active', !showA4);
+      a4Tab.setAttribute('aria-selected', showA4 ? 'true' : 'false');
+      aiTab.setAttribute('aria-selected', showA4 ? 'false' : 'true');
+    }
+
+    a4Tab.addEventListener('click', () => setSideMode('a4'));
+    aiTab.addEventListener('click', () => setSideMode('ai'));
+    setSideMode(sideMode);
+
+    function syncAiSelection(): void {
+      if (!selectedBlockId) {
+        aiPanel?.setSelection({ blockId: null, blockType: null, scope: 'block' });
+        return;
+      }
+      const block = findBlockById(lesson.blocks, selectedBlockId);
+      const scope: AiScope = block?.block_type === 'section' ? 'section' : 'block';
+      aiPanel?.setSelection({
+        blockId: selectedBlockId,
+        blockType: block?.block_type ?? null,
+        scope
+      });
+    }
+
+    function syncSelectionUi(): void {
+      for (const row of blocksContainer.querySelectorAll('.lesson-editor__block-row')) {
+        row.classList.remove('lesson-editor__block-row--selected');
+      }
+      for (const editor of blocksContainer.querySelectorAll('.block-editor')) {
+        editor.classList.remove('block-editor--selected');
+      }
+      if (!selectedBlockId) {
+        syncAiSelection();
+        return;
+      }
+      const selectedEditor = blocksContainer.querySelector(
+        `.block-editor[data-block-id="${CSS.escape(selectedBlockId)}"]`
+      );
+      selectedEditor?.classList.add('block-editor--selected');
+      selectedEditor?.closest('.lesson-editor__block-row')?.classList.add('lesson-editor__block-row--selected');
+      syncAiSelection();
+    }
+
+    blocksContainer.addEventListener('click', (event) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      if (target.closest('button, a, input, textarea, select, label')) return;
+      const editor = target.closest('.block-editor') as HTMLElement | null;
+      const id = editor?.dataset.blockId;
+      if (!id) return;
+      selectedBlockId = id;
+      syncSelectionUi();
+    });
 
     function markDirty(): void {
       saveController?.notifyChange();
@@ -710,12 +853,23 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       closeEditSourceModal?.();
       closeEditSourceModal = null;
       a4Preview?.dispose();
+      a4Preview = null;
       historyPanel?.dispose();
+      historyPanel = null;
+      aiPanel?.dispose();
+      aiPanel = null;
       savePublishHandle?.dispose();
       saveController?.dispose();
     },
     openA4Preview() {
       if (disposed) return;
+      try {
+        sessionStorage.setItem(`teaching_hub_lesson_side_${lessonId}`, 'a4');
+      } catch {
+        /* ignore */
+      }
+      const a4Button = refs.canvas.querySelector('.lesson-editor__mode-tab');
+      if (a4Button instanceof HTMLButtonElement) a4Button.click();
       const preview = refs.canvas.querySelector('.a4-preview');
       if (!(preview instanceof HTMLElement)) return;
       if (!preview.hasAttribute('tabindex')) {

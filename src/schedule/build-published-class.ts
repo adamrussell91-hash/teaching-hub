@@ -1,5 +1,5 @@
 import { filterBlocksForStudent } from '../blocks/visibility';
-import type { Class, ClassHomepage, ScheduledLesson, Unit } from '../schemas';
+import type { Class, ClassHomepage, Cover, ScheduledLesson, Unit } from '../schemas';
 import type { PublishedClass, PublishedClassScheduleRow } from '../student/published-class';
 
 function normalizeHomepage(homepage: ClassHomepage | undefined): ClassHomepage {
@@ -35,7 +35,12 @@ export function buildPublishedClass(input: {
           })
           .filter((entry): entry is { id: string; title: string } => entry !== null);
 
-        return { id: unit.id, title: unit.title, lessons: lessonsForUnit };
+        return {
+          id: unit.id,
+          title: unit.title,
+          lessons: lessonsForUnit,
+          ...(unit.cover ? { cover: unit.cover } : {})
+        };
       })()
     : undefined;
 
@@ -71,15 +76,21 @@ export function buildPublishedClass(input: {
   const active_units = cls.active_unit_ids
     .map((unitId) => {
       const unit = unitById.get(unitId);
-      return unit ? { id: unit.id, title: unit.title } : null;
+      if (!unit) return null;
+      return {
+        id: unit.id,
+        title: unit.title,
+        ...(unit.cover ? { cover: unit.cover as Cover } : {})
+      };
     })
-    .filter((unit): unit is { id: string; title: string } => unit !== null);
+    .filter((unit): unit is { id: string; title: string; cover?: Cover } => unit !== null);
 
   return {
     id: cls.id,
     code: cls.code,
     title: cls.title,
     ...(cls.display_name ? { display_name: cls.display_name } : {}),
+    ...(cls.cover ? { cover: cls.cover } : {}),
     homepage: normalizeHomepage(cls.homepage),
     ...(current_unit ? { current_unit } : {}),
     ...(current_lesson ? { current_lesson } : {}),

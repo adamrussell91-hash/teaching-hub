@@ -8,6 +8,13 @@ export {
 export { YearSchema, type Year } from './year';
 export { SubjectSchema, type Subject } from './subject';
 export {
+  CoverSchema,
+  CoverPatchSchema,
+  resolveCoverUrl,
+  coverAltText,
+  type Cover
+} from './cover';
+export {
   ClassSchema,
   ClassHomepageSchema,
   type Class,

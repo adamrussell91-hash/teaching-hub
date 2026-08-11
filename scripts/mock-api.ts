@@ -24,9 +24,11 @@ import {
   mediaTypeFromMime
 } from '../src/media/upload-rules';
 import {
+  BlockSchema,
   ClassHomepageSchema,
   ClassSchema,
   CompositionTemplateSchema,
+  CoverPatchSchema,
   LessonSchema,
   LessonTemplateSchema,
   PublishableLessonSchema,
@@ -42,13 +44,13 @@ import {
   TimelineItemSchema,
   UnitSchema,
   UnitTemplateSchema,
-  BlockSchema,
   toPublishedLesson,
   type Block,
   type Class,
   type ClassHomepage,
   type CompositionSummary,
   type CompositionTemplate,
+  type Cover,
   type Lesson,
   type LessonTemplate,
   type LessonTemplateSummary,
@@ -308,21 +310,26 @@ function binaryResponse(
   const headers = new MockHeaders();
   headers.set('content-type', contentType);
   if (extraHeaders) {
-    for (const [name, value] of Object.entries(extraHeaders)) {
-      headers.set(name, value);
-    }
+    for (const [key, value] of Object.entries(extraHeaders)) headers.set(key, value);
   }
   return {
     status,
     headers,
-    bodyBytes: bytes,
     async json() {
-      throw new Error('Response body is not JSON');
+      throw new Error('binary response');
     },
     async text() {
-      return Buffer.from(bytes).toString('utf-8');
-    }
+      return Buffer.from(bytes).toString('utf8');
+    },
+    bodyBytes: bytes
   };
+}
+
+function sseResponse(events: unknown[]): MockResponse {
+  const body = events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join('');
+  return binaryResponse(200, new TextEncoder().encode(body), 'text/event-stream', {
+    'cache-control': 'no-store'
+  });
 }
 
 function slugify(title: string): string {
@@ -909,9 +916,12 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
   }
 
   function handleGetPublishedUnit(id: string): MockResponse {
-    const unit = store.getJSON<{ title?: string; lesson_ids?: string[] }>(
-      unitKey(id)
-    );
+    const unit = store.getJSON<{
+      title?: string;
+      lesson_ids?: string[];
+      cover?: unknown;
+      blocks?: unknown;
+    }>(unitKey(id));
     if (!unit || typeof unit.title !== 'string' || !unit.title) {
       return notFoundResponse('Unit not found');
     }
@@ -942,10 +952,35 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       Array.isArray(unit.lesson_ids) ? unit.lesson_ids : [],
       matching
     );
+
+    const unitParsed = UnitSchema.safeParse({
+      id,
+      type: 'unit',
+      title: unit.title,
+      slug: 'published',
+      year_id: 'year',
+      subject_id: 'subject',
+      lesson_ids: Array.isArray(unit.lesson_ids) ? unit.lesson_ids : [],
+      blocks: unit.blocks ?? [],
+      cover: unit.cover,
+      status: 'active',
+      created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
+      schema_version: 1
+    });
+
+    const studentBlocks = sanitizeBlocksDeep(
+      filterBlocksForStudent(unitParsed.success ? (unitParsed.data.blocks ?? []) : [])
+    );
+
     return okResponse(200, {
       unit_id: id,
       title: unit.title,
-      lessons
+      lessons,
+      ...(unitParsed.success && unitParsed.data.cover
+        ? { cover: unitParsed.data.cover }
+        : {}),
+      blocks: studentBlocks
     });
   }
 
@@ -1165,17 +1200,18 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const hasMeetingDays = record.meeting_days !== undefined;
     const hasCurrent = record.current_scheduled_lesson_id !== undefined;
     const hasHomepage = record.homepage !== undefined;
+    const hasCover = record.cover !== undefined;
     const statusFields = parseStatusPatch(body);
     if (!statusFields.ok) {
       return errorResponse(400, statusFields.code, statusFields.message);
     }
     const hasStatus = statusFields.hasStatus;
 
-    if (!hasMeetingDays && !hasCurrent && !hasHomepage && !hasStatus) {
+    if (!hasMeetingDays && !hasCurrent && !hasHomepage && !hasCover && !hasStatus) {
       return errorResponse(
         400,
         'validation_error',
-        'Provide meeting_days, current_scheduled_lesson_id, homepage, and/or status'
+        'Provide meeting_days, current_scheduled_lesson_id, homepage, cover, and/or status'
       );
     }
 
@@ -1226,6 +1262,15 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       homepage = homepageParsed.data;
     }
 
+    let cover: Cover | null | undefined;
+    if (hasCover) {
+      const coverParsed = CoverPatchSchema.safeParse(record.cover);
+      if (!coverParsed.success) {
+        return errorResponse(400, 'validation_error', 'cover is invalid');
+      }
+      cover = coverParsed.data;
+    }
+
     const rawClass = store.getJSON(classKey(classId));
     if (!rawClass) return notFoundResponse('Class not found');
     const classParsed = ClassSchema.safeParse(rawClass);
@@ -1262,6 +1307,14 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
 
     if (homepage !== undefined) {
       merged.homepage = homepage;
+    }
+
+    if (cover !== undefined) {
+      if (cover === null) {
+        delete merged.cover;
+      } else {
+        merged.cover = cover;
+      }
     }
 
     if (hasStatus) {
@@ -1317,17 +1370,18 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const hasDescription = record.description !== undefined;
     const hasBlocks = record.blocks !== undefined;
     const hasLessonIds = record.lesson_ids !== undefined;
+    const hasCover = record.cover !== undefined;
     const statusFields = parseStatusPatch(body);
     if (!statusFields.ok) {
       return errorResponse(400, statusFields.code, statusFields.message);
     }
     const hasStatus = statusFields.hasStatus;
 
-    if (!hasTitle && !hasDescription && !hasBlocks && !hasLessonIds && !hasStatus) {
+    if (!hasTitle && !hasDescription && !hasBlocks && !hasLessonIds && !hasCover && !hasStatus) {
       return errorResponse(
         400,
         'validation_error',
-        'Provide title, description, blocks, lesson_ids, and/or status'
+        'Provide title, description, blocks, lesson_ids, cover, and/or status'
       );
     }
 
@@ -1371,6 +1425,15 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       lesson_ids = record.lesson_ids as string[];
     }
 
+    let cover: Cover | null | undefined;
+    if (hasCover) {
+      const coverParsed = CoverPatchSchema.safeParse(record.cover);
+      if (!coverParsed.success) {
+        return errorResponse(400, 'validation_error', 'cover is invalid');
+      }
+      cover = coverParsed.data;
+    }
+
     const rawUnit = store.getJSON(unitKey(unitId));
     if (!rawUnit) return notFoundResponse('Unit not found');
     const unitParsed = UnitSchema.safeParse(rawUnit);
@@ -1387,6 +1450,13 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     if (description !== undefined) merged.description = description;
     if (blocks !== undefined) merged.blocks = blocks;
     if (lesson_ids !== undefined) merged.lesson_ids = lesson_ids;
+    if (cover !== undefined) {
+      if (cover === null) {
+        delete merged.cover;
+      } else {
+        merged.cover = cover;
+      }
+    }
 
     if (hasStatus) {
       try {
@@ -1669,6 +1739,22 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       return errorResponse(400, 'validation_error', 'Class data is invalid', validated.error.flatten());
     }
 
+    const rawSubject = store.getJSON(subjectKey(subject_id));
+    const subjectParsed = rawSubject ? SubjectSchema.safeParse(rawSubject) : null;
+    if (subjectParsed?.success) {
+      const classIds = subjectParsed.data.class_ids.includes(id)
+        ? subjectParsed.data.class_ids
+        : [...subjectParsed.data.class_ids, id];
+      const updatedSubject = SubjectSchema.safeParse({
+        ...subjectParsed.data,
+        class_ids: classIds,
+        updated_at: timestamp
+      });
+      if (updatedSubject.success) {
+        store.setJSON(subjectKey(subject_id), updatedSubject.data);
+      }
+    }
+
     store.setJSON(classKey(id), validated.data);
     seedIds.classes.push(id);
     return okResponse(201, validated.data);
@@ -1709,7 +1795,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       subject_id,
       lesson_ids: [],
       description: typeof record.description === 'string' ? record.description : undefined,
-      blocks: Array.isArray(record.blocks) ? (record.blocks as Unit['blocks']) : undefined,
+      blocks: Array.isArray(record.blocks) ? (record.blocks as Unit['blocks']) : [],
       status: 'active',
       created_at: timestamp,
       updated_at: timestamp,
@@ -2697,6 +2783,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
   const PUBLISHED_UNIT_RE = /^\/api\/published\/units\/([^/]+)$/;
   const PUBLISHED_CLASS_RE = /^\/api\/published\/classes\/([^/]+)$/;
   const CLASS_PATCH_RE = /^\/api\/classes\/([^/]+)$/;
+  const UNIT_PATCH_RE = /^\/api\/units\/([^/]+)$/;
   const SCOPE_SEQUENCE_PATCH_RE = /^\/api\/scope-sequences\/([^/]+)$/;
   const SCHEDULE_UNIT_RE = /^\/api\/classes\/([^/]+)\/schedule-unit$/;
   const SCHEDULED_LESSON_RE = /^\/api\/scheduled-lessons\/([^/]+)$/;
@@ -2743,6 +2830,60 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
         return errorResponse(400, 'bad_request', 'lesson_id, block_id, and messages are required');
       }
       return okResponse(200, { text: 'mock-ai-reply' });
+    }
+
+    if (method === 'POST' && path === '/api/ai/chat') {
+      const session = getSession(cookie);
+      if (!session.authenticated) return unauthorizedResponse();
+      if (!body || typeof body !== 'object') {
+        return errorResponse(400, 'invalid_json', 'Request body is not valid JSON');
+      }
+      const req = body as {
+        lesson_id?: unknown;
+        agent?: unknown;
+        scope?: unknown;
+        selected_block_id?: unknown;
+        message?: unknown;
+        action?: unknown;
+      };
+      if (
+        typeof req.lesson_id !== 'string' ||
+        typeof req.agent !== 'string' ||
+        typeof req.scope !== 'string' ||
+        typeof req.selected_block_id !== 'string' ||
+        typeof req.message !== 'string'
+      ) {
+        return errorResponse(400, 'validation_error', 'Invalid AI chat request');
+      }
+      const lesson = store.getJSON<Lesson>(draftLessonKey(req.lesson_id));
+      if (!lesson) return notFoundResponse('Lesson not found');
+      const selected = lesson.blocks.find((b) => b.id === req.selected_block_id);
+      if (!selected) {
+        return errorResponse(400, 'validation_error', 'selected_block_id not found');
+      }
+      const proposal =
+        selected.block_type === 'rich_text' || selected.block_type === 'heading'
+          ? {
+              kind: 'replace_block' as const,
+              block_id: selected.id,
+              block: {
+                ...selected,
+                content:
+                  selected.block_type === 'heading'
+                    ? { ...selected.content, text: `${selected.content.text || 'Heading'} (AI)` }
+                    : { ...selected.content, html: '<p>Mock AI rewrite.</p>' }
+              }
+            }
+          : {
+              kind: 'review_only' as const,
+              summary: 'Mock review: keep the focus tight and one teaching move at a time.'
+            };
+      return sseResponse([
+        { type: 'status', text: 'Thinking…' },
+        { type: 'text', text: 'Mock AI response. ' },
+        { type: 'proposal', proposal },
+        { type: 'done' }
+      ]);
     }
 
     if (method === 'POST' && path === '/api/classes') return handlePostClass(cookie, body);
@@ -2936,6 +3077,11 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       if (method === 'DELETE') {
         return handlePermanentDeleteRoute(cookie, 'class', classPatchMatch[1]!);
       }
+    }
+
+    const unitPatchMatch = UNIT_PATCH_RE.exec(path);
+    if (unitPatchMatch && method === 'PATCH') {
+      return handlePatchUnit(cookie, unitPatchMatch[1]!, body);
     }
 
     const scopeSequencePatchMatch = SCOPE_SEQUENCE_PATCH_RE.exec(path);

@@ -1,8 +1,10 @@
 import { ApiClientError } from '@/api/client';
 import { navigate } from '@/app/router';
 import type { CollectionResolveContext } from '@/blocks/collection-resolve';
-import type { Class, ScheduledLesson } from '@/schemas';
+import type { Class, ScheduledLesson, Unit } from '@/schemas';
+import { resolveCoverUrl } from '@/schemas';
 import { resolveScheduleToday } from '@/schedule/today';
+import { mountCoverPicker, renderCoverBanner } from '@/teacher/cover-picker';
 import { mountCreateControl } from '@/teacher/create/control';
 import type { CreateKind } from '@/teacher/create/types';
 import type { CurriculumLessonSummary, CurriculumResponse } from '@/teacher/nav';
@@ -80,13 +82,27 @@ export function renderClassesIndex(
       card.className = 'classes-index__card';
 
       const tile = document.createElement('a');
-      tile.className = 'glass-tile home-class-tile';
+      tile.className = 'glass-tile home-class-tile entity-cover-tile';
       tile.href = path;
       tile.dataset.classId = cls.id;
       tile.addEventListener('click', (event) => {
         event.preventDefault();
         navigate(path);
       });
+
+      const coverUrl = resolveCoverUrl(cls.cover, curriculum.media);
+      if (coverUrl) {
+        const media = document.createElement('div');
+        media.className = 'entity-cover-tile__media';
+        const img = document.createElement('img');
+        img.src = coverUrl;
+        img.alt = '';
+        media.append(img);
+        tile.append(media);
+      }
+
+      const body = document.createElement('div');
+      body.className = 'entity-cover-tile__body';
 
       const eyebrow = document.createElement('p');
       eyebrow.className = 'home-class-tile__eyebrow';
@@ -96,7 +112,8 @@ export function renderClassesIndex(
       title.className = 'home-class-tile__title';
       title.textContent = cls.code || cls.title;
 
-      tile.append(eyebrow, title);
+      body.append(eyebrow, title);
+      tile.append(body);
 
       const actions = document.createElement('div');
       actions.className = 'list-row-actions classes-index__actions';
@@ -136,8 +153,7 @@ export function renderClassesIndex(
 
       actions.append(archive, trash);
       card.append(tile, actions);
-      grid.append(card);
-    }
+      grid.append(card);    }
   }
 
   canvas.append(header, grid);
@@ -178,12 +194,13 @@ export function renderClassPage(
   root.className = 'class-page';
 
   root.append(
-    buildHeader(cls, year?.title, subject?.title),
+    buildCoverAndHeader(cls, curriculum, year?.title, subject?.title, options),
+    buildAnnouncementsSection(cls, curriculum, options),
     buildCurrentUnitSection(cls, unitsById),
     buildCurrentLessonSection(cls, curriculum, lessonsById),
     buildScheduleSection(cls, curriculum, lessonsById, options),
-    buildUnitsSection(cls, unitsById),
-    buildHomepageSection(cls, curriculum, options)
+    buildUnitsGallerySection(cls, unitsById, curriculum),
+    buildHomepageRestSection(cls, curriculum, options)
   );
 
   canvas.append(root);
@@ -220,10 +237,32 @@ function collectionContextForClass(
   };
 }
 
-function buildHeader(cls: Class, yearTitle?: string, subjectTitle?: string): HTMLElement {
+function buildCoverAndHeader(
+  cls: Class,
+  curriculum: CurriculumResponse,
+  yearTitle: string | undefined,
+  subjectTitle: string | undefined,
+  options: ClassPageOptions
+): HTMLElement {
   const section = document.createElement('header');
-  section.className = 'class-page__header';
+  section.className = 'class-page__header glass-panel';
   section.dataset.classSection = 'header';
+
+  const coverHost = document.createElement('div');
+  coverHost.className = 'class-page__cover';
+  mountCoverPicker(coverHost, {
+    cover: cls.cover,
+    media: curriculum.media,
+    titleFallback: cls.title,
+    editable: true,
+    onSave: async (cover) => {
+      await patchClass(cls.id, { cover });
+      await options.onScheduleMutated?.();
+    }
+  });
+
+  const identity = document.createElement('div');
+  identity.className = 'class-page__identity';
 
   const heading = document.createElement('h1');
   heading.className = 'home-heading';
@@ -237,10 +276,84 @@ function buildHeader(cls: Class, yearTitle?: string, subjectTitle?: string): HTM
   context.className = 'class-page__context';
   context.textContent = [yearTitle, subjectTitle].filter(Boolean).join(' · ');
 
-  section.append(heading, title);
-  if (context.textContent) {
-    section.append(context);
+  identity.append(heading, title);
+  if (context.textContent) identity.append(context);
+
+  section.append(coverHost, identity);
+  return section;
+}
+
+function buildAnnouncementsSection(
+  cls: Class,
+  curriculum: CurriculumResponse,
+  options: ClassPageOptions
+): HTMLElement {
+  const section = document.createElement('div');
+  section.className = 'class-page__announcements';
+  section.dataset.classSection = 'announcements';
+
+  const toolbar = document.createElement('div');
+  toolbar.className = 'class-page__homepage-toolbar';
+
+  const editButton = document.createElement('button');
+  editButton.type = 'button';
+  editButton.className = 'btn btn--secondary class-page__edit-homepage';
+  editButton.textContent = 'Edit homepage';
+
+  const viewAsStudent = document.createElement('a');
+  viewAsStudent.className = 'btn btn--ghost class-page__view-as-student';
+  viewAsStudent.href = `/s/classes/${cls.id}`;
+  viewAsStudent.textContent = 'View as student';
+  viewAsStudent.addEventListener('click', (event) => {
+    event.preventDefault();
+    navigate(`/s/classes/${cls.id}`);
+  });
+
+  toolbar.append(editButton, viewAsStudent);
+
+  const regionsContainer = document.createElement('div');
+  regionsContainer.className = 'class-page__homepage-regions';
+
+  const resolveContext = collectionContextForClass(cls, curriculum);
+  let editorHandle: HomepageEditorHandle | null = null;
+
+  function showViewMode(): void {
+    editorHandle?.destroy();
+    editorHandle = null;
+    editButton.hidden = false;
+    renderHomepageRegionsView(
+      regionsContainer,
+      normalizeHomepage(cls.homepage),
+      resolveContext,
+      ['announcements']
+    );
   }
+
+  function showEditMode(): void {
+    editButton.hidden = true;
+    editorHandle?.destroy();
+    editorHandle = mountHomepageEditor(regionsContainer, normalizeHomepage(cls.homepage), {
+      classId: cls.id,
+      resolveContext,
+      onSave: async (homepage) => {
+        await patchClass(cls.id, { homepage });
+        await options.onScheduleMutated?.();
+      },
+      onRestored: (restored) => {
+        cls.homepage = normalizeHomepage(restored.homepage);
+      },
+      onCancel: () => {
+        showViewMode();
+      }
+    });
+  }
+
+  editButton.addEventListener('click', () => {
+    showEditMode();
+  });
+
+  showViewMode();
+  section.append(toolbar, regionsContainer);
   return section;
 }
 
@@ -493,12 +606,13 @@ async function runScheduleMutation(
   }
 }
 
-function buildUnitsSection(
+function buildUnitsGallerySection(
   cls: Class,
-  unitsById: Map<string, { id: string; title: string }>
+  unitsById: Map<string, Unit>,
+  curriculum: CurriculumResponse
 ): HTMLElement {
   const section = document.createElement('section');
-  section.className = 'class-page__section';
+  section.className = 'class-page__section glass-panel';
   section.dataset.classSection = 'units';
 
   const heading = document.createElement('h2');
@@ -508,36 +622,43 @@ function buildUnitsSection(
 
   const units = cls.active_unit_ids
     .map((id) => unitsById.get(id))
-    .filter((unit): unit is { id: string; title: string } => Boolean(unit));
+    .filter((unit): unit is Unit => Boolean(unit));
 
   if (units.length === 0) {
     section.append(emptyCopy('No active units.'));
     return section;
   }
 
-  const list = document.createElement('ul');
-  list.className = 'class-page__unit-list';
+  const grid = document.createElement('div');
+  grid.className = 'class-page__unit-gallery';
 
   for (const unit of units) {
-    const item = document.createElement('li');
     const path = `/units/${unit.id}`;
-    const link = document.createElement('a');
-    link.className = 'class-page__link';
-    link.href = path;
-    link.textContent = unit.title;
-    link.addEventListener('click', (event) => {
+    const card = document.createElement('a');
+    card.className = 'class-page__unit-card entity-cover-tile';
+    card.href = path;
+    card.addEventListener('click', (event) => {
       event.preventDefault();
       navigate(path);
     });
-    item.append(link);
-    list.append(item);
+
+    card.append(renderCoverBanner(unit.cover, curriculum.media, unit.title));
+
+    const footer = document.createElement('div');
+    footer.className = 'entity-cover-tile__body';
+    const title = document.createElement('p');
+    title.className = 'home-class-tile__title';
+    title.textContent = unit.title;
+    footer.append(title);
+    card.append(footer);
+    grid.append(card);
   }
 
-  section.append(list);
+  section.append(grid);
   return section;
 }
 
-function buildHomepageSection(
+function buildHomepageRestSection(
   cls: Class,
   curriculum: CurriculumResponse,
   options: ClassPageOptions
@@ -546,63 +667,24 @@ function buildHomepageSection(
   section.className = 'class-page__homepage';
   section.dataset.classSection = 'homepage';
 
-  const toolbar = document.createElement('div');
-  toolbar.className = 'class-page__homepage-toolbar';
-
-  const editButton = document.createElement('button');
-  editButton.type = 'button';
-  editButton.className = 'btn btn--secondary class-page__edit-homepage';
-  editButton.textContent = 'Edit homepage';
-
-  const viewAsStudent = document.createElement('a');
-  viewAsStudent.className = 'btn btn--ghost class-page__view-as-student';
-  viewAsStudent.href = `/s/classes/${cls.id}`;
-  viewAsStudent.textContent = 'View as student';
-  viewAsStudent.addEventListener('click', (event) => {
-    event.preventDefault();
-    navigate(`/s/classes/${cls.id}`);
-  });
-
-  toolbar.append(editButton, viewAsStudent);
-
   const regionsContainer = document.createElement('div');
   regionsContainer.className = 'class-page__homepage-regions';
 
   const resolveContext = collectionContextForClass(cls, curriculum);
-  let editorHandle: HomepageEditorHandle | null = null;
+  renderHomepageRegionsView(
+    regionsContainer,
+    normalizeHomepage(cls.homepage),
+    resolveContext,
+    ['resources', 'custom']
+  );
 
-  function showViewMode(): void {
-    editorHandle?.destroy();
-    editorHandle = null;
-    editButton.hidden = false;
-    renderHomepageRegionsView(regionsContainer, normalizeHomepage(cls.homepage), resolveContext);
-  }
+  // Keep a quiet edit affordance for resources/custom when announcements edit is elsewhere.
+  const note = document.createElement('p');
+  note.className = 'class-page__empty';
+  note.textContent = 'Use Edit homepage above announcements to change resources and custom blocks.';
 
-  function showEditMode(): void {
-    editButton.hidden = true;
-    editorHandle?.destroy();
-    editorHandle = mountHomepageEditor(regionsContainer, normalizeHomepage(cls.homepage), {
-      classId: cls.id,
-      resolveContext,
-      onSave: async (homepage) => {
-        await patchClass(cls.id, { homepage });
-        await options.onScheduleMutated?.();
-      },
-      onRestored: (restored) => {
-        cls.homepage = normalizeHomepage(restored.homepage);
-      },
-      onCancel: () => {
-        showViewMode();
-      }
-    });
-  }
-
-  editButton.addEventListener('click', () => {
-    showEditMode();
-  });
-
-  showViewMode();
-  section.append(toolbar, regionsContainer);
+  void options;
+  section.append(regionsContainer, note);
   return section;
 }
 

@@ -65,3 +65,7 @@ export function versionIndexKey(kind: string, parentId: string): string {
 export function versionsPrefix(kind: string, parentId: string): string {
   return `versions/${kind}/${parentId}/`;
 }
+
+export function aiUsageLogKey(day: string): string {
+  return `ai_usage/${day}`;
+}

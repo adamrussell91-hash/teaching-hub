@@ -20,7 +20,7 @@ Block primitives: [`docs/specs/03_BLOCK_SYSTEM.md`](specs/03_BLOCK_SYSTEM.md)
 
 Suggested order for continuing builder / teaching-page work (adjust as needed):
 
-1. **AI agent integration**
+1. **AI composition fill / whole-lesson scope** (Phase 13D–E) — agent panel WIP may still need polish before fully shipped
 
 Larger product tracks (not “next block”, but still ahead):
 
@@ -34,9 +34,11 @@ Larger product tracks (not “next block”, but still ahead):
 | Date | Slice | Outcome |
 |------|--------|---------|
 | 2026-08-11 | **Versioning / archive / recovery** | Lesson/unit/class-homepage version history (checkpoints, restore draft-only); archive vs trash; dependency-aware permanent delete + Trash UI — [`design`](superpowers/specs/2026-08-11-versioning-archive-recovery-design.md) / [`plan`](superpowers/plans/2026-08-11-versioning-archive-recovery.md) |
-| 2026-08-11 | **Linked template reuse** | Linked composition templates (edit source / detach); propagates updates to linked copies — [`design`](superpowers/specs/2026-08-11-linked-composition-templates-design.md) / [`plan`](superpowers/plans/2026-08-11-linked-composition-templates.md) |
-| 2026-08-11 | **Lesson & unit templates** | Save lesson/unit templates; `/templates` library (use/rename/archive); create new independent entities — [`design`](superpowers/specs/2026-08-11-lesson-unit-templates-design.md) / [`plan`](superpowers/plans/2026-08-11-lesson-unit-templates.md) |
+| 2026-08-11 | **Linked template reuse** | Linked composition insert (live draft resolve); Edit Source / Detach; publish expands to independent tree — [`design`](superpowers/specs/2026-08-11-linked-composition-templates-design.md) / [`plan`](superpowers/plans/2026-08-11-linked-composition-templates.md) |
+| 2026-08-11 | **AI agent integration** | Lesson editor A4\|AI panel; Ann/Clementine/Hammond/Clare; block/section selection; capability actions; SSE proposals Accept/Reject/Regenerate — [`design`](superpowers/specs/2026-08-11-ai-agent-integration-design.md) |
 | 2026-08-11 | **Search / nav acceleration** | Rail search + ⌘K panel; client title/metadata + server body scan; ranked results with snippets — [`design`](superpowers/specs/2026-08-11-search-nav-acceleration-design.md) / [`plan`](superpowers/plans/2026-08-11-search-nav-acceleration.md) |
+| 2026-08-10 | **Google Drive / media library uploads** | Hosted uploads + Drive picker mirror + Resources library + publish warnings — [`design`](superpowers/specs/2026-08-10-media-library-drive-design.md) / [`plan`](superpowers/plans/2026-08-10-media-library-drive.md) |
+| 2026-08-10 | **A4 print pipeline** | Teacher A4 portrait preview + Print via shared renderer; `response_space` lines; minimal media fallbacks — [`design`](superpowers/specs/2026-08-10-a4-print-pipeline-design.md) / [`plan`](superpowers/plans/2026-08-10-a4-print-pipeline.md) |
 | 2026-08-07 | First slice | Auth, lesson draft/publish, `rich_text` / `heading` / `callout`, student lesson view |
 | 2026-08-08 | Teacher rail + section shells | Curriculum rail, Units / Lessons / Resources shells |
 | 2026-08-08 | Builder blocks (media) | `image`, `video`, `embed`, `html` + publish rules |
@@ -63,8 +65,6 @@ Larger product tracks (not “next block”, but still ahead):
 | 2026-08-09 | **Response space** | `response_space` on short-answer `question_set` items (schema + builder); student UI unchanged; print deferred — [`design`](superpowers/specs/2026-08-09-response-space-design.md) / [`plan`](superpowers/plans/2026-08-09-response-space.md) |
 | 2026-08-09 | **Embed viewers** | Map / Slides / Document / PDF via provider-aware `embed` (menu presets + URL detect; iframe vs card) — [`design`](superpowers/specs/2026-08-09-embed-viewers-design.md) / [`plan`](superpowers/plans/2026-08-09-embed-viewers.md) |
 | 2026-08-09 | **Templates & reuse** | Composition save/insert (section → independent copy); no linked templates yet — [`design`](superpowers/specs/2026-08-09-templates-reuse-design.md) / [`plan`](superpowers/plans/2026-08-09-templates-reuse.md) |
-| 2026-08-10 | **A4 print pipeline** | Teacher A4 portrait preview + Print via shared renderer; `response_space` lines; minimal media fallbacks — [`design`](superpowers/specs/2026-08-10-a4-print-pipeline-design.md) / [`plan`](superpowers/plans/2026-08-10-a4-print-pipeline.md) |
-| 2026-08-10 | **Google Drive / media library uploads** | Hosted uploads + Drive picker mirror + Resources library + publish warnings — [`design`](superpowers/specs/2026-08-10-media-library-drive-design.md) / [`plan`](superpowers/plans/2026-08-10-media-library-drive.md) |
 
 ### Block types live today (32)
 
@@ -76,14 +76,13 @@ Larger product tracks (not “next block”, but still ahead):
 |------------|--------|
 | 0–4 Foundation → basic builder → publish | Done (core) |
 | 5 Block system expansion | **In progress** — layout + timeline + tabs + gallery + activities + viz + collection + html_app + columns UX + response space + embed viewers + A4 print v1 done |
-| 6–8 Unit/class pages, scheduling, scope | Largely done for v1 |
+| 6–8 Unit/class pages, scheduling, scope | Done for v1 (+ Clinical Glass class/unit refresh) |
 | 9 A4 print | **v1 done** — preview + print; metadata/tools polish later |
 | 10 Google Drive | **v1 done** — mirror + picker + library |
 | 11 Templates / reuse | **Done (v1)** — lesson/unit templates + compositions + linked reuse |
 | 12 Search | **v1 done** — rail + ⌘K panel; client titles + server body scan |
-| 13 AI | Not started |
+| 13 AI | **v1 done** — agent panel + block/section proposals; composition/whole-lesson later |
 | 14–15 Versioning / hardening | **Phase 14 core done** — history + archive/trash/restore/permanent delete; export/backup + Phase 15 hardening still ahead |
-
 ---
 
 ## Projection (backlog — block-focused)
@@ -120,11 +119,11 @@ Unchecked = not built yet.
 - [x] Media library + uploads / Drive
 - [x] Templates & compositions (compositions + lesson/unit templates + linked reuse)
 - [x] Search
-- [ ] AI agent
+- [x] AI agent
 - [x] Versioning / archive / recovery
 
 ---
 
 ## Latest note
 
-**2026-08-11** — Versioning / archive / recovery core shipped (history panel, trash, dependency-aware permanent delete). Next up: AI agent integration; export/portable backup and Phase 15 hardening remain deferred.
+**2026-08-11** — Versioning / archive / recovery core shipped (history panel, trash, dependency-aware permanent delete). AI agent panel + covers WIP restored onto main. Next up: AI composition/whole-lesson scope; export/portable backup and Phase 15 hardening remain deferred.

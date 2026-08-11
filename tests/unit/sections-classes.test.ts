@@ -201,6 +201,20 @@ describe('classes section', () => {
     expect(canvas.textContent).toContain('No announcements yet.');
     expect(canvas.querySelector('.class-page__edit-homepage')).not.toBeNull();
     expect(canvas.querySelector('.class-page__view-as-student')).not.toBeNull();
+    expect(canvas.querySelector('[data-class-section="header"] .cover-picker')).not.toBeNull();
+    expect(canvas.querySelector('[data-class-section="units"] .class-page__unit-gallery')).not.toBeNull();
+
+    const announcements = canvas.querySelector('[data-class-section="announcements"]');
+    const schedule = canvas.querySelector('[data-class-section="schedule"]');
+    expect(announcements).not.toBeNull();
+    expect(schedule).not.toBeNull();
+    expect(
+      Boolean(
+        announcements &&
+          schedule &&
+          announcements.compareDocumentPosition(schedule) & Node.DOCUMENT_POSITION_FOLLOWING
+      )
+    ).toBe(true);
 
     const unitLink = canvas.querySelector<HTMLAnchorElement>('a[href="/units/unit_aotfw"]');
     expect(unitLink).not.toBeNull();

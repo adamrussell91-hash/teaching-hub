@@ -19,9 +19,11 @@ import {
 import {
   ClassHomepageSchema,
   ClassSchema,
+  CoverPatchSchema,
   ScheduledLessonSchema,
   type Class,
-  type ClassHomepage
+  type ClassHomepage,
+  type Cover
 } from '../../src/schemas';
 import {
   CHECKPOINT_AFTER_SAVE_WARNING,
@@ -47,6 +49,7 @@ function parseBody(
       meeting_days?: number[];
       current_scheduled_lesson_id?: string | null;
       homepage?: ClassHomepage;
+      cover?: Cover | null;
       status?: Class['status'];
       trash_reason?: string;
     }
@@ -59,17 +62,18 @@ function parseBody(
   const hasMeetingDays = record.meeting_days !== undefined;
   const hasCurrent = record.current_scheduled_lesson_id !== undefined;
   const hasHomepage = record.homepage !== undefined;
+  const hasCover = record.cover !== undefined;
   const statusPatch = parseStatusPatch(body);
   if (!statusPatch.ok) {
     return { ok: false, code: statusPatch.code, message: statusPatch.message };
   }
   const hasStatus = statusPatch.hasStatus;
 
-  if (!hasMeetingDays && !hasCurrent && !hasHomepage && !hasStatus) {
+  if (!hasMeetingDays && !hasCurrent && !hasHomepage && !hasCover && !hasStatus) {
     return {
       ok: false,
       code: 'validation_error',
-      message: 'Provide meeting_days, current_scheduled_lesson_id, homepage, and/or status'
+      message: 'Provide meeting_days, current_scheduled_lesson_id, homepage, cover, and/or status'
     };
   }
 
@@ -125,11 +129,25 @@ function parseBody(
     homepage = homepageParsed.data;
   }
 
+  let cover: Cover | null | undefined;
+  if (hasCover) {
+    const coverParsed = CoverPatchSchema.safeParse(record.cover);
+    if (!coverParsed.success) {
+      return {
+        ok: false,
+        code: 'validation_error',
+        message: 'cover is invalid'
+      };
+    }
+    cover = coverParsed.data;
+  }
+
   return {
     ok: true,
     meeting_days,
     current_scheduled_lesson_id,
     homepage,
+    cover,
     status: statusPatch.status,
     trash_reason: statusPatch.trash_reason
   };
@@ -224,6 +242,14 @@ export default async function handler(request: Request, context: FunctionContext
 
   if (parsed.homepage !== undefined) {
     merged.homepage = parsed.homepage;
+  }
+
+  if (parsed.cover !== undefined) {
+    if (parsed.cover === null) {
+      delete merged.cover;
+    } else {
+      merged.cover = parsed.cover;
+    }
   }
 
   if (parsed.status !== undefined) {

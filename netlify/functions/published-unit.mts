@@ -1,9 +1,12 @@
 import { getContentStore, getJSON, unitKey } from './_shared/blobs.mts';
 import { errorResponse, methodNotAllowed, okResponse, preflightResponse, withCors } from './_shared/http.mts';
+import { filterBlocksForStudent } from '../../src/blocks/visibility';
+import { sanitizeBlocksDeep } from '../../src/blocks/sanitize-blocks';
 import {
   orderLessonsByUnitIds,
+  UnitSchema,
   type PublishedUnitLessonSummary
-} from '../../src/schemas/published-unit';
+} from '../../src/schemas';
 
 interface FunctionContext {
   params: Record<string, string | undefined>;
@@ -12,6 +15,17 @@ interface FunctionContext {
 interface UnitBlob {
   title?: string;
   lesson_ids?: string[];
+  cover?: unknown;
+  blocks?: unknown;
+  id?: string;
+  type?: string;
+  slug?: string;
+  year_id?: string;
+  subject_id?: string;
+  status?: string;
+  created_at?: string;
+  updated_at?: string;
+  schema_version?: number;
 }
 
 interface PublishedLessonBlob {
@@ -56,11 +70,35 @@ export default async function handler(request: Request, context: FunctionContext
 
   const lessons = orderLessonsByUnitIds(unit.lesson_ids ?? [], matching);
 
+  const unitParsed = UnitSchema.safeParse({
+    id,
+    type: 'unit',
+    title: unit.title,
+    slug: unit.slug ?? 'published',
+    year_id: unit.year_id ?? 'year',
+    subject_id: unit.subject_id ?? 'subject',
+    lesson_ids: unit.lesson_ids ?? [],
+    blocks: unit.blocks ?? [],
+    cover: unit.cover,
+    status: unit.status ?? 'active',
+    created_at: unit.created_at ?? '2026-01-01T00:00:00.000Z',
+    updated_at: unit.updated_at ?? '2026-01-01T00:00:00.000Z',
+    schema_version: unit.schema_version ?? 1
+  });
+
+  const studentBlocks = sanitizeBlocksDeep(
+    filterBlocksForStudent(unitParsed.success ? (unitParsed.data.blocks ?? []) : [])
+  );
+
   return withCors(
     okResponse(200, {
       unit_id: id,
       title: unit.title,
-      lessons
+      lessons,
+      ...(unitParsed.success && unitParsed.data.cover
+        ? { cover: unitParsed.data.cover }
+        : {}),
+      blocks: studentBlocks
     }),
     request,
     env

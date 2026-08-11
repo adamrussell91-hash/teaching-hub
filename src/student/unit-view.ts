@@ -1,6 +1,8 @@
 import { apiGet, ApiClientError } from '@/api/client';
 import { navigate } from '@/app/router';
+import { renderBlock } from '@/blocks/render';
 import type { PublishedUnit } from '@/schemas/published-unit';
+import { renderCoverBanner } from '@/teacher/cover-picker';
 
 export interface MountStudentUnitViewOptions {
   root: HTMLElement;
@@ -46,10 +48,23 @@ function renderStatus(content: HTMLElement, text: string): void {
 function renderPublishedUnit(content: HTMLElement, unit: PublishedUnit): void {
   content.replaceChildren();
 
+  content.append(renderCoverBanner(unit.cover, [], unit.title));
+
   const title = document.createElement('h1');
   title.className = 'student-surface__title';
   title.textContent = unit.title;
   content.append(title);
+
+  const planBlocks = unit.blocks ?? [];
+  if (planBlocks.length > 0) {
+    const plan = document.createElement('section');
+    plan.className = 'student-unit__plan';
+    plan.dataset.unitSection = 'plan';
+    for (const block of planBlocks) {
+      plan.append(renderBlock(block, 'student'));
+    }
+    content.append(plan);
+  }
 
   if (unit.lessons.length === 0) {
     const empty = document.createElement('p');
@@ -85,7 +100,7 @@ function renderPublishedUnit(content: HTMLElement, unit: PublishedUnit): void {
 
 /**
  * Loads a published unit and renders the public student unit surface:
- * unit title and a list of published lesson links (or empty / not-found copy).
+ * cover, plan overview blocks, and published lesson links.
  */
 export function mountStudentUnitView(
   options: MountStudentUnitViewOptions

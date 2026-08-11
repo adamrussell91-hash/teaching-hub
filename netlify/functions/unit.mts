@@ -18,8 +18,10 @@ import {
 } from './_shared/http.mts';
 import {
   BlockSchema,
+  CoverPatchSchema,
   UnitSchema,
   type Block,
+  type Cover,
   type Unit
 } from '../../src/schemas';
 import { unitContentChanged } from '../../src/recovery/versions';
@@ -48,6 +50,7 @@ function parseBody(
       description?: string;
       blocks?: Block[];
       lesson_ids?: string[];
+      cover?: Cover | null;
       status?: Unit['status'];
       trash_reason?: string;
     }
@@ -61,17 +64,18 @@ function parseBody(
   const hasDescription = record.description !== undefined;
   const hasBlocks = record.blocks !== undefined;
   const hasLessonIds = record.lesson_ids !== undefined;
+  const hasCover = record.cover !== undefined;
   const statusPatch = parseStatusPatch(body);
   if (!statusPatch.ok) {
     return { ok: false, code: statusPatch.code, message: statusPatch.message };
   }
   const hasStatus = statusPatch.hasStatus;
 
-  if (!hasTitle && !hasDescription && !hasBlocks && !hasLessonIds && !hasStatus) {
+  if (!hasTitle && !hasDescription && !hasBlocks && !hasLessonIds && !hasCover && !hasStatus) {
     return {
       ok: false,
       code: 'validation_error',
-      message: 'Provide title, description, blocks, lesson_ids, and/or status'
+      message: 'Provide title, description, blocks, lesson_ids, cover, and/or status'
     };
   }
 
@@ -109,12 +113,22 @@ function parseBody(
     lesson_ids = parsed.data;
   }
 
+  let cover: Cover | null | undefined;
+  if (hasCover) {
+    const parsed = CoverPatchSchema.safeParse(record.cover);
+    if (!parsed.success) {
+      return { ok: false, code: 'validation_error', message: 'cover is invalid' };
+    }
+    cover = parsed.data;
+  }
+
   return {
     ok: true,
     title,
     description,
     blocks,
     lesson_ids,
+    cover,
     status: statusPatch.status,
     trash_reason: statusPatch.trash_reason
   };
@@ -187,6 +201,13 @@ export default async function handler(request: Request, context: FunctionContext
   }
   if (parsed.lesson_ids !== undefined) {
     merged.lesson_ids = parsed.lesson_ids;
+  }
+  if (parsed.cover !== undefined) {
+    if (parsed.cover === null) {
+      delete merged.cover;
+    } else {
+      merged.cover = parsed.cover;
+    }
   }
 
   if (parsed.status !== undefined) {

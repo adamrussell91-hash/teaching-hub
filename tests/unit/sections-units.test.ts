@@ -97,17 +97,17 @@ describe('units', () => {
     renderUnitsIndex(canvas, curriculum);
     expect(canvas.querySelector('.home-heading')?.textContent).toBe('Units');
     expect(canvas.querySelector('[data-create-trigger]')?.textContent).toMatch(/unit/i);
-    expect(canvas.querySelector('.lesson-list__title')?.textContent).toBe(
+    expect(canvas.querySelector('.home-class-tile__title')?.textContent).toBe(
       'Artist of the Floating World'
     );
-    expect(canvas.querySelector('.lesson-list__meta')?.textContent).toBe(
+    expect(canvas.querySelector('.home-class-tile__eyebrow')?.textContent).toBe(
       'Year 12 · English Advanced'
     );
   });
 
-  it('opens the unit stub route', () => {
+  it('opens the unit page route', () => {
     renderUnitsIndex(canvas, curriculum);
-    canvas.querySelector<HTMLAnchorElement>('.lesson-list__open')!.dispatchEvent(
+    canvas.querySelector<HTMLAnchorElement>('.entity-cover-tile')!.dispatchEvent(
       new MouseEvent('click', { bubbles: true, cancelable: true })
     );
     expect(navigate).toHaveBeenCalledWith('/units/unit_aotfw');
@@ -118,6 +118,7 @@ describe('units', () => {
     expect(canvas.querySelector('.home-heading')?.textContent).toBe(
       'Artist of the Floating World'
     );
+    expect(canvas.querySelector('[data-unit-section="plan"]')).toBeTruthy();
     const titles = [...canvas.querySelectorAll('.lesson-list__title')].map((el) => el.textContent);
     expect(titles).toEqual(['Introduction', 'Themes']);
     canvas.querySelectorAll<HTMLAnchorElement>('.lesson-list__open')[1].dispatchEvent(

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { BlockSchema } from './block';
 import { CommonFields, TrashFields } from './common';
+import { CoverSchema } from './cover';
 
 export const ClassHomepageSchema = z.object({
   announcements: z.array(BlockSchema),
@@ -23,7 +24,8 @@ export const ClassSchema = z.object({
   current_unit_id: z.string().min(1).optional(),
   current_scheduled_lesson_id: z.string().min(1).optional(),
   meeting_days: z.array(z.number().int().min(1).max(7)).optional(),
-  homepage: ClassHomepageSchema.optional()
+  homepage: ClassHomepageSchema.optional(),
+  cover: CoverSchema.optional()
 });
 
 export type Class = z.infer<typeof ClassSchema>;

@@ -89,7 +89,7 @@ export default async function handler(request: Request): Promise<Response> {
     subject_id,
     lesson_ids: [],
     description,
-    blocks: Array.isArray(record.blocks) ? (record.blocks as Unit['blocks']) : undefined,
+    blocks: Array.isArray(record.blocks) ? (record.blocks as Unit['blocks']) : [],
     status: 'active',
     created_at: timestamp,
     updated_at: timestamp,

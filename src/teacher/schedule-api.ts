@@ -1,5 +1,5 @@
 import { apiPatch, apiPost } from '@/api/client';
-import type { Class, ClassHomepage, ScheduledLesson } from '@/schemas';
+import type { Class, ClassHomepage, Cover, ScheduledLesson } from '@/schemas';
 
 export function postScheduleUnit(
   classId: string,
@@ -21,6 +21,7 @@ export function patchClass(
     meeting_days?: number[];
     current_scheduled_lesson_id?: string | null;
     homepage?: ClassHomepage;
+    cover?: Cover | null;
   }
 ): Promise<Class> {
   return apiPatch(`/api/classes/${id}`, body);

@@ -93,14 +93,18 @@ function renderHomepageBlock(
 export function renderHomepageRegionsView(
   container: HTMLElement,
   homepage: ClassHomepage,
-  resolveContext?: CollectionResolveContext
+  resolveContext?: CollectionResolveContext,
+  regionKeys: ReadonlyArray<keyof ClassHomepage> = HOMEPAGE_REGIONS.map((r) => r.key)
 ): void {
   container.replaceChildren();
   const normalized = normalizeHomepage(homepage);
 
-  for (const region of HOMEPAGE_REGIONS) {
+  for (const key of regionKeys) {
+    const region = HOMEPAGE_REGIONS.find((entry) => entry.key === key);
+    if (!region) continue;
+
     const section = document.createElement('section');
-    section.className = 'class-page__section homepage-regions__section';
+    section.className = 'class-page__section homepage-regions__section glass-panel';
     section.dataset.homepageRegion = region.key;
 
     const heading = document.createElement('h2');

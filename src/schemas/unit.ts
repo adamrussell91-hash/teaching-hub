@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { BlockSchema } from './block';
 import { CommonFields, TrashFields } from './common';
+import { CoverSchema } from './cover';
 
 export const UnitSchema = z.object({
   ...CommonFields,
@@ -11,6 +12,7 @@ export const UnitSchema = z.object({
   lesson_ids: z.array(z.string().min(1)),
   primary_term: z.number().int().positive().optional(),
   description: z.string().optional(),
+  cover: CoverSchema.optional(),
   blocks: z.array(BlockSchema).optional()
 });
 
