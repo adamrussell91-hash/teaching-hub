@@ -1,10 +1,25 @@
 import { apiPost, apiPut, ApiClientError } from '@/api/client';
 import type { Lesson } from '@/schemas/lesson';
 import type { Media } from '@/schemas/media';
+import type { VersionReason } from '@/schemas/version';
 import {
   collectRestrictedDriveMediaWarnings,
   formatPublishMediaWarnings
 } from '@/teacher/publish-media-warnings';
+
+/** Checkpoint reasons the lesson PUT endpoint accepts alongside a draft body. */
+export type LessonPutCheckpointReason = Extract<
+  VersionReason,
+  'ai_accepted' | 'manual_checkpoint'
+>;
+
+export interface SaveNowOptions {
+  /**
+   * When set, the next PUT includes `checkpoint_reason` so the server creates
+   * a version. Autosave / plain `saveNow()` omit this (no version spam).
+   */
+  checkpointReason?: LessonPutCheckpointReason;
+}
 
 export type SaveState = 'saved' | 'saving' | 'unpublished_changes' | 'published' | 'save_failed';
 
@@ -83,6 +98,8 @@ export class SaveController {
    */
   private savePromise: Promise<void> | null = null;
   private resaveRequested = false;
+  /** One-shot reason applied to the next PUT only (not chained resaves). */
+  private pendingCheckpointReason: LessonPutCheckpointReason | null = null;
   private disposed = false;
 
   constructor(options: SaveControllerOptions) {
@@ -140,10 +157,17 @@ export class SaveController {
    * already in flight: the call coalesces into the current save chain and
    * the returned promise resolves once that entire chain (including any
    * resulting resave) has settled.
+   *
+   * Pass `checkpointReason: 'ai_accepted'` from the AI Accept path so the
+   * server checkpoints the pre-accept draft on that PUT.
    */
-  saveNow(): Promise<void> {
+  saveNow(options?: SaveNowOptions): Promise<void> {
     if (this.disposed) return Promise.resolve();
     this.clearTimer();
+
+    if (options?.checkpointReason) {
+      this.pendingCheckpointReason = options.checkpointReason;
+    }
 
     if (this.savePromise) {
       this.resaveRequested = true;
@@ -163,8 +187,16 @@ export class SaveController {
     this.dirty = false;
     this.setState('saving');
 
+    const checkpointReason = this.pendingCheckpointReason;
+    this.pendingCheckpointReason = null;
+
     try {
-      await apiPut(`/api/lessons/${this.lessonId}`, this.getLesson());
+      const lesson = this.getLesson();
+      const body =
+        checkpointReason === null
+          ? lesson
+          : { ...lesson, checkpoint_reason: checkpointReason };
+      await apiPut(`/api/lessons/${this.lessonId}`, body);
       this.setState(this.hasPublishedVersion ? 'unpublished_changes' : 'saved');
     } catch {
       this.dirty = true;
@@ -175,7 +207,8 @@ export class SaveController {
       this.resaveRequested = false;
       // Chained inside the same save cycle, so the outer promise (and
       // therefore `saveNow`/`flush` callers) don't resolve until this
-      // follow-up round has also settled.
+      // follow-up round has also settled. Chained resaves never re-send
+      // checkpoint_reason (cleared above).
       await this.performSave();
     }
   }

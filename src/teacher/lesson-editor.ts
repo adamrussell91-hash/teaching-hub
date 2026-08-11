@@ -20,6 +20,10 @@ import type { Lesson } from '@/schemas/lesson';
 import type { Media } from '@/schemas/media';
 import { mountA4Preview, type A4PreviewHandle } from '@/teacher/a4-preview';
 import {
+  mountHistoryPanel,
+  type HistoryPanelHandle
+} from '@/teacher/history-panel';
+import {
   buildLinkedPreview,
   ensureCompositionCached,
   openEditSourceModal,
@@ -72,6 +76,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
   let disposed = false;
   let saveController: SaveController | null = null;
   let savePublishHandle: SavePublishHandle | null = null;
+  let historyPanel: HistoryPanelHandle | null = null;
   let a4Preview: A4PreviewHandle | null = null;
   let closeEditSourceModal: (() => void) | null = null;
   let editSourceOpenSeq = 0;
@@ -666,6 +671,34 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         media: mediaList
       })
     });
+
+    const historyHost = document.createElement('div');
+    historyHost.className = 'history-panel-host context-bar__history';
+    const actions = refs.contextBar.querySelector('.context-bar__actions');
+    if (actions) {
+      actions.append(historyHost);
+    } else {
+      refs.contextBar.append(historyHost);
+    }
+
+    function applyRestoredLesson(restored: Lesson): void {
+      Object.assign(lesson, restored);
+      titleInput.value = lesson.title;
+      blockCounter = lesson.blocks.length;
+      renderBlocksList();
+      a4Preview?.update(lesson);
+      const titleEl = refs.contextBar.querySelector('.teacher-layout__context-bar-title');
+      if (titleEl) titleEl.textContent = lesson.title || 'Untitled lesson';
+    }
+
+    historyPanel = mountHistoryPanel({
+      kind: 'lesson',
+      parentId: lesson.id,
+      host: historyHost,
+      onRestored: (live) => {
+        applyRestoredLesson(live as Lesson);
+      }
+    });
   }
 
   return {
@@ -677,6 +710,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       closeEditSourceModal?.();
       closeEditSourceModal = null;
       a4Preview?.dispose();
+      historyPanel?.dispose();
       savePublishHandle?.dispose();
       saveController?.dispose();
     },

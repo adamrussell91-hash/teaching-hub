@@ -4,6 +4,8 @@ import type { CreateKind } from '@/teacher/create/types';
 import type { CurriculumResponse } from '@/teacher/nav';
 import { cloneBlocksWithNewIds } from '@/blocks/clone-blocks';
 import { createUnitTemplate } from '@/teacher/template-api';
+import { mountHistoryPanel } from '@/teacher/history-panel';
+import type { Unit } from '@/schemas';
 
 export interface UnitsIndexOptions {
   onCreated?: (kind: CreateKind, id: string) => void | Promise<void>;
@@ -122,6 +124,9 @@ export function renderUnitStub(
   heading.textContent = unit.title;
   canvas.append(heading);
 
+  const tools = document.createElement('div');
+  tools.className = 'unit-stub__tools';
+
   const saveTemplate = document.createElement('button');
   saveTemplate.type = 'button';
   saveTemplate.className = 'btn btn--secondary';
@@ -148,7 +153,23 @@ export function renderUnitStub(
       }
     })();
   });
-  canvas.append(saveTemplate);
+
+  const historyHost = document.createElement('div');
+  historyHost.className = 'history-panel-host unit-stub__history';
+
+  tools.append(saveTemplate, historyHost);
+  canvas.append(tools);
+
+  mountHistoryPanel({
+    kind: 'unit',
+    parentId: unitId,
+    host: historyHost,
+    onRestored: (live) => {
+      const restored = live as Unit;
+      Object.assign(unit, restored);
+      heading.textContent = unit.title;
+    }
+  });
 
   const lessons = curriculum.lessons
     .filter((lesson) => lesson.unit_id === unitId)

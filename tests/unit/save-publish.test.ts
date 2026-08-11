@@ -124,6 +124,50 @@ describe('SaveController', () => {
     expect(apiPutMock).toHaveBeenCalledWith(`/api/lessons/${lesson.id}`, lesson);
   });
 
+  it('includes checkpoint_reason on saveNow when requested (AI accept path)', async () => {
+    apiPutMock.mockResolvedValue(lesson);
+    const controller = new SaveController({
+      lessonId: lesson.id,
+      getLesson: () => lesson,
+      hasPublishedVersion: false
+    });
+
+    await controller.saveNow({ checkpointReason: 'ai_accepted' });
+
+    expect(apiPutMock).toHaveBeenCalledTimes(1);
+    expect(apiPutMock).toHaveBeenCalledWith(`/api/lessons/${lesson.id}`, {
+      ...lesson,
+      checkpoint_reason: 'ai_accepted'
+    });
+  });
+
+  it('does not re-send checkpoint_reason on a chained resave', async () => {
+    let resolveFirst!: () => void;
+    const first = new Promise<void>((resolve) => {
+      resolveFirst = resolve;
+    });
+    apiPutMock.mockImplementationOnce(async () => {
+      await first;
+      return lesson;
+    });
+    apiPutMock.mockResolvedValue(lesson);
+
+    const controller = new SaveController({
+      lessonId: lesson.id,
+      getLesson: () => lesson,
+      hasPublishedVersion: false
+    });
+
+    const firstSave = controller.saveNow({ checkpointReason: 'ai_accepted' });
+    const secondSave = controller.saveNow();
+    resolveFirst();
+    await Promise.all([firstSave, secondSave]);
+
+    expect(apiPutMock).toHaveBeenCalledTimes(2);
+    expect(apiPutMock.mock.calls[0]![1]).toMatchObject({ checkpoint_reason: 'ai_accepted' });
+    expect(apiPutMock.mock.calls[1]![1]).toEqual(lesson);
+  });
+
   it('transitions saved -> saving -> saved across a successful autosave', async () => {
     apiPutMock.mockResolvedValue(lesson);
     const states: string[] = [];

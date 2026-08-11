@@ -532,10 +532,14 @@ function buildHomepageSection(
     editButton.hidden = true;
     editorHandle?.destroy();
     editorHandle = mountHomepageEditor(regionsContainer, normalizeHomepage(cls.homepage), {
+      classId: cls.id,
       resolveContext,
       onSave: async (homepage) => {
         await patchClass(cls.id, { homepage });
         await options.onScheduleMutated?.();
+      },
+      onRestored: (restored) => {
+        cls.homepage = normalizeHomepage(restored.homepage);
       },
       onCancel: () => {
         showViewMode();

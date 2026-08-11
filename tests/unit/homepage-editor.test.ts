@@ -81,6 +81,7 @@ describe('mountHomepageEditor', () => {
 
   it('does not offer learning activities in homepage block pickers', () => {
     mountHomepageEditor(container, emptyHomepage(), {
+      classId: 'class_test',
       onSave: vi.fn().mockResolvedValue(undefined),
       onCancel: vi.fn()
     });
@@ -98,7 +99,11 @@ describe('mountHomepageEditor', () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
     const onCancel = vi.fn();
 
-    mountHomepageEditor(container, emptyHomepage(), { onSave, onCancel });
+    mountHomepageEditor(container, emptyHomepage(), {
+      classId: 'class_test',
+      onSave,
+      onCancel
+    });
 
     const region = container.querySelector('[data-homepage-region="announcements"]');
     const select = region?.querySelector<HTMLSelectElement>('.homepage-editor__add-block-select');
@@ -121,7 +126,11 @@ describe('mountHomepageEditor', () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
     const onCancel = vi.fn();
 
-    mountHomepageEditor(container, emptyHomepage(), { onSave, onCancel });
+    mountHomepageEditor(container, emptyHomepage(), {
+      classId: 'class_test',
+      onSave,
+      onCancel
+    });
     container.querySelector<HTMLButtonElement>('.homepage-editor__cancel')?.click();
 
     expect(onCancel).toHaveBeenCalledTimes(1);

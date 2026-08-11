@@ -18,7 +18,11 @@ import {
   type BlockEditorContext
 } from '@/blocks/registry';
 import type { Block } from '@/schemas/block';
-import type { ClassHomepage } from '@/schemas/class';
+import type { Class, ClassHomepage } from '@/schemas/class';
+import {
+  mountHistoryPanel,
+  type HistoryPanelHandle
+} from '@/teacher/history-panel';
 
 export const HOMEPAGE_REGIONS = [
   { key: 'announcements', title: 'Announcements', emptyCopy: 'No announcements yet.' },
@@ -128,14 +132,18 @@ export function mountHomepageEditor(
   container: HTMLElement,
   initial: ClassHomepage,
   options: {
+    classId: string;
     onSave: (homepage: ClassHomepage) => Promise<void>;
     onCancel: () => void;
+    /** Called after a successful version restore so the parent class cache stays in sync. */
+    onRestored?: (cls: Class) => void;
     resolveContext?: CollectionResolveContext;
   }
 ): HomepageEditorHandle {
   const homepage = cloneHomepage(normalizeHomepage(initial));
   let blockCounter = countBlocks(homepage);
   let destroyed = false;
+  let historyPanel: HistoryPanelHandle | null = null;
 
   const editorContext: BlockEditorContext = {
     resolveCollection: (block) => resolveCollectionBlock(block, options.resolveContext)
@@ -164,7 +172,10 @@ export function mountHomepageEditor(
   cancelButton.className = 'btn btn--secondary homepage-editor__cancel';
   cancelButton.textContent = 'Cancel';
 
-  toolbar.append(saveButton, cancelButton);
+  const historyHost = document.createElement('div');
+  historyHost.className = 'history-panel-host homepage-editor__history';
+
+  toolbar.append(saveButton, cancelButton, historyHost);
 
   const regionsContainer = document.createElement('div');
   regionsContainer.className = 'homepage-editor__regions';
@@ -345,11 +356,29 @@ export function mountHomepageEditor(
     options.onCancel();
   });
 
+  historyPanel = mountHistoryPanel({
+    kind: 'class_homepage',
+    parentId: options.classId,
+    host: historyHost,
+    onRestored: (live) => {
+      const restoredClass = live as Class;
+      const next = normalizeHomepage(restoredClass.homepage);
+      homepage.announcements = next.announcements;
+      homepage.resources = next.resources;
+      homepage.custom = next.custom;
+      blockCounter = countBlocks(homepage);
+      renderRegions();
+      options.onRestored?.(restoredClass);
+    }
+  });
+
   renderRegions();
 
   return {
     destroy() {
       destroyed = true;
+      historyPanel?.dispose();
+      historyPanel = null;
       container.replaceChildren();
     }
   };
