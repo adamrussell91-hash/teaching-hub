@@ -28,6 +28,12 @@ import {
   createNetlifyJsonStore,
   tryWriteCheckpoint
 } from './_shared/versions.mts';
+import {
+  applyParsedStatus,
+  handlePermanentDelete,
+  LifecycleError,
+  parseStatusPatch
+} from './_shared/lifecycle-routes.mts';
 
 interface FunctionContext {
   params: Record<string, string | undefined>;
@@ -42,6 +48,8 @@ function parseBody(
       description?: string;
       blocks?: Block[];
       lesson_ids?: string[];
+      status?: Unit['status'];
+      trash_reason?: string;
     }
   | { ok: false; code: string; message: string } {
   if (typeof body !== 'object' || body === null) {
@@ -53,12 +61,17 @@ function parseBody(
   const hasDescription = record.description !== undefined;
   const hasBlocks = record.blocks !== undefined;
   const hasLessonIds = record.lesson_ids !== undefined;
+  const statusPatch = parseStatusPatch(body);
+  if (!statusPatch.ok) {
+    return { ok: false, code: statusPatch.code, message: statusPatch.message };
+  }
+  const hasStatus = statusPatch.hasStatus;
 
-  if (!hasTitle && !hasDescription && !hasBlocks && !hasLessonIds) {
+  if (!hasTitle && !hasDescription && !hasBlocks && !hasLessonIds && !hasStatus) {
     return {
       ok: false,
       code: 'validation_error',
-      message: 'Provide title, description, blocks, and/or lesson_ids'
+      message: 'Provide title, description, blocks, lesson_ids, and/or status'
     };
   }
 
@@ -96,7 +109,15 @@ function parseBody(
     lesson_ids = parsed.data;
   }
 
-  return { ok: true, title, description, blocks, lesson_ids };
+  return {
+    ok: true,
+    title,
+    description,
+    blocks,
+    lesson_ids,
+    status: statusPatch.status,
+    trash_reason: statusPatch.trash_reason
+  };
 }
 
 export default async function handler(request: Request, context: FunctionContext): Promise<Response> {
@@ -108,8 +129,13 @@ export default async function handler(request: Request, context: FunctionContext
   if (!id) {
     return withCors(errorResponse(404, 'not_found', 'Unit not found'), request, env);
   }
+
+  if (request.method === 'DELETE') {
+    return handlePermanentDelete(request, context, 'unit');
+  }
+
   if (request.method !== 'PATCH') {
-    return withCors(methodNotAllowed('PATCH, OPTIONS'), request, env);
+    return withCors(methodNotAllowed('PATCH, DELETE, OPTIONS'), request, env);
   }
 
   const originGuard = guardRequestOrigin(request, env);
@@ -145,7 +171,7 @@ export default async function handler(request: Request, context: FunctionContext
   }
 
   const nowIso = new Date().toISOString();
-  const merged: Record<string, unknown> = {
+  let merged: Record<string, unknown> = {
     ...unitParsed.data,
     updated_at: nowIso
   };
@@ -161,6 +187,18 @@ export default async function handler(request: Request, context: FunctionContext
   }
   if (parsed.lesson_ids !== undefined) {
     merged.lesson_ids = parsed.lesson_ids;
+  }
+
+  if (parsed.status !== undefined) {
+    try {
+      merged = applyParsedStatus(merged as Unit, parsed, nowIso) as Record<string, unknown>;
+      merged.updated_at = nowIso;
+    } catch (err) {
+      if (err instanceof LifecycleError) {
+        return withCors(errorResponse(400, err.code, err.message), request, env);
+      }
+      throw err;
+    }
   }
 
   const validated = UnitSchema.safeParse(merged);

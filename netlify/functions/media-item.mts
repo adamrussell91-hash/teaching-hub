@@ -18,6 +18,12 @@ import {
   type Media
 } from '../../src/schemas';
 import { optionalNonEmptyString } from './_shared/media-fields.mts';
+import {
+  applyParsedStatus,
+  handlePermanentDelete,
+  LifecycleError,
+  parseStatusPatch
+} from './_shared/lifecycle-routes.mts';
 
 interface FunctionContext {
   params: Record<string, string | undefined>;
@@ -126,8 +132,18 @@ export default async function handler(request: Request, context: FunctionContext
   const env = process.env;
 
   if (request.method === 'OPTIONS') return preflightResponse(request, env);
+
+  const id = context.params.id;
+  if (!id) {
+    return withCors(errorResponse(404, 'not_found', 'Media not found'), request, env);
+  }
+
+  if (request.method === 'DELETE') {
+    return handlePermanentDelete(request, context, 'media');
+  }
+
   if (request.method !== 'GET' && request.method !== 'PATCH') {
-    return withCors(methodNotAllowed('GET, PATCH, OPTIONS'), request, env);
+    return withCors(methodNotAllowed('GET, PATCH, DELETE, OPTIONS'), request, env);
   }
 
   const originGuard = guardRequestOrigin(request, env);
@@ -137,11 +153,6 @@ export default async function handler(request: Request, context: FunctionContext
   const session = getTeacherSession(request, env);
   if (!session.authenticated) {
     return withCors(errorResponse(401, 'unauthorized', 'Authentication required'), request, env);
-  }
-
-  const id = context.params.id;
-  if (!id) {
-    return withCors(errorResponse(404, 'not_found', 'Media not found'), request, env);
   }
 
   const store = getContentStore();
@@ -171,16 +182,34 @@ export default async function handler(request: Request, context: FunctionContext
     return withCors(errorResponse(400, parsed.code, parsed.message), request, env);
   }
 
-  const merged: Media = {
+  const nowIso = new Date().toISOString();
+  let merged: Media = {
     ...existing.data,
-    updated_at: new Date().toISOString()
+    updated_at: nowIso
   };
 
   if (parsed.title !== undefined) {
     merged.title = parsed.title;
     merged.slug = slugify(parsed.title);
   }
-  if (parsed.status !== undefined) merged.status = parsed.status;
+  if (parsed.status !== undefined) {
+    try {
+      const statusParsed = parseStatusPatch({
+        status: parsed.status,
+        trash_reason: (body as Record<string, unknown>).trash_reason
+      });
+      if (!statusParsed.ok) {
+        return withCors(errorResponse(400, statusParsed.code, statusParsed.message), request, env);
+      }
+      merged = applyParsedStatus(merged, statusParsed, nowIso);
+      merged.updated_at = nowIso;
+    } catch (err) {
+      if (err instanceof LifecycleError) {
+        return withCors(errorResponse(400, err.code, err.message), request, env);
+      }
+      throw err;
+    }
+  }
   if (parsed.preview_url !== undefined) merged.preview_url = parsed.preview_url;
   if (parsed.download_url !== undefined) merged.download_url = parsed.download_url;
   if (parsed.thumbnail_url !== undefined) merged.thumbnail_url = parsed.thumbnail_url;

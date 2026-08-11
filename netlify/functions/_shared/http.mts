@@ -83,7 +83,7 @@ export function corsHeaders(request: Request, env: FunctionEnv): Record<string, 
     'access-control-allow-origin': allowed,
     'access-control-allow-credentials': 'true',
     'access-control-allow-headers': 'content-type',
-    'access-control-allow-methods': 'GET, POST, PUT, OPTIONS',
+    'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
     vary: 'origin'
   };
 }

@@ -16,6 +16,12 @@ import {
   SectionBlockSchema,
   type CompositionTemplate
 } from '../../src/schemas';
+import {
+  applyParsedStatus,
+  handlePermanentDelete,
+  LifecycleError,
+  parseStatusPatch
+} from './_shared/lifecycle-routes.mts';
 
 interface FunctionContext {
   params: Record<string, string | undefined>;
@@ -25,8 +31,17 @@ export default async function handler(request: Request, context: FunctionContext
   const env = process.env;
 
   if (request.method === 'OPTIONS') return preflightResponse(request, env);
+
+  const earlyId = context.params.id;
+  if (request.method === 'DELETE') {
+    if (!earlyId) {
+      return withCors(errorResponse(404, 'not_found', 'Composition not found'), request, env);
+    }
+    return handlePermanentDelete(request, context, 'composition');
+  }
+
   if (request.method !== 'GET' && request.method !== 'PATCH') {
-    return withCors(methodNotAllowed('GET, PATCH, OPTIONS'), request, env);
+    return withCors(methodNotAllowed('GET, PATCH, DELETE, OPTIONS'), request, env);
   }
 
   const originGuard = guardRequestOrigin(request, env);
@@ -76,15 +91,21 @@ export default async function handler(request: Request, context: FunctionContext
   const record = body as Record<string, unknown>;
   const hasTitle = typeof record.title === 'string';
   const hasRoot = record.root !== undefined;
-  if (!hasTitle && !hasRoot) {
+  const statusParsed = parseStatusPatch(body);
+  if (!statusParsed.ok) {
+    return withCors(errorResponse(400, statusParsed.code, statusParsed.message), request, env);
+  }
+  const hasStatus = statusParsed.hasStatus;
+  if (!hasTitle && !hasRoot && !hasStatus) {
     return withCors(
-      errorResponse(400, 'validation_error', 'At least one of title or root is required'),
+      errorResponse(400, 'validation_error', 'At least one of title, root, or status is required'),
       request,
       env
     );
   }
 
-  const next = { ...existing.data };
+  const nowIso = new Date().toISOString();
+  let next = { ...existing.data };
 
   if (hasTitle) {
     const title = (record.title as string).trim();
@@ -119,7 +140,18 @@ export default async function handler(request: Request, context: FunctionContext
     next.root = structuredClone(rootParsed.data);
   }
 
-  next.updated_at = new Date().toISOString();
+  if (hasStatus) {
+    try {
+      next = applyParsedStatus(next, statusParsed, nowIso);
+    } catch (err) {
+      if (err instanceof LifecycleError) {
+        return withCors(errorResponse(400, err.code, err.message), request, env);
+      }
+      throw err;
+    }
+  }
+
+  next.updated_at = nowIso;
 
   const validated = CompositionTemplateSchema.safeParse(next);
   if (!validated.success) {

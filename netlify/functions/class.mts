@@ -20,6 +20,7 @@ import {
   ClassHomepageSchema,
   ClassSchema,
   ScheduledLessonSchema,
+  type Class,
   type ClassHomepage
 } from '../../src/schemas';
 import {
@@ -27,6 +28,12 @@ import {
   createNetlifyJsonStore,
   tryWriteCheckpoint
 } from './_shared/versions.mts';
+import {
+  applyParsedStatus,
+  handlePermanentDelete,
+  LifecycleError,
+  parseStatusPatch
+} from './_shared/lifecycle-routes.mts';
 
 interface FunctionContext {
   params: Record<string, string | undefined>;
@@ -40,6 +47,8 @@ function parseBody(
       meeting_days?: number[];
       current_scheduled_lesson_id?: string | null;
       homepage?: ClassHomepage;
+      status?: Class['status'];
+      trash_reason?: string;
     }
   | { ok: false; code: string; message: string } {
   if (typeof body !== 'object' || body === null) {
@@ -50,12 +59,17 @@ function parseBody(
   const hasMeetingDays = record.meeting_days !== undefined;
   const hasCurrent = record.current_scheduled_lesson_id !== undefined;
   const hasHomepage = record.homepage !== undefined;
+  const statusPatch = parseStatusPatch(body);
+  if (!statusPatch.ok) {
+    return { ok: false, code: statusPatch.code, message: statusPatch.message };
+  }
+  const hasStatus = statusPatch.hasStatus;
 
-  if (!hasMeetingDays && !hasCurrent && !hasHomepage) {
+  if (!hasMeetingDays && !hasCurrent && !hasHomepage && !hasStatus) {
     return {
       ok: false,
       code: 'validation_error',
-      message: 'Provide meeting_days, current_scheduled_lesson_id, and/or homepage'
+      message: 'Provide meeting_days, current_scheduled_lesson_id, homepage, and/or status'
     };
   }
 
@@ -111,7 +125,14 @@ function parseBody(
     homepage = homepageParsed.data;
   }
 
-  return { ok: true, meeting_days, current_scheduled_lesson_id, homepage };
+  return {
+    ok: true,
+    meeting_days,
+    current_scheduled_lesson_id,
+    homepage,
+    status: statusPatch.status,
+    trash_reason: statusPatch.trash_reason
+  };
 }
 
 export default async function handler(request: Request, context: FunctionContext): Promise<Response> {
@@ -123,8 +144,13 @@ export default async function handler(request: Request, context: FunctionContext
   if (!id) {
     return withCors(errorResponse(404, 'not_found', 'Class not found'), request, env);
   }
+
+  if (request.method === 'DELETE') {
+    return handlePermanentDelete(request, context, 'class');
+  }
+
   if (request.method !== 'PATCH') {
-    return withCors(methodNotAllowed('PATCH, OPTIONS'), request, env);
+    return withCors(methodNotAllowed('PATCH, DELETE, OPTIONS'), request, env);
   }
 
   const originGuard = guardRequestOrigin(request, env);
@@ -179,7 +205,7 @@ export default async function handler(request: Request, context: FunctionContext
   }
 
   const nowIso = new Date().toISOString();
-  const merged: Record<string, unknown> = {
+  let merged: Record<string, unknown> = {
     ...classParsed.data,
     updated_at: nowIso
   };
@@ -198,6 +224,18 @@ export default async function handler(request: Request, context: FunctionContext
 
   if (parsed.homepage !== undefined) {
     merged.homepage = parsed.homepage;
+  }
+
+  if (parsed.status !== undefined) {
+    try {
+      merged = applyParsedStatus(merged as Class, parsed, nowIso) as Record<string, unknown>;
+      merged.updated_at = nowIso;
+    } catch (err) {
+      if (err instanceof LifecycleError) {
+        return withCors(errorResponse(400, err.code, err.message), request, env);
+      }
+      throw err;
+    }
   }
 
   const validated = ClassSchema.safeParse(merged);

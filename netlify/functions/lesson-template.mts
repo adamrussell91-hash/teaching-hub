@@ -11,7 +11,13 @@ import {
   preflightResponse,
   withCors
 } from './_shared/http.mts';
-import { LessonTemplateSchema, StatusSchema, type LessonTemplate } from '../../src/schemas';
+import { LessonTemplateSchema, type LessonTemplate } from '../../src/schemas';
+import {
+  applyParsedStatus,
+  handlePermanentDelete,
+  LifecycleError,
+  parseStatusPatch
+} from './_shared/lifecycle-routes.mts';
 
 interface FunctionContext {
   params: Record<string, string | undefined>;
@@ -21,8 +27,17 @@ export default async function handler(request: Request, context: FunctionContext
   const env = process.env;
 
   if (request.method === 'OPTIONS') return preflightResponse(request, env);
+
+  const earlyId = context.params.id;
+  if (request.method === 'DELETE') {
+    if (!earlyId) {
+      return withCors(errorResponse(404, 'not_found', 'Lesson template not found'), request, env);
+    }
+    return handlePermanentDelete(request, context, 'lesson_template');
+  }
+
   if (request.method !== 'GET' && request.method !== 'PATCH') {
-    return withCors(methodNotAllowed('GET, PATCH, OPTIONS'), request, env);
+    return withCors(methodNotAllowed('GET, PATCH, DELETE, OPTIONS'), request, env);
   }
 
   const originGuard = guardRequestOrigin(request, env);
@@ -70,7 +85,7 @@ export default async function handler(request: Request, context: FunctionContext
   }
 
   const record = body as Record<string, unknown>;
-  const next = { ...existing.data };
+  let next = { ...existing.data };
   if (typeof record.title === 'string') {
     const title = record.title.trim();
     if (!title) {
@@ -79,14 +94,22 @@ export default async function handler(request: Request, context: FunctionContext
     next.title = title;
     next.slug = slugify(title);
   }
+  const nowIso = new Date().toISOString();
   if (record.status !== undefined) {
-    const status = StatusSchema.safeParse(record.status);
-    if (!status.success) {
-      return withCors(errorResponse(400, 'validation_error', 'status is invalid'), request, env);
+    const statusParsed = parseStatusPatch(body);
+    if (!statusParsed.ok) {
+      return withCors(errorResponse(400, statusParsed.code, statusParsed.message), request, env);
     }
-    next.status = status.data;
+    try {
+      next = applyParsedStatus(next, statusParsed, nowIso);
+    } catch (err) {
+      if (err instanceof LifecycleError) {
+        return withCors(errorResponse(400, err.code, err.message), request, env);
+      }
+      throw err;
+    }
   }
-  next.updated_at = new Date().toISOString();
+  next.updated_at = nowIso;
 
   const validated = LessonTemplateSchema.safeParse(next);
   if (!validated.success) {
