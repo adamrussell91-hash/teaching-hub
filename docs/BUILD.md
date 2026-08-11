@@ -24,8 +24,7 @@ Suggested order for continuing builder / teaching-page work (adjust as needed):
 
 Larger product tracks (not “next block”, but still ahead):
 
-- Linked template reuse (edit source / detach)
-- Versioning, archive, recovery  
+- Versioning, archive, recovery
 
 ---
 
@@ -33,6 +32,7 @@ Larger product tracks (not “next block”, but still ahead):
 
 | Date | Slice | Outcome |
 |------|--------|---------|
+| 2026-08-11 | **Linked template reuse** | Linked composition templates (edit source / detach); propagates updates to linked copies — [`design`](superpowers/specs/2026-08-11-linked-composition-templates-design.md) / [`plan`](superpowers/plans/2026-08-11-linked-composition-templates.md) |
 | 2026-08-11 | **Lesson & unit templates** | Save lesson/unit templates; `/templates` library (use/rename/archive); create new independent entities — [`design`](superpowers/specs/2026-08-11-lesson-unit-templates-design.md) / [`plan`](superpowers/plans/2026-08-11-lesson-unit-templates.md) |
 | 2026-08-11 | **Search / nav acceleration** | Rail search + ⌘K panel; client title/metadata + server body scan; ranked results with snippets — [`design`](superpowers/specs/2026-08-11-search-nav-acceleration-design.md) / [`plan`](superpowers/plans/2026-08-11-search-nav-acceleration.md) |
 | 2026-08-07 | First slice | Auth, lesson draft/publish, `rich_text` / `heading` / `callout`, student lesson view |
@@ -77,7 +77,7 @@ Larger product tracks (not “next block”, but still ahead):
 | 6–8 Unit/class pages, scheduling, scope | Largely done for v1 |
 | 9 A4 print | **v1 done** — preview + print; metadata/tools polish later |
 | 10 Google Drive | **v1 done** — mirror + picker + library |
-| 11 Templates / reuse | **Lesson/unit templates v1** + compositions v1; linked reuse later |
+| 11 Templates / reuse | **Done (v1)** — lesson/unit templates + compositions + linked reuse |
 | 12 Search | **v1 done** — rail + ⌘K panel; client titles + server body scan |
 | 13 AI | Not started |
 | 14–15 Versioning / hardening | Not started |
@@ -116,7 +116,7 @@ Unchecked = not built yet.
 ### Platform (later)
 - [x] A4 print pipeline
 - [x] Media library + uploads / Drive
-- [x] Templates & compositions (compositions v1 + lesson/unit templates v1; linked later)
+- [x] Templates & compositions (compositions + lesson/unit templates + linked reuse)
 - [x] Search
 - [ ] AI agent
 - [ ] Versioning / archive / recovery
@@ -125,4 +125,4 @@ Unchecked = not built yet.
 
 ## Latest note
 
-**2026-08-11** — Lesson & unit templates shipped (save, `/templates` library, create-new independent copy). Next up: AI agent integration.
+**2026-08-11** — Linked composition templates shipped (edit source / detach). Next up: AI agent integration; versioning, archive, recovery on the horizon.
