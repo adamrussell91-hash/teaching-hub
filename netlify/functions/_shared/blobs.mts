@@ -11,7 +11,9 @@ import {
   scopeSequenceKey,
   mediaKey,
   mediaFileKey,
-  compositionKey
+  compositionKey,
+  lessonTemplateKey,
+  unitTemplateKey
 } from '../../../src/storage/keys';
 
 // Re-exported so function handlers have one place to import key builders from,
@@ -29,7 +31,9 @@ export {
   scopeSequenceKey,
   mediaKey,
   mediaFileKey,
-  compositionKey
+  compositionKey,
+  lessonTemplateKey,
+  unitTemplateKey
 };
 
 const CONTENT_STORE_NAME = 'teaching-hub-content';

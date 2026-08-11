@@ -11,6 +11,7 @@ const SECTIONS: Array<{ id: TeacherSection; label: string; path: string }> = [
   { id: 'scope-sequences', label: 'Scope & Sequences', path: '/scope-sequences' },
   { id: 'units', label: 'Units', path: '/units' },
   { id: 'lessons', label: 'Lessons', path: '/lessons' },
+  { id: 'templates', label: 'Templates', path: '/templates' },
   { id: 'resources', label: 'Resource Library', path: '/resources' }
 ];
 

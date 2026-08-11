@@ -69,3 +69,15 @@ export {
   type CompositionTemplate,
   type CompositionSummary
 } from './composition';
+export {
+  LessonTemplateSchema,
+  LessonTemplateSummarySchema,
+  type LessonTemplate,
+  type LessonTemplateSummary
+} from './lesson-template';
+export {
+  UnitTemplateSchema,
+  UnitTemplateSummarySchema,
+  type UnitTemplate,
+  type UnitTemplateSummary
+} from './unit-template';

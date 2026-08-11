@@ -26,6 +26,7 @@ import { renderClassesIndex, renderClassPage, type ClassPageOptions } from '@/te
 import { openScheduleUnitModal } from '@/teacher/sections/schedule-unit-modal';
 import { renderUnitsIndex, renderUnitStub } from '@/teacher/sections/units';
 import { renderLessonsIndex } from '@/teacher/sections/lessons';
+import { renderTemplatesPage } from '@/teacher/sections/templates';
 import { fetchContentSearch } from '@/teacher/search/api';
 import { resolveTodayClassId } from '@/teacher/search/actions';
 import { openSearchPanel } from '@/teacher/search/panel';
@@ -506,6 +507,21 @@ function renderTeacherResourcesRoute(token: number): void {
   });
 }
 
+function renderTeacherTemplatesRoute(token: number): void {
+  const refs = mountTeacherShell();
+  renderContextBar(refs, { title: 'Templates' });
+  renderRailStatus(refs.railNav, 'Loading curriculum…');
+  renderCanvasStatus(refs.canvas, 'Loading…');
+
+  void loadNavAndHandleErrors(refs, token, 'templates', undefined, (curriculum) => {
+    renderTemplatesPage(refs.canvas, curriculum, {
+      onCreated: async () => {
+        curriculumPromise = null;
+      }
+    });
+  });
+}
+
 function renderTeacherScopeSequencesRoute(token: number): void {
   const refs = mountTeacherShell();
   renderContextBar(refs, { title: 'Scope & Sequences' });
@@ -656,6 +672,9 @@ function renderRoute(match: RouteMatch, token: number): void {
       break;
     case 'teacher-resources':
       renderTeacherResourcesRoute(token);
+      break;
+    case 'teacher-templates':
+      renderTeacherTemplatesRoute(token);
       break;
     case 'teacher-scope-sequences':
       renderTeacherScopeSequencesRoute(token);

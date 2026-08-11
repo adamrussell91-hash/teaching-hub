@@ -2,6 +2,8 @@ import { navigate } from '@/app/router';
 import { mountCreateControl } from '@/teacher/create/control';
 import type { CreateKind } from '@/teacher/create/types';
 import type { CurriculumResponse } from '@/teacher/nav';
+import { cloneBlocksWithNewIds } from '@/blocks/clone-blocks';
+import { createUnitTemplate } from '@/teacher/template-api';
 
 export interface UnitsIndexOptions {
   onCreated?: (kind: CreateKind, id: string) => void | Promise<void>;
@@ -119,6 +121,34 @@ export function renderUnitStub(
   heading.className = 'home-heading';
   heading.textContent = unit.title;
   canvas.append(heading);
+
+  const saveTemplate = document.createElement('button');
+  saveTemplate.type = 'button';
+  saveTemplate.className = 'btn btn--secondary';
+  saveTemplate.textContent = 'Save as unit template';
+  saveTemplate.addEventListener('click', () => {
+    void (async () => {
+      const suggested = unit.title.trim() || 'Unit template';
+      const title = window.prompt('Unit template name', suggested);
+      if (title === null) return;
+      const trimmed = title.trim();
+      if (!trimmed) {
+        window.alert('Unit template name is required.');
+        return;
+      }
+      try {
+        await createUnitTemplate({
+          title: trimmed,
+          description: unit.description,
+          blocks: unit.blocks ? cloneBlocksWithNewIds(unit.blocks) : undefined
+        });
+        window.alert(`Saved “${trimmed}” as a unit template.`);
+      } catch {
+        window.alert('Unable to save unit template.');
+      }
+    })();
+  });
+  canvas.append(saveTemplate);
 
   const lessons = curriculum.lessons
     .filter((lesson) => lesson.unit_id === unitId)

@@ -56,6 +56,8 @@ export default async function handler(request: Request): Promise<Response> {
   const title = typeof record.title === 'string' ? record.title.trim() : '';
   const year_id = typeof record.year_id === 'string' ? record.year_id : '';
   const subject_id = typeof record.subject_id === 'string' ? record.subject_id : '';
+  const description =
+    typeof record.description === 'string' ? record.description : undefined;
 
   if (!title || !year_id || !subject_id) {
     return withCors(
@@ -86,6 +88,8 @@ export default async function handler(request: Request): Promise<Response> {
     year_id,
     subject_id,
     lesson_ids: [],
+    description,
+    blocks: Array.isArray(record.blocks) ? (record.blocks as Unit['blocks']) : undefined,
     status: 'active',
     created_at: timestamp,
     updated_at: timestamp,

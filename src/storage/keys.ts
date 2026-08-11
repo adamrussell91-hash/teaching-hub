@@ -45,3 +45,11 @@ export function mediaFileKey(id: string): string {
 export function compositionKey(id: string): string {
   return `templates/compositions/${id}`;
 }
+
+export function lessonTemplateKey(id: string): string {
+  return `templates/lessons/${id}`;
+}
+
+export function unitTemplateKey(id: string): string {
+  return `templates/units/${id}`;
+}

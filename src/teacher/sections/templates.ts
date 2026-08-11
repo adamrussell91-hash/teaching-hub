@@ -1,0 +1,241 @@
+import type { CurriculumResponse } from '@/teacher/nav';
+import {
+  listLessonTemplates,
+  listUnitTemplates,
+  patchLessonTemplate,
+  patchUnitTemplate,
+  useLessonTemplate,
+  useUnitTemplate
+} from '@/teacher/template-api';
+import type { LessonTemplateSummary, UnitTemplateSummary } from '@/schemas';
+import { navigate } from '@/app/router';
+
+type Tab = 'lessons' | 'units';
+
+export interface TemplatesPageOptions {
+  onCreated?: () => void | Promise<void>;
+}
+
+function pickUnitId(curriculum: CurriculumResponse): string | null {
+  const units = [...curriculum.units].sort((a, b) => a.title.localeCompare(b.title));
+  if (units.length === 0) return null;
+  const labels = units.map((u, i) => `${i + 1}. ${u.title}`).join('\n');
+  const answer = window.prompt(`Create lesson in which unit?\n${labels}\nEnter number:`, '1');
+  if (!answer) return null;
+  const index = Number.parseInt(answer, 10) - 1;
+  return units[index]?.id ?? null;
+}
+
+function pickSubject(curriculum: CurriculumResponse): { yearId: string; subjectId: string } | null {
+  const subjects = [...curriculum.subjects].sort((a, b) => a.title.localeCompare(b.title));
+  if (subjects.length === 0) return null;
+  const yearsById = new Map(curriculum.years.map((y) => [y.id, y]));
+  const labels = subjects
+    .map((s, i) => {
+      const year = yearsById.get(s.year_id)?.title ?? '';
+      return `${i + 1}. ${year} · ${s.title}`;
+    })
+    .join('\n');
+  const answer = window.prompt(`Create unit under which subject?\n${labels}\nEnter number:`, '1');
+  if (!answer) return null;
+  const index = Number.parseInt(answer, 10) - 1;
+  const subject = subjects[index];
+  if (!subject) return null;
+  return { yearId: subject.year_id, subjectId: subject.id };
+}
+
+export function renderTemplatesPage(
+  canvas: HTMLElement,
+  curriculum: CurriculumResponse,
+  options: TemplatesPageOptions = {}
+): { dispose: () => void } {
+  canvas.replaceChildren();
+  let tab: Tab = 'lessons';
+  let lessonRows: LessonTemplateSummary[] = [];
+  let unitRows: UnitTemplateSummary[] = [];
+  let statusText = '';
+
+  const root = document.createElement('div');
+  root.className = 'templates-page';
+
+  const header = document.createElement('header');
+  header.className = 'templates-page__header';
+  const heading = document.createElement('h1');
+  heading.className = 'home-heading';
+  heading.textContent = 'Templates';
+  header.append(heading);
+
+  const tabs = document.createElement('div');
+  tabs.className = 'templates-page__tabs';
+  tabs.setAttribute('role', 'tablist');
+
+  const lessonTab = document.createElement('button');
+  lessonTab.type = 'button';
+  lessonTab.className = 'templates-page__tab';
+  lessonTab.textContent = 'Lessons';
+  const unitTab = document.createElement('button');
+  unitTab.type = 'button';
+  unitTab.className = 'templates-page__tab';
+  unitTab.textContent = 'Units';
+
+  const status = document.createElement('p');
+  status.className = 'templates-page__status';
+  status.hidden = true;
+
+  const list = document.createElement('div');
+  list.className = 'templates-page__list';
+
+  tabs.append(lessonTab, unitTab);
+  root.append(header, tabs, status, list);
+  canvas.append(root);
+
+  function setStatus(message: string): void {
+    statusText = message;
+    status.hidden = !message;
+    status.textContent = message;
+  }
+
+  function paintTabs(): void {
+    lessonTab.setAttribute('aria-selected', tab === 'lessons' ? 'true' : 'false');
+    unitTab.setAttribute('aria-selected', tab === 'units' ? 'true' : 'false');
+    lessonTab.classList.toggle('templates-page__tab--active', tab === 'lessons');
+    unitTab.classList.toggle('templates-page__tab--active', tab === 'units');
+  }
+
+  function renderList(): void {
+    list.replaceChildren();
+    const rows = tab === 'lessons' ? lessonRows : unitRows;
+    if (rows.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'teacher-layout__canvas-status';
+      empty.textContent =
+        tab === 'lessons' ? 'No lesson templates yet.' : 'No unit templates yet.';
+      list.append(empty);
+      return;
+    }
+
+    for (const row of rows) {
+      const item = document.createElement('div');
+      item.className = 'templates-page__row';
+
+      const info = document.createElement('div');
+      const title = document.createElement('p');
+      title.className = 'templates-page__title';
+      title.textContent = row.title;
+      const meta = document.createElement('p');
+      meta.className = 'templates-page__meta';
+      meta.textContent = `Updated ${new Date(row.updated_at).toLocaleString()}`;
+      info.append(title, meta);
+
+      const actions = document.createElement('div');
+      actions.className = 'templates-page__actions';
+
+      const useBtn = document.createElement('button');
+      useBtn.type = 'button';
+      useBtn.className = 'btn btn--primary';
+      useBtn.textContent = 'Use';
+      useBtn.addEventListener('click', () => {
+        void (async () => {
+          try {
+            setStatus('Creating…');
+            if (tab === 'lessons') {
+              const unitId = pickUnitId(curriculum);
+              if (!unitId) {
+                setStatus('');
+                return;
+              }
+              const lesson = await useLessonTemplate({ templateId: row.id, unitId });
+              await options.onCreated?.();
+              navigate(`/lessons/${lesson.id}`);
+            } else {
+              const parent = pickSubject(curriculum);
+              if (!parent) {
+                setStatus('');
+                return;
+              }
+              const unit = await useUnitTemplate({
+                templateId: row.id,
+                yearId: parent.yearId,
+                subjectId: parent.subjectId
+              });
+              await options.onCreated?.();
+              navigate(`/units/${unit.id}`);
+            }
+          } catch {
+            setStatus('Unable to create from template.');
+          }
+        })();
+      });
+
+      const renameBtn = document.createElement('button');
+      renameBtn.type = 'button';
+      renameBtn.className = 'btn btn--secondary';
+      renameBtn.textContent = 'Rename';
+      renameBtn.addEventListener('click', () => {
+        void (async () => {
+          const next = window.prompt('New title', row.title);
+          if (!next?.trim()) return;
+          try {
+            if (tab === 'lessons') await patchLessonTemplate(row.id, { title: next.trim() });
+            else await patchUnitTemplate(row.id, { title: next.trim() });
+            await reload();
+            setStatus('Renamed.');
+          } catch {
+            setStatus('Unable to rename.');
+          }
+        })();
+      });
+
+      const archiveBtn = document.createElement('button');
+      archiveBtn.type = 'button';
+      archiveBtn.className = 'btn btn--ghost';
+      archiveBtn.textContent = 'Archive';
+      archiveBtn.addEventListener('click', () => {
+        void (async () => {
+          if (!window.confirm(`Archive “${row.title}”?`)) return;
+          try {
+            if (tab === 'lessons') await patchLessonTemplate(row.id, { status: 'archived' });
+            else await patchUnitTemplate(row.id, { status: 'archived' });
+            await reload();
+            setStatus('Archived.');
+          } catch {
+            setStatus('Unable to archive.');
+          }
+        })();
+      });
+
+      actions.append(useBtn, renameBtn, archiveBtn);
+      item.append(info, actions);
+      list.append(item);
+    }
+  }
+
+  async function reload(): Promise<void> {
+    try {
+      const [lessons, units] = await Promise.all([listLessonTemplates(), listUnitTemplates()]);
+      lessonRows = lessons.templates;
+      unitRows = units.templates;
+      paintTabs();
+      renderList();
+    } catch {
+      setStatus('Unable to load templates.');
+    }
+  }
+
+  lessonTab.addEventListener('click', () => {
+    tab = 'lessons';
+    paintTabs();
+    renderList();
+  });
+  unitTab.addEventListener('click', () => {
+    tab = 'units';
+    paintTabs();
+    renderList();
+  });
+
+  paintTabs();
+  void reload();
+  if (statusText) setStatus(statusText);
+
+  return { dispose: () => undefined };
+}

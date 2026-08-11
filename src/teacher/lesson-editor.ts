@@ -8,11 +8,13 @@ import {
   type InsertMenuValue
 } from '@/blocks/create-block';
 import { insertCompositionRoot } from '@/blocks/composition-insert';
+import { cloneBlocksWithNewIds } from '@/blocks/clone-blocks';
 import { createBlockEditor } from '@/blocks/registry';
 import type { CompositionSummary, CompositionTemplate } from '@/schemas/composition';
 import type { Lesson } from '@/schemas/lesson';
 import type { Media } from '@/schemas/media';
 import { mountA4Preview, type A4PreviewHandle } from '@/teacher/a4-preview';
+import { createLessonTemplate } from '@/teacher/template-api';
 import { fetchCurriculum } from '@/teacher/nav';
 import { renderContextBar, type TeacherShellRefs } from '@/teacher/shell';
 import { mountSavePublishControls, SaveController, type SavePublishHandle } from '@/teacher/save-publish';
@@ -107,6 +109,11 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
 
     titleField.append(titleLabel, titleInput);
 
+    const saveLessonTemplateButton = document.createElement('button');
+    saveLessonTemplateButton.type = 'button';
+    saveLessonTemplateButton.className = 'btn btn--secondary lesson-editor__save-lesson-template';
+    saveLessonTemplateButton.textContent = 'Save as lesson template';
+
     const blocksContainer = document.createElement('div');
     blocksContainer.className = 'lesson-editor__blocks';
 
@@ -172,7 +179,14 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
 
     const main = document.createElement('div');
     main.className = 'lesson-editor__main';
-    main.append(publishPanel, titleField, blocksContainer, addBlockBar, compositionStatus);
+    main.append(
+      publishPanel,
+      titleField,
+      saveLessonTemplateButton,
+      blocksContainer,
+      addBlockBar,
+      compositionStatus
+    );
 
     const previewHost = document.createElement('div');
     previewHost.className = 'lesson-editor__preview';
@@ -363,6 +377,26 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       }
     }
 
+    async function saveLessonAsTemplate(): Promise<void> {
+      const suggested = lesson.title.trim() || 'Lesson template';
+      const title = window.prompt('Lesson template name', suggested);
+      if (title === null) return;
+      const trimmed = title.trim();
+      if (!trimmed) {
+        setCompositionStatus('Lesson template name is required.');
+        return;
+      }
+      try {
+        await createLessonTemplate({
+          title: trimmed,
+          blocks: cloneBlocksWithNewIds(lesson.blocks)
+        });
+        setCompositionStatus(`Saved “${trimmed}” as a lesson template.`);
+      } catch {
+        setCompositionStatus('Unable to save lesson template.');
+      }
+    }
+
     async function insertSelectedComposition(): Promise<void> {
       const id = compositionSelect.value;
       if (!id) return;
@@ -396,6 +430,10 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
 
     addButton.addEventListener('click', () => {
       addBlock(addSelect.value as InsertMenuValue);
+    });
+
+    saveLessonTemplateButton.addEventListener('click', () => {
+      void saveLessonAsTemplate();
     });
 
     compositionButton.addEventListener('click', () => {

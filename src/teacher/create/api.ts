@@ -15,6 +15,8 @@ export function postUnit(body: {
   title: string;
   year_id: string;
   subject_id: string;
+  description?: string;
+  blocks?: Unit['blocks'];
 }): Promise<Unit> {
   return apiPost('/api/units', body);
 }

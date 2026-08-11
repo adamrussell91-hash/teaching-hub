@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { BlockSchema } from './block';
 import { CommonFields } from './common';
 
 export const UnitSchema = z.object({
@@ -8,7 +9,8 @@ export const UnitSchema = z.object({
   subject_id: z.string().min(1),
   lesson_ids: z.array(z.string().min(1)),
   primary_term: z.number().int().positive().optional(),
-  description: z.string().optional()
+  description: z.string().optional(),
+  blocks: z.array(BlockSchema).optional()
 });
 
 export type Unit = z.infer<typeof UnitSchema>;

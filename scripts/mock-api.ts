@@ -14,7 +14,9 @@ import {
   scopeSequenceKey,
   mediaKey,
   mediaFileKey,
-  compositionKey
+  compositionKey,
+  lessonTemplateKey,
+  unitTemplateKey
 } from '../src/storage/keys';
 import {
   ALLOWED_MEDIA_MIME,
@@ -26,6 +28,7 @@ import {
   ClassSchema,
   CompositionTemplateSchema,
   LessonSchema,
+  LessonTemplateSchema,
   PublishableLessonSchema,
   PublishedLessonSchema,
   ScheduledLessonSchema,
@@ -38,6 +41,8 @@ import {
   StatusSchema,
   TimelineItemSchema,
   UnitSchema,
+  UnitTemplateSchema,
+  BlockSchema,
   toPublishedLesson,
   type Block,
   type Class,
@@ -45,11 +50,15 @@ import {
   type CompositionSummary,
   type CompositionTemplate,
   type Lesson,
+  type LessonTemplate,
+  type LessonTemplateSummary,
   type ScheduledLesson,
   type ScopeSequence,
   type Media,
   type TimelineItem,
-  type Unit
+  type Unit,
+  type UnitTemplate,
+  type UnitTemplateSummary
 } from '../src/schemas';
 import { orderLessonsByUnitIds } from '../src/schemas/published-unit';
 import { filterBlocksForStudent } from '../src/blocks/visibility';
@@ -1169,6 +1178,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       year_id,
       subject_id,
       lesson_ids: [],
+      description: typeof record.description === 'string' ? record.description : undefined,
+      blocks: Array.isArray(record.blocks) ? (record.blocks as Unit['blocks']) : undefined,
       status: 'active',
       created_at: timestamp,
       updated_at: timestamp,
@@ -1464,6 +1475,204 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     }
 
     return okResponse(200, parsed.data);
+  }
+
+  function listLessonTemplateSummaries(): LessonTemplateSummary[] {
+    return store
+      .listKeys('templates/lessons/')
+      .map((key) => store.getJSON<LessonTemplate>(key))
+      .filter((entry): entry is LessonTemplate => {
+        if (!entry) return false;
+        const parsed = LessonTemplateSchema.safeParse(entry);
+        return parsed.success && parsed.data.status === 'active';
+      })
+      .map((entry) => ({ id: entry.id, title: entry.title, updated_at: entry.updated_at }))
+      .sort((a, b) => a.title.localeCompare(b.title));
+  }
+
+  function listUnitTemplateSummaries(): UnitTemplateSummary[] {
+    return store
+      .listKeys('templates/units/')
+      .map((key) => store.getJSON<UnitTemplate>(key))
+      .filter((entry): entry is UnitTemplate => {
+        if (!entry) return false;
+        const parsed = UnitTemplateSchema.safeParse(entry);
+        return parsed.success && parsed.data.status === 'active';
+      })
+      .map((entry) => ({ id: entry.id, title: entry.title, updated_at: entry.updated_at }))
+      .sort((a, b) => a.title.localeCompare(b.title));
+  }
+
+  function handleGetLessonTemplates(cookie: string | null | undefined): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+    return okResponse(200, { templates: listLessonTemplateSummaries() });
+  }
+
+  function handlePostLessonTemplate(cookie: string | null | undefined, body: unknown): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+    if (typeof body !== 'object' || body === null) {
+      return errorResponse(400, 'validation_error', 'Request body must be a JSON object');
+    }
+    const record = body as Record<string, unknown>;
+    const title = typeof record.title === 'string' ? record.title.trim() : '';
+    const blocksParsed = BlockSchema.array().safeParse(record.blocks ?? []);
+    if (!title || !blocksParsed.success) {
+      return errorResponse(400, 'validation_error', 'title and blocks[] are required');
+    }
+    const timestamp = nowIso();
+    const id = newId('lesson_template');
+    const candidate: LessonTemplate = {
+      id,
+      type: 'lesson_template',
+      title,
+      slug: slugify(title),
+      status: 'active',
+      blocks: blocksParsed.data,
+      created_at: timestamp,
+      updated_at: timestamp,
+      schema_version: 1
+    };
+    const validated = LessonTemplateSchema.safeParse(candidate);
+    if (!validated.success) {
+      return errorResponse(400, 'validation_error', 'Lesson template is invalid', validated.error.flatten());
+    }
+    store.setJSON(lessonTemplateKey(id), validated.data);
+    return okResponse(201, validated.data);
+  }
+
+  function handleGetLessonTemplate(cookie: string | null | undefined, id: string): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+    const raw = store.getJSON<LessonTemplate>(lessonTemplateKey(id));
+    if (!raw) return notFoundResponse('Lesson template not found');
+    const parsed = LessonTemplateSchema.safeParse(raw);
+    if (!parsed.success) return errorResponse(500, 'invalid_data', 'Stored lesson template is invalid');
+    return okResponse(200, parsed.data);
+  }
+
+  function handlePatchLessonTemplate(
+    cookie: string | null | undefined,
+    id: string,
+    body: unknown
+  ): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+    const raw = store.getJSON<LessonTemplate>(lessonTemplateKey(id));
+    if (!raw) return notFoundResponse('Lesson template not found');
+    const existing = LessonTemplateSchema.safeParse(raw);
+    if (!existing.success) return errorResponse(500, 'invalid_data', 'Stored lesson template is invalid');
+    if (typeof body !== 'object' || body === null) {
+      return errorResponse(400, 'validation_error', 'Request body must be a JSON object');
+    }
+    const record = body as Record<string, unknown>;
+    const next = { ...existing.data };
+    if (typeof record.title === 'string') {
+      const title = record.title.trim();
+      if (!title) return errorResponse(400, 'validation_error', 'title must not be empty');
+      next.title = title;
+      next.slug = slugify(title);
+    }
+    if (record.status !== undefined) {
+      const status = StatusSchema.safeParse(record.status);
+      if (!status.success) return errorResponse(400, 'validation_error', 'status is invalid');
+      next.status = status.data;
+    }
+    next.updated_at = nowIso();
+    const validated = LessonTemplateSchema.safeParse(next);
+    if (!validated.success) {
+      return errorResponse(400, 'validation_error', 'Lesson template is invalid', validated.error.flatten());
+    }
+    store.setJSON(lessonTemplateKey(id), validated.data);
+    return okResponse(200, validated.data);
+  }
+
+  function handleGetUnitTemplates(cookie: string | null | undefined): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+    return okResponse(200, { templates: listUnitTemplateSummaries() });
+  }
+
+  function handlePostUnitTemplate(cookie: string | null | undefined, body: unknown): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+    if (typeof body !== 'object' || body === null) {
+      return errorResponse(400, 'validation_error', 'Request body must be a JSON object');
+    }
+    const record = body as Record<string, unknown>;
+    const title = typeof record.title === 'string' ? record.title.trim() : '';
+    if (!title) return errorResponse(400, 'validation_error', 'title is required');
+    const blocksParsed = BlockSchema.array().optional().safeParse(record.blocks);
+    if (!blocksParsed.success) {
+      return errorResponse(400, 'validation_error', 'blocks must be an array when provided');
+    }
+    const timestamp = nowIso();
+    const id = newId('unit_template');
+    const candidate: UnitTemplate = {
+      id,
+      type: 'unit_template',
+      title,
+      slug: slugify(title),
+      status: 'active',
+      description: typeof record.description === 'string' ? record.description : undefined,
+      blocks: blocksParsed.data,
+      created_at: timestamp,
+      updated_at: timestamp,
+      schema_version: 1
+    };
+    const validated = UnitTemplateSchema.safeParse(candidate);
+    if (!validated.success) {
+      return errorResponse(400, 'validation_error', 'Unit template is invalid', validated.error.flatten());
+    }
+    store.setJSON(unitTemplateKey(id), validated.data);
+    return okResponse(201, validated.data);
+  }
+
+  function handleGetUnitTemplate(cookie: string | null | undefined, id: string): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+    const raw = store.getJSON<UnitTemplate>(unitTemplateKey(id));
+    if (!raw) return notFoundResponse('Unit template not found');
+    const parsed = UnitTemplateSchema.safeParse(raw);
+    if (!parsed.success) return errorResponse(500, 'invalid_data', 'Stored unit template is invalid');
+    return okResponse(200, parsed.data);
+  }
+
+  function handlePatchUnitTemplate(
+    cookie: string | null | undefined,
+    id: string,
+    body: unknown
+  ): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+    const raw = store.getJSON<UnitTemplate>(unitTemplateKey(id));
+    if (!raw) return notFoundResponse('Unit template not found');
+    const existing = UnitTemplateSchema.safeParse(raw);
+    if (!existing.success) return errorResponse(500, 'invalid_data', 'Stored unit template is invalid');
+    if (typeof body !== 'object' || body === null) {
+      return errorResponse(400, 'validation_error', 'Request body must be a JSON object');
+    }
+    const record = body as Record<string, unknown>;
+    const next = { ...existing.data };
+    if (typeof record.title === 'string') {
+      const title = record.title.trim();
+      if (!title) return errorResponse(400, 'validation_error', 'title must not be empty');
+      next.title = title;
+      next.slug = slugify(title);
+    }
+    if (record.status !== undefined) {
+      const status = StatusSchema.safeParse(record.status);
+      if (!status.success) return errorResponse(400, 'validation_error', 'status is invalid');
+      next.status = status.data;
+    }
+    next.updated_at = nowIso();
+    const validated = UnitTemplateSchema.safeParse(next);
+    if (!validated.success) {
+      return errorResponse(400, 'validation_error', 'Unit template is invalid', validated.error.flatten());
+    }
+    store.setJSON(unitTemplateKey(id), validated.data);
+    return okResponse(200, validated.data);
   }
 
   function optionalNonEmptyString(
@@ -1837,6 +2046,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
   const SCHEDULE_UNIT_RE = /^\/api\/classes\/([^/]+)\/schedule-unit$/;
   const SCHEDULED_LESSON_RE = /^\/api\/scheduled-lessons\/([^/]+)$/;
   const COMPOSITION_ID_RE = /^\/api\/compositions\/([^/]+)$/;
+  const LESSON_TEMPLATE_ID_RE = /^\/api\/lesson-templates\/([^/]+)$/;
+  const UNIT_TEMPLATE_ID_RE = /^\/api\/unit-templates\/([^/]+)$/;
   const MEDIA_FILE_RE = /^\/api\/media\/([^/]+)\/file$/;
   const MEDIA_ID_RE = /^\/api\/media\/([^/]+)$/;
 
@@ -1886,6 +2097,10 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     }
     if (method === 'GET' && path === '/api/compositions') return handleGetCompositions(cookie);
     if (method === 'POST' && path === '/api/compositions') return handlePostComposition(cookie, body);
+    if (method === 'GET' && path === '/api/lesson-templates') return handleGetLessonTemplates(cookie);
+    if (method === 'POST' && path === '/api/lesson-templates') return handlePostLessonTemplate(cookie, body);
+    if (method === 'GET' && path === '/api/unit-templates') return handleGetUnitTemplates(cookie);
+    if (method === 'POST' && path === '/api/unit-templates') return handlePostUnitTemplate(cookie, body);
     if (method === 'POST' && path === '/api/media/upload') {
       return handlePostMediaUpload(cookie, body);
     }
@@ -1894,6 +2109,18 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const compositionMatch = COMPOSITION_ID_RE.exec(path);
     if (compositionMatch && method === 'GET') {
       return handleGetComposition(cookie, compositionMatch[1]!);
+    }
+    const lessonTemplateMatch = LESSON_TEMPLATE_ID_RE.exec(path);
+    if (lessonTemplateMatch) {
+      const id = lessonTemplateMatch[1]!;
+      if (method === 'GET') return handleGetLessonTemplate(cookie, id);
+      if (method === 'PATCH') return handlePatchLessonTemplate(cookie, id, body);
+    }
+    const unitTemplateMatch = UNIT_TEMPLATE_ID_RE.exec(path);
+    if (unitTemplateMatch) {
+      const id = unitTemplateMatch[1]!;
+      if (method === 'GET') return handleGetUnitTemplate(cookie, id);
+      if (method === 'PATCH') return handlePatchUnitTemplate(cookie, id, body);
     }
 
     const mediaFileMatch = MEDIA_FILE_RE.exec(path);

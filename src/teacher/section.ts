@@ -6,7 +6,8 @@ export type TeacherSection =
   | 'scope-sequences'
   | 'units'
   | 'lessons'
-  | 'resources';
+  | 'resources'
+  | 'templates';
 
 export function sectionFromRoute(match: RouteMatch): TeacherSection | null {
   switch (match.name) {
@@ -26,6 +27,8 @@ export function sectionFromRoute(match: RouteMatch): TeacherSection | null {
       return 'lessons';
     case 'teacher-resources':
       return 'resources';
+    case 'teacher-templates':
+      return 'templates';
     default:
       return null;
   }

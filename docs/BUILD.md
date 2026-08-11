@@ -20,11 +20,11 @@ Block primitives: [`docs/specs/03_BLOCK_SYSTEM.md`](specs/03_BLOCK_SYSTEM.md)
 
 Suggested order for continuing builder / teaching-page work (adjust as needed):
 
-1. **Lesson / unit templates & linked reuse** — save/insert lesson & unit templates; linked reuse beyond compositions v1
+1. **AI agent integration**
 
 Larger product tracks (not “next block”, but still ahead):
 
-- AI agent integration
+- Linked template reuse (edit source / detach)
 - Versioning, archive, recovery  
 
 ---
@@ -33,6 +33,8 @@ Larger product tracks (not “next block”, but still ahead):
 
 | Date | Slice | Outcome |
 |------|--------|---------|
+| 2026-08-11 | **Lesson & unit templates** | Save lesson/unit templates; `/templates` library (use/rename/archive); create new independent entities — [`design`](superpowers/specs/2026-08-11-lesson-unit-templates-design.md) / [`plan`](superpowers/plans/2026-08-11-lesson-unit-templates.md) |
+| 2026-08-11 | **Search / nav acceleration** | Rail search + ⌘K panel; client title/metadata + server body scan; ranked results with snippets — [`design`](superpowers/specs/2026-08-11-search-nav-acceleration-design.md) / [`plan`](superpowers/plans/2026-08-11-search-nav-acceleration.md) |
 | 2026-08-07 | First slice | Auth, lesson draft/publish, `rich_text` / `heading` / `callout`, student lesson view |
 | 2026-08-08 | Teacher rail + section shells | Curriculum rail, Units / Lessons / Resources shells |
 | 2026-08-08 | Builder blocks (media) | `image`, `video`, `embed`, `html` + publish rules |
@@ -61,7 +63,6 @@ Larger product tracks (not “next block”, but still ahead):
 | 2026-08-09 | **Templates & reuse** | Composition save/insert (section → independent copy); no linked templates yet — [`design`](superpowers/specs/2026-08-09-templates-reuse-design.md) / [`plan`](superpowers/plans/2026-08-09-templates-reuse.md) |
 | 2026-08-10 | **A4 print pipeline** | Teacher A4 portrait preview + Print via shared renderer; `response_space` lines; minimal media fallbacks — [`design`](superpowers/specs/2026-08-10-a4-print-pipeline-design.md) / [`plan`](superpowers/plans/2026-08-10-a4-print-pipeline.md) |
 | 2026-08-10 | **Google Drive / media library uploads** | Hosted uploads + Drive picker mirror + Resources library + publish warnings — [`design`](superpowers/specs/2026-08-10-media-library-drive-design.md) / [`plan`](superpowers/plans/2026-08-10-media-library-drive.md) |
-| 2026-08-11 | **Search / nav acceleration** | Rail search + ⌘K panel; client title/metadata + server body scan; ranked results with snippets — [`design`](superpowers/specs/2026-08-11-search-nav-acceleration-design.md) / [`plan`](superpowers/plans/2026-08-11-search-nav-acceleration.md) |
 
 ### Block types live today (32)
 
@@ -76,7 +77,7 @@ Larger product tracks (not “next block”, but still ahead):
 | 6–8 Unit/class pages, scheduling, scope | Largely done for v1 |
 | 9 A4 print | **v1 done** — preview + print; metadata/tools polish later |
 | 10 Google Drive | **v1 done** — mirror + picker + library |
-| 11 Templates / reuse | **Compositions v1** — save/insert section; lesson/unit/linked templates later |
+| 11 Templates / reuse | **Lesson/unit templates v1** + compositions v1; linked reuse later |
 | 12 Search | **v1 done** — rail + ⌘K panel; client titles + server body scan |
 | 13 AI | Not started |
 | 14–15 Versioning / hardening | Not started |
@@ -115,7 +116,7 @@ Unchecked = not built yet.
 ### Platform (later)
 - [x] A4 print pipeline
 - [x] Media library + uploads / Drive
-- [x] Templates & compositions (compositions v1: save section + insert independent copy; lesson/unit/linked later)
+- [x] Templates & compositions (compositions v1 + lesson/unit templates v1; linked later)
 - [x] Search
 - [ ] AI agent
 - [ ] Versioning / archive / recovery
@@ -124,4 +125,4 @@ Unchecked = not built yet.
 
 ## Latest note
 
-**2026-08-11** — Search / nav acceleration slice shipped (rail search + ⌘K panel, client + server index, ranked results). Next up: Lesson / unit templates & linked reuse.
+**2026-08-11** — Lesson & unit templates shipped (save, `/templates` library, create-new independent copy). Next up: AI agent integration.

@@ -16,7 +16,7 @@ describe('primary nav', () => {
     container = document.createElement('div');
   });
 
-  it('renders the six section links', () => {
+  it('renders the section links including Templates', () => {
     renderPrimaryNav(container, { activeSection: 'home' });
     const labels = [...container.querySelectorAll('.primary-nav__link')].map((el) => el.textContent);
     expect(labels).toEqual([
@@ -25,6 +25,7 @@ describe('primary nav', () => {
       'Scope & Sequences',
       'Units',
       'Lessons',
+      'Templates',
       'Resource Library'
     ]);
   });
