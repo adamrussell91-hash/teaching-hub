@@ -11,7 +11,11 @@ import {
   preflightResponse,
   withCors
 } from './_shared/http.mts';
-import { createNetlifyJsonStore, writeCheckpoint } from './_shared/versions.mts';
+import {
+  CHECKPOINT_AFTER_SAVE_WARNING,
+  createNetlifyJsonStore,
+  tryWriteCheckpoint
+} from './_shared/versions.mts';
 import type { VersionReason } from '../../src/schemas';
 
 interface FunctionContext {
@@ -86,16 +90,22 @@ export default async function handler(request: Request, context: FunctionContext
 
   await setJSON(store, draftLessonKey(id), validated.data);
 
+  let warning: string | undefined;
   if (checkpointReasonRaw === 'ai_accepted' || checkpointReasonRaw === 'manual_checkpoint') {
-    await writeCheckpoint(createNetlifyJsonStore(store), {
+    const checkpointed = await tryWriteCheckpoint(createNetlifyJsonStore(store), {
       kind: 'lesson',
       parentId: id,
       snapshot: validated.data,
       reason: checkpointReasonRaw as VersionReason
     });
+    if (!checkpointed.ok) warning = CHECKPOINT_AFTER_SAVE_WARNING;
   }
 
-  return withCors(okResponse(200, validated.data), request, env);
+  return withCors(
+    okResponse(200, validated.data, {}, warning ? { warning } : undefined),
+    request,
+    env
+  );
 }
 
 export const config = { path: '/api/lessons/:id' };

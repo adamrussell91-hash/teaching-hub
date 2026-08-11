@@ -121,13 +121,27 @@ export default async function handler(request: Request, context: FunctionContext
   const studentSnapshot = PublishedLessonSchema.parse({ ...fullSnapshot, blocks: studentBlocks });
 
   // Checkpoint the pre-publish draft before writing the published snapshot.
-  await writeCheckpoint(createNetlifyJsonStore(store), {
-    kind: 'lesson',
-    parentId: id,
-    snapshot: validated.data,
-    reason: 'publish',
-    now: publishedAt
-  });
+  // Fail closed: do not publish if history checkpointing fails.
+  try {
+    await writeCheckpoint(createNetlifyJsonStore(store), {
+      kind: 'lesson',
+      parentId: id,
+      snapshot: validated.data,
+      reason: 'publish',
+      now: publishedAt
+    });
+  } catch (err) {
+    console.error('publish writeCheckpoint failed', err);
+    return withCors(
+      errorResponse(
+        500,
+        'checkpoint_failed',
+        'Publish aborted: version history checkpoint failed before writing the published snapshot.'
+      ),
+      request,
+      env
+    );
+  }
 
   await setJSON(store, publishedLessonKey(id), studentSnapshot);
   // Persist publish timestamp on the draft so reload shows Published / Unpublished changes.

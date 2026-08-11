@@ -129,14 +129,27 @@ export async function handleVersionCollection(
   const loaded = await loadLiveSnapshot(kind, id);
   if (!loaded.ok) return withCors(loaded.response, request, env);
 
-  const record = await writeCheckpoint(jsonStore, {
-    kind,
-    parentId: id,
-    snapshot: loaded.snapshot,
-    reason: 'manual_checkpoint',
-    label
-  });
-  return withCors(okResponse(200, record), request, env);
+  try {
+    const record = await writeCheckpoint(jsonStore, {
+      kind,
+      parentId: id,
+      snapshot: loaded.snapshot,
+      reason: 'manual_checkpoint',
+      label
+    });
+    return withCors(okResponse(200, record), request, env);
+  } catch (err) {
+    console.error('manual writeCheckpoint failed', err);
+    return withCors(
+      errorResponse(
+        500,
+        'checkpoint_failed',
+        'Version history checkpoint failed. The live document was not modified.'
+      ),
+      request,
+      env
+    );
+  }
 }
 
 export async function handleVersionItem(

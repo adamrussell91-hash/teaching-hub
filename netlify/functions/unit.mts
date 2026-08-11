@@ -22,7 +22,12 @@ import {
   type Block,
   type Unit
 } from '../../src/schemas';
-import { createNetlifyJsonStore, writeCheckpoint } from './_shared/versions.mts';
+import { unitContentChanged } from '../../src/recovery/versions';
+import {
+  CHECKPOINT_AFTER_SAVE_WARNING,
+  createNetlifyJsonStore,
+  tryWriteCheckpoint
+} from './_shared/versions.mts';
 
 interface FunctionContext {
   params: Record<string, string | undefined>;
@@ -165,16 +170,23 @@ export default async function handler(request: Request, context: FunctionContext
 
   await setJSON(store, unitKey(id), validated.data as Unit);
 
-  // Meaningful content PATCH (not status-only) → checkpoint full unit.
-  await writeCheckpoint(createNetlifyJsonStore(store), {
-    kind: 'unit',
-    parentId: id,
-    snapshot: validated.data,
-    reason: 'save',
-    now: nowIso
-  });
+  let warning: string | undefined;
+  if (unitContentChanged(unitParsed.data, validated.data)) {
+    const checkpointed = await tryWriteCheckpoint(createNetlifyJsonStore(store), {
+      kind: 'unit',
+      parentId: id,
+      snapshot: validated.data,
+      reason: 'save',
+      now: nowIso
+    });
+    if (!checkpointed.ok) warning = CHECKPOINT_AFTER_SAVE_WARNING;
+  }
 
-  return withCors(okResponse(200, validated.data), request, env);
+  return withCors(
+    okResponse(200, validated.data, {}, warning ? { warning } : undefined),
+    request,
+    env
+  );
 }
 
 export const config = { path: '/api/units/:id' };

@@ -14,9 +14,18 @@ export function jsonResponse(status: number, body: unknown, headers: Record<stri
 
 /**
  * Mirrors the `ApiSuccess` shape consumed by `src/api/client.ts`
- * (`{ ok: true, data }`).
+ * (`{ ok: true, data }`). Optional `warning` is ignored by the client today
+ * but surfaces non-fatal side-effect failures (e.g. checkpoint after save).
  */
-export function okResponse(status: number, data: unknown, headers: Record<string, string> = {}): Response {
+export function okResponse(
+  status: number,
+  data: unknown,
+  headers: Record<string, string> = {},
+  extras?: { warning?: string }
+): Response {
+  if (extras?.warning) {
+    return jsonResponse(status, { ok: true, data, warning: extras.warning }, headers);
+  }
   return jsonResponse(status, { ok: true, data }, headers);
 }
 

@@ -1,6 +1,22 @@
+import type { Unit } from '@/schemas/unit';
 import type { VersionIndex, VersionIndexEntry, VersionKind } from '@/schemas/version';
 
 export const VERSION_RETENTION = 10;
+
+/** Compare versioned unit fields only (ignores updated_at / status / etc.). */
+export function unitContentChanged(
+  before: Pick<Unit, 'title' | 'description' | 'blocks' | 'lesson_ids'>,
+  after: Pick<Unit, 'title' | 'description' | 'blocks' | 'lesson_ids'>
+): boolean {
+  const fingerprint = (unit: typeof before) =>
+    JSON.stringify({
+      title: unit.title,
+      description: unit.description ?? null,
+      blocks: unit.blocks ?? null,
+      lesson_ids: unit.lesson_ids
+    });
+  return fingerprint(before) !== fingerprint(after);
+}
 
 export function emptyVersionIndex(kind: VersionKind, parentId: string): VersionIndex {
   return { parent_id: parentId, kind, latest_revision: 0, entries: [] };

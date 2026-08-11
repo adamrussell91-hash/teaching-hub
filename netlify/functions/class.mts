@@ -22,7 +22,11 @@ import {
   ScheduledLessonSchema,
   type ClassHomepage
 } from '../../src/schemas';
-import { createNetlifyJsonStore, writeCheckpoint } from './_shared/versions.mts';
+import {
+  CHECKPOINT_AFTER_SAVE_WARNING,
+  createNetlifyJsonStore,
+  tryWriteCheckpoint
+} from './_shared/versions.mts';
 
 interface FunctionContext {
   params: Record<string, string | undefined>;
@@ -203,17 +207,23 @@ export default async function handler(request: Request, context: FunctionContext
 
   await setJSON(store, classKey(id), validated.data);
 
+  let warning: string | undefined;
   if (parsed.homepage !== undefined) {
-    await writeCheckpoint(createNetlifyJsonStore(store), {
+    const checkpointed = await tryWriteCheckpoint(createNetlifyJsonStore(store), {
       kind: 'class_homepage',
       parentId: id,
       snapshot: { homepage: validated.data.homepage },
       reason: 'save',
       now: nowIso
     });
+    if (!checkpointed.ok) warning = CHECKPOINT_AFTER_SAVE_WARNING;
   }
 
-  return withCors(okResponse(200, validated.data), request, env);
+  return withCors(
+    okResponse(200, validated.data, {}, warning ? { warning } : undefined),
+    request,
+    env
+  );
 }
 
 export const config = { path: '/api/classes/:id' };

@@ -52,6 +52,10 @@ export class VersionStoreError extends Error {
   }
 }
 
+/** Returned on entity save when the primary write succeeded but checkpointing failed. */
+export const CHECKPOINT_AFTER_SAVE_WARNING =
+  'Saved successfully, but version history checkpoint failed.';
+
 export function createMemoryJsonStore(initial: Record<string, unknown> = {}): JsonStore {
   const map = new Map<string, unknown>(Object.entries(initial));
   return {
@@ -148,6 +152,30 @@ export async function writeCheckpoint(
   const pruned = pruneIndexEntries(withEntry, VERSION_RETENTION);
   await store.setJSON(versionIndexKey(kind, parentId), pruned);
   return record;
+}
+
+/**
+ * Runs writeCheckpoint; on failure logs and returns false so callers can still
+ * return 200 for an already-persisted entity write.
+ */
+export async function tryWriteCheckpoint(
+  store: JsonStore,
+  opts: {
+    kind: VersionKind;
+    parentId: string;
+    snapshot: unknown;
+    reason: VersionReason;
+    label?: string;
+    now?: string;
+  }
+): Promise<{ ok: true; record: VersionRecord } | { ok: false }> {
+  try {
+    const record = await writeCheckpoint(store, opts);
+    return { ok: true, record };
+  } catch (err) {
+    console.error('writeCheckpoint failed', err);
+    return { ok: false };
+  }
 }
 
 export async function listVersionIndex(

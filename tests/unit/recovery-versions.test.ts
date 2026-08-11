@@ -5,6 +5,7 @@ import {
   nextRevision,
   appendCheckpointToIndex,
   pruneIndexEntries,
+  unitContentChanged,
   VERSION_RETENTION
 } from '@/recovery/versions';
 
@@ -29,5 +30,33 @@ describe('version index helpers', () => {
     expect(index.latest_revision).toBe(11);
     expect(index.entries[0]?.revision).toBe(11); // newest first
     expect(index.entries.at(-1)?.revision).toBe(2);
+  });
+
+  it('unitContentChanged ignores no-op patches of the same content fields', () => {
+    const before = {
+      title: 'Unit A',
+      description: 'Desc',
+      blocks: [],
+      lesson_ids: ['lesson_1']
+    };
+    expect(unitContentChanged(before, { ...before })).toBe(false);
+    expect(
+      unitContentChanged(before, {
+        ...before,
+        description: undefined
+      })
+    ).toBe(true);
+    expect(
+      unitContentChanged(before, {
+        ...before,
+        title: 'Unit B'
+      })
+    ).toBe(true);
+    expect(
+      unitContentChanged(
+        { ...before, description: undefined },
+        { ...before, description: undefined }
+      )
+    ).toBe(false);
   });
 });
