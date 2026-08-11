@@ -25,6 +25,7 @@ describe('composition-link', () => {
 
   it('isCompositionUsable requires active status', () => {
     const root = createBlock('section', 'block_root');
+    if (root.block_type !== 'section') throw new Error('expected section');
     const base = {
       id: 'composition_1',
       type: 'composition_template' as const,
