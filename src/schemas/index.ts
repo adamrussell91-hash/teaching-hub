@@ -82,3 +82,15 @@ export {
   type UnitTemplate,
   type UnitTemplateSummary
 } from './unit-template';
+export {
+  VersionKindSchema,
+  VersionReasonSchema,
+  VersionIndexEntrySchema,
+  VersionIndexSchema,
+  VersionRecordSchema,
+  type VersionKind,
+  type VersionReason,
+  type VersionIndex,
+  type VersionIndexEntry,
+  type VersionRecord
+} from './version';

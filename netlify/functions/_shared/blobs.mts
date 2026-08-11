@@ -13,7 +13,10 @@ import {
   mediaFileKey,
   compositionKey,
   lessonTemplateKey,
-  unitTemplateKey
+  unitTemplateKey,
+  versionKey,
+  versionIndexKey,
+  versionsPrefix
 } from '../../../src/storage/keys';
 
 // Re-exported so function handlers have one place to import key builders from,
@@ -33,7 +36,10 @@ export {
   mediaFileKey,
   compositionKey,
   lessonTemplateKey,
-  unitTemplateKey
+  unitTemplateKey,
+  versionKey,
+  versionIndexKey,
+  versionsPrefix
 };
 
 const CONTENT_STORE_NAME = 'teaching-hub-content';

@@ -53,3 +53,15 @@ export function lessonTemplateKey(id: string): string {
 export function unitTemplateKey(id: string): string {
   return `templates/units/${id}`;
 }
+
+export function versionKey(kind: string, parentId: string, revision: number): string {
+  return `versions/${kind}/${parentId}/${revision}`;
+}
+
+export function versionIndexKey(kind: string, parentId: string): string {
+  return `versions/${kind}/${parentId}/_index`;
+}
+
+export function versionsPrefix(kind: string, parentId: string): string {
+  return `versions/${kind}/${parentId}/`;
+}
