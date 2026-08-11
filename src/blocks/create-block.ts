@@ -1,5 +1,5 @@
-import { emptyColumnsForPreset } from '@/blocks/column-presets';
-import type { Block, EmbedProvider } from '@/schemas/block';
+import { emptyColumnsForPreset } from './column-presets';
+import type { Block, EmbedProvider } from '../schemas/block';
 
 type ColumnsBlock = Extract<Block, { block_type: 'columns' }>;
 type SectionBlock = Extract<Block, { block_type: 'section' }>;

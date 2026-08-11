@@ -1,7 +1,7 @@
-import type { Block } from '@/schemas/block';
-import type { CompositionTemplate } from '@/schemas/composition';
-import { cloneBlockWithNewIds } from '@/blocks/create-block';
-import { isCompositionUsable, isLinkedSection } from '@/blocks/composition-link';
+import type { Block } from '../schemas/block';
+import type { CompositionTemplate } from '../schemas/composition';
+import { cloneBlockWithNewIds } from './create-block';
+import { isCompositionUsable, isLinkedSection } from './composition-link';
 
 export class LinkedResolveError extends Error {
   constructor(message: string) {

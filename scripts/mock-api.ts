@@ -63,6 +63,11 @@ import {
 import { orderLessonsByUnitIds } from '../src/schemas/published-unit';
 import { filterBlocksForStudent } from '../src/blocks/visibility';
 import { sanitizeBlocksDeep } from '../src/blocks/sanitize-blocks';
+import { isLinkedSection } from '../src/blocks/composition-link';
+import {
+  LinkedResolveError,
+  resolveLinkedSectionsForPublish
+} from '../src/blocks/resolve-linked-sections';
 import { runContentSearch } from '../src/search/run-content-search';
 import { applyScheduleUnit } from '../src/schedule/schedule-unit';
 import { reorderScheduledLesson } from '../src/schedule/reorder';
@@ -540,10 +545,38 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       );
     }
 
+    const compositionMap = new Map<string, CompositionTemplate>();
+    for (const block of parsed.data.blocks) {
+      if (!isLinkedSection(block)) continue;
+      const sourceId = block.content.link.source_composition_id;
+      if (compositionMap.has(sourceId)) continue;
+      const raw = store.getJSON(compositionKey(sourceId));
+      const composition = CompositionTemplateSchema.safeParse(raw);
+      if (composition.success) {
+        compositionMap.set(sourceId, composition.data);
+      }
+    }
+
+    let n = 0;
+    let resolvedBlocks: Block[];
+    try {
+      resolvedBlocks = resolveLinkedSectionsForPublish(
+        parsed.data.blocks,
+        (sourceId) => compositionMap.get(sourceId) ?? null,
+        () => `block_pub_${id}_${++n}`
+      );
+    } catch (err) {
+      if (err instanceof LinkedResolveError) {
+        return errorResponse(400, 'validation_error', err.message);
+      }
+      throw err;
+    }
+
     await ensureDomPolyfill();
 
     const publishedAt = new Date().toISOString();
-    const fullSnapshot = toPublishedLesson(parsed.data, publishedAt);
+    const lessonForPublish = { ...parsed.data, blocks: resolvedBlocks };
+    const fullSnapshot = toPublishedLesson(lessonForPublish, publishedAt);
     const studentBlocks = sanitizeBlocksDeep(filterBlocksForStudent(fullSnapshot.blocks));
 
     const studentSnapshot = PublishedLessonSchema.parse({
@@ -553,6 +586,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
 
     store.setJSON(publishedLessonKey(id), studentSnapshot);
     // Persist publish timestamp on the draft so reload shows Published / Unpublished changes.
+    // Draft keeps linked stubs; only the published snapshot expands them.
     store.setJSON(draftLessonKey(id), {
       ...parsed.data,
       published_at: publishedAt,
