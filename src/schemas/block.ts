@@ -703,7 +703,12 @@ export const SectionChildBlockSchema = z.lazy(() =>
   ])
 );
 
-export const SectionBlockSchema = z.object({
+export const SectionLinkSchema = z.object({
+  mode: z.literal('linked'),
+  source_composition_id: z.string().min(1)
+});
+
+const SectionBlockObjectSchema = z.object({
   id: z.string().min(1),
   type: z.literal('block'),
   block_type: z.literal('section'),
@@ -712,22 +717,44 @@ export const SectionBlockSchema = z.object({
   content: z.object({
     title: z.string(),
     collapsed_in_editor: z.boolean().optional(),
-    blocks: z.array(SectionChildBlockSchema)
+    blocks: z.array(SectionChildBlockSchema),
+    link: SectionLinkSchema.optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
 
+function refineLinkedSection(
+  section: z.infer<typeof SectionBlockObjectSchema>,
+  ctx: z.RefinementCtx
+) {
+  if (section.content.link && section.content.blocks.length > 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Linked sections must have empty content.blocks',
+      path: ['content', 'blocks']
+    });
+  }
+}
+
+export const SectionBlockSchema = SectionBlockObjectSchema.superRefine(refineLinkedSection);
+
 export const BlockSchema = z.lazy(() =>
-  z.discriminatedUnion('block_type', [
-    ...leafBlockSchemas,
-    SpacerBlockSchema,
-    ColumnsBlockSchema,
-    SectionBlockSchema,
-    TimelineBlockSchema,
-    TabsBlockSchema,
-    CollectionBlockSchema
-  ])
+  z
+    .discriminatedUnion('block_type', [
+      ...leafBlockSchemas,
+      SpacerBlockSchema,
+      ColumnsBlockSchema,
+      SectionBlockObjectSchema,
+      TimelineBlockSchema,
+      TabsBlockSchema,
+      CollectionBlockSchema
+    ])
+    .superRefine((block, ctx) => {
+      if (block.block_type === 'section') {
+        refineLinkedSection(block, ctx);
+      }
+    })
 );
 
 export type Block = z.infer<typeof BlockSchema>;
