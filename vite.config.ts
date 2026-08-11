@@ -2,15 +2,21 @@
 import { defineConfig, type Plugin } from 'vite';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createMockApi, loadSeedFile } from './scripts/mock-api';
+import { readFileSync } from 'node:fs';
+import type { SeedData } from './scripts/mock-store';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function mockApiPlugin(): Plugin {
   return {
     name: 'teaching-hub-mock-api',
-    configureServer(server) {
-      const seed = loadSeedFile(path.resolve(__dirname, 'fixtures/seed.json'));
+    async configureServer(server) {
+      // Load via Vite SSR so `@/` aliases in mock-api's dependency graph resolve.
+      // A static import here is bundled into vite.config by Node and breaks on `@/`.
+      const { createMockApi } = await server.ssrLoadModule('/scripts/mock-api.ts');
+      const seed = JSON.parse(
+        readFileSync(path.resolve(__dirname, 'fixtures/seed.json'), 'utf-8')
+      ) as SeedData;
       const api = createMockApi({ seed });
       server.middlewares.use(async (req, res, next) => {
         if (!req.url?.startsWith('/api/')) {

@@ -1,6 +1,6 @@
-import type { Block } from '../schemas/block';
-import type { CompositionTemplate } from '../schemas/composition';
-import { createBlock } from './create-block';
+import type { Block } from '@/schemas/block';
+import type { CompositionTemplate } from '@/schemas/composition';
+import { createBlock } from '@/blocks/create-block';
 
 type SectionBlock = Extract<Block, { block_type: 'section' }>;
 
