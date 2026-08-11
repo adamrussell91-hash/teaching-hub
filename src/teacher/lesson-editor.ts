@@ -19,6 +19,12 @@ import type { CompositionSummary, CompositionTemplate } from '@/schemas/composit
 import type { Lesson } from '@/schemas/lesson';
 import type { Media } from '@/schemas/media';
 import { mountA4Preview, type A4PreviewHandle } from '@/teacher/a4-preview';
+import {
+  buildLinkedPreview,
+  ensureCompositionCached,
+  openEditSourceModal,
+  type CompositionCache
+} from '@/teacher/lesson-editor-compositions';
 import { createLessonTemplate } from '@/teacher/template-api';
 import { fetchCurriculum } from '@/teacher/nav';
 import { renderContextBar, type TeacherShellRefs } from '@/teacher/shell';
@@ -213,7 +219,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       a4Preview?.update(lesson);
     }
 
-    const compositionCache = new Map<string, CompositionTemplate | 'missing'>();
+    const compositionCache: CompositionCache = new Map();
     const compositionFetchInFlight = new Set<string>();
 
     function setCompositionStatus(text: string | null): void {
@@ -261,60 +267,21 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
 
     void refreshCompositions();
 
-    function ensureCompositionCached(compositionId: string): void {
-      if (compositionCache.has(compositionId) || compositionFetchInFlight.has(compositionId)) {
-        return;
-      }
-      compositionFetchInFlight.add(compositionId);
-      void apiGet<CompositionTemplate>(`/api/compositions/${compositionId}`)
-        .then((full) => {
-          compositionCache.set(compositionId, isCompositionUsable(full) ? full : 'missing');
-        })
-        .catch(() => {
-          compositionCache.set(compositionId, 'missing');
-        })
-        .finally(() => {
-          compositionFetchInFlight.delete(compositionId);
+    function queueCompositionFetch(compositionId: string): void {
+      ensureCompositionCached({
+        compositionId,
+        cache: compositionCache,
+        inFlight: compositionFetchInFlight,
+        onSettled: () => {
           if (!disposed && !isStale()) {
             renderBlocksList();
           }
-        });
+        }
+      });
     }
 
     function renderLinkedPreview(compositionId: string): HTMLElement {
-      const preview = document.createElement('div');
-      preview.className = 'lesson-editor__linked-preview';
-
-      const cached = compositionCache.get(compositionId);
-      if (cached === undefined) {
-        ensureCompositionCached(compositionId);
-        const loading = document.createElement('p');
-        loading.className = 'lesson-editor__linked-loading';
-        loading.textContent = 'Loading composition…';
-        preview.append(loading);
-        return preview;
-      }
-
-      if (cached === 'missing') {
-        const broken = document.createElement('p');
-        broken.className = 'lesson-editor__linked-broken';
-        broken.textContent = 'Linked composition is missing or unavailable.';
-        preview.append(broken);
-        return preview;
-      }
-
-      const title = document.createElement('p');
-      title.className = 'lesson-editor__linked-title';
-      title.textContent = cached.title;
-
-      const summary = document.createElement('p');
-      summary.className = 'lesson-editor__linked-summary';
-      const childCount =
-        cached.root.block_type === 'section' ? cached.root.content.blocks.length : 0;
-      summary.textContent = `${childCount} blocks from composition`;
-
-      preview.append(title, summary);
-      return preview;
+      return buildLinkedPreview(compositionId, compositionCache, queueCompositionFetch);
     }
 
     function renderBlocksList(): void {
@@ -379,9 +346,17 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
           editSourceButton.className = 'btn btn--ghost lesson-editor__edit-source';
           editSourceButton.textContent = 'Edit Source';
           editSourceButton.setAttribute('aria-label', `Edit source for block ${index + 1}`);
-          // Task 7 wires Edit Source modal.
           editSourceButton.addEventListener('click', () => {
-            /* TODO(Task 7): open Edit Source modal */
+            void openEditSourceModal({
+              compositionId: block.content.link.source_composition_id,
+              media: mediaList,
+              setStatus: setCompositionStatus,
+              onSaved: (updated) => {
+                compositionCache.set(updated.id, updated);
+                setCompositionStatus(`Saved “${updated.title}”.`);
+                renderBlocksList();
+              }
+            });
           });
 
           const detachButton = document.createElement('button');

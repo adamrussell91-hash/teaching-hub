@@ -8,17 +8,19 @@ vi.mock('@/api/client', async () => {
     ...actual,
     apiGet: vi.fn(),
     apiPut: vi.fn(),
-    apiPost: vi.fn()
+    apiPost: vi.fn(),
+    apiPatch: vi.fn()
   };
 });
 
-import { apiGet, apiPut, apiPost, ApiClientError } from '@/api/client';
+import { apiGet, apiPut, apiPost, apiPatch, ApiClientError } from '@/api/client';
 import { mountLessonEditor } from '@/teacher/lesson-editor';
 import { renderTeacherShell } from '@/teacher/shell';
 
 const apiGetMock = apiGet as unknown as ReturnType<typeof vi.fn>;
 const apiPutMock = apiPut as unknown as ReturnType<typeof vi.fn>;
 const apiPostMock = apiPost as unknown as ReturnType<typeof vi.fn>;
+const apiPatchMock = apiPatch as unknown as ReturnType<typeof vi.fn>;
 
 const ISO = '2026-01-01T00:00:00.000Z';
 
@@ -81,6 +83,7 @@ describe('mountLessonEditor', () => {
     apiGetMock.mockReset();
     apiPutMock.mockReset();
     apiPostMock.mockReset();
+    apiPatchMock.mockReset();
     container = document.createElement('div');
     refs = renderTeacherShell(container);
   });
@@ -602,5 +605,111 @@ describe('mountLessonEditor', () => {
     expect(row.querySelector('.lesson-editor__linked-badge')?.textContent).toBe('Linked');
     expect(row.querySelector('.lesson-editor__edit-source')).not.toBeNull();
     expect(row.querySelector('.lesson-editor__detach-composition')).not.toBeNull();
+  });
+
+  it('Edit Source saves composition via PATCH and refreshes preview', async () => {
+    const child: Block = {
+      id: 'block_child_1',
+      type: 'block',
+      block_type: 'rich_text',
+      variant: 'medium',
+      visibility: 'student_teacher',
+      content: { html: '<p>Read</p>' },
+      layout: {},
+      print: {},
+      settings: {},
+      created_at: ISO,
+      updated_at: ISO,
+      schema_version: 1
+    };
+    const templateRoot: Block = {
+      id: 'block_template_root',
+      type: 'block',
+      block_type: 'section',
+      variant: 'medium',
+      visibility: 'student_teacher',
+      content: { title: 'Reading pack', blocks: [child] },
+      layout: {},
+      print: {},
+      settings: {},
+      created_at: ISO,
+      updated_at: ISO,
+      schema_version: 1
+    };
+    const linkedStub: Block = {
+      id: 'block_lesson_001_1',
+      type: 'block',
+      block_type: 'section',
+      variant: 'medium',
+      visibility: 'student_teacher',
+      content: {
+        title: 'Reading pack',
+        blocks: [],
+        link: { mode: 'linked', source_composition_id: 'composition_1' }
+      },
+      layout: {},
+      print: {},
+      settings: {},
+      created_at: ISO,
+      updated_at: ISO,
+      schema_version: 1
+    };
+    const composition = {
+      id: 'composition_1',
+      type: 'composition_template' as const,
+      title: 'Reading pack',
+      slug: 'reading-pack',
+      status: 'active' as const,
+      root: templateRoot,
+      created_at: ISO,
+      updated_at: ISO,
+      schema_version: 1 as const
+    };
+
+    apiGetMock.mockImplementation(async (path: string) => {
+      if (path === '/api/compositions') {
+        return { compositions: [{ id: 'composition_1', title: 'Reading pack', updated_at: ISO }] };
+      }
+      if (path === '/api/compositions/composition_1') {
+        return composition;
+      }
+      if (path.startsWith('/api/lessons/')) {
+        return makeLesson({ blocks: [linkedStub] });
+      }
+      throw new Error(`Unexpected apiGet path: ${path}`);
+    });
+    apiPatchMock.mockResolvedValue({
+      ...composition,
+      title: 'Updated reading pack'
+    });
+
+    mountLessonEditor({ refs, lessonId: 'lesson_001', isStale: () => false });
+    await tick();
+    await tick();
+
+    refs.canvas.querySelector<HTMLButtonElement>('.lesson-editor__edit-source')!.click();
+    await tick();
+
+    const dialog = document.querySelector<HTMLDialogElement>('.lesson-editor__composition-modal');
+    expect(dialog).not.toBeNull();
+    expect(dialog?.open).toBe(true);
+
+    const titleInput = dialog!.querySelector<HTMLInputElement>(
+      '.lesson-editor__composition-modal-title'
+    )!;
+    titleInput.value = 'Updated reading pack';
+    titleInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+    dialog!.querySelector<HTMLButtonElement>('.lesson-editor__composition-modal-save')!.click();
+    await tick();
+
+    expect(apiPatchMock).toHaveBeenCalledWith(
+      '/api/compositions/composition_1',
+      expect.objectContaining({ title: 'Updated reading pack' })
+    );
+    expect(document.querySelector('.lesson-editor__composition-modal')).toBeNull();
+    expect(refs.canvas.querySelector('.lesson-editor__linked-title')?.textContent).toBe(
+      'Updated reading pack'
+    );
   });
 });
