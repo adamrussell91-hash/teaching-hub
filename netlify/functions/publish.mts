@@ -1,8 +1,25 @@
-import { draftLessonKey, getContentStore, getJSON, publishedLessonKey, setJSON } from './_shared/blobs.mts';
+import {
+  compositionKey,
+  draftLessonKey,
+  getContentStore,
+  getJSON,
+  publishedLessonKey,
+  setJSON
+} from './_shared/blobs.mts';
 import { getTeacherSession } from './_shared/session.mts';
 import { PublishedLessonSchema, toPublishedLesson, validatePublishableLesson, type Lesson } from './_shared/validate.mts';
 import { filterBlocksForStudent } from '../../src/blocks/visibility';
 import { sanitizeBlocksDeep } from '../../src/blocks/sanitize-blocks';
+import { isLinkedSection } from '../../src/blocks/composition-link';
+import {
+  LinkedResolveError,
+  resolveLinkedSectionsForPublish
+} from '../../src/blocks/resolve-linked-sections';
+import {
+  CompositionTemplateSchema,
+  type Block,
+  type CompositionTemplate
+} from '../../src/schemas';
 import {
   errorResponse,
   guardRequestOrigin,
@@ -67,15 +84,44 @@ export default async function handler(request: Request, context: FunctionContext
     );
   }
 
+  const compositionMap = new Map<string, CompositionTemplate>();
+  for (const block of validated.data.blocks) {
+    if (!isLinkedSection(block)) continue;
+    const sourceId = block.content.link.source_composition_id;
+    if (compositionMap.has(sourceId)) continue;
+    const raw = await getJSON(store, compositionKey(sourceId));
+    const composition = CompositionTemplateSchema.safeParse(raw);
+    if (composition.success) {
+      compositionMap.set(sourceId, composition.data);
+    }
+  }
+
+  let n = 0;
+  let resolvedBlocks: Block[];
+  try {
+    resolvedBlocks = resolveLinkedSectionsForPublish(
+      validated.data.blocks,
+      (sourceId) => compositionMap.get(sourceId) ?? null,
+      () => `block_pub_${id}_${++n}`
+    );
+  } catch (err) {
+    if (err instanceof LinkedResolveError) {
+      return withCors(errorResponse(400, 'validation_error', err.message), request, env);
+    }
+    throw err;
+  }
+
   await ensureDomPolyfill();
 
   const publishedAt = new Date().toISOString();
-  const fullSnapshot = toPublishedLesson(validated.data, publishedAt);
+  const lessonForPublish = { ...validated.data, blocks: resolvedBlocks };
+  const fullSnapshot = toPublishedLesson(lessonForPublish, publishedAt);
   const studentBlocks = sanitizeBlocksDeep(filterBlocksForStudent(fullSnapshot.blocks));
   const studentSnapshot = PublishedLessonSchema.parse({ ...fullSnapshot, blocks: studentBlocks });
 
   await setJSON(store, publishedLessonKey(id), studentSnapshot);
   // Persist publish timestamp on the draft so reload shows Published / Unpublished changes.
+  // Draft keeps linked stubs; only the published snapshot expands them.
   await setJSON(store, draftLessonKey(id), {
     ...validated.data,
     published_at: publishedAt,

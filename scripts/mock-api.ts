@@ -63,6 +63,11 @@ import {
 import { orderLessonsByUnitIds } from '../src/schemas/published-unit';
 import { filterBlocksForStudent } from '../src/blocks/visibility';
 import { sanitizeBlocksDeep } from '../src/blocks/sanitize-blocks';
+import { isLinkedSection } from '../src/blocks/composition-link';
+import {
+  LinkedResolveError,
+  resolveLinkedSectionsForPublish
+} from '../src/blocks/resolve-linked-sections';
 import { runContentSearch } from '../src/search/run-content-search';
 import { applyScheduleUnit } from '../src/schedule/schedule-unit';
 import { reorderScheduledLesson } from '../src/schedule/reorder';
@@ -540,10 +545,38 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       );
     }
 
+    const compositionMap = new Map<string, CompositionTemplate>();
+    for (const block of parsed.data.blocks) {
+      if (!isLinkedSection(block)) continue;
+      const sourceId = block.content.link.source_composition_id;
+      if (compositionMap.has(sourceId)) continue;
+      const raw = store.getJSON(compositionKey(sourceId));
+      const composition = CompositionTemplateSchema.safeParse(raw);
+      if (composition.success) {
+        compositionMap.set(sourceId, composition.data);
+      }
+    }
+
+    let n = 0;
+    let resolvedBlocks: Block[];
+    try {
+      resolvedBlocks = resolveLinkedSectionsForPublish(
+        parsed.data.blocks,
+        (sourceId) => compositionMap.get(sourceId) ?? null,
+        () => `block_pub_${id}_${++n}`
+      );
+    } catch (err) {
+      if (err instanceof LinkedResolveError) {
+        return errorResponse(400, 'validation_error', err.message);
+      }
+      throw err;
+    }
+
     await ensureDomPolyfill();
 
     const publishedAt = new Date().toISOString();
-    const fullSnapshot = toPublishedLesson(parsed.data, publishedAt);
+    const lessonForPublish = { ...parsed.data, blocks: resolvedBlocks };
+    const fullSnapshot = toPublishedLesson(lessonForPublish, publishedAt);
     const studentBlocks = sanitizeBlocksDeep(filterBlocksForStudent(fullSnapshot.blocks));
 
     const studentSnapshot = PublishedLessonSchema.parse({
@@ -553,6 +586,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
 
     store.setJSON(publishedLessonKey(id), studentSnapshot);
     // Persist publish timestamp on the draft so reload shows Published / Unpublished changes.
+    // Draft keeps linked stubs; only the published snapshot expands them.
     store.setJSON(draftLessonKey(id), {
       ...parsed.data,
       published_at: publishedAt,
@@ -1477,6 +1511,78 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     return okResponse(200, parsed.data);
   }
 
+  function handlePatchComposition(
+    cookie: string | null | undefined,
+    id: string,
+    body: unknown
+  ): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+
+    const raw = store.getJSON<CompositionTemplate>(compositionKey(id));
+    if (!raw) return notFoundResponse('Composition not found');
+
+    const existing = CompositionTemplateSchema.safeParse(raw);
+    if (!existing.success) {
+      return errorResponse(500, 'invalid_data', 'Stored composition is invalid');
+    }
+
+    if (typeof body !== 'object' || body === null) {
+      return errorResponse(400, 'validation_error', 'Request body must be a JSON object');
+    }
+
+    const record = body as Record<string, unknown>;
+    const hasTitle = typeof record.title === 'string';
+    const hasRoot = record.root !== undefined;
+    if (!hasTitle && !hasRoot) {
+      return errorResponse(400, 'validation_error', 'At least one of title or root is required');
+    }
+
+    const next = { ...existing.data };
+
+    if (hasTitle) {
+      const title = (record.title as string).trim();
+      if (!title) return errorResponse(400, 'validation_error', 'title must not be empty');
+      next.title = title;
+      next.slug = slugify(title);
+    }
+
+    if (hasRoot) {
+      const rootParsed = SectionBlockSchema.safeParse(record.root);
+      if (!rootParsed.success) {
+        return errorResponse(
+          400,
+          'validation_error',
+          'root must be a section block',
+          rootParsed.error.flatten()
+        );
+      }
+      if (rootParsed.data.content.link) {
+        return errorResponse(
+          400,
+          'validation_error',
+          'Composition root must not be a linked section'
+        );
+      }
+      next.root = structuredClone(rootParsed.data);
+    }
+
+    next.updated_at = nowIso();
+
+    const validated = CompositionTemplateSchema.safeParse(next);
+    if (!validated.success) {
+      return errorResponse(
+        400,
+        'validation_error',
+        'Composition data is invalid',
+        validated.error.flatten()
+      );
+    }
+
+    store.setJSON(compositionKey(id), validated.data);
+    return okResponse(200, validated.data);
+  }
+
   function listLessonTemplateSummaries(): LessonTemplateSummary[] {
     return store
       .listKeys('templates/lessons/')
@@ -2111,8 +2217,10 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     if (method === 'POST' && path === '/api/media') return handlePostMedia(cookie, body);
 
     const compositionMatch = COMPOSITION_ID_RE.exec(path);
-    if (compositionMatch && method === 'GET') {
-      return handleGetComposition(cookie, compositionMatch[1]!);
+    if (compositionMatch) {
+      const id = compositionMatch[1]!;
+      if (method === 'GET') return handleGetComposition(cookie, id);
+      if (method === 'PATCH') return handlePatchComposition(cookie, id, body);
     }
     const lessonTemplateMatch = LESSON_TEMPLATE_ID_RE.exec(path);
     if (lessonTemplateMatch) {

@@ -5,6 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { createMockApi } from '../../scripts/mock-api';
 import type { SeedData } from '../../scripts/mock-store';
 import { createBlock } from '@/blocks/create-block';
+import { createLinkedSectionStub } from '@/blocks/composition-link';
 import { compositionKey } from '@/storage/keys';
 import type { CompositionTemplate } from '@/schemas/composition';
 
@@ -92,5 +93,91 @@ describe('compositions API (mock)', () => {
     expect(compositionKey('composition_missing')).toBe(
       'templates/compositions/composition_missing'
     );
+  });
+
+  it('PATCH /api/compositions/:id updates title and root', async () => {
+    const api = freshApi();
+    const cookie = await signIn(api);
+    const root = createBlock('section', 'block_sec_save');
+    if (root.block_type !== 'section') throw new Error('expected section');
+    root.content.title = 'Original root';
+
+    const createRes = await api.request('POST', '/api/compositions', {
+      cookie,
+      body: { title: 'Original', root }
+    });
+    expect(createRes.status).toBe(201);
+    const created = (await createRes.json()).data as CompositionTemplate;
+
+    const newRoot = createBlock('section', 'block_new_root');
+    if (newRoot.block_type !== 'section') throw new Error('expected section');
+    newRoot.content.title = 'Updated root';
+
+    const patchRes = await api.request('PATCH', `/api/compositions/${created.id}`, {
+      cookie,
+      body: { title: 'Renamed', root: newRoot }
+    });
+    expect(patchRes.status).toBe(200);
+    const patched = (await patchRes.json()).data as CompositionTemplate;
+    expect(patched.title).toBe('Renamed');
+    expect(patched.root.content.title).toBe('Updated root');
+  });
+
+  it('PATCH rejects empty body', async () => {
+    const api = freshApi();
+    const cookie = await signIn(api);
+    const root = createBlock('section', 'block_sec_empty_patch');
+    if (root.block_type !== 'section') throw new Error('expected section');
+    root.content.title = 'Keep';
+
+    const createRes = await api.request('POST', '/api/compositions', {
+      cookie,
+      body: { title: 'Keep title', root }
+    });
+    expect(createRes.status).toBe(201);
+    const created = (await createRes.json()).data as CompositionTemplate;
+
+    const patchRes = await api.request('PATCH', `/api/compositions/${created.id}`, {
+      cookie,
+      body: {}
+    });
+    expect(patchRes.status).toBe(400);
+  });
+
+  it('PATCH returns 404 for missing id', async () => {
+    const api = freshApi();
+    const cookie = await signIn(api);
+    const res = await api.request('PATCH', '/api/compositions/composition_missing', {
+      cookie,
+      body: { title: 'X' }
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it('PATCH rejects root with content.link', async () => {
+    const api = freshApi();
+    const cookie = await signIn(api);
+    const root = createBlock('section', 'block_sec_link_patch');
+    if (root.block_type !== 'section') throw new Error('expected section');
+    root.content.title = 'Own root';
+
+    const createRes = await api.request('POST', '/api/compositions', {
+      cookie,
+      body: { title: 'Owned', root }
+    });
+    expect(createRes.status).toBe(201);
+    const created = (await createRes.json()).data as CompositionTemplate;
+
+    const linkedRoot = createLinkedSectionStub({
+      id: 'block_linked_root',
+      sourceCompositionId: 'composition_other',
+      titleHint: 'Linked'
+    });
+
+    const patchRes = await api.request('PATCH', `/api/compositions/${created.id}`, {
+      cookie,
+      body: { root: linkedRoot }
+    });
+    expect(patchRes.status).toBe(400);
   });
 });

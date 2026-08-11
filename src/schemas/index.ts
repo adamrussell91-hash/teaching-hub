@@ -26,6 +26,7 @@ export {
   HeadingBlockSchema,
   CalloutBlockSchema,
   SectionBlockSchema,
+  SectionLinkSchema,
   BlockSchema,
   type Block
 } from './block';
