@@ -9,6 +9,7 @@ import {
 } from '@/teacher/template-api';
 import type { LessonTemplateSummary, UnitTemplateSummary } from '@/schemas';
 import { navigate } from '@/app/router';
+import { confirmAndTrash, entityPath, patchStatus } from '@/teacher/lifecycle-api';
 
 type Tab = 'lessons' | 'units';
 
@@ -194,8 +195,8 @@ export function renderTemplatesPage(
         void (async () => {
           if (!window.confirm(`Archive “${row.title}”?`)) return;
           try {
-            if (tab === 'lessons') await patchLessonTemplate(row.id, { status: 'archived' });
-            else await patchUnitTemplate(row.id, { status: 'archived' });
+            const type = tab === 'lessons' ? 'lesson_template' : 'unit_template';
+            await patchStatus(entityPath(type, row.id), 'archived');
             await reload();
             setStatus('Archived.');
           } catch {
@@ -204,7 +205,25 @@ export function renderTemplatesPage(
         })();
       });
 
-      actions.append(useBtn, renameBtn, archiveBtn);
+      const trashBtn = document.createElement('button');
+      trashBtn.type = 'button';
+      trashBtn.className = 'btn btn--ghost';
+      trashBtn.textContent = 'Trash';
+      trashBtn.addEventListener('click', () => {
+        void (async () => {
+          try {
+            const type = tab === 'lessons' ? 'lesson_template' : 'unit_template';
+            const ok = await confirmAndTrash(type, row.id, row.title);
+            if (!ok) return;
+            await reload();
+            setStatus('Moved to trash.');
+          } catch {
+            setStatus('Unable to move to trash.');
+          }
+        })();
+      });
+
+      actions.append(useBtn, renameBtn, archiveBtn, trashBtn);
       item.append(info, actions);
       list.append(item);
     }

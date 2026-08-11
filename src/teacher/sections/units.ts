@@ -5,10 +5,16 @@ import type { CurriculumResponse } from '@/teacher/nav';
 import { cloneBlocksWithNewIds } from '@/blocks/clone-blocks';
 import { createUnitTemplate } from '@/teacher/template-api';
 import { mountHistoryPanel } from '@/teacher/history-panel';
+import {
+  confirmAndArchive,
+  confirmAndTrash,
+  entityPath
+} from '@/teacher/lifecycle-api';
 import type { Unit } from '@/schemas';
 
 export interface UnitsIndexOptions {
   onCreated?: (kind: CreateKind, id: string) => void | Promise<void>;
+  onMutated?: () => void | Promise<void>;
 }
 
 export function renderUnitsIndex(
@@ -44,7 +50,9 @@ export function renderUnitsIndex(
 
   const yearsById = new Map(curriculum.years.map((year) => [year.id, year]));
   const subjectsById = new Map(curriculum.subjects.map((subject) => [subject.id, subject]));
-  const units = [...curriculum.units].sort((a, b) => a.title.localeCompare(b.title));
+  const units = curriculum.units
+    .filter((unit) => unit.status === 'active')
+    .sort((a, b) => a.title.localeCompare(b.title));
 
   if (units.length === 0) {
     const empty = document.createElement('p');
@@ -80,6 +88,9 @@ export function renderUnitsIndex(
 
     info.append(title, meta);
 
+    const actions = document.createElement('div');
+    actions.className = 'list-row-actions';
+
     const path = `/units/${unit.id}`;
     const open = document.createElement('a');
     open.className = 'btn btn--secondary lesson-list__open';
@@ -90,7 +101,38 @@ export function renderUnitsIndex(
       navigate(path);
     });
 
-    item.append(info, open);
+    const archive = document.createElement('button');
+    archive.type = 'button';
+    archive.className = 'btn btn--ghost';
+    archive.textContent = 'Archive';
+    archive.addEventListener('click', () => {
+      void (async () => {
+        try {
+          const ok = await confirmAndArchive(entityPath('unit', unit.id), unit.title);
+          if (ok) await options.onMutated?.();
+        } catch {
+          window.alert('Unable to archive unit.');
+        }
+      })();
+    });
+
+    const trash = document.createElement('button');
+    trash.type = 'button';
+    trash.className = 'btn btn--ghost';
+    trash.textContent = 'Trash';
+    trash.addEventListener('click', () => {
+      void (async () => {
+        try {
+          const ok = await confirmAndTrash('unit', unit.id, unit.title);
+          if (ok) await options.onMutated?.();
+        } catch {
+          window.alert('Unable to move unit to trash.');
+        }
+      })();
+    });
+
+    actions.append(open, archive, trash);
+    item.append(info, actions);
     list.append(item);
   }
 
@@ -172,7 +214,7 @@ export function renderUnitStub(
   });
 
   const lessons = curriculum.lessons
-    .filter((lesson) => lesson.unit_id === unitId)
+    .filter((lesson) => lesson.unit_id === unitId && lesson.status === 'active')
     .sort((a, b) => a.sequence - b.sequence);
 
   if (lessons.length === 0) {

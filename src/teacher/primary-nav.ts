@@ -12,7 +12,8 @@ const SECTIONS: Array<{ id: TeacherSection; label: string; path: string }> = [
   { id: 'units', label: 'Units', path: '/units' },
   { id: 'lessons', label: 'Lessons', path: '/lessons' },
   { id: 'templates', label: 'Templates', path: '/templates' },
-  { id: 'resources', label: 'Resource Library', path: '/resources' }
+  { id: 'resources', label: 'Resource Library', path: '/resources' },
+  { id: 'trash', label: 'Trash', path: '/trash' }
 ];
 
 export function renderPrimaryNav(container: HTMLElement, options: PrimaryNavOptions): void {

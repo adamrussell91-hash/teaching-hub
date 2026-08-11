@@ -10,6 +10,7 @@ export type RouteName =
   | 'teacher-lesson'
   | 'teacher-resources'
   | 'teacher-templates'
+  | 'teacher-trash'
   | 'student-lesson'
   | 'student-unit'
   | 'student-class'
@@ -28,6 +29,7 @@ export type RouteParams = {
   'teacher-lesson': { lessonId: string };
   'teacher-resources': Record<string, never>;
   'teacher-templates': Record<string, never>;
+  'teacher-trash': Record<string, never>;
   'student-lesson': { lessonId: string };
   'student-unit': { unitId: string };
   'student-class': { classId: string };
@@ -156,6 +158,15 @@ export function match(pathname: string): RouteMatch | null {
   if (path === '/templates') {
     return {
       name: 'teacher-templates',
+      params: {},
+      requiresAuth: true,
+      path
+    };
+  }
+
+  if (path === '/trash') {
+    return {
+      name: 'teacher-trash',
       params: {},
       requiresAuth: true,
       path

@@ -111,3 +111,7 @@ export function apiPatch<T>(
 ): Promise<T> {
   return apiRequest<T>('PATCH', path, { ...options, body });
 }
+
+export function apiDelete<T>(path: string, options?: ApiRequestOptions): Promise<T> {
+  return apiRequest<T>('DELETE', path, options);
+}

@@ -173,6 +173,8 @@ describe('classes section', () => {
       'a.home-class-tile[href="/classes/class_2026_12engadv1"]'
     );
     expect(tile).not.toBeNull();
+    expect(canvas.textContent).toMatch(/Archive/);
+    expect(canvas.textContent).toMatch(/Trash/);
     tile?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     expect(navigate).toHaveBeenCalledWith('/classes/class_2026_12engadv1');
   });

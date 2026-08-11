@@ -108,6 +108,12 @@ describe('router match', () => {
       requiresAuth: true,
       path: '/resources'
     });
+    expect(match('/trash')).toEqual({
+      name: 'teacher-trash',
+      params: {},
+      requiresAuth: true,
+      path: '/trash'
+    });
     expect(match('/units')).toEqual({
       name: 'teacher-units',
       params: {},

@@ -88,7 +88,9 @@ export function renderClassesNav(
 
   const list = document.createElement('div');
   list.className = 'rail-classes';
-  for (const cls of [...curriculum.classes].sort((a, b) => a.code.localeCompare(b.code))) {
+  for (const cls of [...curriculum.classes]
+    .filter((entry) => entry.status === 'active')
+    .sort((a, b) => a.code.localeCompare(b.code))) {
     const link = document.createElement('a');
     link.className = 'nav-item rail-classes__item';
     const path = `/classes/${cls.id}`;
@@ -221,7 +223,9 @@ export function renderCurriculumNav(
     wrapper.append(createToggleButton(unit.title, nodeId, 'nested-2'));
 
     if (isExpanded(nodeId)) {
-      const lessons = lessonsByUnit.get(unit.id) ?? [];
+      const lessons = (lessonsByUnit.get(unit.id) ?? []).filter(
+        (lesson) => lesson.status === 'active'
+      );
       const children = document.createElement('div');
       children.className = 'curriculum-nav__children';
       for (const lesson of lessons) {
@@ -244,7 +248,7 @@ export function renderCurriculumNav(
       children.className = 'curriculum-nav__children';
       for (const unitId of subject.unit_ids) {
         const unit = unitsById.get(unitId);
-        if (unit) children.append(renderUnitNode(unit));
+        if (unit && unit.status === 'active') children.append(renderUnitNode(unit));
       }
       wrapper.append(children);
     }

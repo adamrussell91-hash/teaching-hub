@@ -102,7 +102,11 @@ export function renderTeacherHome(
     header,
     buildSignalsPanel(todayEntries.length, unpublished.length, openHomeCreate),
     weekMount,
-    buildClassesPanel(curriculum.classes, curriculum, openCreateClass)
+    buildClassesPanel(
+      curriculum.classes.filter((cls) => cls.status === 'active'),
+      curriculum,
+      openCreateClass
+    )
   );
 
   canvas.append(root);

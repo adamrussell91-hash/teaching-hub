@@ -3,6 +3,7 @@ import type { CurriculumResponse } from '@/teacher/nav';
 import { isHttpUrl } from '@/blocks/url-safety';
 import { createMedia, patchMedia, uploadMediaFile } from '@/teacher/media-api';
 import { ApiClientError } from '@/api/client';
+import { confirmAndTrash } from '@/teacher/lifecycle-api';
 
 export function openUrlForMedia(media: Media): string | undefined {
   const url = media.preview_url ?? media.download_url;
@@ -12,7 +13,7 @@ export function openUrlForMedia(media: Media): string | undefined {
 }
 
 export interface ResourcesIndexOptions {
-  /** Called after successful create/upload/archive to reload curriculum and remount. */
+  /** Called after successful create/upload/archive/trash to reload curriculum and remount. */
   refresh?: () => Promise<void>;
   /** Optional Drive picker hook (Task 5). */
   onDrivePick?: () => void | Promise<void>;
@@ -127,6 +128,9 @@ export function renderResourcesIndex(
       btn.disabled = busy;
     }
     for (const btn of canvas.querySelectorAll<HTMLButtonElement>('[data-resources-archive]')) {
+      btn.disabled = busy;
+    }
+    for (const btn of canvas.querySelectorAll<HTMLButtonElement>('[data-resources-trash]')) {
       btn.disabled = busy;
     }
     fileInput.disabled = busy;
@@ -272,7 +276,31 @@ export function renderResourcesIndex(
         }
       })();
     });
-    actions.append(archive);
+
+    const trash = document.createElement('button');
+    trash.type = 'button';
+    trash.className = 'btn btn--ghost';
+    trash.dataset.resourcesTrash = entry.id;
+    trash.textContent = 'Trash';
+    trash.addEventListener('click', () => {
+      void (async () => {
+        setBusy(true);
+        setStatus(null);
+        try {
+          const ok = await confirmAndTrash('media', entry.id, entry.title);
+          if (!ok) {
+            setBusy(false);
+            return;
+          }
+          await options?.refresh?.();
+        } catch (error) {
+          setStatus(errorMessage(error), true);
+          setBusy(false);
+        }
+      })();
+    });
+
+    actions.append(archive, trash);
 
     item.append(actions);
     list.append(item);

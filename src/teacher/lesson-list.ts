@@ -1,10 +1,21 @@
 import { navigate } from '@/app/router';
 import type { CurriculumResponse } from '@/teacher/nav';
+import {
+  confirmAndArchive,
+  confirmAndTrash,
+  entityPath
+} from '@/teacher/lifecycle-api';
+
+export interface LessonListOptions {
+  heading: string | null;
+  /** Called after archive/trash so the caller can reload curriculum. */
+  onMutated?: () => void | Promise<void>;
+}
 
 export function renderLessonList(
   canvas: HTMLElement,
   curriculum: CurriculumResponse,
-  options: { heading: string | null }
+  options: LessonListOptions
 ): void {
   canvas.replaceChildren();
 
@@ -15,7 +26,14 @@ export function renderLessonList(
     canvas.append(heading);
   }
 
-  if (curriculum.lessons.length === 0) {
+  const lessons = curriculum.lessons
+    .filter((lesson) => lesson.status === 'active')
+    .sort((a, b) => {
+      if (a.unit_id !== b.unit_id) return a.unit_id.localeCompare(b.unit_id);
+      return a.sequence - b.sequence;
+    });
+
+  if (lessons.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'teacher-layout__canvas-status';
     empty.textContent = 'No lessons yet.';
@@ -24,15 +42,11 @@ export function renderLessonList(
   }
 
   const unitsById = new Map(curriculum.units.map((unit) => [unit.id, unit]));
-  const sortedLessons = [...curriculum.lessons].sort((a, b) => {
-    if (a.unit_id !== b.unit_id) return a.unit_id.localeCompare(b.unit_id);
-    return a.sequence - b.sequence;
-  });
 
   const list = document.createElement('ul');
   list.className = 'lesson-list';
 
-  for (const lesson of sortedLessons) {
+  for (const lesson of lessons) {
     const unit = unitsById.get(lesson.unit_id);
     const item = document.createElement('li');
     item.className = 'lesson-list__item';
@@ -52,6 +66,9 @@ export function renderLessonList(
 
     info.append(title, meta);
 
+    const actions = document.createElement('div');
+    actions.className = 'list-row-actions';
+
     const path = `/lessons/${lesson.id}`;
     const open = document.createElement('a');
     open.className = 'btn btn--secondary lesson-list__open';
@@ -62,7 +79,38 @@ export function renderLessonList(
       navigate(path);
     });
 
-    item.append(info, open);
+    const archive = document.createElement('button');
+    archive.type = 'button';
+    archive.className = 'btn btn--ghost';
+    archive.textContent = 'Archive';
+    archive.addEventListener('click', () => {
+      void (async () => {
+        try {
+          const ok = await confirmAndArchive(entityPath('lesson', lesson.id), lesson.title);
+          if (ok) await options.onMutated?.();
+        } catch {
+          window.alert('Unable to archive lesson.');
+        }
+      })();
+    });
+
+    const trash = document.createElement('button');
+    trash.type = 'button';
+    trash.className = 'btn btn--ghost';
+    trash.textContent = 'Trash';
+    trash.addEventListener('click', () => {
+      void (async () => {
+        try {
+          const ok = await confirmAndTrash('lesson', lesson.id, lesson.title);
+          if (ok) await options.onMutated?.();
+        } catch {
+          window.alert('Unable to move lesson to trash.');
+        }
+      })();
+    });
+
+    actions.append(open, archive, trash);
+    item.append(info, actions);
     list.append(item);
   }
 

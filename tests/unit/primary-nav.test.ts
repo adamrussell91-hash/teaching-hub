@@ -26,7 +26,8 @@ describe('primary nav', () => {
       'Units',
       'Lessons',
       'Templates',
-      'Resource Library'
+      'Resource Library',
+      'Trash'
     ]);
   });
 

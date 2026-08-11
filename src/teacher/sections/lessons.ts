@@ -5,6 +5,7 @@ import { renderLessonList } from '@/teacher/lesson-list';
 
 export interface LessonsIndexOptions {
   onCreated?: (kind: CreateKind, id: string) => void | Promise<void>;
+  onMutated?: () => void | Promise<void>;
 }
 
 export function renderLessonsIndex(
@@ -40,7 +41,7 @@ export function renderLessonsIndex(
   listHost.className = 'lessons-index__list';
 
   canvas.append(header, listHost);
-  renderLessonList(listHost, curriculum, { heading: null });
+  renderLessonList(listHost, curriculum, { heading: null, onMutated: options.onMutated });
 
   return {
     dispose: () => {

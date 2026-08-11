@@ -27,6 +27,7 @@ import { openScheduleUnitModal } from '@/teacher/sections/schedule-unit-modal';
 import { renderUnitsIndex, renderUnitStub } from '@/teacher/sections/units';
 import { renderLessonsIndex } from '@/teacher/sections/lessons';
 import { renderTemplatesPage } from '@/teacher/sections/templates';
+import { renderTrashSection } from '@/teacher/sections/trash';
 import { fetchContentSearch } from '@/teacher/search/api';
 import { resolveTodayClassId } from '@/teacher/search/actions';
 import { openSearchPanel } from '@/teacher/search/panel';
@@ -89,6 +90,7 @@ let scopeIndexHandle: { dispose?: () => void } | null = null;
 let classesIndexHandle: { dispose?: () => void } | null = null;
 let unitsIndexHandle: { dispose?: () => void } | null = null;
 let lessonsIndexHandle: { dispose?: () => void } | null = null;
+let trashSectionHandle: { dispose?: () => void } | null = null;
 
 /**
  * Flushes any pending/in-flight autosave for the current lesson editor and
@@ -152,6 +154,12 @@ function teardownLessonsIndex(): void {
   if (!lessonsIndexHandle) return;
   lessonsIndexHandle.dispose?.();
   lessonsIndexHandle = null;
+}
+
+function teardownTrashSection(): void {
+  if (!trashSectionHandle) return;
+  trashSectionHandle.dispose?.();
+  trashSectionHandle = null;
 }
 
 function pathForCreatedEntity(
@@ -397,10 +405,20 @@ function renderTeacherClassesRoute(token: number): void {
   renderCanvasStatus(refs.canvas, 'Loading…');
 
   void loadNavAndHandleErrors(refs, token, 'classes', undefined, (curriculum) => {
-    teardownClassesIndex();
-    classesIndexHandle = renderClassesIndex(refs.canvas, curriculum, {
-      onCreated: (kind, id) => handleEntityCreated(refs, token, kind, id)
-    });
+    const remount = (data: CurriculumResponse): void => {
+      teardownClassesIndex();
+      classesIndexHandle = renderClassesIndex(refs.canvas, data, {
+        onCreated: (kind, id) => handleEntityCreated(refs, token, kind, id),
+        onMutated: async () => {
+          curriculumPromise = null;
+          const next = await getCurriculum();
+          if (token !== renderToken) return;
+          mountTeacherRail(refs, next, token, 'classes');
+          remount(next);
+        }
+      });
+    };
+    remount(curriculum);
   });
 }
 
@@ -522,6 +540,18 @@ function renderTeacherTemplatesRoute(token: number): void {
   });
 }
 
+function renderTeacherTrashRoute(token: number): void {
+  const refs = mountTeacherShell();
+  renderContextBar(refs, { title: 'Trash' });
+  renderRailStatus(refs.railNav, 'Loading curriculum…');
+  renderCanvasStatus(refs.canvas, 'Loading…');
+
+  void loadNavAndHandleErrors(refs, token, 'trash', undefined, () => {
+    teardownTrashSection();
+    trashSectionHandle = renderTrashSection(refs.canvas);
+  });
+}
+
 function renderTeacherScopeSequencesRoute(token: number): void {
   const refs = mountTeacherShell();
   renderContextBar(refs, { title: 'Scope & Sequences' });
@@ -563,10 +593,20 @@ function renderTeacherUnitsRoute(token: number): void {
   renderCanvasStatus(refs.canvas, 'Loading…');
 
   void loadNavAndHandleErrors(refs, token, 'units', undefined, (curriculum) => {
-    teardownUnitsIndex();
-    unitsIndexHandle = renderUnitsIndex(refs.canvas, curriculum, {
-      onCreated: (kind, id) => handleEntityCreated(refs, token, kind, id)
-    });
+    const remount = (data: CurriculumResponse): void => {
+      teardownUnitsIndex();
+      unitsIndexHandle = renderUnitsIndex(refs.canvas, data, {
+        onCreated: (kind, id) => handleEntityCreated(refs, token, kind, id),
+        onMutated: async () => {
+          curriculumPromise = null;
+          const next = await getCurriculum();
+          if (token !== renderToken) return;
+          mountTeacherRail(refs, next, token, 'units');
+          remount(next);
+        }
+      });
+    };
+    remount(curriculum);
   });
 }
 
@@ -598,10 +638,20 @@ function renderTeacherLessonsRoute(token: number): void {
   renderCanvasStatus(refs.canvas, 'Loading…');
 
   void loadNavAndHandleErrors(refs, token, 'lessons', undefined, (curriculum) => {
-    teardownLessonsIndex();
-    lessonsIndexHandle = renderLessonsIndex(refs.canvas, curriculum, {
-      onCreated: (kind, id) => handleEntityCreated(refs, token, kind, id)
-    });
+    const remount = (data: CurriculumResponse): void => {
+      teardownLessonsIndex();
+      lessonsIndexHandle = renderLessonsIndex(refs.canvas, data, {
+        onCreated: (kind, id) => handleEntityCreated(refs, token, kind, id),
+        onMutated: async () => {
+          curriculumPromise = null;
+          const next = await getCurriculum();
+          if (token !== renderToken) return;
+          mountTeacherRail(refs, next, token, 'lessons');
+          remount(next);
+        }
+      });
+    };
+    remount(curriculum);
   });
 }
 
@@ -676,6 +726,9 @@ function renderRoute(match: RouteMatch, token: number): void {
     case 'teacher-templates':
       renderTeacherTemplatesRoute(token);
       break;
+    case 'teacher-trash':
+      renderTeacherTrashRoute(token);
+      break;
     case 'teacher-scope-sequences':
       renderTeacherScopeSequencesRoute(token);
       break;
@@ -724,6 +777,7 @@ async function handleRoute(match: RouteMatch): Promise<void> {
   teardownClassesIndex();
   teardownUnitsIndex();
   teardownLessonsIndex();
+  teardownTrashSection();
   teardownStudentLessonView();
   teardownStudentUnitView();
   teardownStudentClassView();

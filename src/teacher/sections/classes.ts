@@ -13,9 +13,15 @@ import {
   type HomepageEditorHandle
 } from '@/teacher/sections/homepage-editor';
 import { patchClass, patchScheduledLesson } from '@/teacher/schedule-api';
+import {
+  confirmAndArchive,
+  confirmAndTrash,
+  entityPath
+} from '@/teacher/lifecycle-api';
 
 export interface ClassesIndexOptions {
   onCreated?: (kind: CreateKind, id: string) => void | Promise<void>;
+  onMutated?: () => void | Promise<void>;
 }
 
 export interface ClassPageOptions {
@@ -53,7 +59,9 @@ export function renderClassesIndex(
   disposers.push(createControl.dispose);
 
   const subjectsById = new Map(curriculum.subjects.map((subject) => [subject.id, subject]));
-  const classes = [...curriculum.classes].sort((a, b) => a.code.localeCompare(b.code));
+  const classes = curriculum.classes
+    .filter((cls) => cls.status === 'active')
+    .sort((a, b) => a.code.localeCompare(b.code));
 
   const grid = document.createElement('div');
   grid.className = 'home-classes classes-index__grid';
@@ -67,6 +75,9 @@ export function renderClassesIndex(
     for (const cls of classes) {
       const subject = subjectsById.get(cls.subject_id);
       const path = `/classes/${cls.id}`;
+
+      const card = document.createElement('div');
+      card.className = 'classes-index__card';
 
       const tile = document.createElement('a');
       tile.className = 'glass-tile home-class-tile';
@@ -86,7 +97,46 @@ export function renderClassesIndex(
       title.textContent = cls.code || cls.title;
 
       tile.append(eyebrow, title);
-      grid.append(tile);
+
+      const actions = document.createElement('div');
+      actions.className = 'list-row-actions classes-index__actions';
+
+      const archive = document.createElement('button');
+      archive.type = 'button';
+      archive.className = 'btn btn--ghost';
+      archive.textContent = 'Archive';
+      archive.addEventListener('click', () => {
+        void (async () => {
+          try {
+            const ok = await confirmAndArchive(
+              entityPath('class', cls.id),
+              cls.code || cls.title
+            );
+            if (ok) await options.onMutated?.();
+          } catch {
+            window.alert('Unable to archive class.');
+          }
+        })();
+      });
+
+      const trash = document.createElement('button');
+      trash.type = 'button';
+      trash.className = 'btn btn--ghost';
+      trash.textContent = 'Trash';
+      trash.addEventListener('click', () => {
+        void (async () => {
+          try {
+            const ok = await confirmAndTrash('class', cls.id, cls.code || cls.title);
+            if (ok) await options.onMutated?.();
+          } catch {
+            window.alert('Unable to move class to trash.');
+          }
+        })();
+      });
+
+      actions.append(archive, trash);
+      card.append(tile, actions);
+      grid.append(card);
     }
   }
 
