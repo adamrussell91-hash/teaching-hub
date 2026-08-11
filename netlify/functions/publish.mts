@@ -30,6 +30,7 @@ import {
   preflightResponse,
   withCors
 } from './_shared/http.mts';
+import { createNetlifyJsonStore, writeCheckpoint } from './_shared/versions.mts';
 
 interface FunctionContext {
   params: Record<string, string | undefined>;
@@ -118,6 +119,15 @@ export default async function handler(request: Request, context: FunctionContext
   const fullSnapshot = toPublishedLesson(lessonForPublish, publishedAt);
   const studentBlocks = sanitizeBlocksDeep(filterBlocksForStudent(fullSnapshot.blocks));
   const studentSnapshot = PublishedLessonSchema.parse({ ...fullSnapshot, blocks: studentBlocks });
+
+  // Checkpoint the pre-publish draft before writing the published snapshot.
+  await writeCheckpoint(createNetlifyJsonStore(store), {
+    kind: 'lesson',
+    parentId: id,
+    snapshot: validated.data,
+    reason: 'publish',
+    now: publishedAt
+  });
 
   await setJSON(store, publishedLessonKey(id), studentSnapshot);
   // Persist publish timestamp on the draft so reload shows Published / Unpublished changes.

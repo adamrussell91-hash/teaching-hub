@@ -22,6 +22,7 @@ import {
   ScheduledLessonSchema,
   type ClassHomepage
 } from '../../src/schemas';
+import { createNetlifyJsonStore, writeCheckpoint } from './_shared/versions.mts';
 
 interface FunctionContext {
   params: Record<string, string | undefined>;
@@ -201,6 +202,16 @@ export default async function handler(request: Request, context: FunctionContext
   }
 
   await setJSON(store, classKey(id), validated.data);
+
+  if (parsed.homepage !== undefined) {
+    await writeCheckpoint(createNetlifyJsonStore(store), {
+      kind: 'class_homepage',
+      parentId: id,
+      snapshot: { homepage: validated.data.homepage },
+      reason: 'save',
+      now: nowIso
+    });
+  }
 
   return withCors(okResponse(200, validated.data), request, env);
 }

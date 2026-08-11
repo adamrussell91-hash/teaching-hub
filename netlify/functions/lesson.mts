@@ -11,6 +11,8 @@ import {
   preflightResponse,
   withCors
 } from './_shared/http.mts';
+import { createNetlifyJsonStore, writeCheckpoint } from './_shared/versions.mts';
+import type { VersionReason } from '../../src/schemas';
 
 interface FunctionContext {
   params: Record<string, string | undefined>;
@@ -56,14 +58,18 @@ export default async function handler(request: Request, context: FunctionContext
   }
 
   const bodyRecord = body as Record<string, unknown>;
+  const checkpointReasonRaw = bodyRecord.checkpoint_reason;
+  const { checkpoint_reason: _checkpointReason, ...bodyWithoutCheckpoint } = bodyRecord;
+  void _checkpointReason;
+
   const existing = await getJSON<Lesson>(store, draftLessonKey(id));
   const candidate = {
-    ...bodyRecord,
+    ...bodyWithoutCheckpoint,
     id,
     updated_at: new Date().toISOString(),
     published_at:
-      bodyRecord.published_at !== undefined
-        ? bodyRecord.published_at
+      bodyWithoutCheckpoint.published_at !== undefined
+        ? bodyWithoutCheckpoint.published_at
         : existing && typeof existing === 'object' && 'published_at' in existing
           ? (existing as Lesson).published_at
           : undefined
@@ -79,6 +85,16 @@ export default async function handler(request: Request, context: FunctionContext
   }
 
   await setJSON(store, draftLessonKey(id), validated.data);
+
+  if (checkpointReasonRaw === 'ai_accepted' || checkpointReasonRaw === 'manual_checkpoint') {
+    await writeCheckpoint(createNetlifyJsonStore(store), {
+      kind: 'lesson',
+      parentId: id,
+      snapshot: validated.data,
+      reason: checkpointReasonRaw as VersionReason
+    });
+  }
+
   return withCors(okResponse(200, validated.data), request, env);
 }
 
