@@ -1477,6 +1477,78 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     return okResponse(200, parsed.data);
   }
 
+  function handlePatchComposition(
+    cookie: string | null | undefined,
+    id: string,
+    body: unknown
+  ): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+
+    const raw = store.getJSON<CompositionTemplate>(compositionKey(id));
+    if (!raw) return notFoundResponse('Composition not found');
+
+    const existing = CompositionTemplateSchema.safeParse(raw);
+    if (!existing.success) {
+      return errorResponse(500, 'invalid_data', 'Stored composition is invalid');
+    }
+
+    if (typeof body !== 'object' || body === null) {
+      return errorResponse(400, 'validation_error', 'Request body must be a JSON object');
+    }
+
+    const record = body as Record<string, unknown>;
+    const hasTitle = typeof record.title === 'string';
+    const hasRoot = record.root !== undefined;
+    if (!hasTitle && !hasRoot) {
+      return errorResponse(400, 'validation_error', 'At least one of title or root is required');
+    }
+
+    const next = { ...existing.data };
+
+    if (hasTitle) {
+      const title = (record.title as string).trim();
+      if (!title) return errorResponse(400, 'validation_error', 'title must not be empty');
+      next.title = title;
+      next.slug = slugify(title);
+    }
+
+    if (hasRoot) {
+      const rootParsed = SectionBlockSchema.safeParse(record.root);
+      if (!rootParsed.success) {
+        return errorResponse(
+          400,
+          'validation_error',
+          'root must be a section block',
+          rootParsed.error.flatten()
+        );
+      }
+      if (rootParsed.data.content.link) {
+        return errorResponse(
+          400,
+          'validation_error',
+          'Composition root must not be a linked section'
+        );
+      }
+      next.root = structuredClone(rootParsed.data);
+    }
+
+    next.updated_at = nowIso();
+
+    const validated = CompositionTemplateSchema.safeParse(next);
+    if (!validated.success) {
+      return errorResponse(
+        400,
+        'validation_error',
+        'Composition data is invalid',
+        validated.error.flatten()
+      );
+    }
+
+    store.setJSON(compositionKey(id), validated.data);
+    return okResponse(200, validated.data);
+  }
+
   function listLessonTemplateSummaries(): LessonTemplateSummary[] {
     return store
       .listKeys('templates/lessons/')
@@ -2111,8 +2183,10 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     if (method === 'POST' && path === '/api/media') return handlePostMedia(cookie, body);
 
     const compositionMatch = COMPOSITION_ID_RE.exec(path);
-    if (compositionMatch && method === 'GET') {
-      return handleGetComposition(cookie, compositionMatch[1]!);
+    if (compositionMatch) {
+      const id = compositionMatch[1]!;
+      if (method === 'GET') return handleGetComposition(cookie, id);
+      if (method === 'PATCH') return handlePatchComposition(cookie, id, body);
     }
     const lessonTemplateMatch = LESSON_TEMPLATE_ID_RE.exec(path);
     if (lessonTemplateMatch) {
