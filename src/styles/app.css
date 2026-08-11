@@ -442,6 +442,17 @@ a:hover {
   color: var(--depth);
 }
 
+.lesson-editor__composition-modal-error {
+  margin: 0 0 0.75rem;
+  padding: 0.45rem 0.6rem;
+  font-family: var(--font-ui);
+  font-size: 0.84rem;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--high-sea) 10%, var(--glass));
+  border: 1px solid color-mix(in srgb, var(--high-sea) 35%, transparent);
+  border-radius: calc(var(--radius-md) * 0.45);
+}
+
 .lesson-editor__composition-modal-field {
   display: grid;
   gap: 0.35rem;

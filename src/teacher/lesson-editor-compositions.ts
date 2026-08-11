@@ -7,6 +7,16 @@ import type { Media } from '@/schemas/media';
 export type CompositionCacheValue = CompositionTemplate | 'missing';
 export type CompositionCache = Map<string, CompositionCacheValue>;
 
+export interface EditSourceModalHandle {
+  close: () => void;
+}
+
+const noopModalHandle: EditSourceModalHandle = {
+  close() {
+    /* no dialog to close */
+  }
+};
+
 export function ensureCompositionCached(options: {
   compositionId: string;
   cache: CompositionCache;
@@ -77,7 +87,7 @@ export async function openEditSourceModal(options: {
   media: ReadonlyArray<Media>;
   setStatus: (text: string | null) => void;
   onSaved: (updated: CompositionTemplate) => void;
-}): Promise<void> {
+}): Promise<EditSourceModalHandle> {
   const { compositionId, media, setStatus, onSaved } = options;
 
   let full: CompositionTemplate;
@@ -85,12 +95,12 @@ export async function openEditSourceModal(options: {
     full = await apiGet<CompositionTemplate>(`/api/compositions/${compositionId}`);
   } catch {
     setStatus('Unable to load composition.');
-    return;
+    return noopModalHandle;
   }
 
   if (!isCompositionUsable(full)) {
     setStatus('Composition is missing or unavailable.');
-    return;
+    return noopModalHandle;
   }
 
   const working = structuredClone(full);
@@ -101,6 +111,21 @@ export async function openEditSourceModal(options: {
   const heading = document.createElement('h2');
   heading.className = 'lesson-editor__composition-modal-heading';
   heading.textContent = 'Edit composition source';
+
+  const errorEl = document.createElement('p');
+  errorEl.className = 'lesson-editor__composition-modal-error';
+  errorEl.setAttribute('role', 'alert');
+  errorEl.hidden = true;
+
+  const showError = (message: string): void => {
+    errorEl.hidden = false;
+    errorEl.textContent = message;
+  };
+
+  const clearError = (): void => {
+    errorEl.hidden = true;
+    errorEl.textContent = '';
+  };
 
   const titleField = document.createElement('div');
   titleField.className = 'lesson-editor__composition-modal-field';
@@ -119,6 +144,7 @@ export async function openEditSourceModal(options: {
   titleInput.autocomplete = 'off';
   titleInput.addEventListener('input', () => {
     working.title = titleInput.value;
+    clearError();
   });
 
   titleField.append(titleLabel, titleInput);
@@ -152,10 +178,13 @@ export async function openEditSourceModal(options: {
   saveButton.textContent = 'Save';
 
   footer.append(cancelButton, saveButton);
-  dialog.append(heading, titleField, editorHost, footer);
+  dialog.append(heading, errorEl, titleField, editorHost, footer);
   document.body.append(dialog);
 
+  let closed = false;
   const closeDialog = (): void => {
+    if (closed) return;
+    closed = true;
     if (dialog.open) {
       dialog.close();
     }
@@ -166,8 +195,8 @@ export async function openEditSourceModal(options: {
     closeDialog();
   });
 
-  dialog.addEventListener('cancel', (event) => {
-    event.preventDefault();
+  // Escape / backdrop dismiss: let the dialog close, then remove from DOM.
+  dialog.addEventListener('close', () => {
     closeDialog();
   });
 
@@ -175,7 +204,7 @@ export async function openEditSourceModal(options: {
     void (async () => {
       const title = working.title.trim();
       if (!title) {
-        setStatus('Composition title is required.');
+        showError('Composition title is required.');
         return;
       }
       saveButton.disabled = true;
@@ -188,7 +217,7 @@ export async function openEditSourceModal(options: {
         closeDialog();
         onSaved(updated);
       } catch {
-        setStatus('Unable to save composition.');
+        showError('Unable to save composition.');
         saveButton.disabled = false;
         cancelButton.disabled = false;
       }
@@ -196,4 +225,5 @@ export async function openEditSourceModal(options: {
   });
 
   dialog.showModal();
+  return { close: closeDialog };
 }

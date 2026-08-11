@@ -73,6 +73,8 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
   let saveController: SaveController | null = null;
   let savePublishHandle: SavePublishHandle | null = null;
   let a4Preview: A4PreviewHandle | null = null;
+  let closeEditSourceModal: (() => void) | null = null;
+  let editSourceOpenSeq = 0;
 
   renderStatus(refs.canvas, 'Loading lesson…');
 
@@ -347,6 +349,9 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
           editSourceButton.textContent = 'Edit Source';
           editSourceButton.setAttribute('aria-label', `Edit source for block ${index + 1}`);
           editSourceButton.addEventListener('click', () => {
+            closeEditSourceModal?.();
+            closeEditSourceModal = null;
+            const openSeq = ++editSourceOpenSeq;
             void openEditSourceModal({
               compositionId: block.content.link.source_composition_id,
               media: mediaList,
@@ -356,6 +361,15 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
                 setCompositionStatus(`Saved “${updated.title}”.`);
                 renderBlocksList();
               }
+            }).then((modal) => {
+              if (disposed || isStale() || openSeq !== editSourceOpenSeq) {
+                modal.close();
+                return;
+              }
+              closeEditSourceModal = () => {
+                modal.close();
+                closeEditSourceModal = null;
+              };
             });
           });
 
@@ -660,6 +674,8 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     },
     dispose() {
       disposed = true;
+      closeEditSourceModal?.();
+      closeEditSourceModal = null;
       a4Preview?.dispose();
       savePublishHandle?.dispose();
       saveController?.dispose();

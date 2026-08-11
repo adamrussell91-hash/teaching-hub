@@ -712,4 +712,75 @@ describe('mountLessonEditor', () => {
       'Updated reading pack'
     );
   });
+
+  it('dispose while Edit Source modal open removes dialog', async () => {
+    const templateRoot: Block = {
+      id: 'block_template_root',
+      type: 'block',
+      block_type: 'section',
+      variant: 'medium',
+      visibility: 'student_teacher',
+      content: { title: 'Reading pack', blocks: [] },
+      layout: {},
+      print: {},
+      settings: {},
+      created_at: ISO,
+      updated_at: ISO,
+      schema_version: 1
+    };
+    const linkedStub: Block = {
+      id: 'block_lesson_001_1',
+      type: 'block',
+      block_type: 'section',
+      variant: 'medium',
+      visibility: 'student_teacher',
+      content: {
+        title: 'Reading pack',
+        blocks: [],
+        link: { mode: 'linked', source_composition_id: 'composition_1' }
+      },
+      layout: {},
+      print: {},
+      settings: {},
+      created_at: ISO,
+      updated_at: ISO,
+      schema_version: 1
+    };
+
+    apiGetMock.mockImplementation(async (path: string) => {
+      if (path === '/api/compositions') {
+        return { compositions: [{ id: 'composition_1', title: 'Reading pack', updated_at: ISO }] };
+      }
+      if (path === '/api/compositions/composition_1') {
+        return {
+          id: 'composition_1',
+          type: 'composition_template',
+          title: 'Reading pack',
+          slug: 'reading-pack',
+          status: 'active',
+          root: templateRoot,
+          created_at: ISO,
+          updated_at: ISO,
+          schema_version: 1
+        };
+      }
+      if (path.startsWith('/api/lessons/')) {
+        return makeLesson({ blocks: [linkedStub] });
+      }
+      throw new Error(`Unexpected apiGet path: ${path}`);
+    });
+
+    const handle = mountLessonEditor({ refs, lessonId: 'lesson_001', isStale: () => false });
+    await tick();
+    await tick();
+
+    refs.canvas.querySelector<HTMLButtonElement>('.lesson-editor__edit-source')!.click();
+    await tick();
+
+    expect(document.querySelector('.lesson-editor__composition-modal')).not.toBeNull();
+
+    handle.dispose();
+
+    expect(document.querySelector('.lesson-editor__composition-modal')).toBeNull();
+  });
 });
