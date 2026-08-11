@@ -278,6 +278,8 @@ export async function restoreVersion(
   }
 
   const timestamp = now ?? new Date().toISOString();
+  const updated = applyHistoricalSnapshot(kind, live, version.snapshot, timestamp);
+
   await writeCheckpoint(store, {
     kind,
     parentId,
@@ -286,7 +288,6 @@ export async function restoreVersion(
     now: timestamp
   });
 
-  const updated = applyHistoricalSnapshot(kind, live, version.snapshot, timestamp);
   await store.setJSON(liveKey, updated);
   return updated as Lesson | Unit | Class;
 }
