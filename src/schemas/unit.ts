@@ -11,6 +11,8 @@ export const UnitSchema = z.object({
   subject_id: z.string().min(1),
   lesson_ids: z.array(z.string().min(1)),
   primary_term: z.number().int().positive().optional(),
+  start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   description: z.string().optional(),
   cover: CoverSchema.optional(),
   blocks: z.array(BlockSchema).optional()
