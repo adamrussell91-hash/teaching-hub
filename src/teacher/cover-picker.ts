@@ -18,6 +18,8 @@ export interface CoverPickerHandle {
 
 /**
  * Cover hero with optional teacher edit: URL + image library pick + clear.
+ * Prefer `renderEntityBanner` for class-page read view; use this for dialogs
+ * and other edit surfaces that need the full toolbar inline.
  */
 export function mountCoverPicker(
   host: HTMLElement,
@@ -217,7 +219,10 @@ export function mountCoverPicker(
   };
 }
 
-/** Read-only cover banner for student / gallery cards. */
+/**
+ * Read-only cover banner for student views / unit gallery cards.
+ * Class page read view should use `renderEntityBanner` instead.
+ */
 export function renderCoverBanner(
   cover: Cover | null | undefined,
   media: ReadonlyArray<Media>,

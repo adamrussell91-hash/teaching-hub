@@ -1749,6 +1749,22 @@ a:hover {
   color: var(--danger);
 }
 
+/* Minimal entity-banner chrome; Task 8 expands full styling. */
+.entity-banner__edit {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-3);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.entity-banner:hover .entity-banner__edit,
+.entity-banner:focus-within .entity-banner__edit {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .unit-page {
   display: flex;
   flex-direction: column;
