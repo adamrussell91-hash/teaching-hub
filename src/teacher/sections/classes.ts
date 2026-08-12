@@ -3,11 +3,19 @@ import { navigate } from '@/app/router';
 import type { CollectionResolveContext } from '@/blocks/collection-resolve';
 import type { Class, ScheduledLesson, Unit } from '@/schemas';
 import { resolveCoverUrl } from '@/schemas';
+import { daysBetween } from '@/schedule/calendar-dates';
+import {
+  buildClassCalendarModel,
+  shiftYearMonth,
+  yearMonthFromDate
+} from '@/schedule/class-calendar-model';
 import { resolveScheduleToday } from '@/schedule/today';
-import { mountCoverPicker, renderCoverBanner } from '@/teacher/cover-picker';
+import { unitDateProgress, unitDateSpan } from '@/schedule/unit-progress';
+import { renderClassCalendar } from '@/teacher/class-calendar';
 import { mountCreateControl } from '@/teacher/create/control';
 import type { CreateKind } from '@/teacher/create/types';
-import type { CurriculumLessonSummary, CurriculumResponse } from '@/teacher/nav';
+import { renderEntityBanner } from '@/teacher/entity-banner';
+import type { CurriculumResponse } from '@/teacher/nav';
 import {
   mountHomepageEditor,
   normalizeHomepage,
@@ -20,6 +28,7 @@ import {
   confirmAndTrash,
   entityPath
 } from '@/teacher/lifecycle-api';
+import { renderUnitSequence } from '@/teacher/unit-sequence';
 
 export interface ClassesIndexOptions {
   onCreated?: (kind: CreateKind, id: string) => void | Promise<void>;
@@ -153,7 +162,8 @@ export function renderClassesIndex(
 
       actions.append(archive, trash);
       card.append(tile, actions);
-      grid.append(card);    }
+      grid.append(card);
+    }
   }
 
   canvas.append(header, grid);
@@ -170,8 +180,10 @@ export function renderClassPage(
   curriculum: CurriculumResponse,
   classId: string,
   options: ClassPageOptions = {}
-): void {
+): { dispose: () => void } {
   canvas.replaceChildren();
+
+  const disposers: Array<() => void> = [];
 
   const cls = curriculum.classes.find((entry) => entry.id === classId);
   if (!cls) {
@@ -179,7 +191,7 @@ export function renderClassPage(
     status.className = 'teacher-layout__canvas-status';
     status.textContent = 'Class not found.';
     canvas.append(status);
-    return;
+    return { dispose: () => undefined };
   }
 
   const yearsById = new Map(curriculum.years.map((year) => [year.id, year]));
@@ -189,21 +201,366 @@ export function renderClassPage(
 
   const year = yearsById.get(cls.year_id);
   const subject = subjectsById.get(cls.subject_id);
+  const today = resolveScheduleToday(curriculum.schedule_anchor_date);
+
+  const classScheduled = curriculum.scheduled_lessons
+    .filter((entry) => entry.class_id === cls.id)
+    .sort(compareScheduledLessons);
+
+  const lessonTitles = new Map(
+    curriculum.lessons.map((lesson) => [lesson.id, lesson.title] as const)
+  );
+  const unitTitles = new Map(curriculum.units.map((unit) => [unit.id, unit.title] as const));
+
+  const activeUnits = cls.active_unit_ids
+    .map((id) => unitsById.get(id))
+    .filter((unit): unit is Unit => Boolean(unit));
 
   const root = document.createElement('div');
   root.className = 'class-page';
 
-  root.append(
-    buildCoverAndHeader(cls, curriculum, year?.title, subject?.title, options),
-    buildAnnouncementsSection(cls, curriculum, options),
-    buildCurrentUnitSection(cls, unitsById),
-    buildCurrentLessonSection(cls, curriculum, lessonsById),
-    buildScheduleSection(cls, curriculum, lessonsById, options),
-    buildUnitsGallerySection(cls, unitsById, curriculum),
-    buildHomepageRestSection(cls, curriculum, options)
-  );
+  // 1. Banner
+  const bannerHost = document.createElement('div');
+  bannerHost.className = 'class-page__banner';
+  const banner = renderEntityBanner(bannerHost, {
+    cover: cls.cover,
+    media: curriculum.media,
+    title: cls.code || cls.title,
+    eyebrow: [year?.title, subject?.title].filter(Boolean).join(' · '),
+    entityId: cls.id,
+    editable: true,
+    onSave: async (cover) => {
+      await patchClass(cls.id, { cover });
+      await options.onScheduleMutated?.();
+    }
+  });
+  disposers.push(banner.dispose);
 
+  // 2. Action row
+  const actions = document.createElement('div');
+  actions.className = 'class-page__actions';
+
+  const viewAsStudent = document.createElement('a');
+  viewAsStudent.className = 'btn btn--ghost class-page__view-as-student';
+  viewAsStudent.href = `/s/classes/${cls.id}`;
+  viewAsStudent.textContent = 'View as student';
+  viewAsStudent.addEventListener('click', (event) => {
+    event.preventDefault();
+    navigate(`/s/classes/${cls.id}`);
+  });
+
+  const editButton = document.createElement('button');
+  editButton.type = 'button';
+  editButton.className = 'btn btn--secondary class-page__edit-homepage';
+  editButton.textContent = 'Edit page';
+
+  actions.append(viewAsStudent, editButton);
+
+  // Body
+  const body = document.createElement('div');
+  body.className = 'class-page__body';
+
+  const main = document.createElement('div');
+  main.className = 'class-page__main';
+
+  // 3. Teaching today
+  main.append(buildTeachingTodayCard(classScheduled, lessonsById, today));
+
+  // 4. Calendar — local state, re-paint host only
+  const calendarHost = document.createElement('div');
+  calendarHost.className = 'class-page__calendar-host';
+  main.append(calendarHost);
+
+  let selectedDate = today;
+  let viewMonth = yearMonthFromDate(today);
+  let monthDelta = 0;
+
+  const paintCalendar = (): void => {
+    const model = buildClassCalendarModel({
+      scheduled: classScheduled,
+      lessonTitles,
+      today,
+      selectedDate,
+      viewMonth
+    });
+    renderClassCalendar(calendarHost, model, {
+      onSelectDate: (date) => {
+        selectedDate = date;
+        monthDelta = 0;
+        paintCalendar();
+      },
+      onShiftMonth: (delta) => {
+        viewMonth = shiftYearMonth(viewMonth, delta);
+        monthDelta = delta;
+        paintCalendar();
+      },
+      monthDelta,
+      unitTitles,
+      onNavigate: navigate
+    });
+  };
+  paintCalendar();
+
+  // 5. Unit progress
+  const progressUnits =
+    cls.current_unit_id && unitsById.has(cls.current_unit_id)
+      ? [unitsById.get(cls.current_unit_id)!]
+      : activeUnits;
+  for (const unit of progressUnits) {
+    main.append(buildUnitProgressCard(unit, classScheduled, today));
+  }
+
+  // Error banner for sequence mutations
+  const errorBanner = document.createElement('p');
+  errorBanner.className = 'class-page__error';
+  errorBanner.hidden = true;
+  errorBanner.setAttribute('role', 'alert');
+  main.append(errorBanner);
+
+  // 6. Unit sequence
+  const sequenceHost = document.createElement('div');
+  sequenceHost.className = 'class-page__sequence-host';
+  main.append(sequenceHost);
+
+  const sequence = renderUnitSequence(sequenceHost, {
+    units: activeUnits,
+    scheduled: classScheduled,
+    lessonTitles,
+    currentUnitId: cls.current_unit_id ?? activeUnits[0]?.id ?? '',
+    classId: cls.id,
+    today,
+    onMoveUp: (scheduledId) => {
+      void runScheduleMutation(options, errorBanner, async () => {
+        await patchScheduledLesson(scheduledId, { direction: 'up' });
+      });
+    },
+    onMoveDown: (scheduledId) => {
+      void runScheduleMutation(options, errorBanner, async () => {
+        await patchScheduledLesson(scheduledId, { direction: 'down' });
+      });
+    },
+    onNavigate: navigate
+  });
+  disposers.push(sequence.dispose);
+
+  // 7. Side column — announcements + resources + folded custom
+  const side = document.createElement('aside');
+  side.className = 'class-page__side';
+
+  const sideHost = document.createElement('div');
+  sideHost.className = 'class-page__homepage-regions';
+  side.append(sideHost);
+
+  const resolveContext = collectionContextForClass(cls, curriculum);
+  let editorHandle: HomepageEditorHandle | null = null;
+
+  function showViewMode(): void {
+    editorHandle?.destroy();
+    editorHandle = null;
+    editButton.hidden = false;
+    renderHomepageRegionsView(
+      sideHost,
+      normalizeHomepage(cls.homepage),
+      resolveContext,
+      ['announcements', 'resources', 'custom'],
+      {
+        emptyCopy: {
+          announcements:
+            'Nothing posted. Students see announcements at the top of their class page.',
+          resources: 'Texts, links and files this class should have alongside every lesson.'
+        },
+        hideHeadingFor: ['custom'],
+        omitEmpty: ['custom']
+      }
+    );
+
+    const announcements = sideHost.querySelector('[data-homepage-region="announcements"]');
+    if (announcements && !announcements.querySelector('.homepage-regions__blocks')) {
+      const writeOne = document.createElement('button');
+      writeOne.type = 'button';
+      writeOne.className = 'btn btn--secondary class-page__write-announcement';
+      writeOne.textContent = 'Write one';
+      writeOne.addEventListener('click', () => {
+        showEditMode();
+      });
+      announcements.append(writeOne);
+    }
+
+    const resources = sideHost.querySelector('[data-homepage-region="resources"]');
+    if (resources && !resources.querySelector('.homepage-regions__blocks')) {
+      const add = document.createElement('button');
+      add.type = 'button';
+      add.className = 'btn btn--secondary class-page__add-resource';
+      add.textContent = 'Add';
+      add.addEventListener('click', () => {
+        showEditMode();
+      });
+      resources.append(add);
+    }
+  }
+
+  function showEditMode(): void {
+    editButton.hidden = true;
+    editorHandle?.destroy();
+    editorHandle = mountHomepageEditor(sideHost, normalizeHomepage(cls.homepage), {
+      classId: cls.id,
+      resolveContext,
+      onSave: async (homepage) => {
+        await patchClass(cls.id, { homepage });
+        await options.onScheduleMutated?.();
+      },
+      onRestored: (restored) => {
+        cls.homepage = normalizeHomepage(restored.homepage);
+      },
+      onCancel: () => {
+        showViewMode();
+      }
+    });
+  }
+
+  editButton.addEventListener('click', () => {
+    showEditMode();
+  });
+  showViewMode();
+  disposers.push(() => {
+    editorHandle?.destroy();
+    editorHandle = null;
+  });
+
+  body.append(main, side);
+  root.append(bannerHost, actions, body);
   canvas.append(root);
+
+  return {
+    dispose: () => {
+      for (const dispose of disposers.splice(0).reverse()) dispose();
+    }
+  };
+}
+
+function buildTeachingTodayCard(
+  scheduled: ScheduledLesson[],
+  lessonsById: Map<string, { id: string; title: string }>,
+  today: string
+): HTMLElement {
+  const section = document.createElement('section');
+  section.className = 'class-page__teaching-today';
+  section.dataset.classSection = 'teaching-today';
+
+  const focus = resolveTeachingFocus(scheduled, today);
+  if (!focus) {
+    section.append(emptyCopy('No scheduled lessons.'));
+    return section;
+  }
+
+  const lesson = lessonsById.get(focus.entry.lesson_id);
+  const title = lesson?.title ?? focus.entry.lesson_id;
+  const path = `/lessons/${focus.entry.lesson_id}`;
+
+  const label = document.createElement('p');
+  label.className = 'class-page__teaching-label';
+  label.textContent = focus.label;
+
+  const link = document.createElement('a');
+  link.className = 'class-page__teaching-title';
+  link.href = path;
+  link.textContent = title;
+  link.addEventListener('click', (event) => {
+    event.preventDefault();
+    navigate(path);
+  });
+
+  section.append(label, link);
+  return section;
+}
+
+function buildUnitProgressCard(
+  unit: Unit,
+  scheduled: ScheduledLesson[],
+  today: string
+): HTMLElement {
+  const section = document.createElement('section');
+  section.className = 'class-page__unit-progress';
+  section.dataset.classSection = 'unit-progress';
+
+  const path = `/units/${unit.id}`;
+  const link = document.createElement('a');
+  link.className = 'class-page__unit-progress-title';
+  link.href = path;
+  link.textContent = unit.title;
+  link.addEventListener('click', (event) => {
+    event.preventDefault();
+    navigate(path);
+  });
+  section.append(link);
+
+  const span = unitDateSpan(unit, scheduled);
+  const meta = document.createElement('p');
+  meta.className = 'class-page__unit-progress-meta';
+
+  if (!span) {
+    meta.textContent = 'Not scheduled';
+    section.append(meta);
+    return section;
+  }
+
+  const { daysElapsed, daysRemaining } = unitDateProgress(span, today);
+  const totalDays = Math.max(1, daysBetween(span.start, span.end));
+  const weeksTotal = Math.max(1, Math.ceil((totalDays + 1) / 7));
+  const weekNow = Math.min(weeksTotal, Math.max(1, Math.floor(daysElapsed / 7) + 1));
+  meta.textContent = `Week ${weekNow} of ${weeksTotal} · ${daysRemaining} teaching days left`;
+  section.append(meta);
+
+  if (span.source === 'scheduled') {
+    const note = document.createElement('p');
+    note.className = 'class-page__unit-progress-note';
+    note.textContent = 'Dates from the schedule';
+    section.append(note);
+  }
+
+  return section;
+}
+
+/** Prefer today's lesson, else next upcoming, else last taught. */
+export function resolveTeachingFocus(
+  scheduled: ScheduledLesson[],
+  today: string
+): {
+  entry: ScheduledLesson;
+  label: 'Teaching today' | 'Up next' | 'Last taught';
+} | null {
+  if (scheduled.length === 0) return null;
+
+  const todayEntries = scheduled
+    .filter((entry) => entry.date === today)
+    .sort((a, b) => a.schedule_order - b.schedule_order);
+  if (todayEntries[0]) {
+    return { entry: todayEntries[0], label: 'Teaching today' };
+  }
+
+  const upcoming = scheduled
+    .filter((entry) => entry.date > today)
+    .sort((a, b) => {
+      const byDate = a.date.localeCompare(b.date);
+      if (byDate !== 0) return byDate;
+      return a.schedule_order - b.schedule_order;
+    });
+  if (upcoming[0]) {
+    return { entry: upcoming[0], label: 'Up next' };
+  }
+
+  const past = scheduled
+    .filter((entry) => entry.date < today)
+    .sort((a, b) => {
+      const byDate = b.date.localeCompare(a.date);
+      if (byDate !== 0) return byDate;
+      return b.schedule_order - a.schedule_order;
+    });
+  if (past[0]) {
+    return { entry: past[0], label: 'Last taught' };
+  }
+
+  return null;
 }
 
 function collectionContextForClass(
@@ -237,351 +594,6 @@ function collectionContextForClass(
   };
 }
 
-function buildCoverAndHeader(
-  cls: Class,
-  curriculum: CurriculumResponse,
-  yearTitle: string | undefined,
-  subjectTitle: string | undefined,
-  options: ClassPageOptions
-): HTMLElement {
-  const section = document.createElement('header');
-  section.className = 'class-page__header glass-panel';
-  section.dataset.classSection = 'header';
-
-  const coverHost = document.createElement('div');
-  coverHost.className = 'class-page__cover';
-  mountCoverPicker(coverHost, {
-    cover: cls.cover,
-    media: curriculum.media,
-    titleFallback: cls.title,
-    editable: true,
-    onSave: async (cover) => {
-      await patchClass(cls.id, { cover });
-      await options.onScheduleMutated?.();
-    }
-  });
-
-  const identity = document.createElement('div');
-  identity.className = 'class-page__identity';
-
-  const heading = document.createElement('h1');
-  heading.className = 'home-heading';
-  heading.textContent = cls.code;
-
-  const title = document.createElement('p');
-  title.className = 'class-page__title';
-  title.textContent = cls.title;
-
-  const context = document.createElement('p');
-  context.className = 'class-page__context';
-  context.textContent = [yearTitle, subjectTitle].filter(Boolean).join(' · ');
-
-  identity.append(heading, title);
-  if (context.textContent) identity.append(context);
-
-  section.append(coverHost, identity);
-  return section;
-}
-
-function buildAnnouncementsSection(
-  cls: Class,
-  curriculum: CurriculumResponse,
-  options: ClassPageOptions
-): HTMLElement {
-  const section = document.createElement('div');
-  section.className = 'class-page__announcements';
-  section.dataset.classSection = 'announcements';
-
-  const toolbar = document.createElement('div');
-  toolbar.className = 'class-page__homepage-toolbar';
-
-  const editButton = document.createElement('button');
-  editButton.type = 'button';
-  editButton.className = 'btn btn--secondary class-page__edit-homepage';
-  editButton.textContent = 'Edit homepage';
-
-  const viewAsStudent = document.createElement('a');
-  viewAsStudent.className = 'btn btn--ghost class-page__view-as-student';
-  viewAsStudent.href = `/s/classes/${cls.id}`;
-  viewAsStudent.textContent = 'View as student';
-  viewAsStudent.addEventListener('click', (event) => {
-    event.preventDefault();
-    navigate(`/s/classes/${cls.id}`);
-  });
-
-  toolbar.append(editButton, viewAsStudent);
-
-  const regionsContainer = document.createElement('div');
-  regionsContainer.className = 'class-page__homepage-regions';
-
-  const resolveContext = collectionContextForClass(cls, curriculum);
-  let editorHandle: HomepageEditorHandle | null = null;
-
-  function showViewMode(): void {
-    editorHandle?.destroy();
-    editorHandle = null;
-    editButton.hidden = false;
-    renderHomepageRegionsView(
-      regionsContainer,
-      normalizeHomepage(cls.homepage),
-      resolveContext,
-      ['announcements']
-    );
-  }
-
-  function showEditMode(): void {
-    editButton.hidden = true;
-    editorHandle?.destroy();
-    editorHandle = mountHomepageEditor(regionsContainer, normalizeHomepage(cls.homepage), {
-      classId: cls.id,
-      resolveContext,
-      onSave: async (homepage) => {
-        await patchClass(cls.id, { homepage });
-        await options.onScheduleMutated?.();
-      },
-      onRestored: (restored) => {
-        cls.homepage = normalizeHomepage(restored.homepage);
-      },
-      onCancel: () => {
-        showViewMode();
-      }
-    });
-  }
-
-  editButton.addEventListener('click', () => {
-    showEditMode();
-  });
-
-  showViewMode();
-  section.append(toolbar, regionsContainer);
-  return section;
-}
-
-function buildCurrentUnitSection(
-  cls: Class,
-  unitsById: Map<string, { id: string; title: string }>
-): HTMLElement {
-  const section = document.createElement('section');
-  section.className = 'class-page__section';
-  section.dataset.classSection = 'current-unit';
-
-  const heading = document.createElement('h2');
-  heading.className = 'class-page__heading';
-  heading.textContent = 'Current unit';
-  section.append(heading);
-
-  const unitId = cls.current_unit_id;
-  const unit = unitId ? unitsById.get(unitId) : undefined;
-
-  if (!unit) {
-    section.append(emptyCopy('No current unit.'));
-    return section;
-  }
-
-  const path = `/units/${unit.id}`;
-  const link = document.createElement('a');
-  link.className = 'class-page__link';
-  link.href = path;
-  link.textContent = unit.title;
-  link.addEventListener('click', (event) => {
-    event.preventDefault();
-    navigate(path);
-  });
-  section.append(link);
-  return section;
-}
-
-function buildCurrentLessonSection(
-  cls: Class,
-  curriculum: CurriculumResponse,
-  lessonsById: Map<string, CurriculumLessonSummary>
-): HTMLElement {
-  const section = document.createElement('section');
-  section.className = 'class-page__section';
-  section.dataset.classSection = 'current-lesson';
-
-  const heading = document.createElement('h2');
-  heading.className = 'class-page__heading';
-  heading.textContent = 'Current lesson';
-  section.append(heading);
-
-  const scheduled = resolveCurrentScheduledLesson(cls, curriculum);
-  if (!scheduled) {
-    section.append(emptyCopy('No current lesson.'));
-    return section;
-  }
-
-  const lesson = lessonsById.get(scheduled.lesson_id);
-  const title = lesson?.title ?? scheduled.lesson_id;
-  const path = `/lessons/${scheduled.lesson_id}`;
-
-  const row = document.createElement('div');
-  row.className = 'class-page__current-lesson';
-
-  const label = document.createElement('p');
-  label.className = 'class-page__current-lesson-title';
-  label.textContent = title;
-
-  const open = document.createElement('a');
-  open.className = 'btn btn--secondary';
-  open.href = path;
-  open.textContent = 'Open';
-  open.addEventListener('click', (event) => {
-    event.preventDefault();
-    navigate(path);
-  });
-
-  row.append(label, open);
-  section.append(row);
-  return section;
-}
-
-function buildScheduleSection(
-  cls: Class,
-  curriculum: CurriculumResponse,
-  lessonsById: Map<string, CurriculumLessonSummary>,
-  options: ClassPageOptions
-): HTMLElement {
-  const section = document.createElement('section');
-  section.className = 'class-page__section';
-  section.dataset.classSection = 'schedule';
-
-  const header = document.createElement('div');
-  header.className = 'class-page__section-header';
-
-  const heading = document.createElement('h2');
-  heading.className = 'class-page__heading';
-  heading.textContent = 'Schedule';
-
-  const scheduleUnit = document.createElement('button');
-  scheduleUnit.type = 'button';
-  scheduleUnit.className = 'btn btn--primary class-schedule__schedule-unit';
-  scheduleUnit.textContent = 'Schedule unit';
-  scheduleUnit.addEventListener('click', () => {
-    options.onScheduleUnit?.();
-  });
-
-  header.append(heading, scheduleUnit);
-  section.append(header);
-
-  const errorBanner = document.createElement('p');
-  errorBanner.className = 'class-page__error';
-  errorBanner.hidden = true;
-  errorBanner.setAttribute('role', 'alert');
-  section.append(errorBanner);
-
-  const entries = curriculum.scheduled_lessons
-    .filter((entry) => entry.class_id === cls.id)
-    .sort(compareScheduledLessons);
-
-  if (entries.length === 0) {
-    section.append(emptyCopy('No scheduled lessons.'));
-    return section;
-  }
-
-  const list = document.createElement('ul');
-  list.className = 'lesson-list class-schedule';
-
-  for (const entry of entries) {
-    const lesson = lessonsById.get(entry.lesson_id);
-    const isCurrent = cls.current_scheduled_lesson_id === entry.id;
-    const item = document.createElement('li');
-    item.className = `lesson-list__item class-schedule__row${isCurrent ? ' is-current' : ''}`;
-
-    const info = document.createElement('div');
-    info.className = 'lesson-list__info';
-
-    const title = document.createElement('p');
-    title.className = 'lesson-list__title';
-    title.textContent = lesson?.title ?? entry.lesson_id;
-
-    const controls = document.createElement('div');
-    controls.className = 'class-schedule__controls';
-
-    const dateInput = document.createElement('input');
-    dateInput.type = 'date';
-    dateInput.className = 'class-schedule__date';
-    dateInput.value = entry.date;
-    dateInput.dataset.scheduleAction = 'date';
-    dateInput.addEventListener('change', () => {
-      const previousDate = entry.date;
-      void runScheduleMutation(
-        options,
-        errorBanner,
-        async () => {
-          if (dateInput.value && dateInput.value !== previousDate) {
-            await patchScheduledLesson(entry.id, { date: dateInput.value });
-          }
-        },
-        () => {
-          dateInput.value = previousDate;
-        }
-      );
-    });
-
-    const meta = document.createElement('p');
-    meta.className = 'lesson-list__meta';
-    meta.textContent = entry.delivery_status;
-
-    controls.append(dateInput, meta);
-    info.append(title, controls);
-
-    const actions = document.createElement('div');
-    actions.className = 'class-schedule__actions';
-
-    const up = document.createElement('button');
-    up.type = 'button';
-    up.className = 'btn btn--ghost class-schedule__action';
-    up.textContent = 'Up';
-    up.dataset.scheduleAction = 'up';
-    up.addEventListener('click', () => {
-      void runScheduleMutation(options, errorBanner, async () => {
-        await patchScheduledLesson(entry.id, { direction: 'up' });
-      });
-    });
-
-    const down = document.createElement('button');
-    down.type = 'button';
-    down.className = 'btn btn--ghost class-schedule__action';
-    down.textContent = 'Down';
-    down.dataset.scheduleAction = 'down';
-    down.addEventListener('click', () => {
-      void runScheduleMutation(options, errorBanner, async () => {
-        await patchScheduledLesson(entry.id, { direction: 'down' });
-      });
-    });
-
-    const setCurrent = document.createElement('button');
-    setCurrent.type = 'button';
-    setCurrent.className = 'btn btn--secondary class-schedule__action';
-    setCurrent.textContent = 'Set current';
-    setCurrent.dataset.scheduleAction = 'set-current';
-    setCurrent.disabled = isCurrent;
-    setCurrent.addEventListener('click', () => {
-      void runScheduleMutation(options, errorBanner, async () => {
-        await patchClass(cls.id, { current_scheduled_lesson_id: entry.id });
-      });
-    });
-
-    const path = `/lessons/${entry.lesson_id}`;
-    const open = document.createElement('a');
-    open.className = 'btn btn--secondary lesson-list__open class-schedule__open';
-    open.href = path;
-    open.textContent = 'Open';
-    open.addEventListener('click', (event) => {
-      event.preventDefault();
-      navigate(path);
-    });
-
-    actions.append(up, down, setCurrent, open);
-    item.append(info, actions);
-    list.append(item);
-  }
-
-  section.append(list);
-  return section;
-}
-
 async function runScheduleMutation(
   options: ClassPageOptions,
   errorBanner: HTMLElement,
@@ -604,111 +616,6 @@ async function runScheduleMutation(
     errorBanner.textContent = message;
     onError?.();
   }
-}
-
-function buildUnitsGallerySection(
-  cls: Class,
-  unitsById: Map<string, Unit>,
-  curriculum: CurriculumResponse
-): HTMLElement {
-  const section = document.createElement('section');
-  section.className = 'class-page__section glass-panel';
-  section.dataset.classSection = 'units';
-
-  const heading = document.createElement('h2');
-  heading.className = 'class-page__heading';
-  heading.textContent = 'Units';
-  section.append(heading);
-
-  const units = cls.active_unit_ids
-    .map((id) => unitsById.get(id))
-    .filter((unit): unit is Unit => Boolean(unit));
-
-  if (units.length === 0) {
-    section.append(emptyCopy('No active units.'));
-    return section;
-  }
-
-  const grid = document.createElement('div');
-  grid.className = 'class-page__unit-gallery';
-
-  for (const unit of units) {
-    const path = `/units/${unit.id}`;
-    const card = document.createElement('a');
-    card.className = 'class-page__unit-card entity-cover-tile';
-    card.href = path;
-    card.addEventListener('click', (event) => {
-      event.preventDefault();
-      navigate(path);
-    });
-
-    card.append(renderCoverBanner(unit.cover, curriculum.media, unit.title));
-
-    const footer = document.createElement('div');
-    footer.className = 'entity-cover-tile__body';
-    const title = document.createElement('p');
-    title.className = 'home-class-tile__title';
-    title.textContent = unit.title;
-    footer.append(title);
-    card.append(footer);
-    grid.append(card);
-  }
-
-  section.append(grid);
-  return section;
-}
-
-function buildHomepageRestSection(
-  cls: Class,
-  curriculum: CurriculumResponse,
-  options: ClassPageOptions
-): HTMLElement {
-  const section = document.createElement('div');
-  section.className = 'class-page__homepage';
-  section.dataset.classSection = 'homepage';
-
-  const regionsContainer = document.createElement('div');
-  regionsContainer.className = 'class-page__homepage-regions';
-
-  const resolveContext = collectionContextForClass(cls, curriculum);
-  renderHomepageRegionsView(
-    regionsContainer,
-    normalizeHomepage(cls.homepage),
-    resolveContext,
-    ['resources', 'custom']
-  );
-
-  // Keep a quiet edit affordance for resources/custom when announcements edit is elsewhere.
-  const note = document.createElement('p');
-  note.className = 'class-page__empty';
-  note.textContent = 'Use Edit homepage above announcements to change resources and custom blocks.';
-
-  void options;
-  section.append(regionsContainer, note);
-  return section;
-}
-
-function resolveCurrentScheduledLesson(
-  cls: Class,
-  curriculum: CurriculumResponse
-): ScheduledLesson | undefined {
-  if (cls.current_scheduled_lesson_id) {
-    const pinned = curriculum.scheduled_lessons.find(
-      (entry) => entry.id === cls.current_scheduled_lesson_id && entry.class_id === cls.id
-    );
-    if (pinned) return pinned;
-  }
-
-  const anchor = resolveScheduleToday(curriculum.schedule_anchor_date);
-  const candidates = curriculum.scheduled_lessons
-    .filter((entry) => entry.class_id === cls.id && entry.date >= anchor)
-    .sort((a, b) => {
-      const byDate = a.date.localeCompare(b.date);
-      if (byDate !== 0) return byDate;
-      return a.schedule_order - b.schedule_order;
-    });
-
-  return candidates[0];
 }
 
 function compareScheduledLessons(a: ScheduledLesson, b: ScheduledLesson): number {

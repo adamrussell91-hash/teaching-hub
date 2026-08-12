@@ -86,6 +86,7 @@ let scopeIndexHandle: { dispose?: () => void } | null = null;
 
 // Section index handles (create controls), if mounted.
 let classesIndexHandle: { dispose?: () => void } | null = null;
+let classPageHandle: { dispose?: () => void } | null = null;
 let unitsIndexHandle: { dispose?: () => void } | null = null;
 let lessonsIndexHandle: { dispose?: () => void } | null = null;
 let trashSectionHandle: { dispose?: () => void } | null = null;
@@ -140,6 +141,12 @@ function teardownClassesIndex(): void {
   if (!classesIndexHandle) return;
   classesIndexHandle.dispose?.();
   classesIndexHandle = null;
+}
+
+function teardownClassPage(): void {
+  if (!classPageHandle) return;
+  classPageHandle.dispose?.();
+  classPageHandle = null;
 }
 
 function teardownUnitsIndex(): void {
@@ -440,7 +447,8 @@ function renderTeacherClassRoute(classId: string, token: number): void {
       if (cls) {
         renderContextBar(refs, { title: cls.code || cls.title });
       }
-      renderClassPage(refs.canvas, curriculum, classId, classPageOptions);
+      teardownClassPage();
+      classPageHandle = renderClassPage(refs.canvas, curriculum, classId, classPageOptions);
     } catch (error) {
       if (token !== renderToken) return;
 
@@ -478,7 +486,8 @@ function renderTeacherClassRoute(classId: string, token: number): void {
         opened_at: new Date().toISOString()
       });
     }
-    renderClassPage(refs.canvas, curriculum, classId, classPageOptions);
+    teardownClassPage();
+    classPageHandle = renderClassPage(refs.canvas, curriculum, classId, classPageOptions);
   });
 }
 
@@ -802,6 +811,7 @@ async function handleRoute(match: RouteMatch): Promise<void> {
   teardownTeacherHome();
   teardownScopeIndex();
   teardownClassesIndex();
+  teardownClassPage();
   teardownUnitsIndex();
   teardownLessonsIndex();
   teardownTrashSection();

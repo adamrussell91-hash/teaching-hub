@@ -90,31 +90,46 @@ function renderHomepageBlock(
   return renderBlock(block, 'teacher');
 }
 
+export type HomepageRegionsViewOptions = {
+  emptyCopy?: Partial<Record<keyof ClassHomepage, string>>;
+  /** Omit the system region heading (e.g. fold custom blocks under teacher titles). */
+  hideHeadingFor?: ReadonlyArray<keyof ClassHomepage>;
+  /** Skip empty regions entirely (e.g. hide empty custom). */
+  omitEmpty?: ReadonlyArray<keyof ClassHomepage>;
+};
+
 export function renderHomepageRegionsView(
   container: HTMLElement,
   homepage: ClassHomepage,
   resolveContext?: CollectionResolveContext,
-  regionKeys: ReadonlyArray<keyof ClassHomepage> = HOMEPAGE_REGIONS.map((r) => r.key)
+  regionKeys: ReadonlyArray<keyof ClassHomepage> = HOMEPAGE_REGIONS.map((r) => r.key),
+  options: HomepageRegionsViewOptions = {}
 ): void {
   container.replaceChildren();
   const normalized = normalizeHomepage(homepage);
+  const hideHeading = new Set(options.hideHeadingFor ?? []);
+  const omitEmpty = new Set(options.omitEmpty ?? []);
 
   for (const key of regionKeys) {
     const region = HOMEPAGE_REGIONS.find((entry) => entry.key === key);
     if (!region) continue;
 
+    const blocks = normalized[region.key];
+    if (blocks.length === 0 && omitEmpty.has(key)) continue;
+
     const section = document.createElement('section');
     section.className = 'class-page__section homepage-regions__section glass-panel';
     section.dataset.homepageRegion = region.key;
 
-    const heading = document.createElement('h2');
-    heading.className = 'class-page__heading';
-    heading.textContent = region.title;
-    section.append(heading);
+    if (!hideHeading.has(key)) {
+      const heading = document.createElement('h2');
+      heading.className = 'class-page__heading';
+      heading.textContent = region.title;
+      section.append(heading);
+    }
 
-    const blocks = normalized[region.key];
     if (blocks.length === 0) {
-      section.append(regionEmptyCopy(region.emptyCopy));
+      section.append(regionEmptyCopy(options.emptyCopy?.[key] ?? region.emptyCopy));
     } else {
       const list = document.createElement('div');
       list.className = 'homepage-regions__blocks';

@@ -9,7 +9,11 @@ vi.mock('@/teacher/schedule-api', () => ({
 
 import { navigate } from '@/app/router';
 import { patchClass, patchScheduledLesson } from '@/teacher/schedule-api';
-import { renderClassesIndex, renderClassPage } from '@/teacher/sections/classes';
+import {
+  renderClassesIndex,
+  renderClassPage,
+  resolveTeachingFocus
+} from '@/teacher/sections/classes';
 import type { CurriculumResponse } from '@/teacher/nav';
 import type { Block } from '@/schemas/block';
 import type { Class, ScheduledLesson, Subject, Unit, Year } from '@/schemas';
@@ -185,110 +189,88 @@ describe('classes section', () => {
     expect(canvas.querySelector('[data-create-trigger]')).not.toBeNull();
   });
 
-  it('renders hybrid class page generated sections', () => {
+  it('renders recomposed class page with banner, calendar, and sequence', () => {
     renderClassPage(canvas, curriculum, 'class_2026_12engadv1');
-    expect(canvas.textContent).toContain('12ENGADV1');
-    expect(canvas.textContent).toContain('Year 12 English Advanced');
-    expect(canvas.textContent).toMatch(/Current unit/i);
-    expect(canvas.textContent).toContain('Artist of the Floating World');
-    expect(canvas.textContent).toMatch(/Current lesson/i);
+
+    expect(canvas.querySelector('.entity-banner__title')?.textContent).toBe('12ENGADV1');
+    expect(canvas.querySelector('.entity-banner__eyebrow')?.textContent).toBe(
+      'Year 12 · English Advanced'
+    );
+    // Class code once in the banner title — not repeated as a separate page heading.
+    const codeMatches = canvas.textContent?.match(/12ENGADV1/g) ?? [];
+    expect(codeMatches.length).toBe(1);
+
+    expect(canvas.querySelector('.class-page__edit-homepage')?.textContent).toBe('Edit page');
+    expect(canvas.querySelector('.class-page__view-as-student')).not.toBeNull();
+
+    expect(canvas.textContent).toMatch(/Teaching today/i);
     expect(canvas.textContent).toContain('Memory');
-    expect(canvas.textContent).toMatch(/Schedule/i);
-    expect(canvas.textContent).toContain('Intro');
+    expect(canvas.querySelector('.class-calendar')).not.toBeNull();
+    expect(canvas.querySelector('.unit-sequence')).not.toBeNull();
+    expect(canvas.querySelector('a.seq__lesson-link[href="/lessons/lesson_aotfw_008"]')).not.toBeNull();
+
+    expect(canvas.textContent).toMatch(/Artist of the Floating World/);
+    expect(canvas.textContent).toMatch(/Week/);
+    expect(canvas.textContent).toMatch(/days left|Not scheduled/);
+    expect(canvas.textContent).toMatch(/Dates from the schedule/);
+
     expect(canvas.textContent).toMatch(/Announcements/i);
     expect(canvas.textContent).toMatch(/Resources/i);
-    expect(canvas.textContent).toMatch(/Custom blocks/i);
-    expect(canvas.textContent).toContain('No announcements yet.');
-    expect(canvas.querySelector('.class-page__edit-homepage')).not.toBeNull();
-    expect(canvas.querySelector('.class-page__view-as-student')).not.toBeNull();
-    expect(canvas.querySelector('[data-class-section="header"] .cover-picker')).not.toBeNull();
-    expect(canvas.querySelector('[data-class-section="units"] .class-page__unit-gallery')).not.toBeNull();
-
-    const announcements = canvas.querySelector('[data-class-section="announcements"]');
-    const schedule = canvas.querySelector('[data-class-section="schedule"]');
-    expect(announcements).not.toBeNull();
-    expect(schedule).not.toBeNull();
-    expect(
-      Boolean(
-        announcements &&
-          schedule &&
-          announcements.compareDocumentPosition(schedule) & Node.DOCUMENT_POSITION_FOLLOWING
-      )
-    ).toBe(true);
+    expect(canvas.textContent).not.toMatch(/Custom blocks/i);
+    expect(canvas.textContent).toContain(
+      'Nothing posted. Students see announcements at the top of their class page.'
+    );
+    expect(canvas.textContent).toContain(
+      'Texts, links and files this class should have alongside every lesson.'
+    );
+    expect(canvas.querySelector('.class-page__write-announcement')?.textContent).toBe('Write one');
+    expect(canvas.querySelector('.class-page__add-resource')?.textContent).toBe('Add');
+    expect(canvas.textContent).not.toContain(
+      'Use Edit homepage above announcements to change resources and custom blocks.'
+    );
 
     const unitLink = canvas.querySelector<HTMLAnchorElement>('a[href="/units/unit_aotfw"]');
     expect(unitLink).not.toBeNull();
   });
 
-  it('opens a scheduled lesson from the schedule', () => {
+  it('opens teaching-today lesson from the focus card', () => {
     renderClassPage(canvas, curriculum, 'class_2026_12engadv1');
-    const schedule = canvas.querySelector('[data-class-section="schedule"]');
-    const open = schedule?.querySelector<HTMLAnchorElement>('.lesson-list__open, .class-schedule__open');
-    expect(open).not.toBeNull();
-    open?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    const link = canvas.querySelector<HTMLAnchorElement>(
+      '[data-class-section="teaching-today"] a.class-page__teaching-title'
+    );
+    expect(link?.getAttribute('href')).toBe('/lessons/lesson_aotfw_008');
+    link?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     expect(navigate).toHaveBeenCalledWith('/lessons/lesson_aotfw_008');
   });
 
-  it('opens the current lesson', () => {
-    renderClassPage(canvas, curriculum, 'class_2026_12engadv1');
-    const current = canvas.querySelector('[data-class-section="current-lesson"]');
-    const open = current?.querySelector<HTMLAnchorElement>('a');
-    expect(open?.getAttribute('href')).toBe('/lessons/lesson_aotfw_008');
-    open?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-    expect(navigate).toHaveBeenCalledWith('/lessons/lesson_aotfw_008');
-  });
-
-  it('falls back to earliest scheduled lesson on/after anchor when current is unset', () => {
-    const withoutCurrent: CurriculumResponse = {
+  it('labels tomorrow as Up next when nothing is scheduled today', () => {
+    const withoutToday: CurriculumResponse = {
       ...curriculum,
-      classes: [{ ...classRow, current_scheduled_lesson_id: undefined }]
+      scheduled_lessons: [scheduledPlanned],
+      schedule_anchor_date: '2026-08-12'
     };
-    renderClassPage(canvas, withoutCurrent, 'class_2026_12engadv1');
-    const current = canvas.querySelector('[data-class-section="current-lesson"]');
-    expect(current?.textContent).toContain('Memory');
+    renderClassPage(canvas, withoutToday, 'class_2026_12engadv1');
+    const focus = canvas.querySelector('[data-class-section="teaching-today"]');
+    expect(focus?.textContent).toMatch(/Up next/i);
+    expect(focus?.textContent).toContain('Intro');
+    expect(focus?.textContent).not.toMatch(/Teaching today/i);
   });
 
   it('shows not found for unknown class', () => {
-    renderClassPage(canvas, curriculum, 'class_missing');
+    const handle = renderClassPage(canvas, curriculum, 'class_missing');
     expect(canvas.textContent).toMatch(/Class not found/i);
+    expect(typeof handle.dispose).toBe('function');
   });
 
-  it('exposes date, reorder, and set-current controls on schedule rows', () => {
-    renderClassPage(canvas, curriculum, 'class_2026_12engadv1', { onScheduleMutated: vi.fn() });
-    const schedule = canvas.querySelector('[data-class-section="schedule"]');
-    expect(schedule?.querySelector('[data-schedule-action="set-current"]')).toBeTruthy();
-    expect(schedule?.querySelector('[data-schedule-action="up"]')).toBeTruthy();
-    expect(schedule?.querySelector('[data-schedule-action="down"]')).toBeTruthy();
-    expect(schedule?.querySelector('[data-schedule-action="date"]')).toBeTruthy();
-    expect(schedule?.querySelector('.class-schedule__schedule-unit')).toBeTruthy();
-    expect(schedule?.querySelector('.class-schedule__row.is-current')).toBeTruthy();
-  });
-
-  it('calls schedule API and refresh when reordering a row', async () => {
+  it('calls schedule API and refresh when reordering via unit sequence', async () => {
     const onScheduleMutated = vi.fn().mockResolvedValue(undefined);
     renderClassPage(canvas, curriculum, 'class_2026_12engadv1', { onScheduleMutated });
 
-    const up = canvas.querySelector<HTMLButtonElement>('[data-schedule-action="up"]');
+    const up = canvas.querySelector<HTMLButtonElement>('[aria-label="Move up"]');
+    expect(up).not.toBeNull();
     up?.click();
     await vi.waitFor(() => {
       expect(patchScheduledLesson).toHaveBeenCalledWith('scheduled_aotfw_008', { direction: 'up' });
-      expect(onScheduleMutated).toHaveBeenCalled();
-    });
-  });
-
-  it('calls schedule API and refresh when setting current lesson', async () => {
-    const onScheduleMutated = vi.fn().mockResolvedValue(undefined);
-    renderClassPage(canvas, curriculum, 'class_2026_12engadv1', { onScheduleMutated });
-
-    const setCurrentButtons = canvas.querySelectorAll<HTMLButtonElement>(
-      '[data-schedule-action="set-current"]'
-    );
-    const enabled = [...setCurrentButtons].find((button) => !button.disabled);
-    enabled?.click();
-    await vi.waitFor(() => {
-      expect(patchClass).toHaveBeenCalledWith('class_2026_12engadv1', {
-        current_scheduled_lesson_id: 'scheduled_aotfw_001'
-      });
       expect(onScheduleMutated).toHaveBeenCalled();
     });
   });
@@ -298,7 +280,7 @@ describe('classes section', () => {
     const onScheduleMutated = vi.fn().mockResolvedValue(undefined);
     renderClassPage(canvas, curriculum, 'class_2026_12engadv1', { onScheduleMutated });
 
-    canvas.querySelector<HTMLButtonElement>('[data-schedule-action="up"]')?.click();
+    canvas.querySelector<HTMLButtonElement>('[aria-label="Move up"]')?.click();
 
     await vi.waitFor(() => {
       const banner = canvas.querySelector('.class-page__error');
@@ -308,29 +290,7 @@ describe('classes section', () => {
     expect(onScheduleMutated).not.toHaveBeenCalled();
   });
 
-  it('reverts the date input when a date mutation fails', async () => {
-    vi.mocked(patchScheduledLesson).mockRejectedValueOnce(new Error('Date update failed'));
-    const onScheduleMutated = vi.fn().mockResolvedValue(undefined);
-    renderClassPage(canvas, curriculum, 'class_2026_12engadv1', { onScheduleMutated });
-
-    const dateInput = canvas.querySelector<HTMLInputElement>('[data-schedule-action="date"]');
-    expect(dateInput?.value).toBe('2026-08-12');
-    if (!dateInput) throw new Error('expected date input');
-
-    dateInput.value = '2026-09-01';
-    dateInput.dispatchEvent(new Event('change', { bubbles: true }));
-
-    await vi.waitFor(() => {
-      expect(patchScheduledLesson).toHaveBeenCalledWith('scheduled_aotfw_008', {
-        date: '2026-09-01'
-      });
-      expect(dateInput.value).toBe('2026-08-12');
-      expect(canvas.querySelector('.class-page__error')?.textContent).toBe('Date update failed');
-    });
-    expect(onScheduleMutated).not.toHaveBeenCalled();
-  });
-
-  it('shows Edit homepage and renders announcement blocks in view mode', () => {
+  it('shows Edit page and renders announcement blocks in view mode', () => {
     const withHomepage: CurriculumResponse = {
       ...curriculum,
       classes: [
@@ -347,7 +307,7 @@ describe('classes section', () => {
 
     renderClassPage(canvas, withHomepage, 'class_2026_12engadv1');
 
-    expect(canvas.querySelector('.class-page__edit-homepage')?.textContent).toBe('Edit homepage');
+    expect(canvas.querySelector('.class-page__edit-homepage')?.textContent).toBe('Edit page');
     const announcements = canvas.querySelector('[data-homepage-region="announcements"]');
     expect(announcements?.querySelector('.block[data-block-type="heading"]')).not.toBeNull();
     expect(announcements?.textContent).toContain('Campus closed Monday');
@@ -404,7 +364,35 @@ describe('classes section', () => {
 
     expect(patchClass).not.toHaveBeenCalled();
     expect(canvas.querySelector('.homepage-editor')).toBeNull();
-    expect(canvas.textContent).toContain('No announcements yet.');
+    expect(canvas.textContent).toContain(
+      'Nothing posted. Students see announcements at the top of their class page.'
+    );
     expect(canvas.querySelector('.class-page__edit-homepage')).not.toBeNull();
+  });
+
+  it('returns a dispose that tears down the banner', () => {
+    const handle = renderClassPage(canvas, curriculum, 'class_2026_12engadv1');
+    expect(canvas.querySelector('.entity-banner')).not.toBeNull();
+    handle.dispose();
+    expect(canvas.querySelector('.entity-banner')).toBeNull();
+  });
+});
+
+describe('resolveTeachingFocus', () => {
+  it('prefers today, then upcoming, then last taught', () => {
+    const today = resolveTeachingFocus(
+      [scheduledCurrent, scheduledPlanned],
+      '2026-08-12'
+    );
+    expect(today?.label).toBe('Teaching today');
+    expect(today?.entry.id).toBe('scheduled_aotfw_008');
+
+    const upNext = resolveTeachingFocus([scheduledPlanned], '2026-08-12');
+    expect(upNext?.label).toBe('Up next');
+    expect(upNext?.entry.id).toBe('scheduled_aotfw_001');
+
+    const last = resolveTeachingFocus([scheduledCurrent], '2026-08-14');
+    expect(last?.label).toBe('Last taught');
+    expect(last?.entry.id).toBe('scheduled_aotfw_008');
   });
 });
