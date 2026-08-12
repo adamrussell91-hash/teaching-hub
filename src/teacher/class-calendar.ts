@@ -5,11 +5,22 @@ export interface RenderClassCalendarOptions {
   onShiftMonth: (delta: -1 | 1) => void;
   monthDelta?: number;
   unitTitles?: Map<string, string>;
+  /** SPA navigation for lesson links; when set, anchors preventDefault then call this. */
+  onNavigate?: (path: string) => void;
 }
+
+type CalendarHandlers = {
+  onSelectDate: (date: string) => void;
+  onShiftMonth: (delta: -1 | 1) => void;
+  onNavigate?: (path: string) => void;
+};
+
+const handlersByRoot = new WeakMap<HTMLElement, CalendarHandlers>();
 
 /**
  * Month calendar + selected-day detail. Replaces the class page "This week" strip.
- * Nav buttons bind once via dataset.bound; grid and detail rebuild each render.
+ * Nav buttons bind once via dataset.bound; callbacks stay fresh via WeakMap.
+ * Grid and detail rebuild each render.
  */
 export function renderClassCalendar(
   host: HTMLElement,
@@ -18,7 +29,8 @@ export function renderClassCalendar(
     onSelectDate,
     onShiftMonth,
     monthDelta = 0,
-    unitTitles
+    unitTitles,
+    onNavigate
   }: RenderClassCalendarOptions
 ): void {
   let root = host.querySelector<HTMLElement>(':scope > .class-calendar');
@@ -60,6 +72,8 @@ export function renderClassCalendar(
     host.replaceChildren(root);
   }
 
+  handlersByRoot.set(root, { onSelectDate, onShiftMonth, onNavigate });
+
   const label = root.querySelector<HTMLElement>('[data-calendar="month-label"]');
   if (label) label.textContent = model.monthLabel;
 
@@ -73,7 +87,7 @@ export function renderClassCalendar(
       grid.append(cell);
     }
     for (const day of model.monthDays) {
-      grid.append(buildDayCell(day, onSelectDate));
+      grid.append(buildDayCell(day, root));
     }
     applyMonthMotion(grid, monthDelta);
   }
@@ -81,18 +95,18 @@ export function renderClassCalendar(
   const detail = root.querySelector<HTMLElement>('.class-calendar__detail');
   if (detail) {
     detail.replaceChildren();
-    renderDayDetail(detail, model, unitTitles);
+    renderDayDetail(detail, model, unitTitles, root);
   }
 
   const prev = root.querySelector<HTMLButtonElement>('[data-calendar="prev-month"]');
   const next = root.querySelector<HTMLButtonElement>('[data-calendar="next-month"]');
   if (prev && !prev.dataset.bound) {
     prev.dataset.bound = '1';
-    prev.addEventListener('click', () => onShiftMonth(-1));
+    prev.addEventListener('click', () => handlersByRoot.get(root)?.onShiftMonth(-1));
   }
   if (next && !next.dataset.bound) {
     next.dataset.bound = '1';
-    next.addEventListener('click', () => onShiftMonth(1));
+    next.addEventListener('click', () => handlersByRoot.get(root)?.onShiftMonth(1));
   }
 }
 
@@ -103,9 +117,18 @@ function applyMonthMotion(grid: HTMLElement, monthDelta: number): void {
   grid.dataset.motion = monthDelta > 0 ? 'forward' : 'back';
 }
 
+function wireSpaLink(anchor: HTMLAnchorElement, root: HTMLElement): void {
+  anchor.addEventListener('click', (event) => {
+    const navigate = handlersByRoot.get(root)?.onNavigate;
+    if (!navigate) return;
+    event.preventDefault();
+    navigate(anchor.getAttribute('href') ?? '/');
+  });
+}
+
 function buildDayCell(
   day: ClassCalendarModel['monthDays'][number],
-  onSelectDate: (date: string) => void
+  root: HTMLElement
 ): HTMLElement {
   const singleLesson = day.lessons.length === 1 ? day.lessons[0] : null;
   const cell = singleLesson
@@ -124,8 +147,10 @@ function buildDayCell(
   if (day.isSelected) cell.dataset.selected = 'true';
   cell.setAttribute('aria-label', accessibleDayLabel(day.date, day.lessons));
 
-  if (!singleLesson) {
-    cell.addEventListener('click', () => onSelectDate(day.date));
+  if (singleLesson) {
+    wireSpaLink(cell as HTMLAnchorElement, root);
+  } else {
+    cell.addEventListener('click', () => handlersByRoot.get(root)?.onSelectDate(day.date));
   }
 
   const num = document.createElement('span');
@@ -150,7 +175,8 @@ function buildDots(lessons: CalendarDayLesson[]): HTMLElement {
 function renderDayDetail(
   detail: HTMLElement,
   model: ClassCalendarModel,
-  unitTitles?: Map<string, string>
+  unitTitles: Map<string, string> | undefined,
+  root: HTMLElement
 ): void {
   const heading = document.createElement('h3');
   heading.className = 'class-calendar__detail-heading';
@@ -178,6 +204,7 @@ function renderDayDetail(
     const row = document.createElement('a');
     row.className = 'class-calendar__detail-lesson';
     row.href = `/lessons/${lesson.lessonId}`;
+    wireSpaLink(row, root);
 
     const title = document.createElement('span');
     title.className = 'class-calendar__detail-title';
