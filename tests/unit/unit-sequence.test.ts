@@ -230,7 +230,7 @@ describe('renderUnitSequence', () => {
 
     const rows = [
       ...host.querySelectorAll<HTMLAnchorElement>(
-        'details[data-unit-id="unit_aotfw"] a.seq__row'
+        'details[data-unit-id="unit_aotfw"] a.seq__lesson-link'
       )
     ];
     expect(rows).toHaveLength(2);
@@ -273,8 +273,8 @@ describe('renderUnitSequence', () => {
     const onOverflow = vi.fn();
     render({ onMoveUp, onMoveDown, onOverflow });
 
-    const row = host.querySelector<HTMLAnchorElement>(
-      'a.seq__row[href="/lessons/l2"]'
+    const row = host.querySelector(
+      'details[data-unit-id="unit_aotfw"] .seq__lessons .seq__row:nth-child(2)'
     )!;
     const [up, down, overflow] = [...row.querySelectorAll('button')];
 
@@ -292,7 +292,9 @@ describe('renderUnitSequence', () => {
     render({ onNavigate });
 
     const unitLink = host.querySelector<HTMLAnchorElement>('a[href="/units/unit_aotfw"]')!;
-    const lessonLink = host.querySelector<HTMLAnchorElement>('a.seq__row[href="/lessons/l1"]')!;
+    const lessonLink = host.querySelector<HTMLAnchorElement>(
+      'a.seq__lesson-link[href="/lessons/l1"]'
+    )!;
 
     unitLink.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     lessonLink.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));

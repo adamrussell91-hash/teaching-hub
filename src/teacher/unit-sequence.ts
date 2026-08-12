@@ -113,11 +113,15 @@ function buildLessonRow(
   index: number,
   lessonTitles: Map<string, string>,
   root: HTMLElement
-): HTMLAnchorElement {
-  const row = document.createElement('a');
+): HTMLElement {
+  // Row is a div so reorder buttons are valid siblings of the lesson link.
+  const row = document.createElement('div');
   row.className = 'seq__row';
-  row.href = `/lessons/${entry.lesson_id}`;
-  wireSpaLink(row, root);
+
+  const link = document.createElement('a');
+  link.className = 'seq__lesson-link';
+  link.href = `/lessons/${entry.lesson_id}`;
+  wireSpaLink(link, root);
 
   const marker = document.createElement('span');
   marker.className = 'seq__marker';
@@ -134,6 +138,8 @@ function buildLessonRow(
   const status = document.createElement('span');
   status.className = 'seq__lesson-status';
   status.textContent = entry.delivery_status;
+
+  link.append(marker, title, date, status);
 
   const controls = document.createElement('span');
   controls.className = 'seq__controls';
@@ -169,7 +175,7 @@ function buildLessonRow(
   });
 
   controls.append(up, down, overflow);
-  row.append(marker, title, date, status, controls);
+  row.append(link, controls);
   return row;
 }
 
