@@ -21,6 +21,7 @@ Block primitives: [`docs/specs/03_BLOCK_SYSTEM.md`](specs/03_BLOCK_SYSTEM.md)
 Suggested order for continuing builder / teaching-page work (adjust as needed):
 
 1. **AI composition fill / whole-lesson scope** (Phase 13D–E) — agent panel WIP may still need polish before fully shipped
+2. **Class page follow-ups** — wire richer overflow actions (set-current / date edit), student class view parity
 
 Larger product tracks (not “next block”, but still ahead):
 
@@ -33,6 +34,7 @@ Larger product tracks (not “next block”, but still ahead):
 
 | Date | Slice | Outcome |
 |------|--------|---------|
+| 2026-08-13 | **Class page redesign** | Month calendar (life-hub model/renderer port), collapsible unit sequence, date-based unit progress (`unit.start_date`/`end_date` optional with scheduled-lesson fallback), read-first cover banner — [`plan`](superpowers/plans/2026-08-12-class-page-redesign.md) |
 | 2026-08-11 | **Versioning / archive / recovery** | Lesson/unit/class-homepage version history (checkpoints, restore draft-only); archive vs trash; dependency-aware permanent delete + Trash UI — [`design`](superpowers/specs/2026-08-11-versioning-archive-recovery-design.md) / [`plan`](superpowers/plans/2026-08-11-versioning-archive-recovery.md) |
 | 2026-08-11 | **Linked template reuse** | Linked composition insert (live draft resolve); Edit Source / Detach; publish expands to independent tree — [`design`](superpowers/specs/2026-08-11-linked-composition-templates-design.md) / [`plan`](superpowers/plans/2026-08-11-linked-composition-templates.md) |
 | 2026-08-11 | **AI agent integration** | Lesson editor A4\|AI panel; Ann/Clementine/Hammond/Clare; block/section selection; capability actions; SSE proposals Accept/Reject/Regenerate — [`design`](superpowers/specs/2026-08-11-ai-agent-integration-design.md) |

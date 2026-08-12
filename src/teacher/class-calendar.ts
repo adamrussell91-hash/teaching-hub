@@ -7,12 +7,15 @@ export interface RenderClassCalendarOptions {
   unitTitles?: Map<string, string>;
   /** SPA navigation for lesson links; when set, anchors preventDefault then call this. */
   onNavigate?: (path: string) => void;
+  /** Empty-day CTA — opens schedule flow when provided. */
+  onScheduleLesson?: () => void;
 }
 
 type CalendarHandlers = {
   onSelectDate: (date: string) => void;
   onShiftMonth: (delta: -1 | 1) => void;
   onNavigate?: (path: string) => void;
+  onScheduleLesson?: () => void;
 };
 
 const handlersByRoot = new WeakMap<HTMLElement, CalendarHandlers>();
@@ -30,7 +33,8 @@ export function renderClassCalendar(
     onShiftMonth,
     monthDelta = 0,
     unitTitles,
-    onNavigate
+    onNavigate,
+    onScheduleLesson
   }: RenderClassCalendarOptions
 ): void {
   let root = host.querySelector<HTMLElement>(':scope > .class-calendar');
@@ -72,7 +76,7 @@ export function renderClassCalendar(
     host.replaceChildren(root);
   }
 
-  handlersByRoot.set(root, { onSelectDate, onShiftMonth, onNavigate });
+  handlersByRoot.set(root, { onSelectDate, onShiftMonth, onNavigate, onScheduleLesson });
 
   const label = root.querySelector<HTMLElement>('[data-calendar="month-label"]');
   if (label) label.textContent = model.monthLabel;
@@ -193,6 +197,9 @@ function renderDayDetail(
     scheduleBtn.type = 'button';
     scheduleBtn.className = 'class-calendar__schedule-btn';
     scheduleBtn.textContent = 'Schedule a lesson';
+    scheduleBtn.addEventListener('click', () => {
+      handlersByRoot.get(root)?.onScheduleLesson?.();
+    });
     detail.append(scheduleBtn);
     return;
   }

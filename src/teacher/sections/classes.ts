@@ -193,6 +193,7 @@ export function renderClassPage(
     canvas.append(status);
     return { dispose: () => undefined };
   }
+  const pageClass: Class = cls;
 
   const yearsById = new Map(curriculum.years.map((year) => [year.id, year]));
   const subjectsById = new Map(curriculum.subjects.map((subject) => [subject.id, subject]));
@@ -296,7 +297,8 @@ export function renderClassPage(
       },
       monthDelta,
       unitTitles,
-      onNavigate: navigate
+      onNavigate: navigate,
+      onScheduleLesson: () => options.onScheduleUnit?.()
     });
   };
   paintCalendar();
@@ -360,7 +362,7 @@ export function renderClassPage(
     editButton.hidden = false;
     renderHomepageRegionsView(
       sideHost,
-      normalizeHomepage(cls.homepage),
+      normalizeHomepage(pageClass.homepage),
       resolveContext,
       ['announcements', 'resources', 'custom'],
       {
@@ -402,15 +404,15 @@ export function renderClassPage(
   function showEditMode(): void {
     editButton.hidden = true;
     editorHandle?.destroy();
-    editorHandle = mountHomepageEditor(sideHost, normalizeHomepage(cls.homepage), {
-      classId: cls.id,
+    editorHandle = mountHomepageEditor(sideHost, normalizeHomepage(pageClass.homepage), {
+      classId: pageClass.id,
       resolveContext,
       onSave: async (homepage) => {
-        await patchClass(cls.id, { homepage });
+        await patchClass(pageClass.id, { homepage });
         await options.onScheduleMutated?.();
       },
       onRestored: (restored) => {
-        cls.homepage = normalizeHomepage(restored.homepage);
+        pageClass.homepage = normalizeHomepage(restored.homepage);
       },
       onCancel: () => {
         showViewMode();

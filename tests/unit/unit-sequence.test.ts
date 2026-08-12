@@ -264,7 +264,7 @@ describe('renderUnitSequence', () => {
       expect(getComputedStyle(btn).display).not.toBe('none');
     }
     expect(controls.hasAttribute('hidden')).toBe(false);
-    expect(controls.style.display).not.toBe('none');
+    expect((controls as HTMLElement).style.display).not.toBe('none');
   });
 
   it('wires move and overflow callbacks', () => {
