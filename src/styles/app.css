@@ -3334,27 +3334,37 @@ a:hover {
   text-decoration: none;
 }
 
-.event-chip[data-tint='blue'] {
+.event-chip[data-tint='blue'],
+.scope-timeline__item[data-tint='blue'],
+.scope-overview__bar[data-tint='blue'] {
   background: var(--pastel-blue);
   color: var(--pastel-blue-ink);
 }
 
-.event-chip[data-tint='sage'] {
+.event-chip[data-tint='sage'],
+.scope-timeline__item[data-tint='sage'],
+.scope-overview__bar[data-tint='sage'] {
   background: var(--pastel-sage);
   color: var(--pastel-sage-ink);
 }
 
-.event-chip[data-tint='peach'] {
+.event-chip[data-tint='peach'],
+.scope-timeline__item[data-tint='peach'],
+.scope-overview__bar[data-tint='peach'] {
   background: var(--pastel-peach);
   color: var(--pastel-peach-ink);
 }
 
-.event-chip[data-tint='gold'] {
+.event-chip[data-tint='gold'],
+.scope-timeline__item[data-tint='gold'],
+.scope-overview__bar[data-tint='gold'] {
   background: var(--pastel-gold);
   color: var(--pastel-gold-ink);
 }
 
-.event-chip[data-tint='lilac'] {
+.event-chip[data-tint='lilac'],
+.scope-timeline__item[data-tint='lilac'],
+.scope-overview__bar[data-tint='lilac'] {
   background: var(--pastel-lilac);
   color: var(--pastel-lilac-ink);
 }
@@ -4539,6 +4549,14 @@ a.home-class-tile:hover {
   width: 100%;
 }
 
+.scope-timeline__course {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--muted);
+}
+
 .scope-timeline__terms {
   height: 1.75rem;
 }
@@ -4557,11 +4575,18 @@ a.home-class-tile:hover {
   text-transform: uppercase;
   color: var(--muted);
   border-right: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.35);
+  background: var(--glass);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.scope-timeline__term:first-child {
+  border-radius: var(--radius-md) 0 0 0;
 }
 
 .scope-timeline__term:last-child {
   border-right: 0;
+  border-radius: 0 var(--radius-md) 0 0;
 }
 
 .scope-timeline__track {
@@ -4585,7 +4610,7 @@ a.home-class-tile:hover {
 .scope-timeline__week-mark {
   padding: var(--space-1) 0;
   text-align: center;
-  border-right: 1px solid rgba(20, 43, 81, 0.06);
+  border-right: 1px solid rgba(23, 55, 94, 0.04);
 }
 
 .scope-timeline__week-mark:last-child {
@@ -4675,8 +4700,9 @@ a.home-class-tile:hover {
   opacity: 1;
 }
 
-.scope-timeline__item--note .scope-timeline__handle::after {
-  background: rgba(20, 43, 81, 0.35);
+.scope-timeline__item--note .scope-timeline__handle::after,
+.scope-timeline__item--navy .scope-timeline__handle::after {
+  background: rgba(255, 255, 255, 0.55);
 }
 
 body.scope-timeline--dragging,
@@ -4686,15 +4712,14 @@ body.scope-timeline--dragging * {
 }
 
 .scope-timeline__item--unit {
-  color: #fff;
-  background: var(--wave);
-  border-color: var(--marine);
+  border-color: transparent;
 }
 
-.scope-timeline__item--note {
-  color: var(--marine);
-  background: rgba(240, 207, 172, 0.65);
-  border-color: rgba(224, 120, 24, 0.35);
+.scope-timeline__item--note,
+.scope-timeline__item--navy {
+  background: var(--navy);
+  color: #fff;
+  border-color: var(--navy);
   height: 1.85rem;
   top: 1.55rem;
   font-weight: var(--weight-medium);
@@ -5111,8 +5136,10 @@ input.scope-timeline__note-title:focus-visible {
   font-weight: var(--weight-bold);
   letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
-  color: var(--marine);
-  background: rgba(55, 111, 183, 0.12);
+  color: var(--muted);
+  background: var(--glass);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border: 1px solid var(--line);
   border-right: none;
   box-sizing: border-box;
@@ -5120,11 +5147,11 @@ input.scope-timeline__note-title:focus-visible {
 
 .scope-overview__term:last-child {
   border-right: 1px solid var(--line);
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  border-radius: 0 var(--radius-md) 0 0;
 }
 
 .scope-overview__term:first-child {
-  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  border-radius: var(--radius-md) 0 0 0;
 }
 
 .scope-overview__label {
@@ -5140,17 +5167,15 @@ input.scope-timeline__note-title:focus-visible {
 }
 
 .scope-overview__bar--unit {
-  color: #fff;
-  background: var(--wave);
-  border-color: var(--marine);
+  border-color: transparent;
 }
 
 .scope-overview__bar--note {
   top: 1.15rem;
   bottom: 1.15rem;
-  color: var(--marine);
-  background: rgba(240, 207, 172, 0.75);
-  border-color: rgba(224, 120, 24, 0.35);
+  background: var(--navy);
+  color: #fff;
+  border-color: var(--navy);
   font-weight: var(--weight-medium);
 }
 

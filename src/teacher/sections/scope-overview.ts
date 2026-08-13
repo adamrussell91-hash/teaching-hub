@@ -1,4 +1,5 @@
 import { navigate } from '@/app/router';
+import { pastelFromId } from '@/design/pastel';
 import type { ScopeSequence, Subject, TimelineItem, Unit } from '@/schemas';
 import type { CurriculumResponse } from '@/teacher/nav';
 
@@ -114,6 +115,7 @@ export function renderScopeOverview(
         const path = `/units/${item.unit_id}`;
         bar.href = path;
         bar.dataset.unitId = item.unit_id;
+        bar.dataset.tint = pastelFromId(item.unit_id);
         bindNavigate(bar, path);
       } else {
         const path = `/scope-sequences/${subject.id}?selectNote=${encodeURIComponent(item.id)}`;

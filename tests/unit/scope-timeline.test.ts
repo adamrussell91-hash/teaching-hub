@@ -6,6 +6,7 @@ vi.mock('@/teacher/scope-api', () => ({
 }));
 
 import { navigate } from '@/app/router';
+import { pastelFromId } from '@/design/pastel';
 import { patchScopeSequence } from '@/teacher/scope-api';
 import { renderScopeTimelineEditor } from '@/teacher/sections/scope-timeline';
 import type { CurriculumResponse } from '@/teacher/nav';
@@ -159,9 +160,12 @@ describe('scope timeline editor', () => {
     expect(canvas.querySelector('.page-header__title')?.textContent).toBe('English Advanced');
     const terms = [...canvas.querySelectorAll('.scope-timeline__term')].map((el) => el.textContent);
     expect(terms).toEqual(['Term 1', 'Term 2', 'Term 3', 'Term 4']);
-    const unitItem = canvas.querySelector('.scope-timeline__item--unit');
+    const unitItem = canvas.querySelector<HTMLElement>('.scope-timeline__item--unit');
     expect(unitItem?.textContent).toBe('Artist of the Floating World');
-    expect(canvas.querySelector('.scope-timeline__item--note')?.textContent).toBe('Assessment week');
+    expect(unitItem?.dataset.tint).toBe(pastelFromId(unitItem!.dataset.unitId!));
+    const noteItem = canvas.querySelector('.scope-timeline__item--note');
+    expect(noteItem?.textContent).toBe('Assessment week');
+    expect(noteItem?.classList.contains('scope-timeline__item--navy')).toBe(true);
     expect(canvas.querySelector('.scope-timeline__inspector-empty')?.textContent).toMatch(
       /Select an item/i
     );

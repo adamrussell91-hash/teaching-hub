@@ -1,4 +1,5 @@
 import { navigate } from '@/app/router';
+import { pastelFromId } from '@/design/pastel';
 import type { ScopeSequence, TimelineItem, Unit } from '@/schemas';
 import { applyDragDelta } from '@/scope/timeline-drag';
 import { findFirstFreeStart, weeksToLabel } from '@/scope/timeline-weeks';
@@ -230,6 +231,9 @@ export function renderScopeTimelineEditor(
 
   const main = document.createElement('div');
   main.className = 'scope-timeline__main';
+
+  const course = document.createElement('p');
+  course.className = 'scope-timeline__course';
 
   const termsRow = document.createElement('div');
   termsRow.className = 'scope-timeline__terms';
@@ -502,6 +506,8 @@ export function renderScopeTimelineEditor(
 
   const refreshItems = (): void => {
     itemsLayer.replaceChildren();
+    const unitCount = scope.timeline_items.filter((entry) => entry.kind === 'unit').length;
+    course.textContent = `${unitCount} ${unitCount === 1 ? 'unit' : 'units'} · ${scope.week_count} weeks`;
     const sortedItems = [...scope.timeline_items].sort(
       (a, b) => a.order - b.order || a.start_week - b.start_week
     );
@@ -512,7 +518,13 @@ export function renderScopeTimelineEditor(
       el.className = `scope-timeline__item scope-timeline__item--${item.kind}`;
       el.dataset.itemId = item.id;
       el.dataset.kind = item.kind;
-      if (item.kind === 'unit') el.dataset.unitId = item.unit_id;
+      if (item.kind === 'unit') {
+        el.dataset.unitId = item.unit_id;
+        el.dataset.tint = pastelFromId(item.unit_id);
+      }
+      if (item.kind === 'note') {
+        el.classList.add('scope-timeline__item--navy');
+      }
       applyItemPosition(el, item);
       el.setAttribute('aria-label', itemLabel(item, unitsById));
 
@@ -618,7 +630,7 @@ export function renderScopeTimelineEditor(
   }
 
   track.append(weekMarks, itemsLayer);
-  main.append(termsRow, track);
+  main.append(course, termsRow, track);
   body.append(main, inspector);
   root.append(toolbar, banner, body);
   canvas.append(root);

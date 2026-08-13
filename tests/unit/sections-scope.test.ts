@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('@/app/router', () => ({ navigate: vi.fn() }));
 
 import { navigate } from '@/app/router';
+import { pastelFromId } from '@/design/pastel';
 import {
   renderScopeSequencesIndex,
   renderScopeTimelineEditor
@@ -140,6 +141,7 @@ describe('scope & sequences', () => {
     const bar = canvas.querySelector<HTMLAnchorElement>('[data-scope-bar-kind="unit"]');
     expect(bar).not.toBeNull();
     expect(bar!.getAttribute('href')).toContain('/units/unit_aotfw');
+    expect(bar!.dataset.tint).toBe(pastelFromId(bar!.dataset.unitId!));
 
     const noteBar = canvas.querySelector<HTMLAnchorElement>('[data-scope-bar-kind="note"]');
     expect(noteBar?.getAttribute('href')).toBe(
