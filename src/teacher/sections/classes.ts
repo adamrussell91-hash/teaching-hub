@@ -190,9 +190,24 @@ export function renderClassPage(
   }
   const pageClass: Class = cls;
 
+  const viewAsStudent = document.createElement('a');
+  viewAsStudent.className = 'btn btn--ghost class-page__view-as-student';
+  viewAsStudent.href = `/s/classes/${cls.id}`;
+  viewAsStudent.textContent = 'View as student';
+  viewAsStudent.addEventListener('click', (event) => {
+    event.preventDefault();
+    navigate(`/s/classes/${cls.id}`);
+  });
+
+  const editButton = document.createElement('button');
+  editButton.type = 'button';
+  editButton.className = 'btn btn--secondary class-page__edit-homepage';
+  editButton.textContent = 'Edit page';
+
   renderPageHeader(canvas, {
     eyebrow: 'Classes',
-    title: pageClass.title || pageClass.code
+    title: pageClass.title || pageClass.code,
+    actions: [viewAsStudent, editButton]
   });
 
   const yearsById = new Map(curriculum.years.map((year) => [year.id, year]));
@@ -237,26 +252,6 @@ export function renderClassPage(
   });
   disposers.push(banner.dispose);
 
-  // 2. Action row
-  const actions = document.createElement('div');
-  actions.className = 'class-page__actions';
-
-  const viewAsStudent = document.createElement('a');
-  viewAsStudent.className = 'btn btn--ghost class-page__view-as-student';
-  viewAsStudent.href = `/s/classes/${cls.id}`;
-  viewAsStudent.textContent = 'View as student';
-  viewAsStudent.addEventListener('click', (event) => {
-    event.preventDefault();
-    navigate(`/s/classes/${cls.id}`);
-  });
-
-  const editButton = document.createElement('button');
-  editButton.type = 'button';
-  editButton.className = 'btn btn--secondary class-page__edit-homepage';
-  editButton.textContent = 'Edit page';
-
-  actions.append(viewAsStudent, editButton);
-
   // Body
   const body = document.createElement('div');
   body.className = 'class-page__body';
@@ -287,6 +282,7 @@ export function renderClassPage(
     renderClassCalendar(calendarHost, model, {
       onSelectDate: (date) => {
         selectedDate = date;
+        viewMonth = yearMonthFromDate(date);
         monthDelta = 0;
         paintCalendar();
       },
@@ -430,7 +426,7 @@ export function renderClassPage(
   });
 
   body.append(main, side);
-  root.append(bannerHost, actions, body);
+  root.append(bannerHost, body);
   canvas.append(root);
 
   return {

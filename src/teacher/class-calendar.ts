@@ -1,3 +1,4 @@
+import { pastelFromId } from '@/design/pastel';
 import type { CalendarDayLesson, ClassCalendarModel } from '@/schedule/class-calendar-model';
 
 export interface RenderClassCalendarOptions {
@@ -16,6 +17,7 @@ type CalendarHandlers = {
   onShiftMonth: (delta: -1 | 1) => void;
   onNavigate?: (path: string) => void;
   onScheduleLesson?: () => void;
+  today: string;
 };
 
 const handlersByRoot = new WeakMap<HTMLElement, CalendarHandlers>();
@@ -63,7 +65,13 @@ export function renderClassCalendar(
     next.dataset.calendar = 'next-month';
     next.textContent = '›';
 
-    nav.append(prev, label, next);
+    const todayBtn = document.createElement('button');
+    todayBtn.type = 'button';
+    todayBtn.className = 'class-calendar__today';
+    todayBtn.dataset.calendar = 'today';
+    todayBtn.textContent = 'Today';
+
+    nav.append(prev, label, next, todayBtn);
 
     const grid = document.createElement('div');
     grid.className = 'class-calendar__grid';
@@ -76,7 +84,13 @@ export function renderClassCalendar(
     host.replaceChildren(root);
   }
 
-  handlersByRoot.set(root, { onSelectDate, onShiftMonth, onNavigate, onScheduleLesson });
+  handlersByRoot.set(root, {
+    onSelectDate,
+    onShiftMonth,
+    onNavigate,
+    onScheduleLesson,
+    today: model.today
+  });
 
   const label = root.querySelector<HTMLElement>('[data-calendar="month-label"]');
   if (label) label.textContent = model.monthLabel;
@@ -104,6 +118,7 @@ export function renderClassCalendar(
 
   const prev = root.querySelector<HTMLButtonElement>('[data-calendar="prev-month"]');
   const next = root.querySelector<HTMLButtonElement>('[data-calendar="next-month"]');
+  const todayBtn = root.querySelector<HTMLButtonElement>('[data-calendar="today"]');
   if (prev && !prev.dataset.bound) {
     prev.dataset.bound = '1';
     prev.addEventListener('click', () => handlersByRoot.get(root)?.onShiftMonth(-1));
@@ -111,6 +126,14 @@ export function renderClassCalendar(
   if (next && !next.dataset.bound) {
     next.dataset.bound = '1';
     next.addEventListener('click', () => handlersByRoot.get(root)?.onShiftMonth(1));
+  }
+  if (todayBtn && !todayBtn.dataset.bound) {
+    todayBtn.dataset.bound = '1';
+    todayBtn.addEventListener('click', () => {
+      const handlers = handlersByRoot.get(root);
+      if (!handlers) return;
+      handlers.onSelectDate(handlers.today);
+    });
   }
 }
 
@@ -123,6 +146,7 @@ function applyMonthMotion(grid: HTMLElement, monthDelta: number): void {
 
 function wireSpaLink(anchor: HTMLAnchorElement, root: HTMLElement): void {
   anchor.addEventListener('click', (event) => {
+    event.stopPropagation();
     const navigate = handlersByRoot.get(root)?.onNavigate;
     if (!navigate) return;
     event.preventDefault();
@@ -134,13 +158,8 @@ function buildDayCell(
   day: ClassCalendarModel['monthDays'][number],
   root: HTMLElement
 ): HTMLElement {
-  const singleLesson = day.lessons.length === 1 ? day.lessons[0] : null;
-  const cell = singleLesson
-    ? Object.assign(document.createElement('a'), {
-        href: `/lessons/${singleLesson.lessonId}`
-      })
-    : Object.assign(document.createElement('button'), { type: 'button' as const });
-
+  const cell = document.createElement('button');
+  cell.type = 'button';
   cell.className = 'class-calendar__day';
   cell.dataset.date = day.date;
   if (!day.inMonth) cell.dataset.outside = 'true';
@@ -150,30 +169,33 @@ function buildDayCell(
   }
   if (day.isSelected) cell.dataset.selected = 'true';
   cell.setAttribute('aria-label', accessibleDayLabel(day.date, day.lessons));
-
-  if (singleLesson) {
-    wireSpaLink(cell as HTMLAnchorElement, root);
-  } else {
-    cell.addEventListener('click', () => handlersByRoot.get(root)?.onSelectDate(day.date));
-  }
+  cell.addEventListener('click', () => handlersByRoot.get(root)?.onSelectDate(day.date));
 
   const num = document.createElement('span');
   num.className = 'class-calendar__day-num';
   num.textContent = String(day.day);
-  cell.append(num, buildDots(day.lessons));
-  return cell;
-}
+  cell.append(num);
 
-function buildDots(lessons: CalendarDayLesson[]): HTMLElement {
-  const wrap = document.createElement('span');
-  wrap.className = 'calendar-dots';
-  for (const lesson of lessons.slice(0, 4)) {
-    const dot = document.createElement('i');
-    dot.className = `calendar-dot ${lesson.status}`;
-    dot.title = lesson.title;
-    wrap.append(dot);
+  const visible = day.lessons.slice(0, 2);
+  for (const lesson of visible) {
+    const chip = document.createElement('a');
+    chip.className = 'event-chip';
+    chip.href = `/lessons/${lesson.lessonId}`;
+    chip.dataset.tint = pastelFromId(lesson.unitId);
+    chip.textContent = lesson.title;
+    wireSpaLink(chip, root);
+    cell.append(chip);
   }
-  return wrap;
+
+  const overflow = day.lessons.length - visible.length;
+  if (overflow > 0) {
+    const more = document.createElement('span');
+    more.className = 'event-chip-more';
+    more.textContent = `+${overflow} more`;
+    cell.append(more);
+  }
+
+  return cell;
 }
 
 function renderDayDetail(

@@ -59,16 +59,41 @@ describe('renderClassCalendar', () => {
     expect(days).toHaveLength(model.monthDays.length);
   });
 
-  it('renders a single-lesson day as a link to the lesson', () => {
+  it('renders lesson chips inside the day cell and links them', () => {
     const model = modelForAugust();
-    renderClassCalendar(host, model, {
-      onSelectDate: vi.fn(),
-      onShiftMonth: vi.fn()
-    });
+    renderClassCalendar(host, model, { onSelectDate: vi.fn(), onShiftMonth: vi.fn() });
+    const chip = host.querySelector<HTMLAnchorElement>('a.event-chip[href="/lessons/l1"]');
+    expect(chip).not.toBeNull();
+    expect(chip?.textContent).toContain('Narrative Structure');
+    expect(chip?.dataset.tint).toBeTruthy();
+    const cell = host.querySelector('.class-calendar__day[data-date="2026-08-12"]');
+    expect(cell?.tagName).toBe('BUTTON');
+  });
 
-    const cell = host.querySelector<HTMLAnchorElement>('a.class-calendar__day[href="/lessons/l1"]');
-    expect(cell).not.toBeNull();
-    expect(cell!.getAttribute('href')).toBe('/lessons/l1');
+  it('renders a Today control that selects today', () => {
+    const onSelectDate = vi.fn();
+    const model = modelForAugust({ selectedDate: '2026-08-01', today: '2026-08-12' });
+    renderClassCalendar(host, model, { onSelectDate, onShiftMonth: vi.fn() });
+    host.querySelector<HTMLButtonElement>('[data-calendar="today"]')!.click();
+    expect(onSelectDate).toHaveBeenCalledWith('2026-08-12');
+  });
+
+  it('shows two chips and +N more when a day has more than two lessons', () => {
+    const model = modelForAugust({
+      scheduled: [1, 2, 3].map((n) => ({
+        id: `s${n}`,
+        lesson_id: `l${n}`,
+        unit_id: 'u1',
+        date: '2026-08-12',
+        delivery_status: 'planned' as const,
+        schedule_order: n
+      })),
+      lessonTitles: new Map([['l1', 'One'], ['l2', 'Two'], ['l3', 'Three']])
+    });
+    renderClassCalendar(host, model, { onSelectDate: vi.fn(), onShiftMonth: vi.fn() });
+    const day = host.querySelector('.class-calendar__day[data-date="2026-08-12"]')!;
+    expect(day.querySelectorAll('a.event-chip')).toHaveLength(2);
+    expect(day.querySelector('.event-chip-more')?.textContent).toMatch(/\+1/);
   });
 
   it('marks today, selected, and outside days', () => {
@@ -144,7 +169,7 @@ describe('renderClassCalendar', () => {
     expect(onShiftMonth).toHaveBeenCalledWith(-1);
   });
 
-  it('renders delivery status classes on lesson dots', () => {
+  it('shows two chips and +3 more for a five-lesson day', () => {
     const model = modelForAugust({
       scheduled: [
         {
@@ -203,17 +228,12 @@ describe('renderClassCalendar', () => {
     });
 
     const day = host.querySelector('.class-calendar__day[data-date="2026-08-12"]')!;
-    // Multi-lesson day stays a button
     expect(day.tagName).toBe('BUTTON');
-    const dots = [...day.querySelectorAll('.calendar-dot')];
-    expect(dots).toHaveLength(4);
-    expect(dots.map((d) => d.className)).toEqual([
-      'calendar-dot delivered',
-      'calendar-dot planned',
-      'calendar-dot skipped',
-      'calendar-dot rescheduled'
-    ]);
-    expect(dots[0].getAttribute('title')).toBe('One');
+    expect(day.querySelectorAll('a.event-chip')).toHaveLength(2);
+    expect(day.querySelector('.event-chip-more')?.textContent).toMatch(/\+3/);
+    expect(day.querySelector('.calendar-dot')).toBeNull();
+    // Detail list still lists all lessons
+    expect(host.querySelectorAll('.class-calendar__detail-lesson')).toHaveLength(5);
   });
 
   it('applies month motion only when monthDelta is non-zero', () => {

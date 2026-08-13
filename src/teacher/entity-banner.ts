@@ -98,7 +98,7 @@ export function renderEntityBanner(
       scrim.append(eyebrow);
     }
 
-    const title = document.createElement('h1');
+    const title = document.createElement('p');
     title.className = 'entity-banner__title';
     title.textContent = options.title;
     scrim.append(title);
