@@ -158,9 +158,10 @@ function buildDayCell(
   day: ClassCalendarModel['monthDays'][number],
   root: HTMLElement
 ): HTMLElement {
-  const cell = document.createElement('button');
-  cell.type = 'button';
+  const cell = document.createElement('div');
   cell.className = 'class-calendar__day';
+  cell.setAttribute('role', 'gridcell');
+  cell.tabIndex = 0;
   cell.dataset.date = day.date;
   if (!day.inMonth) cell.dataset.outside = 'true';
   if (day.isToday) {
@@ -169,7 +170,15 @@ function buildDayCell(
   }
   if (day.isSelected) cell.dataset.selected = 'true';
   cell.setAttribute('aria-label', accessibleDayLabel(day.date, day.lessons));
-  cell.addEventListener('click', () => handlersByRoot.get(root)?.onSelectDate(day.date));
+  const selectDay = (): void => {
+    handlersByRoot.get(root)?.onSelectDate(day.date);
+  };
+  cell.addEventListener('click', selectDay);
+  cell.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    selectDay();
+  });
 
   const num = document.createElement('span');
   num.className = 'class-calendar__day-num';

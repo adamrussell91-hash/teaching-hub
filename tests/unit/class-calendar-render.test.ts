@@ -66,8 +66,9 @@ describe('renderClassCalendar', () => {
     expect(chip).not.toBeNull();
     expect(chip?.textContent).toContain('Narrative Structure');
     expect(chip?.dataset.tint).toBeTruthy();
-    const cell = host.querySelector('.class-calendar__day[data-date="2026-08-12"]');
-    expect(cell?.tagName).toBe('BUTTON');
+  const cell = host.querySelector('.class-calendar__day[data-date="2026-08-12"]');
+  expect(cell?.tagName).toBe('DIV');
+  expect(cell?.getAttribute('role')).toBe('gridcell');
   });
 
   it('renders a Today control that selects today', () => {
@@ -125,8 +126,8 @@ describe('renderClassCalendar', () => {
       onShiftMonth: vi.fn()
     });
 
-    const day = host.querySelector<HTMLButtonElement>(
-      'button.class-calendar__day[data-date="2026-08-11"]'
+    const day = host.querySelector<HTMLElement>(
+      '.class-calendar__day[data-date="2026-08-11"]'
     )!;
     expect(day).not.toBeNull();
     day.click();
@@ -228,7 +229,7 @@ describe('renderClassCalendar', () => {
     });
 
     const day = host.querySelector('.class-calendar__day[data-date="2026-08-12"]')!;
-    expect(day.tagName).toBe('BUTTON');
+    expect(day.tagName).toBe('DIV');
     expect(day.querySelectorAll('a.event-chip')).toHaveLength(2);
     expect(day.querySelector('.event-chip-more')?.textContent).toMatch(/\+3/);
     expect(day.querySelector('.calendar-dot')).toBeNull();
