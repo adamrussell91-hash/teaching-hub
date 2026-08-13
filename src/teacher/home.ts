@@ -1,4 +1,5 @@
 import { navigate } from '@/app/router';
+import { pastelFromId } from '@/design/pastel';
 import type { Class, ScheduledLesson } from '@/schemas';
 import { resolveScheduleToday } from '@/schedule/today';
 import { mountCreateControl } from '@/teacher/create/control';
@@ -17,7 +18,7 @@ export interface TeacherHomeOptions {
 }
 
 /**
- * Clinical Glass Home: hero clock, signal tiles, dated week calendar, class tiles.
+ * Cotton Glass Home: page header + clock, signal tiles, today card, week chips, class tiles.
  */
 export function renderTeacherHome(
   canvas: HTMLElement,
@@ -25,7 +26,6 @@ export function renderTeacherHome(
   options: TeacherHomeOptions = {}
 ): { dispose: () => void } {
   canvas.replaceChildren();
-  renderPageHeader(canvas, { eyebrow: 'Workspace', title: 'Teaching Dashboard' });
 
   const lessonsById = new Map(curriculum.lessons.map((lesson) => [lesson.id, lesson]));
   const classesById = new Map(curriculum.classes.map((cls) => [cls.id, cls]));
@@ -47,18 +47,20 @@ export function renderTeacherHome(
     createHost.querySelector<HTMLButtonElement>('[data-create-trigger]')?.click();
   };
 
-  const header = document.createElement('header');
-  header.className = 'home-dashboard__header';
-
   const hero = document.createElement('div');
   hero.className = 'home-dashboard__hero';
+
+  renderPageHeader(hero, {
+    eyebrow: 'Workspace',
+    title: 'Teaching Dashboard',
+    supporting: 'Today’s classes and what still needs publishing.',
+    actions: [createHost]
+  });
 
   const clockHost = document.createElement('div');
   clockHost.className = 'home-dashboard__clock';
   disposers.push(mountHomeClock(clockHost));
-
-  hero.append(clockHost);
-  header.append(hero, createHost);
+  hero.querySelector('.page-header__copy')?.prepend(clockHost);
 
   const createControl = mountCreateControl(createHost, {
     context: 'home',
@@ -75,7 +77,6 @@ export function renderTeacherHome(
       buildWeekPanel({
         curriculum,
         lessonsById,
-        classesById,
         scheduleToday,
         weekOffset,
         onOffsetChange: (next) => {
@@ -97,8 +98,9 @@ export function renderTeacherHome(
   };
 
   root.append(
-    header,
+    hero,
     buildSignalsPanel(todayEntries.length, unpublished.length, openHomeCreate),
+    buildTodayCard(todayEntries, lessonsById, classesById),
     weekMount,
     buildClassesPanel(
       curriculum.classes.filter((cls) => cls.status === 'active'),
@@ -143,6 +145,57 @@ function buildSignalsPanel(
   return panel;
 }
 
+function buildTodayCard(
+  todayEntries: ScheduledLesson[],
+  lessonsById: Map<string, CurriculumLessonSummary>,
+  classesById: Map<string, Class>
+): HTMLElement {
+  const card = document.createElement('section');
+  card.className = 'home-today';
+
+  const heading = document.createElement('h2');
+  heading.className = 'home-today__heading';
+  heading.textContent = 'Today';
+  card.append(heading);
+
+  if (todayEntries.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'home-today__empty';
+    empty.textContent = 'No lessons scheduled today.';
+    card.append(empty);
+    return card;
+  }
+
+  const list = document.createElement('ul');
+  list.className = 'home-today__list';
+
+  for (const entry of todayEntries) {
+    const lesson = lessonsById.get(entry.lesson_id);
+    const cls = classesById.get(entry.class_id);
+    const path = `/lessons/${entry.lesson_id}`;
+
+    const item = document.createElement('li');
+    item.className = 'home-today__item';
+
+    const link = document.createElement('a');
+    link.className = 'home-today__link';
+    link.href = path;
+    link.textContent = [lesson?.title ?? entry.lesson_id, cls?.code]
+      .filter(Boolean)
+      .join(' · ');
+    link.addEventListener('click', (event) => {
+      event.preventDefault();
+      navigate(path);
+    });
+
+    item.append(link);
+    list.append(item);
+  }
+
+  card.append(list);
+  return card;
+}
+
 function buildSignalTile(
   label: string,
   value: string,
@@ -167,7 +220,6 @@ function buildSignalTile(
 function buildWeekPanel(args: {
   curriculum: CurriculumResponse;
   lessonsById: Map<string, CurriculumLessonSummary>;
-  classesById: Map<string, Class>;
   scheduleToday: string;
   weekOffset: number;
   onOffsetChange: (offset: number) => void;
@@ -176,7 +228,6 @@ function buildWeekPanel(args: {
   const {
     curriculum,
     lessonsById,
-    classesById,
     scheduleToday,
     weekOffset,
     onOffsetChange,
@@ -260,7 +311,7 @@ function buildWeekPanel(args: {
 
   for (const day of days) {
     columns.append(
-      buildDayColumn(day, scheduleToday, lessonsById, classesById, onCreate)
+      buildDayColumn(day, scheduleToday, lessonsById, onCreate)
     );
   }
 
@@ -272,7 +323,6 @@ function buildDayColumn(
   day: { date: string; entries: ScheduledLesson[] },
   scheduleToday: string,
   lessonsById: Map<string, CurriculumLessonSummary>,
-  classesById: Map<string, Class>,
   onCreate: () => void
 ): HTMLElement {
   const column = document.createElement('div');
@@ -311,7 +361,7 @@ function buildDayColumn(
     column.append(empty);
   } else {
     for (const entry of day.entries) {
-      column.append(buildLessonCard(entry, lessonsById, classesById));
+      column.append(buildLessonCard(entry, lessonsById));
     }
   }
 
@@ -320,31 +370,26 @@ function buildDayColumn(
 
 function buildLessonCard(
   entry: ScheduledLesson,
-  lessonsById: Map<string, CurriculumLessonSummary>,
-  classesById: Map<string, Class>
+  lessonsById: Map<string, CurriculumLessonSummary>
 ): HTMLAnchorElement {
   const lesson = lessonsById.get(entry.lesson_id);
-  const cls = classesById.get(entry.class_id);
   const path = `/lessons/${entry.lesson_id}`;
 
   const card = document.createElement('a');
-  card.className = 'home-week__card';
+  card.className = 'event-chip';
   card.href = path;
+  card.dataset.tint = pastelFromId(entry.unit_id);
   card.dataset.homeLessonId = entry.lesson_id;
   card.addEventListener('click', (event) => {
     event.preventDefault();
     navigate(path);
   });
 
-  const meta = document.createElement('p');
-  meta.className = 'home-week__card-meta';
-  meta.textContent = cls?.code ?? cls?.title ?? entry.class_id;
-
-  const titleEl = document.createElement('p');
-  titleEl.className = 'home-week__card-title';
+  const titleEl = document.createElement('span');
+  titleEl.className = 'event-chip__title';
   titleEl.textContent = lesson?.title ?? entry.lesson_id;
 
-  card.append(meta, titleEl);
+  card.append(titleEl);
   return card;
 }
 
@@ -377,7 +422,7 @@ function buildClassesPanel(
     for (const cls of sorted) {
       const path = `/classes/${cls.id}`;
       const tile = document.createElement('a');
-      tile.className = 'glass-tile home-class-tile';
+      tile.className = 'glass-panel glass-tile home-class-tile';
       tile.href = path;
       tile.dataset.homeClassId = cls.id;
       tile.addEventListener('click', (event) => {

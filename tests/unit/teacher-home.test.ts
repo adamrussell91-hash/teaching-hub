@@ -111,7 +111,19 @@ describe('teacher home dashboard', () => {
     expect(canvas.querySelector('[data-home-panel="classes"]')).not.toBeNull();
     expect(canvas.textContent).toContain('Teaching Dashboard');
     expect(canvas.querySelector('.page-header__title')?.textContent).toBe('Teaching Dashboard');
+    expect(canvas.querySelector('.home-today')).not.toBeNull();
+    expect(canvas.querySelector('.home-today')?.textContent).toContain('Memory');
+    const chip = canvas.querySelector<HTMLAnchorElement>(
+      'a.event-chip[href="/lessons/lesson_aotfw_008"]'
+    );
+    expect(chip).not.toBeNull();
+    expect(chip?.dataset.tint).toMatch(/blue|sage|peach|gold|lilac/);
     expect(canvas.textContent).toMatch(/\b\d{1,2}\b/);
+
+    const unpublishedTile = [...canvas.querySelectorAll('.home-signal')].find((el) =>
+      el.textContent?.includes('Unpublished')
+    );
+    expect(unpublishedTile?.classList.contains('home-signal--emphasis')).toBe(true);
   });
 
   it('shows weekday day numbers in week columns and lesson links', () => {
@@ -124,7 +136,7 @@ describe('teacher home dashboard', () => {
     expect(dayNumbers).toEqual(['10', '11', '12', '13', '14']);
 
     const lessonLink = canvas.querySelector<HTMLAnchorElement>(
-      'a.home-week__card[href="/lessons/lesson_aotfw_008"]'
+      'a.event-chip[href="/lessons/lesson_aotfw_008"]'
     );
     expect(lessonLink).not.toBeNull();
     expect(lessonLink?.textContent).toContain('Memory');
