@@ -34,6 +34,7 @@ Larger product tracks (not “next block”, but still ahead):
 
 | Date | Slice | Outcome |
 |------|--------|---------|
+| 2026-08-13 | **Cotton glass redesign** | Whole-app cotton glass + Life Hub rail; class calendar chips and scope timeline tints — [design](superpowers/specs/2026-08-13-cotton-glass-redesign-design.md) / [plan](superpowers/plans/2026-08-13-cotton-glass-redesign.md) |
 | 2026-08-13 | **Class page redesign** | Month calendar (life-hub model/renderer port), collapsible unit sequence, date-based unit progress (`unit.start_date`/`end_date` optional with scheduled-lesson fallback), read-first cover banner — [`plan`](superpowers/plans/2026-08-12-class-page-redesign.md) |
 | 2026-08-11 | **Versioning / archive / recovery** | Lesson/unit/class-homepage version history (checkpoints, restore draft-only); archive vs trash; dependency-aware permanent delete + Trash UI — [`design`](superpowers/specs/2026-08-11-versioning-archive-recovery-design.md) / [`plan`](superpowers/plans/2026-08-11-versioning-archive-recovery.md) |
 | 2026-08-11 | **Linked template reuse** | Linked composition insert (live draft resolve); Edit Source / Detach; publish expands to independent tree — [`design`](superpowers/specs/2026-08-11-linked-composition-templates-design.md) / [`plan`](superpowers/plans/2026-08-11-linked-composition-templates.md) |

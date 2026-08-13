@@ -25,7 +25,7 @@ test('teacher publishes lesson visible on student URL', async ({ page, context }
   const student = await context.newPage();
   await student.goto('/s/lessons/lesson_aotfw_008');
 
-  await expect(student.locator('.student-surface__title')).toHaveText(
+  await expect(student.locator('.lesson-hero__title')).toHaveText(
     'Memory, Identity and Ono'
   );
   await expect(student.getByText(/teacher only/i)).toHaveCount(0);

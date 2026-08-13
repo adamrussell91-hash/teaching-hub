@@ -27,9 +27,31 @@ function publishedLesson() {
     lesson_id: 'lesson_aotfw_008',
     title: 'Memory',
     unit_id: 'unit_aotfw',
-    blocks: [],
+    blocks: [] as Array<Record<string, unknown>>,
     published_at: '2026-02-01T12:00:00.000Z',
     schema_version: 1
+  };
+}
+
+function publishedLessonWithLead() {
+  return {
+    ...publishedLesson(),
+    blocks: [
+      {
+        id: 'block_001',
+        type: 'block',
+        variant: 'medium',
+        visibility: 'student_teacher',
+        layout: {},
+        print: {},
+        settings: {},
+        created_at: '2026-01-01T00:00:00.000Z',
+        updated_at: '2026-01-01T00:00:00.000Z',
+        schema_version: 1,
+        block_type: 'rich_text',
+        content: { html: '<p>Lead copy here</p>' }
+      }
+    ]
   };
 }
 
@@ -290,5 +312,45 @@ describe('mountStudentLessonView', () => {
     await vi.waitFor(() => {
       expect(root.textContent).toContain('Unable to load class');
     });
+  });
+
+  it('class-scoped mount renders hero title, lead, and meta', async () => {
+    vi.mocked(apiGet).mockImplementation(async (path: string) => {
+      if (path.includes('/published/classes/')) return publishedClass();
+      if (path.includes('/published/lessons/')) return publishedLessonWithLead();
+      throw new Error(path);
+    });
+
+    const root = document.createElement('div');
+    document.body.append(root);
+    mountStudentLessonView({
+      root,
+      lessonId: 'lesson_aotfw_008',
+      classId: CLASS_ID
+    });
+
+    await vi.waitFor(() => {
+      expect(root.querySelector('.lesson-hero__title')?.textContent).toBe('Memory');
+    });
+    expect(root.querySelectorAll('h1')).toHaveLength(1);
+    expect(root.querySelector('.lesson-hero__lead')?.textContent).toContain('Lead copy');
+    const meta = root.querySelector('.lesson-hero__meta');
+    expect(meta).toBeTruthy();
+    expect(meta?.textContent).toContain('Year 12 English Advanced');
+    expect(meta?.textContent).toContain('2026-08-12');
+  });
+
+  it('bare mount uses Lesson eyebrow and omits meta', async () => {
+    vi.mocked(apiGet).mockResolvedValue(publishedLessonWithLead());
+    const root = document.createElement('div');
+    document.body.append(root);
+    mountStudentLessonView({ root, lessonId: 'lesson_aotfw_008' });
+
+    await vi.waitFor(() => {
+      expect(root.querySelector('.lesson-hero__title')?.textContent).toBe('Memory');
+    });
+    expect(root.querySelector('.lesson-hero__eyebrow')?.textContent).toBe('Lesson');
+    expect(root.querySelector('.lesson-hero__lead')?.textContent).toContain('Lead copy');
+    expect(root.querySelector('.lesson-hero__meta')).toBeNull();
   });
 });

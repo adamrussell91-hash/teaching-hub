@@ -3,6 +3,7 @@ import { navigate } from '@/app/router';
 import { renderBlock } from '@/blocks/render';
 import type { PublishedLesson } from '@/schemas/published-lesson';
 import { scheduleNeighbors } from '@/schedule/schedule-neighbors';
+import { firstLeadFromBlocks } from '@/student/lesson-lead';
 import {
   fetchPublishedClass,
   type PublishedClass
@@ -90,17 +91,65 @@ function renderStatus(content: HTMLElement, text: string): void {
   content.append(status);
 }
 
-function renderPublishedLesson(content: HTMLElement, lesson: PublishedLesson): void {
+function renderPublishedLesson(
+  content: HTMLElement,
+  lesson: PublishedLesson,
+  extras?: { cls?: PublishedClass }
+): void {
   content.replaceChildren();
 
-  const title = document.createElement('h1');
-  title.className = 'student-surface__title';
-  title.textContent = lesson.title;
-  content.append(title);
+  const cls = extras?.cls;
+  const classTitle = cls?.title?.trim() ?? '';
+  const scheduleDate =
+    cls?.schedule.find((row) => row.lesson_id === lesson.lesson_id)?.date ?? '';
+  const lead = firstLeadFromBlocks(lesson.blocks);
 
-  for (const block of lesson.blocks) {
-    content.append(renderBlock(block, 'student', { lessonId: lesson.lesson_id }));
+  const hero = document.createElement('article');
+  hero.className = 'lesson-hero glass-panel';
+
+  const eyebrow = document.createElement('p');
+  eyebrow.className = 'lesson-hero__eyebrow';
+  eyebrow.textContent = classTitle || 'Lesson';
+  hero.append(eyebrow);
+
+  const title = document.createElement('h1');
+  title.className = 'lesson-hero__title';
+  title.textContent = lesson.title;
+  hero.append(title);
+
+  if (lead) {
+    const leadEl = document.createElement('p');
+    leadEl.className = 'lesson-hero__lead';
+    leadEl.textContent = lead;
+    hero.append(leadEl);
   }
+
+  if (classTitle || scheduleDate) {
+    const meta = document.createElement('aside');
+    meta.className = 'lesson-hero__meta';
+    if (classTitle) {
+      const classLine = document.createElement('p');
+      classLine.className = 'lesson-hero__meta-class';
+      classLine.textContent = classTitle;
+      meta.append(classLine);
+    }
+    if (scheduleDate) {
+      const dateLine = document.createElement('p');
+      dateLine.className = 'lesson-hero__meta-date';
+      dateLine.textContent = scheduleDate;
+      meta.append(dateLine);
+    }
+    hero.append(meta);
+  }
+
+  content.append(hero);
+
+  const blocks = document.createElement('div');
+  blocks.className = 'lesson-blocks';
+  for (const block of lesson.blocks) {
+    blocks.append(renderBlock(block, 'student', { lessonId: lesson.lesson_id }));
+  }
+  content.append(blocks);
 }
 
 function wideNavLabels(): boolean {
@@ -218,7 +267,7 @@ export function mountStudentLessonView(
       }
 
       renderClassScopedHeader(header, classId, lesson.unit_id);
-      renderPublishedLesson(content, lesson);
+      renderPublishedLesson(content, lesson, { cls });
       renderLessonNav(content, classId, lessonId, cls);
     });
   } else {
