@@ -18,7 +18,9 @@ describe('primary nav', () => {
 
   it('renders the section links including Templates', () => {
     renderPrimaryNav(container, { activeSection: 'home' });
-    const labels = [...container.querySelectorAll('.primary-nav__link')].map((el) => el.textContent);
+    const labels = [...container.querySelectorAll('.primary-nav__link')].map(
+      (el) => el.querySelector('.primary-nav__label')?.textContent
+    );
     expect(labels).toEqual([
       'Home',
       'Classes',
@@ -29,19 +31,24 @@ describe('primary nav', () => {
       'Resource Library',
       'Trash'
     ]);
+    const links = [...container.querySelectorAll('.primary-nav__link')];
+    expect(links).toHaveLength(8);
+    for (const link of links) {
+      expect(link.querySelector('svg.primary-nav__glyph')).not.toBeNull();
+    }
   });
 
   it('marks the active section with aria-current', () => {
     renderPrimaryNav(container, { activeSection: 'units' });
     const active = container.querySelector('.primary-nav__link[aria-current="page"]');
-    expect(active?.textContent).toBe('Units');
+    expect(active?.querySelector('.primary-nav__label')?.textContent).toBe('Units');
     expect(container.querySelectorAll('[aria-current="page"]')).toHaveLength(1);
   });
 
   it('navigates on click via the client router', () => {
     renderPrimaryNav(container, { activeSection: 'home' });
     const classes = [...container.querySelectorAll<HTMLAnchorElement>('.primary-nav__link')].find(
-      (el) => el.textContent === 'Classes'
+      (el) => el.querySelector('.primary-nav__label')?.textContent === 'Classes'
     )!;
     classes.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     expect(navigate).toHaveBeenCalledWith('/classes');

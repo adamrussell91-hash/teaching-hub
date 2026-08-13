@@ -2,6 +2,7 @@ import { mountCreateControl } from '@/teacher/create/control';
 import type { CreateKind } from '@/teacher/create/types';
 import type { CurriculumResponse } from '@/teacher/nav';
 import { renderLessonList } from '@/teacher/lesson-list';
+import { renderPageHeader } from '@/teacher/page-header';
 
 export interface LessonsIndexOptions {
   onCreated?: (kind: CreateKind, id: string) => void | Promise<void>;
@@ -17,18 +18,11 @@ export function renderLessonsIndex(
 
   const disposers: Array<() => void> = [];
 
-  const header = document.createElement('header');
-  header.className = 'lessons-index__header';
-
-  const heading = document.createElement('h1');
-  heading.className = 'home-heading';
-  heading.textContent = 'Lessons';
-
   const createHost = document.createElement('div');
   createHost.className = 'lessons-index__create create-control';
   createHost.dataset.createHost = '';
 
-  header.append(heading, createHost);
+  renderPageHeader(canvas, { eyebrow: 'Workspace', title: 'Lessons', actions: [createHost] });
 
   const createControl = mountCreateControl(createHost, {
     context: 'lessons',
@@ -40,7 +34,7 @@ export function renderLessonsIndex(
   const listHost = document.createElement('div');
   listHost.className = 'lessons-index__list';
 
-  canvas.append(header, listHost);
+  canvas.append(listHost);
   renderLessonList(listHost, curriculum, { heading: null, onMutated: options.onMutated });
 
   return {

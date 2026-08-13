@@ -110,6 +110,7 @@ describe('teacher home dashboard', () => {
     expect(canvas.querySelector('[data-home-panel="week"]')).not.toBeNull();
     expect(canvas.querySelector('[data-home-panel="classes"]')).not.toBeNull();
     expect(canvas.textContent).toContain('Teaching Dashboard');
+    expect(canvas.querySelector('.page-header__title')?.textContent).toBe('Teaching Dashboard');
     expect(canvas.textContent).toMatch(/\b\d{1,2}\b/);
   });
 

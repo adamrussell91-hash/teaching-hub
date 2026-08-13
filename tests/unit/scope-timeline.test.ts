@@ -156,7 +156,7 @@ describe('scope timeline editor', () => {
 
   it('renders subject heading, term labels, and seeded unit title', () => {
     renderScopeTimelineEditor(canvas, curriculum, 'subject_y12_engadv');
-    expect(canvas.querySelector('.home-heading')?.textContent).toBe('English Advanced');
+    expect(canvas.querySelector('.page-header__title')?.textContent).toBe('English Advanced');
     const terms = [...canvas.querySelectorAll('.scope-timeline__term')].map((el) => el.textContent);
     expect(terms).toEqual(['Term 1', 'Term 2', 'Term 3', 'Term 4']);
     const unitItem = canvas.querySelector('.scope-timeline__item--unit');

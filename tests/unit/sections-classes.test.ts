@@ -167,7 +167,7 @@ describe('classes section', () => {
 
   it('renders glass class tiles that open the class page', () => {
     renderClassesIndex(canvas, curriculum);
-    expect(canvas.querySelector('.home-heading')?.textContent).toBe('Classes');
+    expect(canvas.querySelector('.page-header__title')?.textContent).toBe('Classes');
     expect(canvas.querySelector('[data-create-trigger]')?.textContent).toMatch(/class/i);
     expect(canvas.textContent).toContain('12ENGADV1');
     expect(canvas.textContent).toContain('2026');
@@ -195,6 +195,10 @@ describe('classes section', () => {
     expect(canvas.querySelector('.entity-banner__title')?.textContent).toBe('12ENGADV1');
     expect(canvas.querySelector('.entity-banner__eyebrow')?.textContent).toBe(
       'Year 12 · English Advanced'
+    );
+    expect(canvas.querySelector('.page-header__eyebrow')?.textContent).toBe('Classes');
+    expect(canvas.querySelector('.page-header__title')?.textContent).toBe(
+      'Year 12 English Advanced'
     );
     // Class code once in the banner title — not repeated as a separate page heading.
     const codeMatches = canvas.textContent?.match(/12ENGADV1/g) ?? [];

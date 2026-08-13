@@ -4,6 +4,7 @@ import { isHttpUrl } from '@/blocks/url-safety';
 import { createMedia, patchMedia, uploadMediaFile } from '@/teacher/media-api';
 import { ApiClientError } from '@/api/client';
 import { confirmAndTrash } from '@/teacher/lifecycle-api';
+import { renderPageHeader } from '@/teacher/page-header';
 
 export function openUrlForMedia(media: Media): string | undefined {
   const url = media.preview_url ?? media.download_url;
@@ -38,11 +39,7 @@ export function renderResourcesIndex(
   options?: ResourcesIndexOptions
 ): void {
   canvas.replaceChildren();
-
-  const heading = document.createElement('h1');
-  heading.className = 'home-heading';
-  heading.textContent = 'Resource Library';
-  canvas.append(heading);
+  renderPageHeader(canvas, { eyebrow: 'Library', title: 'Resource Library' });
 
   const status = document.createElement('p');
   status.className = 'resources-status';

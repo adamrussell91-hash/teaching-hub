@@ -4,6 +4,7 @@ import { applyDragDelta } from '@/scope/timeline-drag';
 import { findFirstFreeStart, weeksToLabel } from '@/scope/timeline-weeks';
 import type { CurriculumResponse } from '@/teacher/nav';
 import { patchScopeSequence } from '@/teacher/scope-api';
+import { renderPageHeader } from '@/teacher/page-header';
 
 type DragMode = 'move' | 'resize-start' | 'resize-end';
 
@@ -199,13 +200,10 @@ export function renderScopeTimelineEditor(
   const unitsById = new Map(curriculum.units.map((unit) => [unit.id, unit]));
 
   canvas.replaceChildren();
+  renderPageHeader(canvas, { eyebrow: 'Scope & Sequence', title: subject.title });
 
   const root = document.createElement('div');
   root.className = 'scope-timeline';
-
-  const heading = document.createElement('h1');
-  heading.className = 'home-heading';
-  heading.textContent = subject.title;
 
   const toolbar = document.createElement('div');
   toolbar.className = 'scope-timeline__toolbar';
@@ -622,6 +620,6 @@ export function renderScopeTimelineEditor(
   track.append(weekMarks, itemsLayer);
   main.append(termsRow, track);
   body.append(main, inspector);
-  root.append(heading, toolbar, banner, body);
+  root.append(toolbar, banner, body);
   canvas.append(root);
 }

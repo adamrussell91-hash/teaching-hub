@@ -8,6 +8,7 @@ import {
   type LifecycleEntityType,
   type TrashSummary
 } from '@/teacher/lifecycle-api';
+import { renderPageHeader } from '@/teacher/page-header';
 
 const TYPE_LABELS: Record<LifecycleEntityType, string> = {
   lesson: 'Lesson',
@@ -32,13 +33,10 @@ function formatTrashedAt(value?: string): string {
 
 export function renderTrashSection(canvas: HTMLElement): { dispose: () => void } {
   canvas.replaceChildren();
+  renderPageHeader(canvas, { eyebrow: 'Workspace', title: 'Trash' });
 
   const root = document.createElement('div');
   root.className = 'trash-page';
-
-  const heading = document.createElement('h1');
-  heading.className = 'home-heading';
-  heading.textContent = 'Trash';
 
   const status = document.createElement('p');
   status.className = 'trash-page__status';
@@ -47,7 +45,7 @@ export function renderTrashSection(canvas: HTMLElement): { dispose: () => void }
   const list = document.createElement('div');
   list.className = 'trash-page__list';
 
-  root.append(heading, status, list);
+  root.append(status, list);
   canvas.append(root);
 
   function setStatus(message: string | null, isError = false): void {

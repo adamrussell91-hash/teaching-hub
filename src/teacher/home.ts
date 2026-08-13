@@ -5,6 +5,7 @@ import { mountCreateControl } from '@/teacher/create/control';
 import { openCreateModal } from '@/teacher/create/modal';
 import type { CreateKind } from '@/teacher/create/types';
 import { mountHomeClock } from '@/teacher/home-clock';
+import { renderPageHeader } from '@/teacher/page-header';
 import type { CurriculumLessonSummary, CurriculumResponse } from './nav';
 import {
   selectTodaySchedule,
@@ -24,6 +25,7 @@ export function renderTeacherHome(
   options: TeacherHomeOptions = {}
 ): { dispose: () => void } {
   canvas.replaceChildren();
+  renderPageHeader(canvas, { eyebrow: 'Workspace', title: 'Teaching Dashboard' });
 
   const lessonsById = new Map(curriculum.lessons.map((lesson) => [lesson.id, lesson]));
   const classesById = new Map(curriculum.classes.map((cls) => [cls.id, cls]));
@@ -55,11 +57,7 @@ export function renderTeacherHome(
   clockHost.className = 'home-dashboard__clock';
   disposers.push(mountHomeClock(clockHost));
 
-  const title = document.createElement('h1');
-  title.className = 'home-dashboard__title';
-  title.textContent = 'Teaching Dashboard';
-
-  hero.append(clockHost, title);
+  hero.append(clockHost);
   header.append(hero, createHost);
 
   const createControl = mountCreateControl(createHost, {

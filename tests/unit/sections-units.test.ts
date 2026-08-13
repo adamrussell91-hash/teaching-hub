@@ -95,7 +95,7 @@ describe('units', () => {
 
   it('lists unit title with year and subject meta', () => {
     renderUnitsIndex(canvas, curriculum);
-    expect(canvas.querySelector('.home-heading')?.textContent).toBe('Units');
+    expect(canvas.querySelector('.page-header__title')?.textContent).toBe('Units');
     expect(canvas.querySelector('[data-create-trigger]')?.textContent).toMatch(/unit/i);
     expect(canvas.querySelector('.home-class-tile__title')?.textContent).toBe(
       'Artist of the Floating World'
@@ -115,7 +115,7 @@ describe('units', () => {
 
   it('lists unit lessons in sequence and opens the editor', () => {
     renderUnitStub(canvas, curriculum, 'unit_aotfw');
-    expect(canvas.querySelector('.home-heading')?.textContent).toBe(
+    expect(canvas.querySelector('.page-header__title')?.textContent).toBe(
       'Artist of the Floating World'
     );
     expect(canvas.querySelector('[data-unit-section="plan"]')).toBeTruthy();

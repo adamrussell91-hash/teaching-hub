@@ -3,7 +3,6 @@ import { apiGet, ApiClientError } from '@/api/client';
 import { fetchSession, logout, renderSignIn, type SessionInfo } from '@/auth/gate';
 import {
   renderCanvasStatus,
-  renderContextBar,
   renderRailStatus,
   renderTeacherShell,
   type TeacherShellRefs
@@ -392,7 +391,6 @@ async function loadNavAndHandleErrors(
 
 function renderTeacherHomeRoute(token: number): void {
   const refs = mountTeacherShell();
-  renderContextBar(refs, { title: 'Home' });
   renderRailStatus(refs.railNav, 'Loading curriculum…');
   renderCanvasStatus(refs.canvas, 'Loading home…');
 
@@ -406,7 +404,6 @@ function renderTeacherHomeRoute(token: number): void {
 
 function renderTeacherClassesRoute(token: number): void {
   const refs = mountTeacherShell();
-  renderContextBar(refs, { title: 'Classes' });
   renderRailStatus(refs.railNav, 'Loading curriculum…');
   renderCanvasStatus(refs.canvas, 'Loading…');
 
@@ -429,7 +426,6 @@ function renderTeacherClassesRoute(token: number): void {
 
 function renderTeacherClassRoute(classId: string, token: number): void {
   const refs = mountTeacherShell();
-  renderContextBar(refs, { title: 'Classes' });
   renderRailStatus(refs.railNav, 'Loading curriculum…');
   renderCanvasStatus(refs.canvas, 'Loading…');
 
@@ -443,10 +439,6 @@ function renderTeacherClassRoute(classId: string, token: number): void {
       if (token !== renderToken) return;
       currentCurriculum = curriculum;
       mountTeacherRail(refs, curriculum, 'classes', classId);
-      const cls = curriculum.classes.find((entry) => entry.id === classId);
-      if (cls) {
-        renderContextBar(refs, { title: cls.code || cls.title });
-      }
       teardownClassPage();
       classPageHandle = renderClassPage(refs.canvas, curriculum, classId, classPageOptions);
     } catch (error) {
@@ -478,7 +470,6 @@ function renderTeacherClassRoute(classId: string, token: number): void {
     currentCurriculum = curriculum;
     const cls = curriculum.classes.find((entry) => entry.id === classId);
     if (cls) {
-      renderContextBar(refs, { title: cls.code || cls.title });
       pushRecent({
         type: 'class',
         id: cls.id,
@@ -493,7 +484,6 @@ function renderTeacherClassRoute(classId: string, token: number): void {
 
 function renderTeacherResourcesRoute(token: number): void {
   const refs = mountTeacherShell();
-  renderContextBar(refs, { title: 'Resource Library' });
   renderRailStatus(refs.railNav, 'Loading curriculum…');
   renderCanvasStatus(refs.canvas, 'Loading…');
 
@@ -534,7 +524,6 @@ function renderTeacherResourcesRoute(token: number): void {
 
 function renderTeacherTemplatesRoute(token: number): void {
   const refs = mountTeacherShell();
-  renderContextBar(refs, { title: 'Templates' });
   renderRailStatus(refs.railNav, 'Loading curriculum…');
   renderCanvasStatus(refs.canvas, 'Loading…');
 
@@ -549,7 +538,6 @@ function renderTeacherTemplatesRoute(token: number): void {
 
 function renderTeacherTrashRoute(token: number): void {
   const refs = mountTeacherShell();
-  renderContextBar(refs, { title: 'Trash' });
   renderRailStatus(refs.railNav, 'Loading curriculum…');
   renderCanvasStatus(refs.canvas, 'Loading…');
 
@@ -561,7 +549,6 @@ function renderTeacherTrashRoute(token: number): void {
 
 function renderTeacherScopeSequencesRoute(token: number): void {
   const refs = mountTeacherShell();
-  renderContextBar(refs, { title: 'Scope & Sequences' });
   renderRailStatus(refs.railNav, 'Loading curriculum…');
   renderCanvasStatus(refs.canvas, 'Loading…');
 
@@ -575,7 +562,6 @@ function renderTeacherScopeSequencesRoute(token: number): void {
 
 function renderTeacherScopeSequenceRoute(subjectId: string, token: number): void {
   const refs = mountTeacherShell();
-  renderContextBar(refs, { title: 'Scope & Sequence' });
   renderRailStatus(refs.railNav, 'Loading curriculum…');
   renderCanvasStatus(refs.canvas, 'Loading…');
 
@@ -583,10 +569,6 @@ function renderTeacherScopeSequenceRoute(subjectId: string, token: number): void
     new URLSearchParams(window.location.search).get('selectNote') ?? undefined;
 
   void loadNavAndHandleErrors(refs, token, 'scope-sequences', undefined, (curriculum) => {
-    const subject = curriculum.subjects.find((entry) => entry.id === subjectId);
-    if (subject) {
-      renderContextBar(refs, { title: subject.title });
-    }
     renderScopeTimelineEditor(refs.canvas, curriculum, subjectId, {
       selectedNoteId
     });
@@ -595,7 +577,6 @@ function renderTeacherScopeSequenceRoute(subjectId: string, token: number): void
 
 function renderTeacherUnitsRoute(token: number): void {
   const refs = mountTeacherShell();
-  renderContextBar(refs, { title: 'Units' });
   renderRailStatus(refs.railNav, 'Loading curriculum…');
   renderCanvasStatus(refs.canvas, 'Loading…');
 
@@ -618,7 +599,6 @@ function renderTeacherUnitsRoute(token: number): void {
 
 function renderTeacherUnitRoute(unitId: string, token: number): void {
   const refs = mountTeacherShell();
-  renderContextBar(refs, { title: 'Units' });
   renderRailStatus(refs.railNav, 'Loading curriculum…');
   renderCanvasStatus(refs.canvas, 'Loading…');
 
@@ -627,10 +607,6 @@ function renderTeacherUnitRoute(unitId: string, token: number): void {
     try {
       const curriculum = await getCurriculum();
       if (token !== renderToken) return;
-      const unit = curriculum.units.find((entry) => entry.id === unitId);
-      if (unit) {
-        renderContextBar(refs, { title: unit.title });
-      }
       teardownUnitPage();
       unitPageHandle = renderUnitPage(refs.canvas, curriculum, unitId, {
         onMutated: refreshUnit
@@ -650,7 +626,6 @@ function renderTeacherUnitRoute(unitId: string, token: number): void {
   void loadNavAndHandleErrors(refs, token, 'units', undefined, (curriculum) => {
     const unit = curriculum.units.find((entry) => entry.id === unitId);
     if (unit) {
-      renderContextBar(refs, { title: unit.title });
       pushRecent({
         type: 'unit',
         id: unit.id,
@@ -667,7 +642,6 @@ function renderTeacherUnitRoute(unitId: string, token: number): void {
 
 function renderTeacherLessonsRoute(token: number): void {
   const refs = mountTeacherShell();
-  renderContextBar(refs, { title: 'Lessons' });
   renderRailStatus(refs.railNav, 'Loading curriculum…');
   renderCanvasStatus(refs.canvas, 'Loading…');
 

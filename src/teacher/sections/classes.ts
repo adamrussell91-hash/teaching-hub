@@ -29,6 +29,7 @@ import {
   entityPath
 } from '@/teacher/lifecycle-api';
 import { renderUnitSequence } from '@/teacher/unit-sequence';
+import { renderPageHeader } from '@/teacher/page-header';
 
 export interface ClassesIndexOptions {
   onCreated?: (kind: CreateKind, id: string) => void | Promise<void>;
@@ -49,18 +50,11 @@ export function renderClassesIndex(
 
   const disposers: Array<() => void> = [];
 
-  const header = document.createElement('header');
-  header.className = 'classes-index__header';
-
-  const heading = document.createElement('h1');
-  heading.className = 'home-heading';
-  heading.textContent = 'Classes';
-
   const createHost = document.createElement('div');
   createHost.className = 'classes-index__create create-control';
   createHost.dataset.createHost = '';
 
-  header.append(heading, createHost);
+  renderPageHeader(canvas, { eyebrow: 'Workspace', title: 'Classes', actions: [createHost] });
 
   const createControl = mountCreateControl(createHost, {
     context: 'classes',
@@ -166,7 +160,7 @@ export function renderClassesIndex(
     }
   }
 
-  canvas.append(header, grid);
+  canvas.append(grid);
 
   return {
     dispose: () => {
@@ -187,6 +181,7 @@ export function renderClassPage(
 
   const cls = curriculum.classes.find((entry) => entry.id === classId);
   if (!cls) {
+    renderPageHeader(canvas, { eyebrow: 'Classes', title: 'Class not found' });
     const status = document.createElement('p');
     status.className = 'teacher-layout__canvas-status';
     status.textContent = 'Class not found.';
@@ -194,6 +189,11 @@ export function renderClassPage(
     return { dispose: () => undefined };
   }
   const pageClass: Class = cls;
+
+  renderPageHeader(canvas, {
+    eyebrow: 'Classes',
+    title: pageClass.title || pageClass.code
+  });
 
   const yearsById = new Map(curriculum.years.map((year) => [year.id, year]));
   const subjectsById = new Map(curriculum.subjects.map((subject) => [subject.id, subject]));

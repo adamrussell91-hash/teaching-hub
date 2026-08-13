@@ -28,4 +28,9 @@ describe('teacher shell', () => {
       expect(onLogout).toHaveBeenCalledTimes(1);
     });
   });
+
+  it('hides the context bar when it has no children', () => {
+    const refs = renderTeacherShell(root);
+    expect(refs.contextBar.hidden).toBe(true);
+  });
 });

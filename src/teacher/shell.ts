@@ -65,6 +65,7 @@ export function renderTeacherShell(
 
   const contextBar = document.createElement('div');
   contextBar.className = 'teacher-layout__context-bar';
+  contextBar.hidden = true;
 
   const canvas = document.createElement('div');
   canvas.className = 'teacher-layout__canvas';
@@ -87,6 +88,7 @@ export interface ContextBarConfig {
  * save/publish controls locate the slot via `[data-save-slot]`.
  */
 export function renderContextBar(refs: TeacherShellRefs, config: ContextBarConfig): void {
+  refs.contextBar.hidden = false;
   refs.contextBar.replaceChildren();
 
   const title = document.createElement('h1');

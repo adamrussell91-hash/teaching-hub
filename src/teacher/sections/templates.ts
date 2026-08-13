@@ -10,6 +10,7 @@ import {
 import type { LessonTemplateSummary, UnitTemplateSummary } from '@/schemas';
 import { navigate } from '@/app/router';
 import { confirmAndTrash, entityPath, patchStatus } from '@/teacher/lifecycle-api';
+import { renderPageHeader } from '@/teacher/page-header';
 
 type Tab = 'lessons' | 'units';
 
@@ -59,12 +60,7 @@ export function renderTemplatesPage(
   const root = document.createElement('div');
   root.className = 'templates-page';
 
-  const header = document.createElement('header');
-  header.className = 'templates-page__header';
-  const heading = document.createElement('h1');
-  heading.className = 'home-heading';
-  heading.textContent = 'Templates';
-  header.append(heading);
+  renderPageHeader(canvas, { eyebrow: 'Workspace', title: 'Templates' });
 
   const tabs = document.createElement('div');
   tabs.className = 'templates-page__tabs';
@@ -87,7 +83,7 @@ export function renderTemplatesPage(
   list.className = 'templates-page__list';
 
   tabs.append(lessonTab, unitTab);
-  root.append(header, tabs, status, list);
+  root.append(tabs, status, list);
   canvas.append(root);
 
   function setStatus(message: string): void {

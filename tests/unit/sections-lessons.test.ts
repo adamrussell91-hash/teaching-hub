@@ -56,7 +56,7 @@ describe('lessons index', () => {
 
   it('lists lessons and opens the editor', () => {
     renderLessonsIndex(canvas, curriculum);
-    expect(canvas.querySelector('.home-heading')?.textContent).toBe('Lessons');
+    expect(canvas.querySelector('.page-header__title')?.textContent).toBe('Lessons');
     expect(canvas.querySelector('[data-create-trigger]')?.textContent).toMatch(/lesson/i);
     expect(canvas.querySelector('.lesson-list__title')?.textContent).toBe('Introduction');
     canvas.querySelector<HTMLAnchorElement>('.lesson-list__open')!.dispatchEvent(

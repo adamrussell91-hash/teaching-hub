@@ -109,7 +109,7 @@ describe('resources section', () => {
   it('lists active media titles sorted and Open when URL present', () => {
     renderResourcesIndex(canvas, curriculum);
 
-    expect(canvas.querySelector('.home-heading')?.textContent).toBe('Resource Library');
+    expect(canvas.querySelector('.page-header__title')?.textContent).toBe('Resource Library');
 
     const titles = [...canvas.querySelectorAll('.lesson-list__title')].map(
       (node) => node.textContent

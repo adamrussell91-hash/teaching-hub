@@ -127,7 +127,7 @@ describe('scope & sequences', () => {
   it('renders overall timeline with subject rows and clickable unit bars', () => {
     renderScopeSequencesIndex(canvas, curriculum);
     expect(canvas.querySelector('.scope-overview')).not.toBeNull();
-    expect(canvas.querySelector('.home-heading')?.textContent).toMatch(/Overall Scope/i);
+    expect(canvas.querySelector('.page-header__title')?.textContent).toMatch(/Overall Scope/i);
 
     const rows = canvas.querySelectorAll('.scope-overview__row');
     expect(rows).toHaveLength(1);
@@ -163,7 +163,7 @@ describe('scope & sequences', () => {
 
   it('renders the timeline editor for a known subject with a scope', () => {
     renderScopeTimelineEditor(canvas, curriculum, 'subject_y12_engadv');
-    expect(canvas.querySelector('.home-heading')?.textContent).toBe('English Advanced');
+    expect(canvas.querySelector('.page-header__title')?.textContent).toBe('English Advanced');
     expect(canvas.querySelector('.scope-timeline')).toBeTruthy();
     expect(canvas.textContent).not.toMatch(/coming next/i);
   });

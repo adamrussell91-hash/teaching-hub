@@ -24,6 +24,7 @@ import {
 import type { Unit } from '@/schemas';
 import { patchUnit } from '@/teacher/unit-api';
 import { ApiClientError } from '@/api/client';
+import { renderPageHeader } from '@/teacher/page-header';
 export interface UnitsIndexOptions {
   onCreated?: (kind: CreateKind, id: string) => void | Promise<void>;
   onMutated?: () => void | Promise<void>;
@@ -42,18 +43,11 @@ export function renderUnitsIndex(
 
   const disposers: Array<() => void> = [];
 
-  const header = document.createElement('header');
-  header.className = 'units-index__header';
-
-  const heading = document.createElement('h1');
-  heading.className = 'home-heading';
-  heading.textContent = 'Units';
-
   const createHost = document.createElement('div');
   createHost.className = 'units-index__create create-control';
   createHost.dataset.createHost = '';
 
-  header.append(heading, createHost);
+  renderPageHeader(canvas, { eyebrow: 'Workspace', title: 'Units', actions: [createHost] });
 
   const createControl = mountCreateControl(createHost, {
     context: 'units',
@@ -61,8 +55,6 @@ export function renderUnitsIndex(
     onCreated: options.onCreated ?? (() => undefined)
   });
   disposers.push(createControl.dispose);
-
-  canvas.append(header);
 
   const yearsById = new Map(curriculum.years.map((year) => [year.id, year]));
   const subjectsById = new Map(curriculum.subjects.map((subject) => [subject.id, subject]));
@@ -192,12 +184,16 @@ export function renderUnitPage(
   const unit = curriculum.units.find((entry) => entry.id === unitId);
 
   if (!unit) {
+    renderPageHeader(canvas, { eyebrow: 'Units', title: 'Unit not found' });
     const status = document.createElement('p');
     status.className = 'teacher-layout__canvas-status';
     status.textContent = 'Unit not found.';
     canvas.append(status);
     return { dispose: () => undefined };
   }
+
+  const pageHeader = renderPageHeader(canvas, { eyebrow: 'Units', title: unit.title });
+  const heading = pageHeader.querySelector('.page-header__title');
 
   const root = document.createElement('div');
   root.className = 'unit-page';
@@ -217,11 +213,7 @@ export function renderUnitPage(
     }
   });
 
-  const heading = document.createElement('h1');
-  heading.className = 'home-heading';
-  heading.textContent = unit.title;
-
-  header.append(coverHost, heading);
+  header.append(coverHost);
 
   const planSection = document.createElement('section');
   planSection.className = 'unit-page__plan glass-panel';
@@ -293,7 +285,7 @@ export function renderUnitPage(
     onRestored: (live) => {
       const restored = live as Unit;
       Object.assign(unit, restored);
-      heading.textContent = unit.title;
+      if (heading) heading.textContent = unit.title;
     }
   });
 
