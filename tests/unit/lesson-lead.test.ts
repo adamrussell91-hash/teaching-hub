@@ -25,4 +25,13 @@ describe('firstLeadFromBlocks', () => {
       firstLeadFromBlocks([{ block_type: 'rich_text', content: { html: '<p>  </p>' } }])
     ).toBeNull();
   });
+
+  it('skips non-lead blocks until the first rich_text or heading', () => {
+    expect(
+      firstLeadFromBlocks([
+        { block_type: 'callout', content: { style: 'information', body: 'note' } },
+        { block_type: 'rich_text', content: { html: '<p>Lead</p>' } }
+      ])
+    ).toBe('Lead');
+  });
 });
