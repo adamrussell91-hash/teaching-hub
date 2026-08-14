@@ -6,9 +6,8 @@ import {
   type AgentSlug
 } from '@/ai/agents';
 import { actionsForScope } from '@/ai/capabilities';
-import { streamAiChat } from '@/ai/client';
-import type { AiProposal } from '@/ai/proposals';
-import type { AiScope } from '@/ai/proposals';
+import { streamAiChat, type ArchiveCitation } from '@/ai/client';
+import type { AiProposal, AiScope } from '@/ai/proposals';
 import type { Block } from '@/schemas/block';
 
 export interface AiPanelHandle {
@@ -32,6 +31,8 @@ interface ChatMessage {
   text: string;
   proposal?: AiProposal;
   proposalStatus?: 'pending' | 'accepted' | 'rejected';
+  citations?: ArchiveCitation[];
+  archiveFailed?: boolean;
 }
 
 function transcriptKey(lessonId: string): string {
@@ -209,6 +210,22 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
       bubble.textContent = msg.text;
       row.append(bubble);
 
+      if (msg.archiveFailed) {
+        const fail = document.createElement('p');
+        fail.className = 'ai-panel__citations';
+        fail.textContent = 'Archive pull failed — she is working from the lesson only.';
+        row.append(fail);
+      } else if (msg.citations?.length) {
+        const list = document.createElement('ul');
+        list.className = 'ai-panel__citations';
+        for (const citation of msg.citations) {
+          const item = document.createElement('li');
+          item.textContent = `${citation.title} (${citation.stance})`;
+          list.append(item);
+        }
+        row.append(list);
+      }
+
       if (msg.proposal && msg.proposal.kind !== 'review_only') {
         const card = document.createElement('div');
         card.className = 'ai-panel__proposal';
@@ -331,6 +348,10 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
           if (!assistant) return;
           if (event.type === 'text') {
             assistant.text += event.text;
+            renderThread();
+          } else if (event.type === 'research') {
+            assistant.citations = event.findings;
+            assistant.archiveFailed = event.archiveFailed;
             renderThread();
           } else if (event.type === 'proposal') {
             if (event.proposal.kind === 'review_only') {

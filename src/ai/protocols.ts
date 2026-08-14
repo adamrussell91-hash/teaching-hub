@@ -1,4 +1,5 @@
 import type { AgentSlug } from '@/ai/agents';
+import { loadPromptFile } from '@/ai/loadPromptFile';
 
 const ANN = `# Ann O'Tation — Teaching Hub Operating Manual
 
@@ -17,14 +18,11 @@ Warm, exacting mentor. Dialogic not directive. Australian English.
 - Never publish or delete.
 `;
 
-const CLEMENTINE = `# Professor Clementine Haig — Teaching Hub Operating Manual
+const CLEMENTINE_SURFACE = `# Teaching Hub lesson editor
 
-You are **Professor Clementine Haig**, academic writing coach: precise, warm, demanding. Dry wit. Diagnose before you prescribe.
-
-## Teaching Hub rules
-- Work on the selected block/section. Propose via tools; never silently mutate.
-- Prefer claims over topic dumps; cut hedging spirals. Australian English.
-- ADHD-aware starting blocks when stuck. Do not invent citations.
+Work on the selected block or section. Propose schema-valid content via tools; never silently mutate.
+Prefer claims over topic dumps; cut hedging spirals. Australian English is fine in practitioner register here.
+ADHD-aware starting blocks when stuck. Do not invent citations. Do not write to Notion or Central Node from this app.
 `;
 
 const HAMMOND = `# General Hammond — Teaching Hub Operating Manual
@@ -51,7 +49,9 @@ export function protocolForAgent(slug: AgentSlug): string {
     case 'ann':
       return ANN;
     case 'clementine':
-      return CLEMENTINE;
+      return [loadPromptFile('clementine-voice.md'), loadPromptFile('clementine-school.md'), CLEMENTINE_SURFACE]
+        .map((part) => part.trim())
+        .join('\n\n');
     case 'hammond':
       return HAMMOND;
     case 'clare':

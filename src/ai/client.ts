@@ -3,10 +3,18 @@ import type { AiProposal } from '@/ai/proposals';
 import type { AgentSlug } from '@/ai/agents';
 import type { AiScope } from '@/ai/proposals';
 
+export type ArchiveCitation = {
+  pageId: string;
+  title: string;
+  excerpt: string;
+  stance: string;
+};
+
 export type AiStreamEvent =
   | { type: 'status'; text: string }
   | { type: 'text'; text: string }
   | { type: 'proposal'; proposal: AiProposal }
+  | { type: 'research'; findings: ArchiveCitation[]; archiveFailed?: boolean }
   | { type: 'tool_error'; name: string; error: string }
   | { type: 'error'; code: string; message: string; retryable?: boolean }
   | { type: 'done' };

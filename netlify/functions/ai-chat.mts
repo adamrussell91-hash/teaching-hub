@@ -1,5 +1,6 @@
 import { findBlockById } from '../../src/blocks/find-block.ts';
 import { agentBySlug } from '../../src/ai/agents.ts';
+import { pullArchive } from '../../src/ai/archiveKernel.ts';
 import { buildAiSystemPrompt } from '../../src/ai/context.ts';
 import { protocolForAgent } from '../../src/ai/protocols.ts';
 import { AI_TOOLS, AiChatRequestSchema, parseToolProposal } from '../../src/ai/proposals.ts';
@@ -89,9 +90,25 @@ export default async function handler(request: Request): Promise<Response> {
     );
   }
 
+  let protocol = protocolForAgent(body.agent);
+  let archiveFindings: Array<{ pageId: string; title: string; excerpt: string; stance: string }> = [];
+  let archiveFailed = false;
+  const kernelSecret = env.RESEARCH_KERNEL_SHARED_SECRET;
+  if (body.agent === 'clementine' && kernelSecret) {
+    const archive = await pullArchive({
+      query: body.message,
+      documentContext: `${lesson.title}\n${body.message}`,
+      url: env.RESEARCH_KERNEL_URL,
+      secret: kernelSecret
+    });
+    archiveFailed = Boolean(archive.archiveFailed);
+    archiveFindings = archive.findings;
+    protocol = `${protocol}\n\n${archive.note}`;
+  }
+
   const system = buildAiSystemPrompt({
     agentName: agent.name,
-    protocol: protocolForAgent(body.agent),
+    protocol,
     lesson,
     scope: body.scope,
     selectedBlockId: body.selected_block_id,
@@ -116,6 +133,13 @@ export default async function handler(request: Request): Promise<Response> {
 
       try {
         send({ type: 'status', text: 'Thinking…' });
+        if (body.agent === 'clementine' && (archiveFindings.length || archiveFailed)) {
+          send({
+            type: 'research',
+            findings: archiveFindings,
+            archiveFailed
+          });
+        }
         for await (const event of streamer.streamMessage({
           system,
           messages: [...history, { role: 'user', content: body.message }],
