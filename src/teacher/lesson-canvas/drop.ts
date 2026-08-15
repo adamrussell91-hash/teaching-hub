@@ -1,3 +1,4 @@
+import { isLinkedSection } from '@/blocks/composition-link';
 import {
   COLUMN_CHILD_TYPES,
   NEW_BLOCK_TYPES,
@@ -7,6 +8,8 @@ import {
 } from '@/blocks/create-block';
 import { findBlockById } from '@/blocks/find-block';
 import type { Block } from '@/schemas/block';
+
+const LINKED_SECTION_MESSAGE = 'Linked sections cannot contain blocks.';
 
 export type DropParent =
   | { kind: 'root' }
@@ -43,6 +46,12 @@ function rejectReason(parent: DropParent, type: NewBlockType): string {
 
 export function insertTypeForParent(parent: DropParent, type: NewBlockType): string | null {
   return allowedTypesFor(parent).includes(type) ? null : rejectReason(parent, type);
+}
+
+function linkedSectionWriteError(blocks: Block[], parent: DropParent): string | null {
+  if (parent.kind !== 'section') return null;
+  const target = findBlockById(blocks, parent.id);
+  return target && isLinkedSection(target) ? LINKED_SECTION_MESSAGE : null;
 }
 
 function sameParent(a: DropParent, b: DropParent): boolean {
@@ -188,6 +197,8 @@ export function insertAt(
   index: number,
   block: Block
 ): DropResult {
+  const linked = linkedSectionWriteError(blocks, parent);
+  if (linked) return { ok: false, message: linked };
   const reason = insertTypeForParent(parent, block.block_type as NewBlockType);
   if (reason) return { ok: false, message: reason };
   const next = updateListAtParent(blocks, parent, (list) => {
@@ -251,6 +262,8 @@ export function moveBlockTo(
   const location = findBlockLocation(blocks, blockId);
   const moving = findBlockById(blocks, blockId);
   if (!location || !moving) return { ok: false, message: 'Block not found.' };
+  const linked = linkedSectionWriteError(blocks, parent);
+  if (linked) return { ok: false, message: linked };
   const reason = insertTypeForParent(parent, moving.block_type as NewBlockType);
   if (reason) return { ok: false, message: reason };
 
@@ -267,6 +280,8 @@ export function reorderSiblings(
   parent: DropParent,
   orderedIds: string[]
 ): DropResult {
+  const linked = linkedSectionWriteError(blocks, parent);
+  if (linked) return { ok: false, message: linked };
   let message: string | null = null;
   const next = updateListAtParent(blocks, parent, (list) => {
     if (orderedIds.length !== list.length) {

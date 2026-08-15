@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createLinkedSectionStub } from '@/blocks/composition-link';
 import { createBlock } from '@/blocks/create-block';
 import type { Block } from '@/schemas/block';
 import {
@@ -18,6 +19,16 @@ function asSection(block: Block): Extract<Block, { block_type: 'section' }> {
 function asColumns(block: Block): Extract<Block, { block_type: 'columns' }> {
   if (block.block_type !== 'columns') throw new Error('expected columns');
   return block;
+}
+
+function asTabs(block: Block): Extract<Block, { block_type: 'tabs' }> {
+  if (block.block_type !== 'tabs') throw new Error('expected tabs');
+  return block;
+}
+
+function withSectionChildren(section: Block, children: Block[]): Block {
+  const s = asSection(section);
+  return { ...s, content: { ...s.content, blocks: children } };
 }
 
 describe('insertTypeForParent', () => {
@@ -66,6 +77,60 @@ describe('insertAt', () => {
     if (result.ok) return;
     expect(result.message).toBe(insertTypeForParent({ kind: 'root' }, 'collection'));
   });
+
+  it('inserts a heading into a section', () => {
+    const section = createBlock('section', 'sec1');
+    const heading = createBlock('heading', 'h1');
+    const result = insertAt([section], { kind: 'section', id: 'sec1' }, 0, heading);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(asSection(result.blocks[0]!).content.blocks.map((b) => b.id)).toEqual(['h1']);
+  });
+
+  it('inserts into a specific columnIndex', () => {
+    const cols = createBlock('columns', 'cols1');
+    const heading = createBlock('heading', 'h1');
+    const result = insertAt([cols], { kind: 'column', id: 'cols1', columnIndex: 1 }, 0, heading);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const columns = asColumns(result.blocks[0]!).content.columns;
+    expect(columns[0]!.blocks).toHaveLength(0);
+    expect(columns[1]!.blocks.map((b) => b.id)).toEqual(['h1']);
+  });
+
+  it('inserts into a specific tabIndex', () => {
+    const tabs = createBlock('tabs', 'tabs1');
+    const heading = createBlock('heading', 'h1');
+    const result = insertAt([tabs], { kind: 'tab', id: 'tabs1', tabIndex: 2 }, 0, heading);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const panels = asTabs(result.blocks[0]!).content.tabs;
+    expect(panels[0]!.blocks).toHaveLength(0);
+    expect(panels[1]!.blocks).toHaveLength(0);
+    expect(panels[2]!.blocks.map((b) => b.id)).toEqual(['h1']);
+  });
+
+  it('returns ok: false and does not mutate when the parent is missing', () => {
+    const blocks = [createBlock('heading', 'h1')];
+    const snapshot = structuredClone(blocks);
+    const result = insertAt(blocks, { kind: 'section', id: 'missing' }, 0, createBlock('rich_text', 'rt1'));
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.message.length).toBeGreaterThan(0);
+    expect(blocks).toEqual(snapshot);
+  });
+
+  it('returns ok: false and does not mutate when columnIndex is out of range', () => {
+    const cols = createBlock('columns', 'cols1');
+    const blocks = [cols];
+    const snapshot = structuredClone(blocks);
+    const result = insertAt(blocks, { kind: 'column', id: 'cols1', columnIndex: 9 }, 0, createBlock('heading', 'h1'));
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.message.length).toBeGreaterThan(0);
+    expect(blocks).toEqual(snapshot);
+    expect(asColumns(blocks[0]!).content.columns.every((col) => col.blocks.length === 0)).toBe(true);
+  });
 });
 
 describe('moveBlockTo', () => {
@@ -92,6 +157,16 @@ describe('moveBlockTo', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.blocks.map((b) => b.id)).toEqual(['rt1', 'h1', 'c1']);
+  });
+
+  it('moves a block from root into a column', () => {
+    const cols = createBlock('columns', 'cols1');
+    const rich = createBlock('rich_text', 'rt1');
+    const result = moveBlockTo([cols, rich], 'rt1', { kind: 'column', id: 'cols1', columnIndex: 0 }, 0);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.blocks.map((b) => b.id)).toEqual(['cols1']);
+    expect(asColumns(result.blocks[0]!).content.columns[0]!.blocks.map((b) => b.id)).toEqual(['rt1']);
   });
 });
 
@@ -141,5 +216,77 @@ describe('reorderSiblings', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.blocks.map((b) => b.id)).toEqual(['c1', 'h1', 'rt1']);
+  });
+
+  it('reorders section children', () => {
+    const tree = [
+      withSectionChildren(createBlock('section', 'sec1'), [
+        createBlock('heading', 'h1'),
+        createBlock('rich_text', 'rt1')
+      ])
+    ];
+    const result = reorderSiblings(tree, { kind: 'section', id: 'sec1' }, ['rt1', 'h1']);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(asSection(result.blocks[0]!).content.blocks.map((b) => b.id)).toEqual(['rt1', 'h1']);
+  });
+});
+
+describe('linked section writes', () => {
+  const linkedMessage = 'Linked sections cannot contain blocks.';
+
+  function linkedTree(): Block[] {
+    return [
+      createLinkedSectionStub({
+        id: 'sec_linked',
+        sourceCompositionId: 'comp_1',
+        titleHint: 'Hook'
+      })
+    ];
+  }
+
+  it('refuses insertAt into a linked section and does not mutate', () => {
+    const blocks = linkedTree();
+    const snapshot = structuredClone(blocks);
+    const result = insertAt(blocks, { kind: 'section', id: 'sec_linked' }, 0, createBlock('heading', 'h1'));
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.message).toBe(linkedMessage);
+    expect(blocks).toEqual(snapshot);
+    expect(asSection(blocks[0]!).content.blocks).toEqual([]);
+  });
+
+  it('refuses moveBlockTo into a linked section and does not mutate', () => {
+    const linked = createLinkedSectionStub({
+      id: 'sec_linked',
+      sourceCompositionId: 'comp_1',
+      titleHint: 'Hook'
+    });
+    const rich = createBlock('rich_text', 'rt1');
+    const blocks = [linked, rich];
+    const snapshot = structuredClone(blocks);
+    const result = moveBlockTo(blocks, 'rt1', { kind: 'section', id: 'sec_linked' }, 0);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.message).toBe(linkedMessage);
+    expect(blocks).toEqual(snapshot);
+    expect(blocks.map((b) => b.id)).toEqual(['sec_linked', 'rt1']);
+  });
+
+  it('refuses reorderSiblings on a linked section and does not mutate', () => {
+    const linked = createLinkedSectionStub({
+      id: 'sec_linked',
+      sourceCompositionId: 'comp_1',
+      titleHint: 'Hook'
+    });
+    const tree = [
+      withSectionChildren(linked, [createBlock('heading', 'h1'), createBlock('rich_text', 'rt1')])
+    ];
+    const snapshot = structuredClone(tree);
+    const result = reorderSiblings(tree, { kind: 'section', id: 'sec_linked' }, ['rt1', 'h1']);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.message).toBe(linkedMessage);
+    expect(tree).toEqual(snapshot);
   });
 });
