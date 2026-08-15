@@ -1,11 +1,14 @@
+import { pullArchive, type ArchivePull } from '../../src/ai/archiveKernel.ts';
 import type { Lesson } from '../../src/schemas/lesson.ts';
 import {
   AiJobCreateSchema,
   appendTranscriptTurns,
+  buildKernelJobPayload,
   fixtureReplaceLessonProposal,
   proposalFromKernelPayload,
   type AiJob,
-  type AiTranscriptTurn
+  type AiTranscriptTurn,
+  type KernelJobPayload
 } from '../../src/ai/jobs.ts';
 import { newId } from './_shared/create-helpers.mts';
 import {
@@ -61,9 +64,7 @@ async function persistCompletedJob(
 async function tryKernelProposal(input: {
   url?: string;
   secret?: string;
-  query: string;
-  lesson: Lesson;
-  transcript: AiTranscriptTurn[];
+  body: KernelJobPayload;
 }): Promise<{ proposal?: ReturnType<typeof fixtureReplaceLessonProposal>; missing: boolean }> {
   const secret = input.secret;
   if (!secret) return { missing: true };
@@ -76,11 +77,7 @@ async function tryKernelProposal(input: {
         'User-Agent': 'TeachingHub/1.0',
         'x-research-kernel-secret': secret
       },
-      body: JSON.stringify({
-        query: input.query,
-        lesson: input.lesson,
-        transcript: input.transcript
-      })
+      body: JSON.stringify(input.body)
     });
     if (response.status === 404) return { missing: true };
     if (!response.ok) return { missing: true };
@@ -150,12 +147,27 @@ export default async function handler(request: Request): Promise<Response> {
   // When RESEARCH_KERNEL_URL/secret is unset or /lesson_proposal is missing,
   // store a schema-valid replace_lesson fixture so local/dev/tests never call Anthropic.
   const transcript = await loadTranscript(store, body.lesson_id, body.agent);
+  const kernelSecret = env.RESEARCH_KERNEL_SHARED_SECRET;
+  let archive: ArchivePull | undefined;
+  if (kernelSecret) {
+    archive = await pullArchive({
+      query: body.message,
+      documentContext: `${lesson.title}\n${body.message}`,
+      url: env.RESEARCH_KERNEL_URL,
+      secret: kernelSecret
+    });
+  }
+  if (archive?.archiveFailed) job.archiveFailed = true;
+
   const kernel = await tryKernelProposal({
     url: env.RESEARCH_KERNEL_URL,
-    secret: env.RESEARCH_KERNEL_SHARED_SECRET,
-    query: body.message,
-    lesson,
-    transcript
+    secret: kernelSecret,
+    body: buildKernelJobPayload({
+      query: body.message,
+      lesson,
+      transcript,
+      archive
+    })
   });
   const proposal = kernel.proposal ?? fixtureReplaceLessonProposal();
   await persistCompletedJob(store, job, proposal);
