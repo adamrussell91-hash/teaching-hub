@@ -125,7 +125,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     let blockCounter = lesson.blocks.length;
     let mediaList: Media[] = media;
     let selectedBlockId: string | null = null;
-    let pendingCompositionId: string | null = null;
+    let draftAt = lesson.updated_at;
 
     renderContextBar(refs, { title: lesson.title || 'Untitled lesson' });
     refs.canvas.replaceChildren();
@@ -156,15 +156,11 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
 
     const pageHost = document.createElement('div');
 
-    const compositionConfirm = document.createElement('div');
-    compositionConfirm.className = 'lesson-editor__insert-composition-confirm';
-    compositionConfirm.hidden = true;
-
     const compositionStatus = document.createElement('p');
     compositionStatus.className = 'lesson-editor__composition-status';
     compositionStatus.hidden = true;
 
-    pageCol.append(publishPanel, pageHost, compositionConfirm, compositionStatus);
+    pageCol.append(publishPanel, pageHost, compositionStatus);
     chatCol.append(chatStrip, aiHost);
     builder.append(railHost, pageCol, chatCol);
     refs.canvas.append(builder);
@@ -184,7 +180,13 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       }
     }
 
+    function bumpDraftClock(): void {
+      const now = new Date().toISOString();
+      draftAt = now > draftAt ? now : new Date(Date.parse(draftAt) + 1).toISOString();
+    }
+
     function markDirty(): void {
+      bumpDraftClock();
       saveController?.notifyChange();
     }
 
@@ -233,41 +235,6 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       }
       compositionStatus.hidden = false;
       compositionStatus.textContent = text;
-    }
-
-    function hideCompositionConfirm(): void {
-      pendingCompositionId = null;
-      compositionConfirm.hidden = true;
-      compositionConfirm.replaceChildren();
-    }
-
-    function showCompositionConfirm(compositionId: string): void {
-      pendingCompositionId = compositionId;
-      compositionConfirm.hidden = false;
-      compositionConfirm.replaceChildren();
-
-      const copyButton = document.createElement('button');
-      copyButton.type = 'button';
-      copyButton.className = 'btn btn--secondary lesson-editor__insert-composition-copy';
-      copyButton.textContent = 'Copy';
-
-      const linkedButton = document.createElement('button');
-      linkedButton.type = 'button';
-      linkedButton.className = 'btn btn--secondary lesson-editor__insert-composition-linked';
-      linkedButton.textContent = 'Linked';
-
-      copyButton.addEventListener('click', () => {
-        const id = pendingCompositionId;
-        hideCompositionConfirm();
-        if (id) void insertSelectedComposition(id);
-      });
-      linkedButton.addEventListener('click', () => {
-        const id = pendingCompositionId;
-        hideCompositionConfirm();
-        if (id) void insertLinkedComposition(id);
-      });
-
-      compositionConfirm.append(copyButton, linkedButton);
     }
 
     function queueCompositionFetch(compositionId: string): void {
@@ -434,10 +401,10 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
 
     function onPaletteInsert(payload: PaletteInsertPayload): void {
       if (payload.kind === 'composition') {
-        showCompositionConfirm(payload.id);
+        palette?.showCompositionConfirm(payload.id);
         return;
       }
-      hideCompositionConfirm();
+      palette?.hideCompositionConfirm();
       const block = createFromInsertMenu(payload.type, nextId());
       const result = insertAt(lesson.blocks, { kind: 'root' }, lesson.blocks.length, block);
       if (!result.ok) {
@@ -450,6 +417,10 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     palette = mountLessonPalette(railHost, {
       families: lessonPaletteFamilies([]),
       onInsert: onPaletteInsert,
+      onCompositionChoice: (id, mode) => {
+        if (mode === 'copy') void insertSelectedComposition(id);
+        else void insertLinkedComposition(id);
+      },
       onShelved: (shelved) => {
         builder.classList.toggle('lesson-builder--rail-shelved', shelved);
       }
@@ -486,7 +457,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
 
     aiPanel = mountAiPanel(aiHost, {
       lessonId,
-      getSnapshotAt: () => lesson.updated_at,
+      getSnapshotAt: () => draftAt,
       onAcceptProposal: (proposal: AiProposal) => {
         const result = applyProposalToLesson(lesson, proposal, nextId);
         if (!result.ok) return result;

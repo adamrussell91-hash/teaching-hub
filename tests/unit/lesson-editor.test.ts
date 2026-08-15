@@ -14,9 +14,14 @@ vi.mock('@/api/client', async () => {
   };
 });
 
+vi.mock('@/ai/client', () => ({ streamAiChat: vi.fn() }));
+
+import { streamAiChat } from '@/ai/client';
 import { apiGet, apiPut, apiPost, apiPatch, ApiClientError } from '@/api/client';
 import { mountLessonEditor, type LessonEditorHandle } from '@/teacher/lesson-editor';
 import { renderTeacherShell } from '@/teacher/shell';
+
+const streamAiChatMock = vi.mocked(streamAiChat);
 
 const apiGetMock = apiGet as unknown as ReturnType<typeof vi.fn>;
 const apiPutMock = apiPut as unknown as ReturnType<typeof vi.fn>;
@@ -185,6 +190,8 @@ describe('mountLessonEditor', () => {
     apiPutMock.mockReset();
     apiPostMock.mockReset();
     apiPatchMock.mockReset();
+    streamAiChatMock.mockReset();
+    streamAiChatMock.mockResolvedValue(undefined);
     vi.stubGlobal('localStorage', new MemoryStorage());
     container = document.createElement('div');
     document.body.append(container);
@@ -808,6 +815,89 @@ describe('mountLessonEditor', () => {
     expect(refs.canvas.querySelector('.lesson-editor__linked-title')?.textContent).toBe(
       'Updated reading pack'
     );
+  });
+
+  it('confirms stale Accept after a local edit and applies when confirmed', async () => {
+    mockLessonLoad();
+    streamAiChatMock.mockImplementation(async (_payload, onEvent) => {
+      onEvent({
+        type: 'proposal',
+        proposal: { kind: 'replace_lesson', title: 'Built lesson', blocks: [] }
+      });
+    });
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    mount();
+    await tick();
+
+    const form = refs.canvas.querySelector<HTMLFormElement>('.ai-panel__composer')!;
+    const input = refs.canvas.querySelector<HTMLTextAreaElement>('.ai-panel__input')!;
+    input.value = 'Build a lesson';
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+    await vi.waitFor(() => {
+      const accept = [...refs.canvas.querySelectorAll('button')].find(
+        (btn) => btn.textContent === 'Accept'
+      );
+      expect(accept).toBeTruthy();
+    });
+
+    const titleInput = refs.canvas.querySelector<HTMLInputElement>('.lesson-page__title')!;
+    titleInput.value = 'Edited while planning';
+    titleInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+    const accept = [...refs.canvas.querySelectorAll('button')].find(
+      (btn) => btn.textContent === 'Accept'
+    )!;
+    accept.click();
+
+    expect(confirmSpy).toHaveBeenCalledWith(
+      'You edited while the plan was built. Accept replaces the lesson with this plan.'
+    );
+    expect(refs.canvas.querySelector<HTMLInputElement>('.lesson-page__title')?.value).toBe(
+      'Built lesson'
+    );
+    confirmSpy.mockRestore();
+  });
+
+  it('asks Copy vs Linked in the palette flyout footer', async () => {
+    apiGetMock.mockImplementation(async (path: string) => {
+      if (path === '/api/compositions') {
+        return { compositions: [{ id: 'composition_1', title: 'Exit ticket', updated_at: ISO }] };
+      }
+      if (path === '/api/curriculum') {
+        return emptyCurriculum;
+      }
+      if (path === '/api/compositions/composition_1') {
+        return {
+          id: 'composition_1',
+          type: 'composition_template',
+          title: 'Exit ticket',
+          slug: 'exit-ticket',
+          status: 'active',
+          root: sectionBlock({ id: 'block_template_root', content: { title: 'Exit ticket', blocks: [] } }),
+          created_at: ISO,
+          updated_at: ISO,
+          schema_version: 1
+        };
+      }
+      if (path.startsWith('/api/lessons/')) {
+        return makeLesson({ blocks: [] });
+      }
+      throw new Error(`Unexpected apiGet path: ${path}`);
+    });
+
+    mount();
+    await tick();
+
+    refs.canvas.querySelector<HTMLButtonElement>('[data-family="Compositions"]')!.click();
+    refs.canvas.querySelector<HTMLButtonElement>('[data-composition-id="composition_1"]')!.click();
+
+    const copy = refs.canvas.querySelector('.lesson-editor__insert-composition-copy');
+    const linked = refs.canvas.querySelector('.lesson-editor__insert-composition-linked');
+    expect(copy?.closest('.lesson-palette__flyout')).not.toBeNull();
+    expect(linked?.closest('.lesson-palette__flyout')).not.toBeNull();
+    expect(copy?.closest('.lesson-builder__page')).toBeNull();
   });
 
   it('dispose while Edit Source modal open removes dialog', async () => {

@@ -11,6 +11,7 @@ export type PaletteInsertPayload =
 export type MountLessonPaletteOptions = {
   families: PaletteFamily[];
   onInsert: (payload: PaletteInsertPayload) => void;
+  onCompositionChoice?: (id: string, mode: 'copy' | 'linked') => void;
   onDragStart?: () => void;
   onShelved?: (shelved: boolean) => void;
 };
@@ -18,6 +19,8 @@ export type MountLessonPaletteOptions = {
 export type LessonPaletteHandle = {
   setShelved(shelved: boolean): void;
   updateFamilies(families: PaletteFamily[]): void;
+  showCompositionConfirm(id: string): void;
+  hideCompositionConfirm(): void;
   dispose(): void;
 };
 
@@ -91,6 +94,41 @@ export function mountLessonPalette(
   function persistShelf(shelved: boolean): void {
     const prefs = readBuilderChromePrefs();
     writeBuilderChromePrefs({ ...prefs, rail: shelved ? 'shelved' : 'open' });
+  }
+
+  function hideCompositionConfirm(): void {
+    flyout?.querySelector('.lesson-palette__flyout-footer')?.remove();
+  }
+
+  function showCompositionConfirm(id: string): void {
+    if (!flyout) return;
+    hideCompositionConfirm();
+
+    const footer = document.createElement('div');
+    footer.className = 'lesson-palette__flyout-footer';
+
+    const copyButton = document.createElement('button');
+    copyButton.type = 'button';
+    copyButton.className = 'btn btn--secondary lesson-editor__insert-composition-copy';
+    copyButton.textContent = 'Copy';
+    copyButton.addEventListener('click', (event) => {
+      event.stopPropagation();
+      hideCompositionConfirm();
+      options.onCompositionChoice?.(id, 'copy');
+    });
+
+    const linkedButton = document.createElement('button');
+    linkedButton.type = 'button';
+    linkedButton.className = 'btn btn--secondary lesson-editor__insert-composition-linked';
+    linkedButton.textContent = 'Linked';
+    linkedButton.addEventListener('click', (event) => {
+      event.stopPropagation();
+      hideCompositionConfirm();
+      options.onCompositionChoice?.(id, 'linked');
+    });
+
+    footer.append(copyButton, linkedButton);
+    flyout.append(footer);
   }
 
   function closeFlyout(): void {
@@ -205,6 +243,8 @@ export function mountLessonPalette(
       closeFlyout();
       renderRail(families);
     },
+    showCompositionConfirm,
+    hideCompositionConfirm,
     dispose() {
       closeFlyout();
       document.removeEventListener('click', onDocumentClick);

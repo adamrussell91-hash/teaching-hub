@@ -157,6 +157,29 @@ describe('mountLessonPalette', () => {
     expect(host.classList.contains('lesson-palette--shelved')).toBe(false);
   });
 
+  it('shows Copy and Linked in the flyout footer via showCompositionConfirm', () => {
+    const onCompositionChoice = vi.fn();
+    const handle = mountLessonPalette(host, {
+      families: lessonPaletteFamilies([{ id: 'composition_1', title: 'Exit ticket' }]),
+      onInsert: vi.fn(),
+      onCompositionChoice
+    });
+
+    host.querySelector<HTMLButtonElement>('[data-family="Compositions"]')!.click();
+    handle.showCompositionConfirm('composition_1');
+
+    const flyout = host.querySelector('.lesson-palette__flyout');
+    const copy = flyout?.querySelector<HTMLButtonElement>('.lesson-editor__insert-composition-copy');
+    const linked = flyout?.querySelector<HTMLButtonElement>(
+      '.lesson-editor__insert-composition-linked'
+    );
+    expect(copy).not.toBeNull();
+    expect(linked).not.toBeNull();
+
+    copy!.click();
+    expect(onCompositionChoice).toHaveBeenCalledWith('composition_1', 'copy');
+  });
+
   it('does not allow drag from a disabled compositions family', () => {
     mountLessonPalette(host, {
       families: lessonPaletteFamilies([]),

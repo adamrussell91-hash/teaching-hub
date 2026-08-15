@@ -5799,15 +5799,13 @@ input.scope-timeline__note-title:focus-visible {
   display: none;
 }
 
-.lesson-editor__insert-composition-confirm {
+.lesson-palette__flyout-footer {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
-  margin-top: var(--space-3);
-}
-
-.lesson-editor__insert-composition-confirm[hidden] {
-  display: none;
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line);
 }
 
 .lesson-page__linked-chrome {
