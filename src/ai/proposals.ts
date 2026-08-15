@@ -1,14 +1,18 @@
 import { z } from 'zod';
 import { BlockSchema } from '@/schemas/block';
+import { CoverSchema } from '@/schemas/cover';
+import { IsoDateSchema } from '@/schemas/common';
+import { countBlocksInTree } from '@/teacher/lesson-canvas/drop';
 
-export const AiScopeSchema = z.enum(['block', 'section']);
+export const AiScopeSchema = z.enum(['block', 'section', 'lesson']).default('lesson');
 export type AiScope = z.infer<typeof AiScopeSchema>;
 
 export const AiChatRequestSchema = z.object({
   lesson_id: z.string().min(1),
   agent: z.enum(['ann', 'clementine', 'hammond', 'clare']),
   scope: AiScopeSchema,
-  selected_block_id: z.string().min(1),
+  selected_block_id: z.string().min(1).optional(),
+  lesson_snapshot_at: IsoDateSchema.optional(),
   message: z.string().min(1).max(8000),
   action: z.string().min(1).max(80).optional(),
   history: z
@@ -34,10 +38,30 @@ export const ProposeReplaceSectionSchema = z.object({
   section: BlockSchema
 });
 
+export const ProposeReplaceLessonSchema = z.object({
+  title: z.string().min(1).optional(),
+  cover: CoverSchema.optional(),
+  blocks: z.array(BlockSchema)
+});
+
 export const ProposeInsertBlocksSchema = z.object({
-  anchor_block_id: z.string().min(1),
+  anchor_block_id: z.string().min(1).optional(),
   position: z.enum(['above', 'below']),
-  blocks: z.array(BlockSchema).min(1).max(12)
+  blocks: z.array(BlockSchema).min(1).max(48)
+});
+
+export const ProposeDeleteBlocksSchema = z.object({
+  ids: z.array(z.string().min(1)).min(1)
+});
+
+export const ProposeReorderBlocksSchema = z.object({
+  parent: z.object({
+    kind: z.enum(['root', 'section', 'column', 'tab']),
+    id: z.string().min(1).optional(),
+    columnIndex: z.number().int().optional(),
+    tabIndex: z.number().int().optional()
+  }),
+  ordered_ids: z.array(z.string().min(1)).min(1)
 });
 
 export const ReviewOnlySchema = z.object({
@@ -48,10 +72,27 @@ export type AiProposal =
   | { kind: 'replace_block'; block_id: string; block: z.infer<typeof BlockSchema> }
   | { kind: 'replace_section'; section_id: string; section: z.infer<typeof BlockSchema> }
   | {
+      kind: 'replace_lesson';
+      title?: string;
+      cover?: z.infer<typeof CoverSchema>;
+      blocks: z.infer<typeof BlockSchema>[];
+    }
+  | {
       kind: 'insert_blocks';
-      anchor_block_id: string;
+      anchor_block_id?: string;
       position: 'above' | 'below';
       blocks: z.infer<typeof BlockSchema>[];
+    }
+  | { kind: 'delete_blocks'; ids: string[] }
+  | {
+      kind: 'reorder_blocks';
+      parent: {
+        kind: 'root' | 'section' | 'column' | 'tab';
+        id?: string;
+        columnIndex?: number;
+        tabIndex?: number;
+      };
+      ordered_ids: string[];
     }
   | { kind: 'review_only'; summary: string };
 
@@ -82,8 +123,23 @@ export const AI_TOOLS = [
     }
   },
   {
+    name: 'propose_replace_lesson',
+    description:
+      'Propose replacing the whole lesson title, optional cover, and blocks. At most 48 blocks in the tree.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        cover: { type: 'object' },
+        blocks: { type: 'array', items: { type: 'object' } }
+      },
+      required: ['blocks']
+    }
+  },
+  {
     name: 'propose_insert_blocks',
-    description: 'Propose inserting one or more schema-valid blocks above or below an anchor block.',
+    description:
+      'Propose inserting one or more schema-valid blocks above or below an optional anchor. Without an anchor, append to the lesson root.',
     input_schema: {
       type: 'object',
       properties: {
@@ -91,7 +147,39 @@ export const AI_TOOLS = [
         position: { type: 'string', enum: ['above', 'below'] },
         blocks: { type: 'array', items: { type: 'object' } }
       },
-      required: ['anchor_block_id', 'position', 'blocks']
+      required: ['position', 'blocks']
+    }
+  },
+  {
+    name: 'propose_delete_blocks',
+    description: 'Propose deleting one or more blocks by id, including nested matches.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        ids: { type: 'array', items: { type: 'string' } }
+      },
+      required: ['ids']
+    }
+  },
+  {
+    name: 'propose_reorder_blocks',
+    description: 'Propose reordering sibling blocks under a parent (root, section, column, or tab).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        parent: {
+          type: 'object',
+          properties: {
+            kind: { type: 'string', enum: ['root', 'section', 'column', 'tab'] },
+            id: { type: 'string' },
+            columnIndex: { type: 'number' },
+            tabIndex: { type: 'number' }
+          },
+          required: ['kind']
+        },
+        ordered_ids: { type: 'array', items: { type: 'string' } }
+      },
+      required: ['parent', 'ordered_ids']
     }
   },
   {
@@ -123,6 +211,19 @@ export function parseToolProposal(name: string, input: unknown): AiProposal | { 
     const section = { ...parsed.data.section, id: parsed.data.section_id };
     return { kind: 'replace_section', section_id: parsed.data.section_id, section };
   }
+  if (name === 'propose_replace_lesson') {
+    const parsed = ProposeReplaceLessonSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.message };
+    if (countBlocksInTree(parsed.data.blocks) > 48) {
+      return { error: 'replace_lesson exceeds 48 blocks' };
+    }
+    return {
+      kind: 'replace_lesson',
+      title: parsed.data.title,
+      cover: parsed.data.cover,
+      blocks: parsed.data.blocks
+    };
+  }
   if (name === 'propose_insert_blocks') {
     const parsed = ProposeInsertBlocksSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.message };
@@ -131,6 +232,20 @@ export function parseToolProposal(name: string, input: unknown): AiProposal | { 
       anchor_block_id: parsed.data.anchor_block_id,
       position: parsed.data.position,
       blocks: parsed.data.blocks
+    };
+  }
+  if (name === 'propose_delete_blocks') {
+    const parsed = ProposeDeleteBlocksSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.message };
+    return { kind: 'delete_blocks', ids: parsed.data.ids };
+  }
+  if (name === 'propose_reorder_blocks') {
+    const parsed = ProposeReorderBlocksSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.message };
+    return {
+      kind: 'reorder_blocks',
+      parent: parsed.data.parent,
+      ordered_ids: parsed.data.ordered_ids
     };
   }
   if (name === 'review_only') {

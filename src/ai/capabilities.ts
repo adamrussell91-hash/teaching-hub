@@ -33,6 +33,13 @@ const SECTION: AiAction[] = [
   { id: 'turn_into_guided_practice', label: 'Turn into guided practice' }
 ];
 
+const LESSON: AiAction[] = [
+  { id: 'build_lesson', label: 'Build lesson' },
+  { id: 'reorganise', label: 'Reorganise' },
+  { id: 'expand', label: 'Expand' },
+  { id: 'condense', label: 'Condense' }
+];
+
 const MEDIA: AiAction[] = [
   { id: 'write_alt_text', label: 'Write alt text' },
   { id: 'generate_activity', label: 'Generate activity from media' },
@@ -133,11 +140,12 @@ export function actionsForBlockType(blockType: Block['block_type']): AiAction[] 
 }
 
 export function actionsForScope(
-  scope: 'block' | 'section',
+  scope: 'block' | 'section' | 'lesson',
   blockType: Block['block_type'] | null
 ): AiAction[] {
+  if (scope === 'lesson') return LESSON;
   if (scope === 'section') return SECTION;
-  if (!blockType) return [];
+  if (!blockType) return LESSON;
   return actionsForBlockType(blockType);
 }
 
@@ -147,5 +155,6 @@ export function isKnownAction(actionId: string): boolean {
     for (const a of list ?? []) all.add(a.id);
   }
   for (const a of SECTION) all.add(a.id);
+  for (const a of LESSON) all.add(a.id);
   return all.has(actionId);
 }
