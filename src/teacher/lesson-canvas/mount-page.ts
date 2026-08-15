@@ -1,3 +1,4 @@
+import { isLinkedSection } from '@/blocks/composition-link';
 import { createFromInsertMenu, cloneBlockWithNewIds } from '@/blocks/create-block';
 import { createBlockEditor, createVisibilitySelect } from '@/blocks/editors';
 import { findBlockById } from '@/blocks/find-block';
@@ -19,10 +20,14 @@ export type MountLessonPageOptions = {
   onSelect?: (blockId: string | null) => void;
   idFactory: () => string;
   onSaveTemplate?: () => void;
+  onSaveComposition?: (blockId: string) => void;
+  onEditSource?: (compositionId: string) => void;
+  onDetachComposition?: (blockId: string) => void;
+  renderLinkedPreview?: (compositionId: string) => HTMLElement;
 };
 
 export type LessonPageHandle = {
-  update(lesson: Lesson): void;
+  update(lesson: Lesson, nextMedia?: Media[]): void;
   dispose(): void;
 };
 
@@ -90,7 +95,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   let lesson = options.lesson;
   let selectedId: string | null = null;
   let coverHandle: CoverPickerHandle | null = null;
-  const media = options.media ?? [];
+  let media = options.media ?? [];
 
   const root = document.createElement('div');
   root.className = 'lesson-page';
@@ -183,7 +188,59 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     });
 
     bar.append(visibility, duplicate, remove);
+
+    if (block.block_type === 'section' && !isLinkedSection(block) && options.onSaveComposition) {
+      const saveComposition = document.createElement('button');
+      saveComposition.type = 'button';
+      saveComposition.className = 'btn btn--ghost lesson-editor__save-composition';
+      saveComposition.textContent = 'Save as composition';
+      saveComposition.setAttribute('aria-label', 'Save as composition');
+      saveComposition.addEventListener('click', (event) => {
+        event.stopPropagation();
+        options.onSaveComposition?.(block.id);
+      });
+      bar.append(saveComposition);
+    }
+
     return bar;
+  }
+
+  function createLinkedChrome(block: Block): HTMLElement {
+    const chrome = document.createElement('div');
+    chrome.className = 'lesson-page__linked-chrome';
+
+    const badge = document.createElement('span');
+    badge.className = 'lesson-editor__linked-badge';
+    badge.textContent = 'Linked';
+    chrome.append(badge);
+
+    if (isLinkedSection(block)) {
+      const compositionId = block.content.link.source_composition_id;
+
+      const editSource = document.createElement('button');
+      editSource.type = 'button';
+      editSource.className = 'btn btn--ghost lesson-editor__edit-source';
+      editSource.textContent = 'Edit Source';
+      editSource.setAttribute('aria-label', 'Edit source');
+      editSource.addEventListener('click', (event) => {
+        event.stopPropagation();
+        options.onEditSource?.(compositionId);
+      });
+
+      const detach = document.createElement('button');
+      detach.type = 'button';
+      detach.className = 'btn btn--ghost lesson-editor__detach-composition';
+      detach.textContent = 'Detach';
+      detach.setAttribute('aria-label', 'Detach linked composition');
+      detach.addEventListener('click', (event) => {
+        event.stopPropagation();
+        options.onDetachComposition?.(block.id);
+      });
+
+      chrome.append(editSource, detach);
+    }
+
+    return chrome;
   }
 
   function renderChrome(): HTMLElement {
@@ -275,10 +332,25 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       row.dataset.blockType = block.block_type;
       if (selectedId === block.id) row.classList.add('lesson-page__block--selected');
 
-      if (isTextLike(block.block_type)) {
+      if (isLinkedSection(block)) {
+        row.append(createLinkedChrome(block));
+        row.append(
+          options.renderLinkedPreview?.(block.content.link.source_composition_id) ??
+            renderBlock(block, 'teacher')
+        );
+        row.addEventListener('click', (event) => {
+          if ((event.target as HTMLElement | null)?.closest('button')) return;
+          selectedId = block.id;
+          options.onSelect?.(block.id);
+        });
+      } else if (isTextLike(block.block_type)) {
         const editor = createBlockEditor(block, onBlockChange, latestBlock(block.id, block), { media });
         editor.querySelectorAll('.block-editor__move-up, .block-editor__move-down').forEach((el) => el.remove());
         row.append(editor);
+        row.addEventListener('click', () => {
+          selectedId = block.id;
+          options.onSelect?.(block.id);
+        });
       } else {
         row.append(renderBlock(block, 'teacher'));
         row.addEventListener('click', () => select(block.id));
@@ -294,7 +366,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     root.append(list);
 
     const selected = selectedId ? findBlockById(lesson.blocks, selectedId) : null;
-    if (selected && !isTextLike(selected.block_type)) {
+    if (selected && !isTextLike(selected.block_type) && !isLinkedSection(selected)) {
       const inspector = document.createElement('div');
       inspector.className = 'lesson-page__inspector';
       const editor = createBlockEditor(
@@ -312,8 +384,9 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   render();
 
   return {
-    update(next: Lesson) {
+    update(next: Lesson, nextMedia?: Media[]) {
       lesson = next;
+      if (nextMedia) media = nextMedia;
       if (selectedId && !findBlockById(lesson.blocks, selectedId)) selectedId = null;
       render();
     },

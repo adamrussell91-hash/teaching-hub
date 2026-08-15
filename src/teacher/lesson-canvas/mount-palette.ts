@@ -12,10 +12,12 @@ export type MountLessonPaletteOptions = {
   families: PaletteFamily[];
   onInsert: (payload: PaletteInsertPayload) => void;
   onDragStart?: () => void;
+  onShelved?: (shelved: boolean) => void;
 };
 
 export type LessonPaletteHandle = {
   setShelved(shelved: boolean): void;
+  updateFamilies(families: PaletteFamily[]): void;
   dispose(): void;
 };
 
@@ -140,37 +142,43 @@ export function mountLessonPalette(
     host.classList.toggle('lesson-palette--shelved', shelved);
     if (shelved) closeFlyout();
     persistShelf(shelved);
+    options.onShelved?.(shelved);
   }
 
-  for (const family of options.families) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'lesson-palette__family';
-    btn.dataset.family = family.id;
+  function renderRail(families: PaletteFamily[]): void {
+    rail.replaceChildren();
+    for (const family of families) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'lesson-palette__family';
+      btn.dataset.family = family.id;
 
-    const glyph = document.createElement('span');
-    glyph.className = 'lesson-palette__family-icon';
-    glyph.textContent = family.id.slice(0, 1);
+      const glyph = document.createElement('span');
+      glyph.className = 'lesson-palette__family-icon';
+      glyph.textContent = family.id.slice(0, 1);
 
-    const label = document.createElement('span');
-    label.className = 'lesson-palette__family-label';
-    label.textContent = family.id;
+      const label = document.createElement('span');
+      label.className = 'lesson-palette__family-label';
+      label.textContent = family.id;
 
-    btn.append(glyph, label);
+      btn.append(glyph, label);
 
-    if (family.disabled) {
-      btn.disabled = true;
-      btn.style.pointerEvents = 'none';
-    } else {
-      btn.addEventListener('click', (event) => {
-        event.stopPropagation();
-        if (openId === family.id) closeFlyout();
-        else openFlyout(family);
-      });
+      if (family.disabled) {
+        btn.disabled = true;
+        btn.style.pointerEvents = 'none';
+      } else {
+        btn.addEventListener('click', (event) => {
+          event.stopPropagation();
+          if (openId === family.id) closeFlyout();
+          else openFlyout(family);
+        });
+      }
+
+      rail.append(btn);
     }
-
-    rail.append(btn);
   }
+
+  renderRail(options.families);
 
   tab.addEventListener('click', (event) => {
     event.stopPropagation();
@@ -193,6 +201,10 @@ export function mountLessonPalette(
 
   return {
     setShelved,
+    updateFamilies(families: PaletteFamily[]) {
+      closeFlyout();
+      renderRail(families);
+    },
     dispose() {
       closeFlyout();
       document.removeEventListener('click', onDocumentClick);

@@ -84,7 +84,9 @@ describe('listSearchActions', () => {
 
   it('includes A4 + publish only with lesson editor', () => {
     const withEditor = listSearchActions({ ...base, path: '/lessons/l1', hasLessonEditor: true });
-    expect(withEditor.some((a) => a.id === 'open-a4')).toBe(true);
+    const print = withEditor.find((a) => a.id === 'open-a4');
+    expect(print?.title).toBe('Print lesson');
+    expect(print?.keywords).toEqual(expect.arrayContaining(['print', 'a4']));
     expect(withEditor.some((a) => a.id === 'publish-lesson')).toBe(true);
 
     const withoutEditor = listSearchActions({ ...base, path: '/lessons/l1', hasLessonEditor: false });

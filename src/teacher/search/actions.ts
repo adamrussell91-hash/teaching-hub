@@ -29,7 +29,7 @@ export function listSearchActions(ctx: SearchActionContext): SearchAction[] {
     actions.push({ id: 'open-student-view', title: 'Open Student View', keywords: ['student', 'preview'] });
   }
   if (ctx.hasLessonEditor) {
-    actions.push({ id: 'open-a4', title: 'Open A4 Preview', keywords: ['print', 'a4'] });
+    actions.push({ id: 'open-a4', title: 'Print lesson', keywords: ['print', 'a4'] });
     actions.push({ id: 'publish-lesson', title: 'Publish Lesson', keywords: ['publish'] });
   }
   return actions;

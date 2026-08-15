@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Block } from '@/schemas/block';
 import type { Lesson } from '@/schemas/lesson';
+import * as openPrint from '@/print/open-print';
 
 vi.mock('@/api/client', async () => {
   const actual = await vi.importActual<typeof import('@/api/client')>('@/api/client');
@@ -14,7 +15,7 @@ vi.mock('@/api/client', async () => {
 });
 
 import { apiGet, apiPut, apiPost, apiPatch, ApiClientError } from '@/api/client';
-import { mountLessonEditor } from '@/teacher/lesson-editor';
+import { mountLessonEditor, type LessonEditorHandle } from '@/teacher/lesson-editor';
 import { renderTeacherShell } from '@/teacher/shell';
 
 const apiGetMock = apiGet as unknown as ReturnType<typeof vi.fn>;
@@ -24,9 +25,49 @@ const apiPatchMock = apiPatch as unknown as ReturnType<typeof vi.fn>;
 
 const ISO = '2026-01-01T00:00:00.000Z';
 
+class MemoryStorage implements Storage {
+  private readonly store = new Map<string, string>();
+
+  get length(): number {
+    return this.store.size;
+  }
+
+  clear(): void {
+    this.store.clear();
+  }
+
+  getItem(key: string): string | null {
+    return this.store.has(key) ? this.store.get(key)! : null;
+  }
+
+  key(index: number): string | null {
+    return [...this.store.keys()][index] ?? null;
+  }
+
+  removeItem(key: string): void {
+    this.store.delete(key);
+  }
+
+  setItem(key: string, value: string): void {
+    this.store.set(key, value);
+  }
+}
+
 function tick(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
+
+const emptyCurriculum = {
+  years: [],
+  subjects: [],
+  units: [],
+  lessons: [],
+  classes: [],
+  scheduled_lessons: [],
+  scope_sequences: [],
+  media: [],
+  schedule_anchor_date: '2026-01-01'
+};
 
 const richTextBlock: Block = {
   id: 'block_lesson_001_1',
@@ -60,14 +101,46 @@ function makeLesson(overrides: Partial<Lesson> = {}): Lesson {
   };
 }
 
+function sectionBlock(overrides: Partial<Block> = {}): Block {
+  return {
+    id: 'block_lesson_001_1',
+    type: 'block',
+    block_type: 'section',
+    variant: 'medium',
+    visibility: 'student_teacher',
+    content: { title: 'Do Now', blocks: [] },
+    layout: {},
+    print: {},
+    settings: {},
+    created_at: ISO,
+    updated_at: ISO,
+    schema_version: 1,
+    ...overrides
+  };
+}
+
+function linkedStub(compositionId = 'composition_1'): Block {
+  return sectionBlock({
+    content: {
+      title: 'Reading pack',
+      blocks: [],
+      link: { mode: 'linked', source_composition_id: compositionId }
+    }
+  });
+}
+
 describe('mountLessonEditor', () => {
   let container: HTMLElement;
   let refs: ReturnType<typeof renderTeacherShell>;
+  let editor: LessonEditorHandle | undefined;
 
   function mockLessonLoad(lesson: Lesson = makeLesson()): void {
     apiGetMock.mockImplementation(async (path: string) => {
       if (path === '/api/compositions') {
         return { compositions: [] };
+      }
+      if (path === '/api/curriculum') {
+        return emptyCurriculum;
       }
       if (path.startsWith('/api/lessons/')) {
         return lesson;
@@ -79,42 +152,96 @@ describe('mountLessonEditor', () => {
     });
   }
 
+  function mount(options: { lessonId?: string; isStale?: () => boolean } = {}): LessonEditorHandle {
+    editor = mountLessonEditor({
+      refs,
+      lessonId: options.lessonId ?? 'lesson_001',
+      isStale: options.isStale ?? (() => false)
+    });
+    return editor;
+  }
+
+  function insertFromPalette(family: string, blockType: string): void {
+    if (!refs.canvas.querySelector(`[data-block-type="${blockType}"]`)) {
+      refs.canvas.querySelector<HTMLButtonElement>(`[data-family="${family}"]`)!.click();
+    }
+    refs.canvas.querySelector<HTMLButtonElement>(`[data-block-type="${blockType}"]`)!.click();
+  }
+
+  function insertComposition(mode: 'copy' | 'linked', compositionId = 'composition_1'): void {
+    refs.canvas.querySelector<HTMLButtonElement>('[data-family="Compositions"]')!.click();
+    refs.canvas
+      .querySelector<HTMLButtonElement>(`[data-composition-id="${compositionId}"]`)!
+      .click();
+    const cls =
+      mode === 'copy'
+        ? '.lesson-editor__insert-composition-copy'
+        : '.lesson-editor__insert-composition-linked';
+    refs.canvas.querySelector<HTMLButtonElement>(cls)!.click();
+  }
+
   beforeEach(() => {
     apiGetMock.mockReset();
     apiPutMock.mockReset();
     apiPostMock.mockReset();
     apiPatchMock.mockReset();
+    vi.stubGlobal('localStorage', new MemoryStorage());
     container = document.createElement('div');
+    document.body.append(container);
     refs = renderTeacherShell(container);
   });
 
-  it('loads the draft and renders an inline-editable title labelled "Lesson title"', async () => {
+  afterEach(() => {
+    editor?.dispose();
+    editor = undefined;
+    container?.remove();
+    document.body.replaceChildren();
+    vi.unstubAllGlobals();
+  });
+
+  it('loads the draft and renders an inline-editable title', async () => {
     mockLessonLoad();
-    mountLessonEditor({ refs, lessonId: 'lesson_001', isStale: () => false });
+    mount();
     await tick();
 
     expect(apiGetMock).toHaveBeenCalledWith('/api/lessons/lesson_001');
 
-    const label = refs.canvas.querySelector('.lesson-editor__title-label');
-    const input = refs.canvas.querySelector<HTMLInputElement>('.lesson-editor__title-input');
-    expect(label?.textContent).toBe('Lesson title');
+    const input = refs.canvas.querySelector<HTMLInputElement>('.lesson-page__title');
     expect(input?.value).toBe('Intro to Testing');
-    expect(label?.getAttribute('for')).toBe(input?.id);
+    expect(input?.getAttribute('aria-label')).toBe('Lesson title');
   });
 
-  it('renders one block editor per block and includes a visibility control', async () => {
+  it('mounts palette, page, and always-on chat without A4 tab or add-block select', async () => {
     mockLessonLoad();
-    mountLessonEditor({ refs, lessonId: 'lesson_001', isStale: () => false });
+    mount();
+    await tick();
+
+    expect(refs.canvas.querySelector('.lesson-palette')).not.toBeNull();
+    expect(refs.canvas.querySelector('.lesson-page')).not.toBeNull();
+    expect(refs.canvas.querySelector('.ai-panel')).not.toBeNull();
+    expect(refs.canvas.querySelector('[aria-label="Print"]')).not.toBeNull();
+    expect(refs.canvas.querySelector('.lesson-editor__add-block-select')).toBeNull();
+    const a4Tab = [...refs.canvas.querySelectorAll('.lesson-editor__mode-tab')].find(
+      (el) => el.textContent === 'A4'
+    );
+    expect(a4Tab).toBeUndefined();
+  });
+
+  it('renders one block editor per text-like block and includes a visibility control', async () => {
+    mockLessonLoad();
+    mount();
     await tick();
 
     const editors = refs.canvas.querySelectorAll('.block-editor');
     expect(editors).toHaveLength(1);
-    expect(editors[0]?.querySelector('.block-editor__visibility')).not.toBeNull();
+    expect(
+      refs.canvas.querySelector('.block-editor__visibility, .lesson-page__toolbar select')
+    ).not.toBeNull();
   });
 
   it('shows an error state when the lesson fails to load', async () => {
     apiGetMock.mockRejectedValue(new ApiClientError({ code: 'not_found', message: 'Lesson not found' }));
-    mountLessonEditor({ refs, lessonId: 'missing', isStale: () => false });
+    mount({ lessonId: 'missing' });
     await tick();
 
     expect(refs.canvas.textContent).toContain('Lesson not found.');
@@ -122,71 +249,97 @@ describe('mountLessonEditor', () => {
 
   it('does not touch the DOM once superseded by a newer route', async () => {
     mockLessonLoad();
-    mountLessonEditor({ refs, lessonId: 'lesson_001', isStale: () => true });
+    mount({ isStale: () => true });
     await tick();
 
-    expect(refs.canvas.querySelector('.lesson-editor__title-input')).toBeNull();
+    expect(refs.canvas.querySelector('.lesson-page__title')).toBeNull();
   });
 
-  it('Add Block appends a new block of the selected type with a generated id', async () => {
+  it('adds a heading from the Basic palette family with a generated id', async () => {
     mockLessonLoad(makeLesson({ blocks: [] }));
-    mountLessonEditor({ refs, lessonId: 'lesson_001', isStale: () => false });
+    mount();
     await tick();
 
-    expect(refs.canvas.textContent).toContain('No blocks yet.');
+    expect(refs.canvas.textContent).not.toContain('No blocks yet. Use Add Block');
 
-    const select = refs.canvas.querySelector<HTMLSelectElement>('.lesson-editor__add-block-select')!;
-    select.value = 'heading';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-    refs.canvas.querySelector<HTMLButtonElement>('.lesson-editor__add-block-button')!.click();
+    insertFromPalette('Basic', 'heading');
 
-    const row = refs.canvas.querySelector<HTMLElement>('.lesson-editor__block-row .block-editor')!;
-    expect(row.dataset.blockType).toBe('heading');
-    expect(row.dataset.blockId).toBe('block_lesson_001_1');
+    const heading =
+      refs.canvas.querySelector<HTMLElement>('.block-editor[data-block-type="heading"]') ??
+      refs.canvas.querySelector<HTMLElement>('.lesson-page__block[data-block-type="heading"]');
+    expect(heading).not.toBeNull();
+    expect(heading?.dataset.blockId).toBe('block_lesson_001_1');
   });
 
-  it('Add Block can append an image block', async () => {
+  it('adds an image from the Media palette family', async () => {
     mockLessonLoad(makeLesson({ blocks: [] }));
-    mountLessonEditor({ refs, lessonId: 'lesson_001', isStale: () => false });
+    mount();
     await tick();
 
-    const select = refs.canvas.querySelector<HTMLSelectElement>('.lesson-editor__add-block-select')!;
-    select.value = 'image';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-    refs.canvas.querySelector<HTMLButtonElement>('.lesson-editor__add-block-button')!.click();
+    insertFromPalette('Media', 'image');
     await tick();
 
-    expect(refs.canvas.querySelector('.block-editor[data-block-type="image"]')).not.toBeNull();
+    const image =
+      refs.canvas.querySelector('.block-editor[data-block-type="image"]') ??
+      refs.canvas.querySelector('.lesson-page__block[data-block-type="image"]');
+    expect(image).not.toBeNull();
+    expect((image as HTMLElement).dataset.blockId).toBe('block_lesson_001_1');
   });
 
-  it('reorders blocks up and down and disables buttons at the boundaries', async () => {
-    const second: Block = { ...richTextBlock, id: 'block_lesson_001_2' };
-    mockLessonLoad(makeLesson({ blocks: [richTextBlock, second] }));
-    mountLessonEditor({ refs, lessonId: 'lesson_001', isStale: () => false });
+  it('appends palette inserts in click order', async () => {
+    mockLessonLoad(makeLesson({ blocks: [] }));
+    mount();
     await tick();
 
-    const blockIds = () =>
-      [...refs.canvas.querySelectorAll<HTMLElement>('.lesson-editor__block-row .block-editor')].map(
-        (el) => el.dataset.blockId
-      );
-    expect(blockIds()).toEqual(['block_lesson_001_1', 'block_lesson_001_2']);
+    insertFromPalette('Basic', 'heading');
+    insertFromPalette('Basic', 'heading');
 
-    const downButtons = () =>
-      [...refs.canvas.querySelectorAll<HTMLButtonElement>('[aria-label^="Move block"][aria-label$="down"]')];
-    downButtons()[0]!.click();
+    const ids = [...refs.canvas.querySelectorAll<HTMLElement>('.lesson-page__block')].map(
+      (el) => el.dataset.blockId
+    );
+    expect(ids).toEqual(['block_lesson_001_1', 'block_lesson_001_2']);
+  });
 
-    expect(blockIds()).toEqual(['block_lesson_001_2', 'block_lesson_001_1']);
+  it('openA4Preview prints the lesson', async () => {
+    const spy = vi.spyOn(openPrint, 'openPrintLesson').mockImplementation(() => {});
+    mockLessonLoad();
+    const handle = mount();
+    await tick();
 
-    const upButtons = () =>
-      [...refs.canvas.querySelectorAll<HTMLButtonElement>('[aria-label^="Move block"][aria-label$="up"]')];
-    expect(upButtons()[0]!.disabled).toBe(true);
-    expect(downButtons()[1]!.disabled).toBe(true);
+    handle.openA4Preview();
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+  });
+
+  it('toggles rail and chat with [ and ] when not typing', async () => {
+    mockLessonLoad();
+    mount();
+    await tick();
+
+    const builder = refs.canvas.querySelector('.lesson-builder')!;
+    expect(builder.classList.contains('lesson-builder--rail-shelved')).toBe(false);
+    expect(builder.classList.contains('lesson-builder--chat-shelved')).toBe(false);
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: '[', bubbles: true }));
+    expect(builder.classList.contains('lesson-builder--rail-shelved')).toBe(true);
+    expect(refs.canvas.querySelector('.lesson-builder__chat-strip')).toBeTruthy();
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: ']', bubbles: true }));
+    expect(builder.classList.contains('lesson-builder--chat-shelved')).toBe(true);
+    const strip = refs.canvas.querySelector<HTMLElement>('.lesson-builder__chat-strip');
+    expect(strip).not.toBeNull();
+    expect(strip?.hidden).toBe(false);
+
+    const title = refs.canvas.querySelector<HTMLInputElement>('.lesson-page__title')!;
+    title.dispatchEvent(new KeyboardEvent('keydown', { key: '[', bubbles: true }));
+    expect(builder.classList.contains('lesson-builder--rail-shelved')).toBe(true);
   });
 
   it('wires Publish success into a visible student link', async () => {
     mockLessonLoad();
     apiPostMock.mockResolvedValue({ student_path: '/s/lessons/lesson_001' });
-    mountLessonEditor({ refs, lessonId: 'lesson_001', isStale: () => false });
+    mount();
     await tick();
 
     refs.contextBar.querySelector<HTMLButtonElement>('.context-bar__publish')!.click();
@@ -205,7 +358,7 @@ describe('mountLessonEditor', () => {
         details: [{ path: ['title'], message: 'Title is required to publish' }]
       })
     );
-    mountLessonEditor({ refs, lessonId: 'lesson_001', isStale: () => false });
+    mount();
     await tick();
 
     refs.contextBar.querySelector<HTMLButtonElement>('.context-bar__publish')!.click();
@@ -220,10 +373,10 @@ describe('mountLessonEditor', () => {
   it('flush() saves immediately, and awaiting it confirms the save completed, without waiting for the autosave debounce', async () => {
     mockLessonLoad();
     apiPutMock.mockResolvedValue(makeLesson());
-    const handle = mountLessonEditor({ refs, lessonId: 'lesson_001', isStale: () => false });
+    const handle = mount();
     await tick();
 
-    const titleInput = refs.canvas.querySelector<HTMLInputElement>('.lesson-editor__title-input')!;
+    const titleInput = refs.canvas.querySelector<HTMLInputElement>('.lesson-page__title')!;
     titleInput.value = 'Updated title';
     titleInput.dispatchEvent(new Event('input', { bubbles: true }));
 
@@ -248,25 +401,21 @@ describe('mountLessonEditor', () => {
     );
     apiPutMock.mockResolvedValueOnce(makeLesson());
 
-    const handle = mountLessonEditor({ refs, lessonId: 'lesson_001', isStale: () => false });
+    const handle = mount();
     await tick();
 
-    const titleInput = refs.canvas.querySelector<HTMLInputElement>('.lesson-editor__title-input')!;
+    const titleInput = refs.canvas.querySelector<HTMLInputElement>('.lesson-page__title')!;
 
     titleInput.value = 'First edit';
     titleInput.dispatchEvent(new Event('input', { bubbles: true }));
 
-    // Kicks off the first (slow) autosave, which is still pending.
     const firstFlush = handle.flush();
     await tick();
     expect(apiPutMock).toHaveBeenCalledTimes(1);
 
-    // A second edit arrives while that save is still in flight.
     titleInput.value = 'Second edit';
     titleInput.dispatchEvent(new Event('input', { bubbles: true }));
 
-    // This mirrors `teardownLessonEditor`: await flush (which must wait for
-    // the queued resave too) before disposing.
     const teardownFlush = handle.flush();
 
     resolveFirstPut(makeLesson());
@@ -281,21 +430,8 @@ describe('mountLessonEditor', () => {
     );
   });
 
-  it('shows Save as composition on section rows and posts to /api/compositions', async () => {
-    const section: Block = {
-      id: 'block_lesson_001_1',
-      type: 'block',
-      block_type: 'section',
-      variant: 'medium',
-      visibility: 'student_teacher',
-      content: { title: 'Do Now', blocks: [] },
-      layout: {},
-      print: {},
-      settings: {},
-      created_at: ISO,
-      updated_at: ISO,
-      schema_version: 1
-    };
+  it('shows Save as composition on a selected section and posts to /api/compositions', async () => {
+    const section = sectionBlock();
     mockLessonLoad(makeLesson({ blocks: [section] }));
     apiPostMock.mockResolvedValue({
       id: 'composition_1',
@@ -310,11 +446,11 @@ describe('mountLessonEditor', () => {
     });
     const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('Do Now pack');
 
-    mountLessonEditor({ refs, lessonId: 'lesson_001', isStale: () => false });
+    mount();
     await tick();
 
+    refs.canvas.querySelector<HTMLElement>('.lesson-page__block[data-block-type="section"]')!.click();
     expect(refs.canvas.querySelector('.lesson-editor__save-composition')).not.toBeNull();
-    expect(refs.canvas.querySelector('.lesson-editor__insert-composition-copy')).not.toBeNull();
 
     refs.canvas.querySelector<HTMLButtonElement>('.lesson-editor__save-composition')!.click();
     await tick();
@@ -347,6 +483,9 @@ describe('mountLessonEditor', () => {
       if (path === '/api/compositions') {
         return { compositions: [{ id: 'composition_1', title: 'Exit ticket', updated_at: ISO }] };
       }
+      if (path === '/api/curriculum') {
+        return emptyCurriculum;
+      }
       if (path === '/api/compositions/composition_1') {
         return {
           id: 'composition_1',
@@ -366,19 +505,18 @@ describe('mountLessonEditor', () => {
       throw new Error(`Unexpected apiGet path: ${path}`);
     });
 
-    mountLessonEditor({ refs, lessonId: 'lesson_001', isStale: () => false });
+    mount();
     await tick();
 
-    const select = refs.canvas.querySelector<HTMLSelectElement>('.lesson-editor__composition-select')!;
-    expect(select.disabled).toBe(false);
-    select.value = 'composition_1';
-    refs.canvas.querySelector<HTMLButtonElement>('.lesson-editor__insert-composition-copy')!.click();
+    insertComposition('copy');
     await tick();
 
-    const editor = refs.canvas.querySelector<HTMLElement>('.block-editor[data-block-type="section"]');
-    expect(editor).not.toBeNull();
-    expect(editor?.dataset.blockId).toBe('block_lesson_001_1');
-    expect(editor?.dataset.blockId).not.toBe('block_template_root');
+    const row = refs.canvas.querySelector<HTMLElement>(
+      '.lesson-page__block[data-block-type="section"], .block-editor[data-block-type="section"]'
+    );
+    expect(row).not.toBeNull();
+    expect(row?.dataset.blockId).toBe('block_lesson_001_1');
+    expect(row?.dataset.blockId).not.toBe('block_template_root');
   });
 
   it('Insert linked appends a linked section stub', async () => {
@@ -430,6 +568,9 @@ describe('mountLessonEditor', () => {
       if (path === '/api/compositions') {
         return { compositions: [{ id: 'composition_1', title: 'Reading pack', updated_at: ISO }] };
       }
+      if (path === '/api/curriculum') {
+        return emptyCurriculum;
+      }
       if (path === '/api/compositions/composition_1') {
         return composition;
       }
@@ -440,12 +581,10 @@ describe('mountLessonEditor', () => {
     });
     apiPutMock.mockResolvedValue(makeLesson());
 
-    const handle = mountLessonEditor({ refs, lessonId: 'lesson_001', isStale: () => false });
+    const handle = mount();
     await tick();
 
-    const select = refs.canvas.querySelector<HTMLSelectElement>('.lesson-editor__composition-select')!;
-    select.value = 'composition_1';
-    refs.canvas.querySelector<HTMLButtonElement>('.lesson-editor__insert-composition-linked')!.click();
+    insertComposition('linked');
     await tick();
 
     expect(refs.canvas.querySelector('.lesson-editor__linked-badge')?.textContent).toBe('Linked');
@@ -499,28 +638,13 @@ describe('mountLessonEditor', () => {
       updated_at: ISO,
       schema_version: 1
     };
-    const linkedStub: Block = {
-      id: 'block_lesson_001_1',
-      type: 'block',
-      block_type: 'section',
-      variant: 'medium',
-      visibility: 'student_teacher',
-      content: {
-        title: 'Reading pack',
-        blocks: [],
-        link: { mode: 'linked', source_composition_id: 'composition_1' }
-      },
-      layout: {},
-      print: {},
-      settings: {},
-      created_at: ISO,
-      updated_at: ISO,
-      schema_version: 1
-    };
 
     apiGetMock.mockImplementation(async (path: string) => {
       if (path === '/api/compositions') {
         return { compositions: [{ id: 'composition_1', title: 'Reading pack', updated_at: ISO }] };
+      }
+      if (path === '/api/curriculum') {
+        return emptyCurriculum;
       }
       if (path === '/api/compositions/composition_1') {
         return {
@@ -536,13 +660,13 @@ describe('mountLessonEditor', () => {
         };
       }
       if (path.startsWith('/api/lessons/')) {
-        return makeLesson({ blocks: [linkedStub] });
+        return makeLesson({ blocks: [linkedStub()] });
       }
       throw new Error(`Unexpected apiGet path: ${path}`);
     });
     apiPutMock.mockResolvedValue(makeLesson());
 
-    const handle = mountLessonEditor({ refs, lessonId: 'lesson_001', isStale: () => false });
+    const handle = mount();
     await tick();
     await tick();
 
@@ -550,7 +674,11 @@ describe('mountLessonEditor', () => {
     await tick();
 
     expect(refs.canvas.querySelector('.lesson-editor__linked-badge')).toBeNull();
-    expect(refs.canvas.querySelector('.block-editor[data-block-type="section"]')).not.toBeNull();
+    expect(
+      refs.canvas.querySelector(
+        '.lesson-page__block[data-block-type="section"], .block-editor[data-block-type="section"]'
+      )
+    ).not.toBeNull();
 
     await handle.flush();
     const saved = apiPutMock.mock.calls.at(-1)?.[1] as Lesson;
@@ -564,47 +692,31 @@ describe('mountLessonEditor', () => {
   });
 
   it('linked row has no Save as composition control', async () => {
-    const linkedStub: Block = {
-      id: 'block_lesson_001_1',
-      type: 'block',
-      block_type: 'section',
-      variant: 'medium',
-      visibility: 'student_teacher',
-      content: {
-        title: 'Reading pack',
-        blocks: [],
-        link: { mode: 'linked', source_composition_id: 'composition_1' }
-      },
-      layout: {},
-      print: {},
-      settings: {},
-      created_at: ISO,
-      updated_at: ISO,
-      schema_version: 1
-    };
-
     apiGetMock.mockImplementation(async (path: string) => {
       if (path === '/api/compositions') {
         return { compositions: [] };
+      }
+      if (path === '/api/curriculum') {
+        return emptyCurriculum;
       }
       if (path === '/api/compositions/composition_1') {
         throw new ApiClientError({ code: 'not_found', message: 'Composition not found' });
       }
       if (path.startsWith('/api/lessons/')) {
-        return makeLesson({ blocks: [linkedStub] });
+        return makeLesson({ blocks: [linkedStub()] });
       }
       throw new Error(`Unexpected apiGet path: ${path}`);
     });
 
-    mountLessonEditor({ refs, lessonId: 'lesson_001', isStale: () => false });
+    mount();
     await tick();
     await tick();
 
-    const row = refs.canvas.querySelector('.lesson-editor__block-row')!;
-    expect(row.querySelector('.lesson-editor__save-composition')).toBeNull();
-    expect(row.querySelector('.lesson-editor__linked-badge')?.textContent).toBe('Linked');
-    expect(row.querySelector('.lesson-editor__edit-source')).not.toBeNull();
-    expect(row.querySelector('.lesson-editor__detach-composition')).not.toBeNull();
+    refs.canvas.querySelector<HTMLElement>('.lesson-page__block[data-block-id="block_lesson_001_1"]')!.click();
+    expect(refs.canvas.querySelector('.lesson-editor__save-composition')).toBeNull();
+    expect(refs.canvas.querySelector('.lesson-editor__linked-badge')?.textContent).toBe('Linked');
+    expect(refs.canvas.querySelector('.lesson-editor__edit-source')).not.toBeNull();
+    expect(refs.canvas.querySelector('.lesson-editor__detach-composition')).not.toBeNull();
   });
 
   it('Edit Source saves composition via PATCH and refreshes preview', async () => {
@@ -636,24 +748,6 @@ describe('mountLessonEditor', () => {
       updated_at: ISO,
       schema_version: 1
     };
-    const linkedStub: Block = {
-      id: 'block_lesson_001_1',
-      type: 'block',
-      block_type: 'section',
-      variant: 'medium',
-      visibility: 'student_teacher',
-      content: {
-        title: 'Reading pack',
-        blocks: [],
-        link: { mode: 'linked', source_composition_id: 'composition_1' }
-      },
-      layout: {},
-      print: {},
-      settings: {},
-      created_at: ISO,
-      updated_at: ISO,
-      schema_version: 1
-    };
     const composition = {
       id: 'composition_1',
       type: 'composition_template' as const,
@@ -670,11 +764,14 @@ describe('mountLessonEditor', () => {
       if (path === '/api/compositions') {
         return { compositions: [{ id: 'composition_1', title: 'Reading pack', updated_at: ISO }] };
       }
+      if (path === '/api/curriculum') {
+        return emptyCurriculum;
+      }
       if (path === '/api/compositions/composition_1') {
         return composition;
       }
       if (path.startsWith('/api/lessons/')) {
-        return makeLesson({ blocks: [linkedStub] });
+        return makeLesson({ blocks: [linkedStub()] });
       }
       throw new Error(`Unexpected apiGet path: ${path}`);
     });
@@ -683,7 +780,7 @@ describe('mountLessonEditor', () => {
       title: 'Updated reading pack'
     });
 
-    mountLessonEditor({ refs, lessonId: 'lesson_001', isStale: () => false });
+    mount();
     await tick();
     await tick();
 
@@ -728,28 +825,13 @@ describe('mountLessonEditor', () => {
       updated_at: ISO,
       schema_version: 1
     };
-    const linkedStub: Block = {
-      id: 'block_lesson_001_1',
-      type: 'block',
-      block_type: 'section',
-      variant: 'medium',
-      visibility: 'student_teacher',
-      content: {
-        title: 'Reading pack',
-        blocks: [],
-        link: { mode: 'linked', source_composition_id: 'composition_1' }
-      },
-      layout: {},
-      print: {},
-      settings: {},
-      created_at: ISO,
-      updated_at: ISO,
-      schema_version: 1
-    };
 
     apiGetMock.mockImplementation(async (path: string) => {
       if (path === '/api/compositions') {
         return { compositions: [{ id: 'composition_1', title: 'Reading pack', updated_at: ISO }] };
+      }
+      if (path === '/api/curriculum') {
+        return emptyCurriculum;
       }
       if (path === '/api/compositions/composition_1') {
         return {
@@ -765,12 +847,12 @@ describe('mountLessonEditor', () => {
         };
       }
       if (path.startsWith('/api/lessons/')) {
-        return makeLesson({ blocks: [linkedStub] });
+        return makeLesson({ blocks: [linkedStub()] });
       }
       throw new Error(`Unexpected apiGet path: ${path}`);
     });
 
-    const handle = mountLessonEditor({ refs, lessonId: 'lesson_001', isStale: () => false });
+    const handle = mount();
     await tick();
     await tick();
 

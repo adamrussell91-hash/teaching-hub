@@ -1,12 +1,6 @@
 import { apiGet, apiPost, ApiClientError } from '@/api/client';
-import {
-  LESSON_BLOCK_GROUPS,
-  INSERT_MENU_LABEL,
-  cloneBlockWithNewIds,
-  createFromInsertMenu,
-  expandGroupTypesForMenu,
-  type InsertMenuValue
-} from '@/blocks/create-block';
+import { applyProposalToLesson } from '@/ai/apply-proposal';
+import type { AiProposal, AiScope } from '@/ai/proposals';
 import { insertCompositionRoot } from '@/blocks/composition-insert';
 import {
   createLinkedSectionStub,
@@ -14,15 +8,12 @@ import {
   isLinkedSection
 } from '@/blocks/composition-link';
 import { cloneBlocksWithNewIds } from '@/blocks/clone-blocks';
-import { createBlockEditor } from '@/blocks/registry';
+import { createFromInsertMenu } from '@/blocks/create-block';
 import { findBlockById } from '@/blocks/find-block';
-import { applyProposalToBlocks } from '@/ai/apply-proposal';
-import type { AiProposal } from '@/ai/proposals';
-import type { AiScope } from '@/ai/proposals';
+import { openPrintLesson } from '@/print/open-print';
 import type { CompositionSummary, CompositionTemplate } from '@/schemas/composition';
 import type { Lesson } from '@/schemas/lesson';
 import type { Media } from '@/schemas/media';
-import { mountA4Preview, type A4PreviewHandle } from '@/teacher/a4-preview';
 import {
   mountHistoryPanel,
   type HistoryPanelHandle
@@ -34,9 +25,23 @@ import {
   type CompositionCache
 } from '@/teacher/lesson-editor-compositions';
 import { mountAiPanel, type AiPanelHandle } from '@/teacher/ai-panel';
+import {
+  mountLessonPage,
+  type LessonPageHandle
+} from '@/teacher/lesson-canvas/mount-page';
+import {
+  mountLessonPalette,
+  type LessonPaletteHandle,
+  type PaletteInsertPayload
+} from '@/teacher/lesson-canvas/mount-palette';
+import { lessonPaletteFamilies } from '@/teacher/lesson-canvas/palette-catalog';
+import {
+  readBuilderChromePrefs,
+  writeBuilderChromePrefs
+} from '@/teacher/lesson-canvas/prefs';
+import { insertAt } from '@/teacher/lesson-canvas/drop';
 import { createLessonTemplate } from '@/teacher/template-api';
 import { fetchCurriculum } from '@/teacher/nav';
-import { mountCoverPicker } from '@/teacher/cover-picker';
 import { renderContextBar, type TeacherShellRefs } from '@/teacher/shell';
 import { mountSavePublishControls, SaveController, type SavePublishHandle } from '@/teacher/save-publish';
 
@@ -50,7 +55,7 @@ export interface LessonEditorHandle {
   flush(): Promise<void>;
   /** Tears down subscriptions/timers. Only call after awaiting `flush`. */
   dispose(): void;
-  /** Scrolls/focuses the mounted A4 preview host when present. */
+  /** Triggers print for the current lesson. */
   openA4Preview(): void;
   /** Runs the existing save/publish control path when the editor is ready. */
   publish(): void;
@@ -59,7 +64,7 @@ export interface LessonEditorHandle {
 export interface MountLessonEditorOptions {
   refs: TeacherShellRefs;
   lessonId: string;
-  /** Returns true if this mount has been superseded by a newer route render. */
+  /** Returns true if this mount has been superseded by a newer route. */
   isStale: () => boolean;
   /** Image media for cover library picker. */
   media?: Media[];
@@ -73,10 +78,16 @@ function renderStatus(canvas: HTMLElement, text: string): void {
   canvas.append(status);
 }
 
+function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+  return target.isContentEditable;
+}
+
 /**
- * Loads a lesson draft and renders the teacher editor: inline title, block
- * list with reorder/visibility controls, an Add Block menu, and wires
- * save/publish controls into the context bar.
+ * Loads a lesson draft and renders the teacher builder: palette rail, page
+ * canvas, and always-on AI chat, plus save/publish controls in the context bar.
  */
 export function mountLessonEditor(options: MountLessonEditorOptions): LessonEditorHandle {
   const { refs, lessonId, isStale, media = [] } = options;
@@ -85,10 +96,13 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
   let saveController: SaveController | null = null;
   let savePublishHandle: SavePublishHandle | null = null;
   let historyPanel: HistoryPanelHandle | null = null;
-  let a4Preview: A4PreviewHandle | null = null;
   let closeEditSourceModal: (() => void) | null = null;
   let editSourceOpenSeq = 0;
   let aiPanel: AiPanelHandle | null = null;
+  let page: LessonPageHandle | null = null;
+  let palette: LessonPaletteHandle | null = null;
+  let removeChromeKeys: (() => void) | null = null;
+  let printLesson: (() => void) | null = null;
 
   renderStatus(refs.canvas, 'Loading lesson…');
 
@@ -109,221 +123,94 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
   function renderEditor(initialLesson: Lesson): void {
     const lesson: Lesson = initialLesson;
     let blockCounter = lesson.blocks.length;
-    let mediaList: Media[] = [];
+    let mediaList: Media[] = media;
+    let selectedBlockId: string | null = null;
+    let pendingCompositionId: string | null = null;
 
     renderContextBar(refs, { title: lesson.title || 'Untitled lesson' });
     refs.canvas.replaceChildren();
+
+    const builder = document.createElement('div');
+    builder.className = 'lesson-builder';
+
+    const railHost = document.createElement('div');
+    railHost.className = 'lesson-builder__rail';
+
+    const pageCol = document.createElement('div');
+    pageCol.className = 'lesson-builder__page';
+
+    const chatCol = document.createElement('div');
+    chatCol.className = 'lesson-builder__chat';
+
+    const chatStrip = document.createElement('button');
+    chatStrip.type = 'button';
+    chatStrip.className = 'lesson-builder__chat-strip';
+    chatStrip.textContent = 'Chat';
+    chatStrip.hidden = true;
+
+    const aiHost = document.createElement('div');
 
     const publishPanel = document.createElement('div');
     publishPanel.className = 'lesson-editor__publish-panel';
     publishPanel.hidden = true;
 
-    const titleField = document.createElement('div');
-    titleField.className = 'lesson-editor__title-field';
+    const pageHost = document.createElement('div');
 
-    const titleInputId = `lesson-title-${lesson.id}`;
-    const titleLabel = document.createElement('label');
-    titleLabel.className = 'lesson-editor__title-label';
-    titleLabel.htmlFor = titleInputId;
-    titleLabel.textContent = 'Lesson title';
-
-    const titleInput = document.createElement('input');
-    titleInput.type = 'text';
-    titleInput.id = titleInputId;
-    titleInput.className = 'lesson-editor__title-input';
-    titleInput.value = lesson.title;
-    titleInput.autocomplete = 'off';
-
-    titleField.append(titleLabel, titleInput);
-
-    const coverHost = document.createElement('div');
-    coverHost.className = 'lesson-editor__cover';
-    mountCoverPicker(coverHost, {
-      cover: lesson.cover,
-      media,
-      titleFallback: lesson.title,
-      onSave: async (cover) => {
-        if (cover === null) {
-          delete lesson.cover;
-        } else {
-          lesson.cover = cover;
-        }
-        saveController?.notifyChange();
-      }
-    });
-
-    const saveLessonTemplateButton = document.createElement('button');
-    saveLessonTemplateButton.type = 'button';
-    saveLessonTemplateButton.className = 'btn btn--secondary lesson-editor__save-lesson-template';
-    saveLessonTemplateButton.textContent = 'Save as lesson template';
-
-    const blocksContainer = document.createElement('div');
-    blocksContainer.className = 'lesson-editor__blocks';
-
-    const addBlockBar = document.createElement('div');
-    addBlockBar.className = 'lesson-editor__add-block';
-
-    const addSelectId = `add-block-type-${lesson.id}`;
-    const addLabel = document.createElement('label');
-    addLabel.className = 'lesson-editor__add-block-label';
-    addLabel.htmlFor = addSelectId;
-    addLabel.textContent = 'Add block';
-
-    const addSelect = document.createElement('select');
-    addSelect.id = addSelectId;
-    addSelect.className = 'lesson-editor__add-block-select';
-    for (const group of LESSON_BLOCK_GROUPS) {
-      const optgroup = document.createElement('optgroup');
-      optgroup.label = group.label;
-      for (const type of expandGroupTypesForMenu(group.types)) {
-        const opt = document.createElement('option');
-        opt.value = type;
-        opt.textContent = INSERT_MENU_LABEL[type];
-        optgroup.append(opt);
-      }
-      addSelect.append(optgroup);
-    }
-
-    const addButton = document.createElement('button');
-    addButton.type = 'button';
-    addButton.className = 'btn btn--secondary lesson-editor__add-block-button';
-    addButton.textContent = 'Add block';
-
-    const compositionSelectId = `insert-composition-${lesson.id}`;
-    const compositionLabel = document.createElement('label');
-    compositionLabel.className = 'lesson-editor__add-block-label';
-    compositionLabel.htmlFor = compositionSelectId;
-    compositionLabel.textContent = 'Composition';
-
-    const compositionSelect = document.createElement('select');
-    compositionSelect.id = compositionSelectId;
-    compositionSelect.className = 'lesson-editor__composition-select';
-
-    const compositionCopyButton = document.createElement('button');
-    compositionCopyButton.type = 'button';
-    compositionCopyButton.className = 'btn btn--secondary lesson-editor__insert-composition-copy';
-    compositionCopyButton.textContent = 'Insert copy';
-
-    const compositionLinkedButton = document.createElement('button');
-    compositionLinkedButton.type = 'button';
-    compositionLinkedButton.className = 'btn btn--secondary lesson-editor__insert-composition-linked';
-    compositionLinkedButton.textContent = 'Insert linked';
+    const compositionConfirm = document.createElement('div');
+    compositionConfirm.className = 'lesson-editor__insert-composition-confirm';
+    compositionConfirm.hidden = true;
 
     const compositionStatus = document.createElement('p');
     compositionStatus.className = 'lesson-editor__composition-status';
     compositionStatus.hidden = true;
 
-    addBlockBar.append(
-      addLabel,
-      addSelect,
-      addButton,
-      compositionLabel,
-      compositionSelect,
-      compositionCopyButton,
-      compositionLinkedButton
-    );
+    pageCol.append(publishPanel, pageHost, compositionConfirm, compositionStatus);
+    chatCol.append(chatStrip, aiHost);
+    builder.append(railHost, pageCol, chatCol);
+    refs.canvas.append(builder);
 
-    const root = document.createElement('div');
-    root.className = 'lesson-editor';
-
-    const main = document.createElement('div');
-    main.className = 'lesson-editor__main';
-    main.append(
-      publishPanel,
-      coverHost,
-      titleField,
-      saveLessonTemplateButton,
-      blocksContainer,
-      addBlockBar,
-      compositionStatus
-    );
-
-    const side = document.createElement('div');
-    side.className = 'lesson-editor__side';
-
-    const modeTabs = document.createElement('div');
-    modeTabs.className = 'lesson-editor__mode-tabs';
-    modeTabs.setAttribute('role', 'tablist');
-    modeTabs.setAttribute('aria-label', 'Lesson side panel');
-
-    const a4Tab = document.createElement('button');
-    a4Tab.type = 'button';
-    a4Tab.className = 'lesson-editor__mode-tab';
-    a4Tab.setAttribute('role', 'tab');
-    a4Tab.textContent = 'A4';
-
-    const aiTab = document.createElement('button');
-    aiTab.type = 'button';
-    aiTab.className = 'lesson-editor__mode-tab';
-    aiTab.setAttribute('role', 'tab');
-    aiTab.textContent = 'AI';
-
-    modeTabs.append(a4Tab, aiTab);
-
-    const previewHost = document.createElement('div');
-    previewHost.className = 'lesson-editor__preview';
-    previewHost.setAttribute('role', 'tabpanel');
-
-    const aiHost = document.createElement('div');
-    aiHost.className = 'lesson-editor__ai';
-    aiHost.setAttribute('role', 'tabpanel');
-
-    side.append(modeTabs, previewHost, aiHost);
-    root.append(main, side);
-    refs.canvas.append(root);
-
-    let selectedBlockId: string | null = null;
-    let sideMode: 'a4' | 'ai' = 'a4';
-    try {
-      const stored = sessionStorage.getItem(`teaching_hub_lesson_side_${lessonId}`);
-      if (stored === 'ai' || stored === 'a4') sideMode = stored;
-    } catch {
-      /* ignore */
+    function nextId(): string {
+      blockCounter += 1;
+      return `block_${lesson.id}_${blockCounter}`;
     }
 
-    a4Preview = mountA4Preview(previewHost);
-    a4Preview.update(lesson);
-
-    aiPanel = mountAiPanel(aiHost, {
-      lessonId,
-      getSnapshotAt: () => lesson.updated_at,
-      onAcceptProposal: (proposal: AiProposal) => {
-        const result = applyProposalToBlocks(lesson.blocks, proposal, () => {
-          blockCounter += 1;
-          return `block_${lesson.id}_${blockCounter}`;
-        });
-        if (!result.ok) return result;
-        lesson.blocks = result.blocks;
-        renderBlocksList();
-        syncSelectionUi();
-        void saveController?.saveNow({ checkpointReason: 'ai_accepted' });
-        return { ok: true };
+    function assignLesson(next: Lesson): void {
+      lesson.title = next.title;
+      lesson.blocks = next.blocks;
+      if (next.cover) {
+        lesson.cover = next.cover;
+      } else {
+        delete lesson.cover;
       }
-    });
-
-    function setSideMode(mode: 'a4' | 'ai'): void {
-      sideMode = mode;
-      try {
-        sessionStorage.setItem(`teaching_hub_lesson_side_${lessonId}`, mode);
-      } catch {
-        /* ignore */
-      }
-      const showA4 = mode === 'a4';
-      previewHost.hidden = !showA4;
-      aiHost.hidden = showA4;
-      a4Tab.classList.toggle('lesson-editor__mode-tab--active', showA4);
-      aiTab.classList.toggle('lesson-editor__mode-tab--active', !showA4);
-      a4Tab.setAttribute('aria-selected', showA4 ? 'true' : 'false');
-      aiTab.setAttribute('aria-selected', showA4 ? 'false' : 'true');
     }
 
-    a4Tab.addEventListener('click', () => setSideMode('a4'));
-    aiTab.addEventListener('click', () => setSideMode('ai'));
-    setSideMode(sideMode);
+    function markDirty(): void {
+      saveController?.notifyChange();
+    }
+
+    function persistChrome(): void {
+      writeBuilderChromePrefs({
+        rail: builder.classList.contains('lesson-builder--rail-shelved') ? 'shelved' : 'open',
+        chat: builder.classList.contains('lesson-builder--chat-shelved') ? 'shelved' : 'open'
+      });
+    }
+
+    function setRailShelved(shelved: boolean): void {
+      builder.classList.toggle('lesson-builder--rail-shelved', shelved);
+      palette?.setShelved(shelved);
+      persistChrome();
+    }
+
+    function setChatShelved(shelved: boolean): void {
+      builder.classList.toggle('lesson-builder--chat-shelved', shelved);
+      aiPanel?.setShelved(shelved);
+      chatStrip.hidden = !shelved;
+      persistChrome();
+    }
 
     function syncAiSelection(): void {
       if (!selectedBlockId) {
-        aiPanel?.setSelection({ blockId: null, blockType: null, scope: 'block' });
+        aiPanel?.setSelection({ blockId: null, blockType: null, scope: 'lesson' });
         return;
       }
       const block = findBlockById(lesson.blocks, selectedBlockId);
@@ -333,41 +220,6 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         blockType: block?.block_type ?? null,
         scope
       });
-    }
-
-    function syncSelectionUi(): void {
-      for (const row of blocksContainer.querySelectorAll('.lesson-editor__block-row')) {
-        row.classList.remove('lesson-editor__block-row--selected');
-      }
-      for (const editor of blocksContainer.querySelectorAll('.block-editor')) {
-        editor.classList.remove('block-editor--selected');
-      }
-      if (!selectedBlockId) {
-        syncAiSelection();
-        return;
-      }
-      const selectedEditor = blocksContainer.querySelector(
-        `.block-editor[data-block-id="${CSS.escape(selectedBlockId)}"]`
-      );
-      selectedEditor?.classList.add('block-editor--selected');
-      selectedEditor?.closest('.lesson-editor__block-row')?.classList.add('lesson-editor__block-row--selected');
-      syncAiSelection();
-    }
-
-    blocksContainer.addEventListener('click', (event) => {
-      const target = event.target as HTMLElement | null;
-      if (!target) return;
-      if (target.closest('button, a, input, textarea, select, label')) return;
-      const editor = target.closest('.block-editor') as HTMLElement | null;
-      const id = editor?.dataset.blockId;
-      if (!id) return;
-      selectedBlockId = id;
-      syncSelectionUi();
-    });
-
-    function markDirty(): void {
-      saveController?.notifyChange();
-      a4Preview?.update(lesson);
     }
 
     const compositionCache: CompositionCache = new Map();
@@ -383,40 +235,40 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       compositionStatus.textContent = text;
     }
 
-    function fillCompositionSelect(compositions: CompositionSummary[]): void {
-      compositionSelect.replaceChildren();
-      if (compositions.length === 0) {
-        const empty = document.createElement('option');
-        empty.value = '';
-        empty.textContent = 'No compositions yet';
-        compositionSelect.append(empty);
-        compositionSelect.disabled = true;
-        compositionCopyButton.disabled = true;
-        compositionLinkedButton.disabled = true;
-        return;
-      }
-      compositionSelect.disabled = false;
-      compositionCopyButton.disabled = false;
-      compositionLinkedButton.disabled = false;
-      for (const row of compositions) {
-        const opt = document.createElement('option');
-        opt.value = row.id;
-        opt.textContent = row.title;
-        compositionSelect.append(opt);
-      }
+    function hideCompositionConfirm(): void {
+      pendingCompositionId = null;
+      compositionConfirm.hidden = true;
+      compositionConfirm.replaceChildren();
     }
 
-    async function refreshCompositions(): Promise<void> {
-      try {
-        const data = await apiGet<{ compositions: CompositionSummary[] }>('/api/compositions');
-        fillCompositionSelect(data.compositions);
-      } catch {
-        fillCompositionSelect([]);
-        setCompositionStatus('Unable to load compositions.');
-      }
-    }
+    function showCompositionConfirm(compositionId: string): void {
+      pendingCompositionId = compositionId;
+      compositionConfirm.hidden = false;
+      compositionConfirm.replaceChildren();
 
-    void refreshCompositions();
+      const copyButton = document.createElement('button');
+      copyButton.type = 'button';
+      copyButton.className = 'btn btn--secondary lesson-editor__insert-composition-copy';
+      copyButton.textContent = 'Copy';
+
+      const linkedButton = document.createElement('button');
+      linkedButton.type = 'button';
+      linkedButton.className = 'btn btn--secondary lesson-editor__insert-composition-linked';
+      linkedButton.textContent = 'Linked';
+
+      copyButton.addEventListener('click', () => {
+        const id = pendingCompositionId;
+        hideCompositionConfirm();
+        if (id) void insertSelectedComposition(id);
+      });
+      linkedButton.addEventListener('click', () => {
+        const id = pendingCompositionId;
+        hideCompositionConfirm();
+        if (id) void insertLinkedComposition(id);
+      });
+
+      compositionConfirm.append(copyButton, linkedButton);
+    }
 
     function queueCompositionFetch(compositionId: string): void {
       ensureCompositionCached({
@@ -425,189 +277,31 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         inFlight: compositionFetchInFlight,
         onSettled: () => {
           if (!disposed && !isStale()) {
-            renderBlocksList();
+            page?.update(lesson);
           }
         }
       });
     }
 
-    function renderLinkedPreview(compositionId: string): HTMLElement {
-      return buildLinkedPreview(compositionId, compositionCache, queueCompositionFetch);
+    function applyBlocks(nextBlocks: Lesson['blocks']): void {
+      lesson.blocks = nextBlocks;
+      page?.update(lesson);
+      markDirty();
     }
 
-    function renderBlocksList(): void {
-      blocksContainer.replaceChildren();
-
-      if (lesson.blocks.length === 0) {
-        const empty = document.createElement('p');
-        empty.className = 'teacher-layout__canvas-status';
-        empty.textContent = 'No blocks yet. Use Add Block to get started.';
-        blocksContainer.append(empty);
-        return;
+    async function refreshCompositions(): Promise<void> {
+      try {
+        const data = await apiGet<{ compositions: CompositionSummary[] }>('/api/compositions');
+        palette?.updateFamilies(lessonPaletteFamilies(data.compositions));
+      } catch {
+        palette?.updateFamilies(lessonPaletteFamilies([]));
+        setCompositionStatus('Unable to load compositions.');
       }
-
-      lesson.blocks.forEach((block, index) => {
-        const row = document.createElement('div');
-        row.className = 'lesson-editor__block-row';
-        if (isLinkedSection(block)) {
-          row.classList.add('lesson-editor__block-row--linked');
-        }
-
-        const controls = document.createElement('div');
-        controls.className = 'lesson-editor__block-controls';
-
-        const upButton = document.createElement('button');
-        upButton.type = 'button';
-        upButton.className = 'btn btn--ghost lesson-editor__reorder';
-        upButton.textContent = '↑';
-        upButton.setAttribute('aria-label', `Move block ${index + 1} up`);
-        upButton.disabled = index === 0;
-        upButton.addEventListener('click', () => moveBlock(index, -1));
-
-        const downButton = document.createElement('button');
-        downButton.type = 'button';
-        downButton.className = 'btn btn--ghost lesson-editor__reorder';
-        downButton.textContent = '↓';
-        downButton.setAttribute('aria-label', `Move block ${index + 1} down`);
-        downButton.disabled = index === lesson.blocks.length - 1;
-        downButton.addEventListener('click', () => moveBlock(index, 1));
-
-        const duplicateButton = document.createElement('button');
-        duplicateButton.type = 'button';
-        duplicateButton.className = 'btn btn--ghost lesson-editor__duplicate';
-        duplicateButton.textContent = 'Duplicate';
-        duplicateButton.setAttribute('aria-label', `Duplicate block ${index + 1}`);
-        duplicateButton.disabled = isLinkedSection(block);
-        if (!isLinkedSection(block)) {
-          duplicateButton.addEventListener('click', () => duplicateBlock(index));
-        }
-
-        const deleteButton = document.createElement('button');
-        deleteButton.type = 'button';
-        deleteButton.className = 'btn btn--ghost lesson-editor__delete';
-        deleteButton.textContent = 'Delete';
-        deleteButton.setAttribute('aria-label', `Delete block ${index + 1}`);
-        deleteButton.addEventListener('click', () => deleteBlock(index));
-
-        controls.append(upButton, downButton, duplicateButton, deleteButton);
-
-        if (isLinkedSection(block)) {
-          const editSourceButton = document.createElement('button');
-          editSourceButton.type = 'button';
-          editSourceButton.className = 'btn btn--ghost lesson-editor__edit-source';
-          editSourceButton.textContent = 'Edit Source';
-          editSourceButton.setAttribute('aria-label', `Edit source for block ${index + 1}`);
-          editSourceButton.addEventListener('click', () => {
-            closeEditSourceModal?.();
-            closeEditSourceModal = null;
-            const openSeq = ++editSourceOpenSeq;
-            void openEditSourceModal({
-              compositionId: block.content.link.source_composition_id,
-              media: mediaList,
-              setStatus: setCompositionStatus,
-              onSaved: (updated) => {
-                compositionCache.set(updated.id, updated);
-                setCompositionStatus(`Saved “${updated.title}”.`);
-                renderBlocksList();
-              }
-            }).then((modal) => {
-              if (disposed || isStale() || openSeq !== editSourceOpenSeq) {
-                modal.close();
-                return;
-              }
-              closeEditSourceModal = () => {
-                modal.close();
-                closeEditSourceModal = null;
-              };
-            });
-          });
-
-          const detachButton = document.createElement('button');
-          detachButton.type = 'button';
-          detachButton.className = 'btn btn--ghost lesson-editor__detach-composition';
-          detachButton.textContent = 'Detach';
-          detachButton.setAttribute('aria-label', `Detach linked composition ${index + 1}`);
-          detachButton.addEventListener('click', () => {
-            void detachLinkedSection(index);
-          });
-
-          controls.append(editSourceButton, detachButton);
-
-          const badge = document.createElement('span');
-          badge.className = 'lesson-editor__linked-badge';
-          badge.textContent = 'Linked';
-
-          const body = document.createElement('div');
-          body.className = 'lesson-editor__linked-body';
-          body.append(badge, renderLinkedPreview(block.content.link.source_composition_id));
-
-          row.append(controls, body);
-          blocksContainer.append(row);
-          return;
-        }
-
-        if (block.block_type === 'section') {
-          const saveCompositionButton = document.createElement('button');
-          saveCompositionButton.type = 'button';
-          saveCompositionButton.className = 'btn btn--ghost lesson-editor__save-composition';
-          saveCompositionButton.textContent = 'Save as composition';
-          saveCompositionButton.setAttribute(
-            'aria-label',
-            `Save block ${index + 1} as composition`
-          );
-          saveCompositionButton.addEventListener('click', () => {
-            void saveBlockAsComposition(index);
-          });
-          controls.append(saveCompositionButton);
-        }
-
-        const editor = createBlockEditor(
-          block,
-          (updated) => {
-            lesson.blocks[index] = updated;
-            markDirty();
-          },
-          () => lesson.blocks[index]!,
-          { media: mediaList }
-        );
-
-        row.append(controls, editor);
-        blocksContainer.append(row);
-      });
     }
 
-    function moveBlock(index: number, direction: -1 | 1): void {
-      const target = index + direction;
-      if (target < 0 || target >= lesson.blocks.length) return;
-      const blocks = lesson.blocks;
-      const temp = blocks[index]!;
-      blocks[index] = blocks[target]!;
-      blocks[target] = temp;
-      markDirty();
-      renderBlocksList();
-    }
-
-    function deleteBlock(index: number): void {
-      lesson.blocks.splice(index, 1);
-      markDirty();
-      renderBlocksList();
-    }
-
-    function duplicateBlock(index: number): void {
-      const source = lesson.blocks[index];
-      if (!source) return;
-      const clone = cloneBlockWithNewIds(source, () => {
-        blockCounter += 1;
-        return `block_${lesson.id}_${blockCounter}`;
-      });
-      lesson.blocks.splice(index + 1, 0, clone);
-      markDirty();
-      renderBlocksList();
-    }
-
-    async function saveBlockAsComposition(index: number): Promise<void> {
-      const block = lesson.blocks[index];
-      if (!block || block.block_type !== 'section') return;
+    async function saveBlockAsComposition(blockId: string): Promise<void> {
+      const block = findBlockById(lesson.blocks, blockId);
+      if (!block || block.block_type !== 'section' || isLinkedSection(block)) return;
       const defaultTitle = block.content.title.trim() || 'Composition';
       const title = window.prompt('Composition name', defaultTitle);
       if (title === null) return;
@@ -648,26 +342,24 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       }
     }
 
-    async function insertSelectedComposition(): Promise<void> {
-      const id = compositionSelect.value;
+    async function insertSelectedComposition(id: string): Promise<void> {
       if (!id) return;
       try {
         const full = await apiGet<CompositionTemplate>(`/api/compositions/${id}`);
-        const clone = insertCompositionRoot(full.root, () => {
-          blockCounter += 1;
-          return `block_${lesson.id}_${blockCounter}`;
-        });
-        lesson.blocks.push(clone);
-        markDirty();
-        renderBlocksList();
+        const clone = insertCompositionRoot(full.root, nextId);
+        const result = insertAt(lesson.blocks, { kind: 'root' }, lesson.blocks.length, clone);
+        if (!result.ok) {
+          setCompositionStatus(result.message);
+          return;
+        }
+        applyBlocks(result.blocks);
         setCompositionStatus(`Inserted “${full.title}”.`);
       } catch {
         setCompositionStatus('Unable to insert composition.');
       }
     }
 
-    async function insertLinkedComposition(): Promise<void> {
-      const id = compositionSelect.value;
+    async function insertLinkedComposition(id: string): Promise<void> {
       if (!id) return;
       try {
         const full = await apiGet<CompositionTemplate>(`/api/compositions/${id}`);
@@ -675,24 +367,27 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
           setCompositionStatus('Composition is not available to link.');
           return;
         }
-        blockCounter += 1;
         const stub = createLinkedSectionStub({
-          id: `block_${lesson.id}_${blockCounter}`,
+          id: nextId(),
           sourceCompositionId: full.id,
           titleHint: full.title
         });
         compositionCache.set(full.id, full);
-        lesson.blocks.push(stub);
-        markDirty();
-        renderBlocksList();
+        const result = insertAt(lesson.blocks, { kind: 'root' }, lesson.blocks.length, stub);
+        if (!result.ok) {
+          setCompositionStatus(result.message);
+          return;
+        }
+        applyBlocks(result.blocks);
         setCompositionStatus(`Linked “${full.title}”.`);
       } catch {
         setCompositionStatus('Unable to link composition.');
       }
     }
 
-    async function detachLinkedSection(index: number): Promise<void> {
-      const block = lesson.blocks[index];
+    async function detachLinkedSection(blockId: string): Promise<void> {
+      const index = lesson.blocks.findIndex((block) => block.id === blockId);
+      const block = index >= 0 ? lesson.blocks[index] : undefined;
       if (!block || !isLinkedSection(block)) return;
       try {
         const full = await apiGet<CompositionTemplate>(
@@ -702,55 +397,146 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
           setCompositionStatus('Unable to detach — composition missing or archived.');
           return;
         }
-        const independent = insertCompositionRoot(full.root, () => {
-          blockCounter += 1;
-          return `block_${lesson.id}_${blockCounter}`;
-        });
-        lesson.blocks[index] = independent;
-        markDirty();
-        renderBlocksList();
+        const independent = insertCompositionRoot(full.root, nextId);
+        const next = [...lesson.blocks];
+        next[index] = independent;
+        applyBlocks(next);
         setCompositionStatus('Detached composition into this lesson.');
       } catch {
         setCompositionStatus('Unable to detach composition.');
       }
     }
 
-    function addBlock(type: InsertMenuValue): void {
-      blockCounter += 1;
-      const id = `block_${lesson.id}_${blockCounter}`;
-      lesson.blocks.push(createFromInsertMenu(type, id));
-      markDirty();
-      renderBlocksList();
+    function openEditSource(compositionId: string): void {
+      closeEditSourceModal?.();
+      closeEditSourceModal = null;
+      const openSeq = ++editSourceOpenSeq;
+      void openEditSourceModal({
+        compositionId,
+        media: mediaList,
+        setStatus: setCompositionStatus,
+        onSaved: (updated) => {
+          compositionCache.set(updated.id, updated);
+          setCompositionStatus(`Saved “${updated.title}”.`);
+          page?.update(lesson);
+        }
+      }).then((modal) => {
+        if (disposed || isStale() || openSeq !== editSourceOpenSeq) {
+          modal.close();
+          return;
+        }
+        closeEditSourceModal = () => {
+          modal.close();
+          closeEditSourceModal = null;
+        };
+      });
     }
 
-    titleInput.addEventListener('input', () => {
-      lesson.title = titleInput.value;
-      markDirty();
+    function onPaletteInsert(payload: PaletteInsertPayload): void {
+      if (payload.kind === 'composition') {
+        showCompositionConfirm(payload.id);
+        return;
+      }
+      hideCompositionConfirm();
+      const block = createFromInsertMenu(payload.type, nextId());
+      const result = insertAt(lesson.blocks, { kind: 'root' }, lesson.blocks.length, block);
+      if (!result.ok) {
+        setCompositionStatus(result.message);
+        return;
+      }
+      applyBlocks(result.blocks);
+    }
+
+    palette = mountLessonPalette(railHost, {
+      families: lessonPaletteFamilies([]),
+      onInsert: onPaletteInsert,
+      onShelved: (shelved) => {
+        builder.classList.toggle('lesson-builder--rail-shelved', shelved);
+      }
     });
 
-    addButton.addEventListener('click', () => {
-      addBlock(addSelect.value as InsertMenuValue);
+    page = mountLessonPage(pageHost, {
+      lesson,
+      media: mediaList,
+      onChange: (next) => {
+        assignLesson(next);
+        markDirty();
+      },
+      onPrint: () => openPrintLesson(lesson),
+      onSelect: (blockId) => {
+        selectedBlockId = blockId;
+        syncAiSelection();
+      },
+      idFactory: nextId,
+      onSaveTemplate: () => {
+        void saveLessonAsTemplate();
+      },
+      onSaveComposition: (blockId) => {
+        void saveBlockAsComposition(blockId);
+      },
+      onEditSource: openEditSource,
+      onDetachComposition: (blockId) => {
+        void detachLinkedSection(blockId);
+      },
+      renderLinkedPreview: (compositionId) =>
+        buildLinkedPreview(compositionId, compositionCache, queueCompositionFetch)
     });
 
-    saveLessonTemplateButton.addEventListener('click', () => {
-      void saveLessonAsTemplate();
+    printLesson = () => openPrintLesson(lesson);
+
+    aiPanel = mountAiPanel(aiHost, {
+      lessonId,
+      getSnapshotAt: () => lesson.updated_at,
+      onAcceptProposal: (proposal: AiProposal) => {
+        const result = applyProposalToLesson(lesson, proposal, nextId);
+        if (!result.ok) return result;
+        assignLesson(result.lesson);
+        page?.update(lesson);
+        void saveController?.saveNow({ checkpointReason: 'ai_accepted' });
+        return { ok: true };
+      },
+      onStaleAccept: (apply) => {
+        if (
+          window.confirm(
+            'You edited while the plan was built. Accept replaces the lesson with this plan.'
+          )
+        ) {
+          apply();
+        }
+      }
     });
 
-    compositionCopyButton.addEventListener('click', () => {
-      void insertSelectedComposition();
-    });
+    syncAiSelection();
 
-    compositionLinkedButton.addEventListener('click', () => {
-      void insertLinkedComposition();
-    });
+    const prefs = readBuilderChromePrefs();
+    if (prefs.rail === 'shelved') setRailShelved(true);
+    if (prefs.chat === 'shelved') setChatShelved(true);
 
-    renderBlocksList();
+    chatStrip.addEventListener('click', () => setChatShelved(false));
+
+    function onWindowKeydown(event: KeyboardEvent): void {
+      if (disposed || isTypingTarget(event.target)) return;
+      if (event.key === '[') {
+        event.preventDefault();
+        setRailShelved(!builder.classList.contains('lesson-builder--rail-shelved'));
+      } else if (event.key === ']') {
+        event.preventDefault();
+        setChatShelved(!builder.classList.contains('lesson-builder--chat-shelved'));
+      }
+    }
+
+    window.addEventListener('keydown', onWindowKeydown);
+    removeChromeKeys = () => {
+      window.removeEventListener('keydown', onWindowKeydown);
+    };
+
+    void refreshCompositions();
 
     void fetchCurriculum()
       .then((curriculum) => {
         if (disposed || isStale()) return;
         mediaList = curriculum.media;
-        renderBlocksList();
+        page?.update(lesson, mediaList);
       })
       .catch(() => {
         /* library picker stays empty */
@@ -827,10 +613,8 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
 
     function applyRestoredLesson(restored: Lesson): void {
       Object.assign(lesson, restored);
-      titleInput.value = lesson.title;
       blockCounter = lesson.blocks.length;
-      renderBlocksList();
-      a4Preview?.update(lesson);
+      page?.update(lesson);
       const titleEl = refs.contextBar.querySelector('.teacher-layout__context-bar-title');
       if (titleEl) titleEl.textContent = lesson.title || 'Untitled lesson';
     }
@@ -851,33 +635,30 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     },
     dispose() {
       disposed = true;
+      removeChromeKeys?.();
+      removeChromeKeys = null;
       closeEditSourceModal?.();
       closeEditSourceModal = null;
-      a4Preview?.dispose();
-      a4Preview = null;
+      page?.dispose();
+      page = null;
+      palette?.dispose();
+      palette = null;
       historyPanel?.dispose();
       historyPanel = null;
       aiPanel?.dispose();
       aiPanel = null;
       savePublishHandle?.dispose();
       saveController?.dispose();
+      printLesson = null;
     },
     openA4Preview() {
       if (disposed) return;
-      try {
-        sessionStorage.setItem(`teaching_hub_lesson_side_${lessonId}`, 'a4');
-      } catch {
-        /* ignore */
+      const print = refs.canvas.querySelector<HTMLButtonElement>('[aria-label="Print"]');
+      if (print) {
+        print.click();
+        return;
       }
-      const a4Button = refs.canvas.querySelector('.lesson-editor__mode-tab');
-      if (a4Button instanceof HTMLButtonElement) a4Button.click();
-      const preview = refs.canvas.querySelector('.a4-preview');
-      if (!(preview instanceof HTMLElement)) return;
-      if (!preview.hasAttribute('tabindex')) {
-        preview.tabIndex = -1;
-      }
-      preview.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      preview.focus({ preventScroll: true });
+      printLesson?.();
     },
     publish() {
       if (disposed) return;
