@@ -206,6 +206,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
 
     const menu = document.createElement('div');
     menu.className = 'lesson-page__menu';
+    menu.hidden = true;
 
     const save = document.createElement('button');
     save.type = 'button';

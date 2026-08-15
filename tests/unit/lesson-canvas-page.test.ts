@@ -179,7 +179,7 @@ describe('mountLessonPage', () => {
     expect(onPrint).toHaveBeenCalledTimes(1);
   });
 
-  it('includes Save as lesson template in the page menu', () => {
+  it('hides Save as lesson template until the overflow menu is opened', () => {
     const onSaveTemplate = vi.fn();
     mount(makeLesson(), { onSaveTemplate });
 
@@ -187,6 +187,12 @@ describe('mountLessonPage', () => {
       btn.textContent?.includes('Save as lesson template')
     );
     expect(save).toBeTruthy();
+    const menu = save!.closest<HTMLElement>('.lesson-page__menu');
+    expect(menu?.hidden).toBe(true);
+
+    host.querySelector<HTMLButtonElement>('[aria-label="Page menu"]')!.click();
+    expect(menu?.hidden).toBe(false);
+
     save!.click();
     expect(onSaveTemplate).toHaveBeenCalledTimes(1);
   });
