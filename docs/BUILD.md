@@ -33,7 +33,7 @@ Suggested order for continuing builder / teaching-page work (adjust as needed):
 
 | Date | Slice | Outcome |
 |------|--------|---------|
-| 2026-08-15 | **GitHub content backup** | Trash **Backup to GitHub** commits the portable archive JSON to `content_backup/` (env token/repo; not after every edit; no secrets/media bytes) |
+| 2026-08-15 | **GitHub content backup** | Trash **Backup to GitHub** plus weekly scheduled snapshot to `content_backup/` (env token/repo; not after every edit; no secrets/media bytes) |
 | 2026-08-15 | **AI composition fill** | Quick actions + chat phrasing fill Reading Comprehension / Vocabulary Study / Source Analysis skeletons (library title match when present); Ann chat injects structure, does not invent layout |
 | 2026-08-15 | **JSON export / Backup Now** | Lesson, unit, and full-archive JSON download (no secrets, no media bytes, no GitHub push) |
 | 2026-08-15 | **Class schedule overflow** | ⋯ on class calendar detail + unit sequence: Set as current, Change date |
@@ -128,11 +128,11 @@ Unchecked = not built yet.
 - [x] AI agent
 - [x] Versioning / archive / recovery
 - [x] JSON export / Backup Now
-- [x] GitHub content backup (manual snapshot; not scheduled)
+- [x] GitHub content backup (manual + weekly scheduled snapshot)
 - [x] AI composition fill (Phase 13D)
 
 ---
 
 ## Latest note
 
-**2026-08-15** — GitHub content backup: Trash **Backup to GitHub** writes the same portable archive JSON to `content_backup/teaching-hub-archive.json` in a configured repo. Not after every edit; no scheduled cron yet. Live streaming and AI auto-publish remain won’t-do. Next: Phase 15.
+**2026-08-15** — GitHub backups: Trash **Backup to GitHub**, plus a weekly Netlify scheduled snapshot of the same archive JSON. Not after every edit. Next: Phase 15.

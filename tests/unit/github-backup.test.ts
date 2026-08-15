@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   GITHUB_BACKUP_PATH,
+  GITHUB_BACKUP_SCHEDULE,
   githubBackupCommitMessage,
   parseGithubRepo,
-  putGithubFile
+  putGithubFile,
+  readGithubBackupConfig
 } from '@/export/github-backup';
 
 describe('GitHub backup helpers', () => {
@@ -17,6 +19,18 @@ describe('GitHub backup helpers', () => {
       name: 'teaching-hub-content'
     });
     expect(parseGithubRepo('nope')).toBeNull();
+    expect(GITHUB_BACKUP_SCHEDULE).toBe('@weekly');
+    expect(
+      readGithubBackupConfig({
+        GITHUB_BACKUP_TOKEN: 'ghp_secret',
+        GITHUB_BACKUP_REPO: 'adam/teaching-hub-content'
+      })
+    ).toEqual({
+      token: 'ghp_secret',
+      repo: 'adam/teaching-hub-content',
+      branch: 'main'
+    });
+    expect(readGithubBackupConfig({})).toBeNull();
   });
 
   it('creates then updates a file without sending secrets in the commit body', async () => {

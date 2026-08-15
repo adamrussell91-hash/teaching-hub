@@ -93,6 +93,7 @@ SITE_ORIGIN=https://teaching-hub.adam-russell.com
 GITHUB_BACKUP_TOKEN=<optional GitHub PAT with contents:write>
 GITHUB_BACKUP_REPO=owner/content-backup-repo
 GITHUB_BACKUP_BRANCH=main
+# Weekly snapshot runs on Netlify production (Sunday 00:00 UTC) when those vars are set.
 ```
 
 4. Add a same-site API hostname (required for the session cookie — same as Life Hub’s `api.adam-russell.com`):

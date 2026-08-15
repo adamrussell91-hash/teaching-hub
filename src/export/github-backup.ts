@@ -1,4 +1,5 @@
 export const GITHUB_BACKUP_PATH = 'content_backup/teaching-hub-archive.json';
+export const GITHUB_BACKUP_SCHEDULE = '@weekly';
 
 export function githubBackupCommitMessage(createdAt: string): string {
   return `chore(content): Teaching Hub archive snapshot ${createdAt}`;
@@ -8,6 +9,17 @@ export function parseGithubRepo(repo: string): { owner: string; name: string } |
   const match = /^([^/\s]+)\/([^/\s]+)$/.exec(repo.trim());
   if (!match) return null;
   return { owner: match[1]!, name: match[2]! };
+}
+
+export function readGithubBackupConfig(env: Record<string, string | undefined>): {
+  token: string;
+  repo: string;
+  branch: string;
+} | null {
+  const token = env.GITHUB_BACKUP_TOKEN?.trim();
+  const repo = env.GITHUB_BACKUP_REPO?.trim();
+  if (!token || !repo || !parseGithubRepo(repo)) return null;
+  return { token, repo, branch: env.GITHUB_BACKUP_BRANCH?.trim() || 'main' };
 }
 
 export interface GithubBackupResult {
