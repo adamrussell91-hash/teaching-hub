@@ -27,8 +27,10 @@ describe('lesson palette catalog', () => {
         expect(INSERT_MENU_DESCRIPTION[type].length).toBeGreaterThan(8);
       }
     }
-    expect(blockIconSrc('concept_map')).toBe('/assets/blocks/concept_map.svg');
-    expect(blockIconSrc('embed:pdf')).toBe('/assets/blocks/embed-pdf.svg');
+    expect(blockIconSrc('concept_map')).toBe('/assets/blocks/concept_map.png');
+    expect(blockIconSrc('embed:pdf')).toBe('/assets/blocks/embed-pdf.png');
+    expect(blockIconSrc('html_app')).toBe('/assets/blocks/html_app.png');
+    expect(blockIconSrc('embed:google_maps')).toBe('/assets/blocks/embed-google_maps.png');
   });
 
   it('hides compositions family when the list is empty', () => {

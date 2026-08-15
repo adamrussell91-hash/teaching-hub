@@ -45,7 +45,7 @@ export const INSERT_MENU_DESCRIPTION: Record<InsertMenuValue, string> = {
 };
 
 export function blockIconSrc(type: InsertMenuValue): string {
-  return `/assets/blocks/${type.replace(':', '-')}.svg`;
+  return `/assets/blocks/${type.replace(':', '-')}.png`;
 }
 
 export type PaletteBlockCard = {

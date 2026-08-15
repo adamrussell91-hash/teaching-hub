@@ -1,42 +1,42 @@
 # Lesson block icons
 
-Drop one SVG per palette insert type here. Until files exist, the palette falls back to a letter tile (`.lesson-palette__card-icon` / `.palette-card__icon`).
+PNG exports from Documents/`teaching hub page content icons`, renamed to palette ids (`:` → `-`). Black export backgrounds are punched out so the line art sits on cotton.
 
-Filenames use `:` → `-` (`embed:pdf` → `embed-pdf.svg`). Paths are `/assets/blocks/<name>.svg`.
+Missing from that folder (letter-tile fallback): `diagram.png`, `collection.png`.
 
-- `rich_text.svg`
-- `heading.svg`
-- `callout.svg`
-- `quote.svg`
-- `divider.svg`
-- `definition.svg`
-- `code.svg`
-- `html.svg`
-- `html_app.svg`
-- `image.svg`
-- `gallery.svg`
-- `video.svg`
-- `embed.svg`
-- `embed-google_maps.svg`
-- `embed-google_slides.svg`
-- `embed-google_docs.svg`
-- `embed-pdf.svg`
-- `audio.svg`
-- `attachment.svg`
-- `accordion.svg`
-- `table.svg`
-- `question_set.svg`
-- `flashcards.svg`
-- `cloze.svg`
-- `self_check.svg`
-- `chart.svg`
-- `equation.svg`
-- `diagram.svg`
-- `mind_map.svg`
-- `concept_map.svg`
-- `columns.svg`
-- `section.svg`
-- `spacer.svg`
-- `timeline.svg`
-- `tabs.svg`
-- `collection.svg`
+| Palette file | Source file |
+| --- | --- |
+| `rich_text.png` | `rich text.png` |
+| `heading.png` | `heading.png` |
+| `callout.png` | `callout.png` |
+| `quote.png` | `quote.png` |
+| `divider.png` | `divider.png` |
+| `definition.png` | `definition.png` |
+| `code.png` | `code.png` |
+| `html.png` | `html.png` |
+| `html_app.png` | `html app.png` |
+| `image.png` | `image.png` |
+| `gallery.png` | `gallery.png` |
+| `video.png` | `video.png` |
+| `embed.png` | `embed.png` |
+| `embed-google_maps.png` | `map.png` |
+| `embed-google_slides.png` | `slides.png` |
+| `embed-google_docs.png` | `document.png` |
+| `embed-pdf.png` | `pdf.png` |
+| `audio.png` | `audio.png` |
+| `attachment.png` | `file.png` |
+| `accordion.png` | `accordian.png` |
+| `table.png` | `table.png` |
+| `question_set.png` | `question set.png` |
+| `flashcards.png` | `flashcards.png` |
+| `cloze.png` | `cloze.png` |
+| `self_check.png` | `self check.png` |
+| `chart.png` | `chart.png` |
+| `equation.png` | `equation.png` |
+| `mind_map.png` | `mindmap.png` |
+| `concept_map.png` | `concept maps.png` |
+| `columns.png` | `columns.png` |
+| `section.png` | `section.png` |
+| `spacer.png` | `spacer.png` |
+| `timeline.png` | `timeline.png` |
+| `tabs.png` | `tabs.png` |
