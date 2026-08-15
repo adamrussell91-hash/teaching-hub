@@ -16,7 +16,9 @@ import {
   mediaFileKey,
   compositionKey,
   lessonTemplateKey,
-  unitTemplateKey
+  unitTemplateKey,
+  aiJobKey,
+  aiTranscriptKey
 } from '../src/storage/keys';
 import {
   ALLOWED_MEDIA_MIME,
@@ -97,6 +99,12 @@ import {
   type LifecycleEntityType
 } from '../netlify/functions/_shared/lifecycle.mts';
 import { parseStatusPatch } from '../netlify/functions/_shared/lifecycle-routes.mts';
+import {
+  appendTranscriptTurns,
+  fixtureReplaceLessonProposal,
+  type AiJob,
+  type AiTranscriptTurn
+} from '../src/ai/jobs';
 
 export const SESSION_COOKIE_NAME = 'teaching_hub_session';
 
@@ -2792,6 +2800,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
   const UNIT_TEMPLATE_ID_RE = /^\/api\/unit-templates\/([^/]+)$/;
   const MEDIA_FILE_RE = /^\/api\/media\/([^/]+)\/file$/;
   const MEDIA_ID_RE = /^\/api\/media\/([^/]+)$/;
+  const AI_JOB_RE = /^\/api\/ai\/jobs\/([^/]+)$/;
 
   async function handle(
     method: string,
@@ -2907,6 +2916,65 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
         { type: 'proposal', proposal },
         { type: 'done' }
       ]);
+    }
+
+    if (method === 'POST' && path === '/api/ai/jobs') {
+      const session = getSession(cookie);
+      if (!session.authenticated) return unauthorizedResponse();
+      if (!body || typeof body !== 'object') {
+        return errorResponse(400, 'invalid_json', 'Request body is not valid JSON');
+      }
+      const req = body as {
+        lesson_id?: unknown;
+        agent?: unknown;
+        message?: unknown;
+      };
+      if (
+        typeof req.lesson_id !== 'string' ||
+        typeof req.agent !== 'string' ||
+        typeof req.message !== 'string'
+      ) {
+        return errorResponse(400, 'validation_error', 'Invalid AI job request');
+      }
+      const lesson = store.getJSON<Lesson>(draftLessonKey(req.lesson_id));
+      if (!lesson) return notFoundResponse('Lesson not found');
+      const now = nowIso();
+      const id = newId('ai_job');
+      const job: AiJob = {
+        id,
+        lesson_id: req.lesson_id,
+        agent: req.agent as AiJob['agent'],
+        status: 'working',
+        snapshot_at: now,
+        message: req.message,
+        created_at: now
+      };
+      store.setJSON(aiJobKey(id), job);
+      return okResponse(202, { id, status: 'working' });
+    }
+
+    const aiJobMatch = AI_JOB_RE.exec(path);
+    if (aiJobMatch && method === 'GET') {
+      const session = getSession(cookie);
+      if (!session.authenticated) return unauthorizedResponse();
+      const id = aiJobMatch[1]!;
+      const job = store.getJSON<AiJob>(aiJobKey(id));
+      if (!job) return notFoundResponse('Job not found');
+      if (job.status === 'working') {
+        const proposal = fixtureReplaceLessonProposal();
+        const done: AiJob = { ...job, status: 'done', proposal };
+        store.setJSON(aiJobKey(id), done);
+        const existing = store.getJSON<AiTranscriptTurn[]>(aiTranscriptKey(job.lesson_id, job.agent));
+        store.setJSON(
+          aiTranscriptKey(job.lesson_id, job.agent),
+          appendTranscriptTurns(existing, [
+            { role: 'user', content: job.message },
+            { role: 'assistant', content: 'Proposed a replace_lesson draft.' }
+          ])
+        );
+        return okResponse(200, done);
+      }
+      return okResponse(200, job);
     }
 
     if (method === 'POST' && path === '/api/classes') return handlePostClass(cookie, body);

@@ -69,3 +69,11 @@ export function versionsPrefix(kind: string, parentId: string): string {
 export function aiUsageLogKey(day: string): string {
   return `ai_usage/${day}`;
 }
+
+export function aiJobKey(id: string): string {
+  return `ai_jobs/${id}`;
+}
+
+export function aiTranscriptKey(lessonId: string, agent: string): string {
+  return `ai_transcripts/${lessonId}/${agent}`;
+}

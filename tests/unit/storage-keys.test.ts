@@ -14,7 +14,9 @@ import {
   scheduleAnchorKey,
   mediaKey,
   mediaFileKey,
-  compositionKey
+  compositionKey,
+  aiJobKey,
+  aiTranscriptKey
 } from '@/storage/keys';
 import { MockStore } from '../../scripts/mock-store';
 
@@ -65,6 +67,13 @@ describe('storage key helpers', () => {
 
   it('builds composition keys', () => {
     expect(compositionKey('composition_1')).toBe('templates/compositions/composition_1');
+  });
+
+  it('builds AI job and transcript keys', () => {
+    expect(aiJobKey('job_1')).toBe('ai_jobs/job_1');
+    expect(aiTranscriptKey('lesson_aotfw_008', 'clementine')).toBe(
+      'ai_transcripts/lesson_aotfw_008/clementine'
+    );
   });
 });
 
