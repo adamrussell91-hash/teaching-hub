@@ -28,7 +28,7 @@ function asTabs(block: Block): Extract<Block, { block_type: 'tabs' }> {
 
 function withSectionChildren(section: Block, children: Block[]): Block {
   const s = asSection(section);
-  return { ...s, content: { ...s.content, blocks: children } };
+  return { ...s, content: { ...s.content, blocks: children as typeof s.content.blocks } };
 }
 
 describe('insertTypeForParent', () => {
@@ -178,7 +178,7 @@ describe('countBlocksInTree', () => {
         ...section,
         content: {
           ...section.content,
-          blocks: [createBlock('heading', 'h1'), createBlock('rich_text', 'rt1')]
+          blocks: [createBlock('heading', 'h1'), createBlock('rich_text', 'rt1')] as typeof section.content.blocks
         }
       }
     ];
@@ -194,7 +194,7 @@ describe('deleteBlocksById', () => {
         ...section,
         content: {
           ...section.content,
-          blocks: [createBlock('heading', 'h1'), createBlock('rich_text', 'rt1')]
+          blocks: [createBlock('heading', 'h1'), createBlock('rich_text', 'rt1')] as typeof section.content.blocks
         }
       }
     ];

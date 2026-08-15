@@ -115,7 +115,9 @@ function makeLesson(overrides: Partial<Lesson> = {}): Lesson {
   };
 }
 
-function sectionBlock(overrides: Partial<Block> = {}): Block {
+function sectionBlock(
+  overrides: Partial<Extract<Block, { block_type: 'section' }>> = {}
+): Extract<Block, { block_type: 'section' }> {
   return {
     id: 'block_lesson_001_1',
     type: 'block',
