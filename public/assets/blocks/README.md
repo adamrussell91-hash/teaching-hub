@@ -2,8 +2,6 @@
 
 PNG exports from Documents/`teaching hub page content icons`, renamed to palette ids (`:` → `-`). Black export backgrounds are punched out so the line art sits on cotton.
 
-Missing from that folder (letter-tile fallback): `diagram.png`, `collection.png`.
-
 | Palette file | Source file |
 | --- | --- |
 | `rich_text.png` | `rich text.png` |
@@ -33,6 +31,7 @@ Missing from that folder (letter-tile fallback): `diagram.png`, `collection.png`
 | `self_check.png` | `self check.png` |
 | `chart.png` | `chart.png` |
 | `equation.png` | `equation.png` |
+| `diagram.png` | `diagram.png` |
 | `mind_map.png` | `mindmap.png` |
 | `concept_map.png` | `concept maps.png` |
 | `columns.png` | `columns.png` |
@@ -40,3 +39,4 @@ Missing from that folder (letter-tile fallback): `diagram.png`, `collection.png`
 | `spacer.png` | `spacer.png` |
 | `timeline.png` | `timeline.png` |
 | `tabs.png` | `tabs.png` |
+| `collection.png` | `collection.png` |
