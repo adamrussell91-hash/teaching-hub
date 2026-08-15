@@ -1,4 +1,5 @@
 import { cloneBlockWithNewIds } from '@/blocks/create-block';
+import { findBlockById } from '@/blocks/find-block';
 import type { Block } from '@/schemas/block';
 import type { Lesson } from '@/schemas/lesson';
 import type { AiProposal } from '@/ai/proposals';
@@ -32,12 +33,20 @@ function stubLesson(blocks: Block[]): Lesson {
 }
 
 function dropParentFromProposal(parent: Extract<AiProposal, { kind: 'reorder_blocks' }>['parent']): DropParent {
-  if (parent.kind === 'root') return { kind: 'root' };
-  if (parent.kind === 'section') return { kind: 'section', id: parent.id ?? '' };
-  if (parent.kind === 'column') {
-    return { kind: 'column', id: parent.id ?? '', columnIndex: parent.columnIndex ?? 0 };
+  switch (parent.kind) {
+    case 'root':
+      return { kind: 'root' };
+    case 'section':
+      return { kind: 'section', id: parent.id };
+    case 'column':
+      return { kind: 'column', id: parent.id, columnIndex: parent.columnIndex };
+    case 'tab':
+      return { kind: 'tab', id: parent.id, tabIndex: parent.tabIndex };
+    default: {
+      const _exhaustive: never = parent;
+      return _exhaustive;
+    }
   }
-  return { kind: 'tab', id: parent.id ?? '', tabIndex: parent.tabIndex ?? 0 };
 }
 
 function withBlocks(lesson: Lesson, blocks: Block[]): Lesson {
@@ -94,6 +103,9 @@ export function applyProposalToLesson(
   if (proposal.kind === 'insert_blocks') {
     const inserts = proposal.blocks.map((block) => cloneBlockWithNewIds(block, nextId));
     if (!proposal.anchor_block_id) {
+      if (lesson.blocks.length > 0) {
+        return { ok: false, message: 'Anchor block required', lesson };
+      }
       return { ok: true, lesson: withBlocks(lesson, [...lesson.blocks, ...inserts]) };
     }
     const result = applyInsertBlocks(
@@ -108,6 +120,9 @@ export function applyProposalToLesson(
   }
 
   if (proposal.kind === 'delete_blocks') {
+    if (proposal.ids.some((id) => !findBlockById(lesson.blocks, id))) {
+      return { ok: false, message: 'Target block not found', lesson };
+    }
     return { ok: true, lesson: withBlocks(lesson, deleteBlocksById(lesson.blocks, proposal.ids)) };
   }
 
@@ -122,6 +137,7 @@ export function applyProposalToLesson(
       : { ok: false, message: result.message, lesson };
   }
 
+  const _exhaustive: never = proposal;
   return { ok: false, message: 'Unknown proposal', lesson };
 }
 

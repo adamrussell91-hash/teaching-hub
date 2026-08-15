@@ -54,13 +54,23 @@ export const ProposeDeleteBlocksSchema = z.object({
   ids: z.array(z.string().min(1)).min(1)
 });
 
-export const ProposeReorderBlocksSchema = z.object({
-  parent: z.object({
-    kind: z.enum(['root', 'section', 'column', 'tab']),
-    id: z.string().min(1).optional(),
-    columnIndex: z.number().int().optional(),
-    tabIndex: z.number().int().optional()
+export const DropParentSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('root') }),
+  z.object({ kind: z.literal('section'), id: z.string().min(1) }),
+  z.object({
+    kind: z.literal('column'),
+    id: z.string().min(1),
+    columnIndex: z.number().int()
   }),
+  z.object({
+    kind: z.literal('tab'),
+    id: z.string().min(1),
+    tabIndex: z.number().int()
+  })
+]);
+
+export const ProposeReorderBlocksSchema = z.object({
+  parent: DropParentSchema,
   ordered_ids: z.array(z.string().min(1)).min(1)
 });
 
@@ -86,12 +96,7 @@ export type AiProposal =
   | { kind: 'delete_blocks'; ids: string[] }
   | {
       kind: 'reorder_blocks';
-      parent: {
-        kind: 'root' | 'section' | 'column' | 'tab';
-        id?: string;
-        columnIndex?: number;
-        tabIndex?: number;
-      };
+      parent: z.infer<typeof DropParentSchema>;
       ordered_ids: string[];
     }
   | { kind: 'review_only'; summary: string };
@@ -227,6 +232,9 @@ export function parseToolProposal(name: string, input: unknown): AiProposal | { 
   if (name === 'propose_insert_blocks') {
     const parsed = ProposeInsertBlocksSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.message };
+    if (countBlocksInTree(parsed.data.blocks) > 48) {
+      return { error: 'insert_blocks exceeds 48 blocks' };
+    }
     return {
       kind: 'insert_blocks',
       anchor_block_id: parsed.data.anchor_block_id,

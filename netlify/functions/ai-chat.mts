@@ -76,9 +76,15 @@ export default async function handler(request: Request): Promise<Response> {
     return withCors(errorResponse(404, 'not_found', 'Lesson not found'), request, env);
   }
 
-  const selected = findBlockById(lesson.blocks, body.selected_block_id);
-  if (!selected) {
-    return withCors(errorResponse(400, 'validation_error', 'selected_block_id not found'), request, env);
+  if (body.selected_block_id) {
+    const selected = findBlockById(lesson.blocks, body.selected_block_id);
+    if (!selected) {
+      return withCors(
+        errorResponse(400, 'validation_error', 'selected_block_id not found'),
+        request,
+        env
+      );
+    }
   }
 
   const apiKey = env.ANTHROPIC_API_KEY;
@@ -111,7 +117,7 @@ export default async function handler(request: Request): Promise<Response> {
     protocol,
     lesson,
     scope: body.scope,
-    selectedBlockId: body.selected_block_id,
+    selectedBlockId: body.selected_block_id ?? '',
     action: body.action
   });
 

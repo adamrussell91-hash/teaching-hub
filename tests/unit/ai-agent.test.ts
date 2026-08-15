@@ -45,8 +45,8 @@ describe('AI capabilities', () => {
   });
 
   it('lists whole-lesson actions when there is no selected type', () => {
-    expect(actionsForScope('lesson', null).length).toBeGreaterThan(0);
-    expect(actionsForScope('block', null).length).toBeGreaterThan(0);
+    expect(actionsForScope('lesson', null).some((a) => a.id === 'build_lesson')).toBe(true);
+    expect(actionsForScope('block', null).some((a) => a.id === 'build_lesson')).toBe(true);
   });
 });
 
@@ -127,6 +127,42 @@ describe('AI block tree + proposals', () => {
     expect('error' in parsed).toBe(true);
   });
 
+  it('rejects replace_lesson when nested children exceed 48', () => {
+    const section = createBlock('section', 'sec');
+    if (section.block_type !== 'section') throw new Error('expected section');
+    section.content.blocks = Array.from({ length: 48 }, (_, i) =>
+      createBlock('heading', `nested${i}`)
+    ) as typeof section.content.blocks;
+    const parsed = parseToolProposal('propose_replace_lesson', { blocks: [section] });
+    expect('error' in parsed).toBe(true);
+  });
+
+  it('applies replace_lesson cover and clones new block ids', () => {
+    const old = createBlock('heading', 'old_h');
+    const incoming = createBlock('heading', 'incoming');
+    const cover = { url: 'https://example.com/cover.jpg', alt_text: 'Cover' };
+    const parsed = parseToolProposal('propose_replace_lesson', {
+      title: 'New title',
+      cover,
+      blocks: [incoming]
+    });
+    expect('kind' in parsed && parsed.kind === 'replace_lesson').toBe(true);
+    if (!('kind' in parsed) || parsed.kind !== 'replace_lesson') return;
+    const applied = applyProposalToLesson(
+      lessonFixture({
+        cover: { url: 'https://example.com/old.jpg' },
+        blocks: [old]
+      }),
+      parsed,
+      () => 'block_new_1'
+    );
+    expect(applied.ok).toBe(true);
+    expect(applied.lesson.cover).toEqual(cover);
+    expect(applied.lesson.blocks).toHaveLength(1);
+    expect(applied.lesson.blocks[0]?.id).toBe('block_new_1');
+    expect(applied.lesson.blocks.some((block) => block.id === 'old_h')).toBe(false);
+  });
+
   it('inserts into an empty lesson without an anchor', () => {
     const parsed = parseToolProposal('propose_insert_blocks', {
       position: 'below',
@@ -137,6 +173,36 @@ describe('AI block tree + proposals', () => {
     const applied = applyProposalToLesson(lessonFixture(), parsed, () => 'block_new_1');
     expect(applied.ok).toBe(true);
     expect(applied.lesson.blocks).toHaveLength(1);
+  });
+
+  it('rejects insert_blocks when nested children exceed 48', () => {
+    const section = createBlock('section', 'sec');
+    if (section.block_type !== 'section') throw new Error('expected section');
+    section.content.blocks = Array.from({ length: 48 }, (_, i) =>
+      createBlock('heading', `nested${i}`)
+    ) as typeof section.content.blocks;
+    const parsed = parseToolProposal('propose_insert_blocks', {
+      position: 'below',
+      blocks: [section]
+    });
+    expect('error' in parsed).toBe(true);
+  });
+
+  it('refuses unanchored insert when the lesson already has blocks', () => {
+    const parsed = parseToolProposal('propose_insert_blocks', {
+      position: 'below',
+      blocks: [createBlock('heading', 'h1')]
+    });
+    expect('kind' in parsed && parsed.kind === 'insert_blocks').toBe(true);
+    if (!('kind' in parsed) || parsed.kind !== 'insert_blocks') return;
+    const existing = createBlock('heading', 'old');
+    const applied = applyProposalToLesson(
+      lessonFixture({ blocks: [existing] }),
+      parsed,
+      () => 'block_new_1'
+    );
+    expect(applied.ok).toBe(false);
+    expect(applied.lesson.blocks.map((block) => block.id)).toEqual(['old']);
   });
 
   it('deletes blocks by id', () => {
@@ -151,6 +217,21 @@ describe('AI block tree + proposals', () => {
       () => 'unused'
     );
     expect(applied.ok).toBe(true);
+    expect(applied.lesson.blocks.map((block) => block.id)).toEqual(['keep']);
+  });
+
+  it('fails delete_blocks when any id is missing', () => {
+    const keep = createBlock('heading', 'keep');
+    const parsed = parseToolProposal('propose_delete_blocks', { ids: ['keep', 'missing'] });
+    expect('kind' in parsed && parsed.kind === 'delete_blocks').toBe(true);
+    if (!('kind' in parsed) || parsed.kind !== 'delete_blocks') return;
+    const applied = applyProposalToLesson(
+      lessonFixture({ blocks: [keep] }),
+      parsed,
+      () => 'unused'
+    );
+    expect(applied.ok).toBe(false);
+    expect(applied.message).toBe('Target block not found');
     expect(applied.lesson.blocks.map((block) => block.id)).toEqual(['keep']);
   });
 
@@ -170,6 +251,20 @@ describe('AI block tree + proposals', () => {
     );
     expect(applied.ok).toBe(true);
     expect(applied.lesson.blocks.map((block) => block.id)).toEqual(['second', 'first']);
+  });
+
+  it('rejects reorder parent that does not match DropParent', () => {
+    const section = parseToolProposal('propose_reorder_blocks', {
+      parent: { kind: 'section' },
+      ordered_ids: ['a']
+    });
+    expect('error' in section).toBe(true);
+
+    const column = parseToolProposal('propose_reorder_blocks', {
+      parent: { kind: 'column', id: 'cols' },
+      ordered_ids: ['a']
+    });
+    expect('error' in column).toBe(true);
   });
 });
 
