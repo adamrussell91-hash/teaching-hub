@@ -286,6 +286,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
 
     aiPanel = mountAiPanel(aiHost, {
       lessonId,
+      getSnapshotAt: () => lesson.updated_at,
       onAcceptProposal: (proposal: AiProposal) => {
         const result = applyProposalToBlocks(lesson.blocks, proposal, () => {
           blockCounter += 1;

@@ -7,6 +7,7 @@ import {
 } from '@/ai/agents';
 import { actionsForScope } from '@/ai/capabilities';
 import { streamAiChat, type ArchiveCitation } from '@/ai/client';
+import { pollAiJob, startAiJob } from '@/ai/jobs-client';
 import type { AiProposal, AiScope } from '@/ai/proposals';
 import type { Block } from '@/schemas/block';
 
@@ -16,12 +17,18 @@ export interface AiPanelHandle {
     blockType: Block['block_type'] | null;
     scope: AiScope;
   }): void;
+  setWorking(working: boolean): void;
+  setShelved(shelved: boolean): void;
+  isWorking(): boolean;
   dispose(): void;
 }
 
 export interface MountAiPanelOptions {
   lessonId: string;
+  getSnapshotAt: () => string;
   onAcceptProposal: (proposal: AiProposal) => { ok: boolean; message?: string };
+  onWorkingChange?: (working: boolean) => void;
+  onStaleAccept?: (apply: () => void) => void;
 }
 
 interface ChatMessage {
@@ -31,9 +38,12 @@ interface ChatMessage {
   text: string;
   proposal?: AiProposal;
   proposalStatus?: 'pending' | 'accepted' | 'rejected';
+  snapshotAt?: string;
   citations?: ArchiveCitation[];
   archiveFailed?: boolean;
 }
+
+const POLL_MS = 50;
 
 function transcriptKey(lessonId: string): string {
   return `teaching_hub_ai_transcript_${lessonId}`;
@@ -58,13 +68,35 @@ function saveTranscript(lessonId: string, messages: ChatMessage[]): void {
   }
 }
 
+function sleep(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(new DOMException('Aborted', 'AbortError'));
+      return;
+    }
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(new DOMException('Aborted', 'AbortError'));
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+function isMutatingProposal(proposal: AiProposal | undefined): boolean {
+  return Boolean(proposal && proposal.kind !== 'review_only');
+}
+
 export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): AiPanelHandle {
   host.classList.add('ai-panel');
 
   let agentSlug = readLastAgentSlug();
   let selectedBlockId: string | null = null;
   let selectedBlockType: Block['block_type'] | null = null;
-  let scope: AiScope = 'block';
+  let scope: AiScope = 'lesson';
   let messages = loadTranscript(options.lessonId);
   let busy = false;
   let abort: AbortController | null = null;
@@ -95,7 +127,7 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
 
   const empty = document.createElement('p');
   empty.className = 'ai-panel__empty';
-  empty.textContent = 'Select a block or section to work with.';
+  empty.textContent = 'Ask an agent to build or edit this lesson.';
 
   const thread = document.createElement('div');
   thread.className = 'ai-panel__thread';
@@ -120,6 +152,17 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
   function nextMsgId(): string {
     msgCounter += 1;
     return `m_${Date.now()}_${msgCounter}`;
+  }
+
+  function currentSnapshot(): string {
+    return options.getSnapshotAt?.() ?? new Date().toISOString();
+  }
+
+  function setWorkingState(working: boolean): void {
+    busy = working;
+    host.classList.toggle('ai-panel--working', working);
+    options.onWorkingChange?.(working);
+    renderShell();
   }
 
   function renderPicker(): void {
@@ -160,31 +203,76 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
 
   function renderScope(): void {
     if (!selectedBlockId) {
-      scopeChip.textContent = 'Working with: nothing selected';
+      scopeChip.textContent = 'Lesson';
       return;
     }
-    const label =
-      scope === 'section'
-        ? 'Working with: Section'
-        : `Working with: Selected Block${selectedBlockType ? ` (${selectedBlockType})` : ''}`;
-    scopeChip.textContent = label;
+    if (scope === 'section') {
+      scopeChip.textContent = 'Looking at: Section';
+      return;
+    }
+    const typeLabel = selectedBlockType ? selectedBlockType.replaceAll('_', ' ') : 'Block';
+    scopeChip.textContent = `Looking at: ${typeLabel}`;
   }
 
   function renderActions(): void {
     actionsBar.replaceChildren();
-    if (!selectedBlockId) return;
     const actions = actionsForScope(scope, selectedBlockType);
     for (const action of actions) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'btn btn--ghost ai-panel__action';
       btn.textContent = action.label;
-      btn.disabled = busy || !selectedBlockId;
+      btn.disabled = busy;
       btn.addEventListener('click', () => {
         void sendMessage(`Please ${action.label.toLowerCase()} the selected content.`, action.id);
       });
       actionsBar.append(btn);
     }
+  }
+
+  function attachProposal(
+    assistant: ChatMessage,
+    proposal: AiProposal,
+    snapshotAt: string
+  ): void {
+    assistant.proposal = proposal;
+    if (proposal.kind === 'review_only') {
+      if (!assistant.text.trim()) assistant.text = proposal.summary;
+      return;
+    }
+    assistant.proposalStatus = 'pending';
+    assistant.snapshotAt = snapshotAt;
+    if (!assistant.text.trim()) {
+      assistant.text = 'Proposed a change — review and Accept to apply.';
+    }
+  }
+
+  function applyPendingProposal(msg: ChatMessage): void {
+    const result = options.onAcceptProposal(msg.proposal!);
+    msg.proposalStatus = result.ok ? 'accepted' : 'pending';
+    if (!result.ok) {
+      messages.push({
+        id: nextMsgId(),
+        role: 'system',
+        text: result.message ?? 'Could not apply proposal'
+      });
+    }
+    saveTranscript(options.lessonId, messages);
+    renderThread();
+  }
+
+  function acceptProposal(msg: ChatMessage): void {
+    if (isMutatingProposal(msg.proposal) && msg.snapshotAt && currentSnapshot() !== msg.snapshotAt) {
+      const apply = () => applyPendingProposal(msg);
+      if (options.onStaleAccept) {
+        options.onStaleAccept(apply);
+        return;
+      }
+      if (!window.confirm('The lesson has changed since this proposal was made. Apply it anyway?')) {
+        return;
+      }
+    }
+    applyPendingProposal(msg);
   }
 
   function renderThread(): void {
@@ -247,17 +335,7 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
           accept.className = 'btn btn--primary';
           accept.textContent = 'Accept';
           accept.addEventListener('click', () => {
-            const result = options.onAcceptProposal(msg.proposal!);
-            msg.proposalStatus = result.ok ? 'accepted' : 'pending';
-            if (!result.ok) {
-              messages.push({
-                id: nextMsgId(),
-                role: 'system',
-                text: result.message ?? 'Could not apply proposal'
-              });
-            }
-            saveTranscript(options.lessonId, messages);
-            renderThread();
+            acceptProposal(msg);
           });
           const reject = document.createElement('button');
           reject.type = 'button';
@@ -293,25 +371,57 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
   }
 
   function renderShell(): void {
-    const hasSelection = Boolean(selectedBlockId);
-    empty.hidden = hasSelection;
-    actionsBar.hidden = !hasSelection;
-    composer.hidden = !hasSelection;
-    thread.hidden = !hasSelection;
-    input.disabled = busy || !hasSelection;
-    sendBtn.disabled = busy || !hasSelection;
+    empty.hidden = messages.length > 0;
+    actionsBar.hidden = false;
+    composer.hidden = false;
+    thread.hidden = false;
+    input.disabled = busy;
+    sendBtn.disabled = busy;
     renderScope();
     renderActions();
     renderThread();
   }
 
+  async function runClementineJob(
+    message: string,
+    assistantId: string,
+    snapshotAt: string,
+    signal: AbortSignal
+  ): Promise<void> {
+    const started = await startAiJob(
+      { lesson_id: options.lessonId, agent: agentSlug, message },
+      { signal }
+    );
+    let job = await pollAiJob(started.id, { signal });
+    let polls = 0;
+    while (job.status === 'working' && !signal.aborted && polls < 120) {
+      polls += 1;
+      await sleep(POLL_MS, signal);
+      job = await pollAiJob(started.id, { signal });
+    }
+    const assistant = messages.find((m) => m.id === assistantId);
+    if (!assistant) return;
+    if (job.status === 'error') {
+      assistant.text = job.error ?? 'AI job failed';
+      renderThread();
+      return;
+    }
+    if (job.proposal) {
+      attachProposal(assistant, job.proposal, snapshotAt);
+      if (job.archiveFailed) assistant.archiveFailed = true;
+    } else if (!assistant.text.trim()) {
+      assistant.text = 'Job finished.';
+    }
+    renderThread();
+  }
+
   async function sendMessage(text: string, action?: string): Promise<void> {
-    if (!selectedBlockId || busy) return;
+    if (busy) return;
     const trimmed = text.trim();
     if (!trimmed) return;
 
-    busy = true;
-    renderShell();
+    const snapshotAt = currentSnapshot();
+    setWorkingState(true);
 
     messages.push({ id: nextMsgId(), role: 'user', text: trimmed });
     const assistantId = nextMsgId();
@@ -333,55 +443,52 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
       }));
 
     try {
-      await streamAiChat(
-        {
+      if (agentSlug === 'clementine') {
+        await runClementineJob(trimmed, assistantId, snapshotAt, abort.signal);
+      } else {
+        const payload = {
           lesson_id: options.lessonId,
           agent: agentSlug,
           scope,
-          selected_block_id: selectedBlockId,
+          selected_block_id: selectedBlockId ?? undefined,
+          lesson_snapshot_at: snapshotAt,
           message: trimmed,
           action,
           history
-        },
-        (event) => {
-          const assistant = messages.find((m) => m.id === assistantId);
-          if (!assistant) return;
-          if (event.type === 'text') {
-            assistant.text += event.text;
-            renderThread();
-          } else if (event.type === 'research') {
-            assistant.citations = event.findings;
-            assistant.archiveFailed = event.archiveFailed;
-            renderThread();
-          } else if (event.type === 'proposal') {
-            if (event.proposal.kind === 'review_only') {
-              assistant.proposal = event.proposal;
-              if (!assistant.text.trim()) assistant.text = event.proposal.summary;
-            } else {
-              assistant.proposal = event.proposal;
-              assistant.proposalStatus = 'pending';
-              if (!assistant.text.trim()) {
-                assistant.text = 'Proposed a change — review and Accept to apply.';
-              }
+        };
+        await streamAiChat(
+          payload,
+          (event) => {
+            const assistant = messages.find((m) => m.id === assistantId);
+            if (!assistant) return;
+            if (event.type === 'text') {
+              assistant.text += event.text;
+              renderThread();
+            } else if (event.type === 'research') {
+              assistant.citations = event.findings;
+              assistant.archiveFailed = event.archiveFailed;
+              renderThread();
+            } else if (event.type === 'proposal') {
+              attachProposal(assistant, event.proposal, snapshotAt);
+              renderThread();
+            } else if (event.type === 'error') {
+              assistant.text = assistant.text || event.message;
+              renderThread();
+            } else if (event.type === 'status' && !assistant.text) {
+              assistant.text = event.text;
+              renderThread();
             }
-            renderThread();
-          } else if (event.type === 'error') {
-            assistant.text = assistant.text || event.message;
-            renderThread();
-          } else if (event.type === 'status' && !assistant.text) {
-            assistant.text = event.text;
-            renderThread();
-          }
-        },
-        abort.signal
-      );
+          },
+          abort.signal
+        );
+      }
     } catch (err) {
       const assistant = messages.find((m) => m.id === assistantId);
       if (assistant && !assistant.text) {
         assistant.text = err instanceof Error ? err.message : 'AI request failed';
       }
     } finally {
-      busy = false;
+      setWorkingState(false);
       saveTranscript(options.lessonId, messages);
       renderShell();
     }
@@ -405,10 +512,19 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
       scope = selection.scope;
       renderShell();
     },
+    setWorking(working) {
+      setWorkingState(working);
+    },
+    setShelved(shelved) {
+      host.classList.toggle('ai-panel--shelved', shelved);
+    },
+    isWorking() {
+      return busy;
+    },
     dispose() {
       abort?.abort();
       host.replaceChildren();
-      host.classList.remove('ai-panel');
+      host.classList.remove('ai-panel', 'ai-panel--working', 'ai-panel--shelved');
     }
   };
 }
