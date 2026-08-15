@@ -9,6 +9,7 @@ import { actionsForScope } from '@/ai/capabilities';
 import { streamAiChat, type ArchiveCitation } from '@/ai/client';
 import { pollAiJob, startAiJob } from '@/ai/jobs-client';
 import { AI_JOB_STALE_MS } from '@/ai/jobs';
+import { filterProposal, listPartialAcceptUnits } from '@/ai/partial-accept';
 import type { AiProposal, AiScope } from '@/ai/proposals';
 import type { Block } from '@/schemas/block';
 
@@ -39,6 +40,8 @@ interface ChatMessage {
   text: string;
   proposal?: AiProposal;
   proposalStatus?: 'pending' | 'accepted' | 'rejected';
+  selectedKeys?: string[];
+  proposalError?: string;
   snapshotAt?: string;
   citations?: ArchiveCitation[];
   archiveFailed?: boolean;
@@ -249,8 +252,8 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
     }
   }
 
-  function applyPendingProposal(msg: ChatMessage): void {
-    const result = options.onAcceptProposal(msg.proposal!);
+  function applyPendingProposal(msg: ChatMessage, proposal: AiProposal = msg.proposal!): void {
+    const result = options.onAcceptProposal(proposal);
     msg.proposalStatus = result.ok ? 'accepted' : 'pending';
     if (!result.ok) {
       messages.push({
@@ -263,9 +266,9 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
     renderThread();
   }
 
-  function acceptProposal(msg: ChatMessage): void {
+  function acceptProposal(msg: ChatMessage, proposal: AiProposal = msg.proposal!): void {
     if (isMutatingProposal(msg.proposal) && msg.snapshotAt && currentSnapshot() !== msg.snapshotAt) {
-      const apply = () => applyPendingProposal(msg);
+      const apply = () => applyPendingProposal(msg, proposal);
       if (options.onStaleAccept) {
         options.onStaleAccept(apply);
         return;
@@ -274,7 +277,21 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
         return;
       }
     }
-    applyPendingProposal(msg);
+    applyPendingProposal(msg, proposal);
+  }
+
+  function acceptSelected(msg: ChatMessage): void {
+    if (!msg.proposal) return;
+    const units = listPartialAcceptUnits(msg.proposal);
+    const keys = new Set(msg.selectedKeys ?? units.map((unit) => unit.key));
+    const filtered = filterProposal(msg.proposal, keys);
+    if (!filtered.ok) {
+      msg.proposalError = filtered.message;
+      renderThread();
+      return;
+    }
+    msg.proposalError = undefined;
+    acceptProposal(msg, filtered.proposal);
   }
 
   function renderThread(): void {
@@ -330,15 +347,52 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
         card.append(title);
 
         if (msg.proposalStatus === 'pending') {
+          const units = listPartialAcceptUnits(msg.proposal);
+          const partial = units.length >= 2;
           const actions = document.createElement('div');
           actions.className = 'ai-panel__proposal-actions';
           const accept = document.createElement('button');
           accept.type = 'button';
           accept.className = 'btn btn--primary';
-          accept.textContent = 'Accept';
+          accept.textContent = partial ? 'Accept selected' : 'Accept';
           accept.addEventListener('click', () => {
-            acceptProposal(msg);
+            if (partial) acceptSelected(msg);
+            else acceptProposal(msg);
           });
+          if (partial) {
+            if (!msg.selectedKeys) msg.selectedKeys = units.map((unit) => unit.key);
+            const selected = new Set(msg.selectedKeys);
+            accept.disabled = !units.some((unit) => selected.has(unit.key));
+            const list = document.createElement('ul');
+            list.className = 'ai-panel__proposal-list';
+            for (const unit of units) {
+              const item = document.createElement('li');
+              const label = document.createElement('label');
+              label.className = unit.group
+                ? 'ai-panel__proposal-check ai-panel__proposal-check--nested'
+                : 'ai-panel__proposal-check';
+              const box = document.createElement('input');
+              box.type = 'checkbox';
+              box.checked = selected.has(unit.key);
+              box.addEventListener('change', () => {
+                const next = new Set(msg.selectedKeys ?? units.map((u) => u.key));
+                if (box.checked) next.add(unit.key);
+                else next.delete(unit.key);
+                msg.selectedKeys = [...next];
+                accept.disabled = !units.some((u) => next.has(u.key));
+              });
+              label.append(box, document.createTextNode(unit.label));
+              item.append(label);
+              list.append(item);
+            }
+            card.append(list);
+          }
+          if (msg.proposalError) {
+            const error = document.createElement('p');
+            error.className = 'ai-panel__proposal-error';
+            error.textContent = msg.proposalError;
+            card.append(error);
+          }
           const reject = document.createElement('button');
           reject.type = 'button';
           reject.className = 'btn btn--secondary';

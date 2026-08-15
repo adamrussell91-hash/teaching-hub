@@ -802,6 +802,33 @@ a:hover {
   gap: var(--space-1);
 }
 
+.ai-panel__proposal-list {
+  margin: 0 0 var(--space-2);
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.ai-panel__proposal-check {
+  display: flex;
+  gap: var(--space-1);
+  align-items: flex-start;
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+}
+
+.ai-panel__proposal-check--nested {
+  padding-left: var(--space-3);
+}
+
+.ai-panel__proposal-error {
+  margin: 0 0 var(--space-1);
+  color: var(--danger);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+}
+
 .ai-panel__review {
   margin: var(--space-1) 0 0;
   font-family: var(--font-ui);

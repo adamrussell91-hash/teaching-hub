@@ -43,10 +43,49 @@ const pollAiJobMock = vi.mocked(pollAiJob);
 
 const SNAPSHOT = '2026-01-01T00:00:00.000Z';
 
+const timestamps = {
+  created_at: '2026-01-01T00:00:00.000Z',
+  updated_at: '2026-01-01T00:00:00.000Z'
+};
+
 const replaceLesson: AiProposal = {
   kind: 'replace_lesson',
   title: 'Built lesson',
   blocks: []
+};
+
+const insertTwoHeadings: AiProposal = {
+  kind: 'insert_blocks',
+  position: 'below',
+  anchor_block_id: 'a',
+  blocks: [
+    {
+      id: 'h1',
+      type: 'block',
+      block_type: 'heading',
+      variant: 'section',
+      visibility: 'student_teacher',
+      content: { text: 'A' },
+      layout: {},
+      print: {},
+      settings: {},
+      ...timestamps,
+      schema_version: 1
+    },
+    {
+      id: 'h2',
+      type: 'block',
+      block_type: 'heading',
+      variant: 'section',
+      visibility: 'student_teacher',
+      content: { text: 'B' },
+      layout: {},
+      print: {},
+      settings: {},
+      ...timestamps,
+      schema_version: 1
+    }
+  ]
 };
 
 function workingJob(overrides: Partial<AiJob> = {}): AiJob {
@@ -282,6 +321,68 @@ describe('mountAiPanel', () => {
     expect(acceptButton(mounted.host)).toBeTruthy();
     expect(mounted.host.textContent).toMatch(/Proposal:/);
     expect(mounted.host.textContent).not.toContain('Proposal accepted');
+  });
+
+  it('keeps Accept without a checklist for title-only replace_lesson', async () => {
+    streamAiChatMock.mockImplementation(async (_payload, onEvent) => {
+      onEvent({ type: 'proposal', proposal: replaceLesson });
+    });
+    const mounted = mountPanel();
+    handle = mounted.handle;
+    submitMessage(mounted.host, 'Replace the lesson');
+
+    await vi.waitFor(() => {
+      expect(acceptButton(mounted.host)).toBeTruthy();
+    });
+    expect(mounted.host.querySelector('.ai-panel__proposal-check')).toBeNull();
+    expect(
+      [...mounted.host.querySelectorAll('button')].some((btn) => btn.textContent === 'Accept selected')
+    ).toBe(false);
+  });
+
+  it('shows Accept selected and checkboxes for a multi-block insert', async () => {
+    streamAiChatMock.mockImplementation(async (_payload, onEvent) => {
+      onEvent({ type: 'proposal', proposal: insertTwoHeadings });
+    });
+    const mounted = mountPanel();
+    handle = mounted.handle;
+    submitMessage(mounted.host, 'Add two headings');
+
+    await vi.waitFor(() => {
+      expect(mounted.host.querySelectorAll('.ai-panel__proposal-check').length).toBe(2);
+    });
+    expect(
+      [...mounted.host.querySelectorAll('button')].some((btn) => btn.textContent === 'Accept selected')
+    ).toBe(true);
+    expect(acceptButton(mounted.host)).toBeUndefined();
+  });
+
+  it('Accept selected applies only checked insert blocks', async () => {
+    streamAiChatMock.mockImplementation(async (_payload, onEvent) => {
+      onEvent({ type: 'proposal', proposal: insertTwoHeadings });
+    });
+    const mounted = mountPanel();
+    handle = mounted.handle;
+    submitMessage(mounted.host, 'Add two headings');
+
+    await vi.waitFor(() => {
+      expect(mounted.host.querySelectorAll('input[type="checkbox"]').length).toBe(2);
+    });
+    const boxes = [...mounted.host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
+    boxes[1]!.checked = false;
+    boxes[1]!.dispatchEvent(new Event('change', { bubbles: true }));
+
+    const acceptSelected = [...mounted.host.querySelectorAll('button')].find(
+      (btn) => btn.textContent === 'Accept selected'
+    );
+    acceptSelected?.click();
+
+    expect(mounted.onAcceptProposal).toHaveBeenCalledTimes(1);
+    const applied = mounted.onAcceptProposal.mock.calls[0]?.[0] as AiProposal;
+    expect(applied.kind).toBe('insert_blocks');
+    if (applied.kind !== 'insert_blocks') throw new Error('expected insert');
+    expect(applied.blocks).toHaveLength(1);
+    expect(applied.blocks[0]?.id).toBe('h1');
   });
 
   it('adds ai-panel--shelved when setShelved(true) and supports setWorking', () => {
