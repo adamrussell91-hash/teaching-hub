@@ -1,3 +1,4 @@
+import { FAILURE } from '@/app/failure';
 import { ApiClientError } from '@/api/client';
 import { navigate } from '@/app/router';
 import {
@@ -267,7 +268,7 @@ export function mountStudentClassView(
       const message =
         error instanceof ApiClientError && error.code === 'not_found'
           ? 'Class not found.'
-          : 'Unable to load class. Please refresh to try again.';
+          : FAILURE.network;
       renderStudentStatus(content, message);
     });
 

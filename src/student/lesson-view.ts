@@ -1,3 +1,4 @@
+import { FAILURE } from '@/app/failure';
 import { apiGet, ApiClientError } from '@/api/client';
 import { navigate } from '@/app/router';
 import { renderBlock } from '@/blocks/render';
@@ -144,7 +145,7 @@ function isNotFound(error: unknown): boolean {
 function loadErrorMessage(
   error: unknown,
   notFoundMessage: string,
-  genericMessage = 'Unable to load lesson. Please refresh to try again.'
+  genericMessage = FAILURE.network
 ): string {
   return isNotFound(error) ? notFoundMessage : genericMessage;
 }
@@ -179,7 +180,7 @@ export function mountStudentLessonView(
           loadErrorMessage(
             lessonResult.reason,
             'Lesson not found.',
-            'Unable to load lesson. Please refresh to try again.'
+            FAILURE.network
           )
         );
         return;
@@ -191,7 +192,7 @@ export function mountStudentLessonView(
           loadErrorMessage(
             classResult.reason,
             'Class not found.',
-            'Unable to load class. Please refresh to try again.'
+            FAILURE.network
           )
         );
         return;

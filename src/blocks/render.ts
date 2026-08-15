@@ -1,3 +1,4 @@
+import { FAILURE } from '@/app/failure';
 import katex from 'katex';
 import { getApiBaseUrl } from '@/api/config';
 import { buildChartSvg, buildChartTableRows, escapeXml } from '@/blocks/chart-svg';
@@ -154,11 +155,17 @@ export function renderImageBlock(
     img.src = block.content.url;
     img.alt = block.content.alt_text;
     img.loading = 'lazy';
+    img.addEventListener('error', () => {
+      const unavailable = document.createElement('p');
+      unavailable.className = 'block-image__unavailable';
+      unavailable.textContent = block.content.alt_text.trim() || FAILURE.imageUnavailable;
+      img.replaceWith(unavailable);
+    });
     figure.append(img);
   } else {
     const unavailable = document.createElement('p');
     unavailable.className = 'block-image__unavailable';
-    unavailable.textContent = block.content.alt_text.trim() || 'Image unavailable.';
+    unavailable.textContent = block.content.alt_text.trim() || FAILURE.imageUnavailable;
     figure.append(unavailable);
   }
   if (block.content.caption) {
@@ -203,18 +210,26 @@ export function renderVideoBlock(
     title.textContent = block.content.title;
     wrap.append(title);
   }
-  const iframe = document.createElement('iframe');
-  iframe.className = 'block-video__frame';
-  iframe.src = videoEmbedSrc(block.content.provider, block.content.external_id);
-  iframe.setAttribute('loading', 'lazy');
-  iframe.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
-  iframe.setAttribute('allowfullscreen', 'true');
-  iframe.setAttribute(
-    'allow',
-    'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture'
-  );
-  iframe.title = block.content.title || 'Video';
-  wrap.append(iframe);
+
+  if (!block.content.external_id.trim()) {
+    const unavailable = document.createElement('p');
+    unavailable.className = 'block-video__unavailable';
+    unavailable.textContent = FAILURE.videoUnavailable;
+    wrap.append(unavailable);
+  } else {
+    const iframe = document.createElement('iframe');
+    iframe.className = 'block-video__frame';
+    iframe.src = videoEmbedSrc(block.content.provider, block.content.external_id);
+    iframe.setAttribute('loading', 'lazy');
+    iframe.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+    iframe.setAttribute('allowfullscreen', 'true');
+    iframe.setAttribute(
+      'allow',
+      'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture'
+    );
+    iframe.title = block.content.title || 'Video';
+    wrap.append(iframe);
+  }
   if (block.content.caption) {
     const cap = document.createElement('p');
     cap.className = 'block-video__caption';
@@ -277,7 +292,7 @@ export function renderEmbedBlock(
   if (!safeUrl) {
     const unavailable = document.createElement('p');
     unavailable.className = 'block-embed__unavailable';
-    unavailable.textContent = 'Embed unavailable.';
+    unavailable.textContent = FAILURE.embedUnavailable;
     wrap.append(unavailable);
     return wrapBlock(wrap, block, mode);
   }
@@ -1921,7 +1936,8 @@ export function renderBlock(
   mode: RenderMode,
   ctx: RenderContext = {}
 ): HTMLElement {
-  switch (block.block_type) {
+  try {
+    switch (block.block_type) {
     case 'rich_text':
       return renderRichTextBlock(block, mode);
     case 'heading':
@@ -1986,5 +2002,11 @@ export function renderBlock(
       return renderMindMapBlock(block, mode);
     case 'concept_map':
       return renderConceptMapBlock(block, mode);
+    }
+  } catch {
+    const fallback = document.createElement('p');
+    fallback.className = 'block-unavailable';
+    fallback.textContent = FAILURE.unsupportedBlock;
+    return wrapBlock(fallback, block, mode);
   }
 }

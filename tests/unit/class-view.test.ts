@@ -236,7 +236,7 @@ describe('mountStudentClassView', () => {
     mountStudentClassView({ root, classId: CLASS_ID });
 
     await vi.waitFor(() => {
-      expect(root.textContent).toContain('Unable to load class');
+      expect(root.textContent).toContain('Unable to load');
     });
   });
 });

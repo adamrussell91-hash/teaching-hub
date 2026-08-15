@@ -1,3 +1,4 @@
+import { createSkipLink } from '@/app/failure';
 import { navigate } from '@/app/router';
 
 export function createStudentShell(contentExtraClass = ''): {
@@ -8,6 +9,10 @@ export function createStudentShell(contentExtraClass = ''): {
   const surface = document.createElement('div');
   surface.className = 'student-surface';
 
+  const content = document.createElement('div');
+  content.className = ['student-surface__content', contentExtraClass].filter(Boolean).join(' ');
+  content.id = 'student-main';
+
   const header = document.createElement('header');
   header.className = 'student-chrome';
 
@@ -16,12 +21,7 @@ export function createStudentShell(contentExtraClass = ''): {
   brand.textContent = 'Teaching Hub';
   header.append(brand);
 
-  const content = document.createElement('div');
-  content.className = ['student-surface__content', contentExtraClass]
-    .filter(Boolean)
-    .join(' ');
-
-  surface.append(header, content);
+  surface.append(createSkipLink('student-main'), header, content);
   return { surface, header, content };
 }
 

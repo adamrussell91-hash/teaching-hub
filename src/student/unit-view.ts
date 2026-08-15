@@ -1,3 +1,4 @@
+import { FAILURE } from '@/app/failure';
 import { apiGet, ApiClientError } from '@/api/client';
 import { renderBlock } from '@/blocks/render';
 import type { PublishedUnit } from '@/schemas/published-unit';
@@ -103,7 +104,7 @@ export function mountStudentUnitView(
       const message =
         error instanceof ApiClientError && error.code === 'not_found'
           ? 'Unit not found.'
-          : 'Unable to load unit. Please refresh to try again.';
+          : FAILURE.network;
       renderStudentStatus(content, message);
     });
 

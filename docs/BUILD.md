@@ -20,7 +20,7 @@ Block primitives: [`docs/specs/03_BLOCK_SYSTEM.md`](specs/03_BLOCK_SYSTEM.md)
 
 Suggested order for continuing builder / teaching-page work (adjust as needed):
 
-1. **Production hardening** (Phase 15)
+1. **Phase 15 remaining** — performance measurement, storage review, browser/classroom passes
 
 ### Won’t do
 
@@ -33,6 +33,7 @@ Suggested order for continuing builder / teaching-page work (adjust as needed):
 
 | Date | Slice | Outcome |
 |------|--------|---------|
+| 2026-08-15 | **Phase 15 v1 (predictable failure + skip links)** | Skip to content on teacher/student; video/image/embed/block fallbacks; AI retry vs stop copy |
 | 2026-08-15 | **GitHub content backup** | Trash **Backup to GitHub** plus weekly scheduled snapshot to `content_backup/` (env token/repo; not after every edit; no secrets/media bytes) |
 | 2026-08-15 | **AI composition fill** | Quick actions + chat phrasing fill Reading Comprehension / Vocabulary Study / Source Analysis skeletons (library title match when present); Ann chat injects structure, does not invent layout |
 | 2026-08-15 | **JSON export / Backup Now** | Lesson, unit, and full-archive JSON download (no secrets, no media bytes, no GitHub push) |
@@ -88,7 +89,7 @@ Suggested order for continuing builder / teaching-page work (adjust as needed):
 | 11 Templates / reuse | **Done (v1)** — lesson/unit templates + compositions + linked reuse |
 | 12 Search | **v1 done** — rail + ⌘K panel; client titles + server body scan |
 | 13 AI | **v1 done** — agent panel + block/section proposals; composition/whole-lesson later |
-| 14–15 Versioning / hardening | **Phase 14 done for v1** — history + trash + JSON export + GitHub snapshot; Phase 15 still ahead |
+| 14–15 Versioning / hardening | **Phase 14 done; Phase 15 v1** — skip links + predictable failure copy; perf/classroom still ahead |
 ---
 
 ## Projection (backlog — block-focused)
@@ -135,4 +136,4 @@ Unchecked = not built yet.
 
 ## Latest note
 
-**2026-08-15** — GitHub backups: Trash **Backup to GitHub**, plus a weekly Netlify scheduled snapshot of the same archive JSON. Not after every edit. Next: Phase 15.
+**2026-08-15** — Phase 15 v1: skip links plus predictable fallbacks when media, embeds, blocks, or AI fail. Performance, storage review, and classroom/browser passes still open.

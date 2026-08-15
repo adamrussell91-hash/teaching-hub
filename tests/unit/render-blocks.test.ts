@@ -191,6 +191,37 @@ describe('renderBlock', () => {
     expect(el.querySelector('.block-embed__unavailable')?.textContent).toBe('Embed unavailable.');
   });
 
+  it('shows a fallback when a video has no id', () => {
+    const el = renderBlock(
+      {
+        ...baseBlock,
+        block_type: 'video',
+        variant: 'large',
+        content: { provider: 'youtube', external_id: '' }
+      },
+      'student'
+    );
+    expect(el.querySelector('iframe')).toBeNull();
+    expect(el.querySelector('.block-video__unavailable')?.textContent).toBe('Video unavailable.');
+  });
+
+  it('replaces a broken image with unavailable copy', () => {
+    const el = renderBlock(
+      {
+        ...baseBlock,
+        block_type: 'image',
+        variant: 'large',
+        content: { url: 'https://example.com/missing.png', alt_text: 'Harbour' }
+      },
+      'student'
+    );
+    const img = el.querySelector('img');
+    expect(img).not.toBeNull();
+    img!.dispatchEvent(new Event('error'));
+    expect(el.querySelector('img')).toBeNull();
+    expect(el.querySelector('.block-image__unavailable')?.textContent).toBe('Harbour');
+  });
+
   it('sanitises html blocks', () => {
     const el = renderBlock(
       {

@@ -16,6 +16,10 @@ describe('teacher shell', () => {
     expect(root.querySelector('.teacher-layout__logout')).toBeNull();
     expect(refs.jobsHost).toBeInstanceOf(HTMLElement);
     expect(root.querySelector('.teacher-layout__jobs')).toBe(refs.jobsHost);
+    const skip = root.querySelector<HTMLAnchorElement>('.skip-link');
+    expect(skip?.textContent).toBe('Skip to content');
+    expect(skip?.getAttribute('href')).toBe('#teacher-main');
+    expect(refs.main.id).toBe('teacher-main');
   });
 
   it('renders sign-out and invokes onLogout when clicked', async () => {

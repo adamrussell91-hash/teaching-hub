@@ -310,7 +310,7 @@ describe('mountStudentLessonView', () => {
     });
 
     await vi.waitFor(() => {
-      expect(root.textContent).toContain('Unable to load class');
+      expect(root.textContent).toContain('Unable to load');
     });
   });
 

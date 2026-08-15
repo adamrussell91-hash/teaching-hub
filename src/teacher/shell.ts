@@ -1,3 +1,5 @@
+import { createSkipLink } from '@/app/failure';
+
 export interface TeacherShellRefs {
   root: HTMLElement;
   rail: HTMLElement;
@@ -67,6 +69,7 @@ export function renderTeacherShell(
 
   const main = document.createElement('div');
   main.className = 'teacher-layout__main';
+  main.id = 'teacher-main';
 
   const contextBar = document.createElement('div');
   contextBar.className = 'teacher-layout__context-bar';
@@ -77,7 +80,7 @@ export function renderTeacherShell(
 
   main.append(contextBar, canvas);
   layout.append(rail, main);
-  root.append(layout);
+  root.append(createSkipLink('teacher-main'), layout);
 
   return { root, rail, railNav, main, contextBar, canvas, jobsHost, logoutButton };
 }
