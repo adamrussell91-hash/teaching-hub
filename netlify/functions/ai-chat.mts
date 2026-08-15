@@ -118,7 +118,8 @@ export default async function handler(request: Request): Promise<Response> {
     lesson,
     scope: body.scope,
     selectedBlockId: body.selected_block_id ?? null,
-    action: body.action
+    action: body.action,
+    fullLesson: body.agent === 'clementine'
   });
 
   const history = (body.history ?? []).map((m) => ({

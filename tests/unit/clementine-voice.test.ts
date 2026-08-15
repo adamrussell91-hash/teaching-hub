@@ -9,8 +9,18 @@ describe('Clementine voice pack', () => {
     expect(protocol).toContain('You buried it on page three');
     expect(protocol).toContain('This is the school workplace');
     expect(protocol).toContain('Propose schema-valid content via tools');
+    expect(protocol).not.toContain('Work on the selected block');
+    expect(protocol).toContain('any part of the lesson');
     expect(protocol).not.toContain('University Reading Protocol');
     expect(protocol).not.toContain('search the Knowledge Hub Notion database');
+  });
+});
+
+describe('Ann protocol', () => {
+  it('allows whole-lesson edits instead of gating on the selected block', () => {
+    const protocol = protocolForAgent('ann');
+    expect(protocol).not.toContain('Default to the selected block or section.');
+    expect(protocol).toContain('any part of the lesson');
   });
 });
 
