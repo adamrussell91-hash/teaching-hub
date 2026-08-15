@@ -269,7 +269,8 @@ describe('classes nav rendering', () => {
 
     expect(container.querySelector('a.nav-item--selected')?.textContent).toBe('12ENGADV1');
     const add = container.querySelector('button.rail-classes__new') as HTMLButtonElement;
-    expect(add.textContent).toBe('+ New class');
+    expect(add.getAttribute('aria-label')).toBe('New class');
+    expect(add.textContent).toBe('+');
     add.click();
     expect(onCreateClass).toHaveBeenCalledOnce();
   });

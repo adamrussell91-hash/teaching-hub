@@ -2,6 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Unit } from '@/schemas';
 
 vi.mock('@/app/router', () => ({ navigate: vi.fn() }));
+vi.mock('@/teacher/search/api', () => ({
+  fetchContentSearch: vi.fn(async () => ({ hits: [] }))
+}));
 
 import { navigate } from '@/app/router';
 import { renderLessonsIndex } from '@/teacher/sections/lessons';
@@ -51,17 +54,43 @@ describe('lessons index', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useRealTimers();
     canvas = document.createElement('div');
+    history.replaceState(null, '', '/lessons');
   });
 
   it('lists lessons and opens the editor', () => {
     renderLessonsIndex(canvas, curriculum);
     expect(canvas.querySelector('.page-header__title')?.textContent).toBe('Lessons');
-    expect(canvas.querySelector('[data-create-trigger]')?.textContent).toMatch(/lesson/i);
+    expect(canvas.querySelector('[data-create-trigger]')?.getAttribute('aria-label')).toMatch(
+      /lesson/i
+    );
     expect(canvas.querySelector('.lesson-list__title')?.textContent).toBe('Introduction');
     canvas.querySelector<HTMLAnchorElement>('.lesson-list__open')!.dispatchEvent(
       new MouseEvent('click', { bubbles: true, cancelable: true })
     );
     expect(navigate).toHaveBeenCalledWith('/lessons/lesson_001');
+  });
+
+  it('shows a no-results state for a query that matches nothing', async () => {
+    vi.useFakeTimers();
+    renderLessonsIndex(canvas, curriculum);
+    const input = canvas.querySelector<HTMLInputElement>('[data-lessons-search]')!;
+    input.value = 'zzzz-not-a-lesson';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(300);
+    expect(canvas.querySelector('[data-lessons-empty]')).toBeTruthy();
+    expect(canvas.querySelector('[data-lessons-clear-filters]')?.textContent).toMatch(/clear filters/i);
+    vi.useRealTimers();
+  });
+
+  it('shows a search field, status badge, grouped unit, and lesson count', () => {
+    renderLessonsIndex(canvas, curriculum);
+    expect(canvas.querySelector('[data-lessons-search]')).toBeTruthy();
+    expect(canvas.querySelector('[data-lessons-count]')?.textContent).toMatch(/1 lesson/);
+    expect(canvas.querySelector('.status-badge')?.textContent).toBe('Draft');
+    expect(canvas.querySelector('.lesson-group__summary')?.textContent).toMatch(
+      /Artist of the Floating World/
+    );
   });
 });

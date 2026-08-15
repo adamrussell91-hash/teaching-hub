@@ -15,7 +15,11 @@ export const LessonSchema = z.object({
   sequence: z.number().int(),
   blocks: z.array(BlockSchema),
   published_at: IsoDateSchema.optional(),
-  cover: CoverSchema.optional()
+  cover: CoverSchema.optional(),
+  tags: z.array(z.string().min(1).max(40)).max(24).optional(),
+  author_id: z.string().min(1).optional(),
+  review_status: z.enum(['needs_review', 'none']).optional(),
+  syllabus_outcomes: z.array(z.string().min(1).max(32)).max(24).optional()
 });
 
 function publishBlockIssues(blocks: z.infer<typeof BlockSchema>[]): string | null {

@@ -7,7 +7,7 @@ import {
 } from '@/ai/agents';
 import { actionsForScope } from '@/ai/capabilities';
 import { streamAiChat, type ArchiveCitation } from '@/ai/client';
-import { pollAiJob, startAiJob } from '@/ai/jobs-client';
+import { pollAiJob, startAiJob, listAiJobs, resolveAiJob, AiJobConflictError } from '@/ai/jobs-client';
 import { AI_JOB_STALE_MS } from '@/ai/jobs';
 import { filterProposal, listPartialAcceptUnits } from '@/ai/partial-accept';
 import type { AiProposal, AiScope } from '@/ai/proposals';
@@ -45,6 +45,7 @@ interface ChatMessage {
   snapshotAt?: string;
   citations?: ArchiveCitation[];
   archiveFailed?: boolean;
+  jobId?: string;
 }
 
 const POLL_MS = import.meta.env.MODE === 'test' ? 50 : 1000;
@@ -264,6 +265,9 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
     }
     saveTranscript(options.lessonId, messages);
     renderThread();
+    if (result.ok && msg.jobId) {
+      void resolveAiJob(msg.jobId, 'accepted');
+    }
   }
 
   function acceptProposal(msg: ChatMessage, proposal: AiProposal = msg.proposal!): void {
@@ -401,6 +405,7 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
             msg.proposalStatus = 'rejected';
             saveTranscript(options.lessonId, messages);
             renderThread();
+            if (msg.jobId) void resolveAiJob(msg.jobId, 'rejected');
           });
           const regen = document.createElement('button');
           regen.type = 'button';
@@ -438,24 +443,21 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
     renderThread();
   }
 
-  async function runClementineJob(
-    message: string,
+  async function pollJobUntilSettled(
+    jobId: string,
     assistantId: string,
     snapshotAt: string,
     signal: AbortSignal
   ): Promise<void> {
-    const started = await startAiJob(
-      { lesson_id: options.lessonId, agent: agentSlug, message },
-      { signal }
-    );
-    let job = await pollAiJob(started.id, { signal });
+    const assistant = messages.find((m) => m.id === assistantId);
+    if (assistant) assistant.jobId = jobId;
+    let job = await pollAiJob(jobId, { signal });
     let polls = 1;
     while (job.status === 'working' && !signal.aborted && polls < MAX_POLLS) {
       polls += 1;
       await sleep(POLL_MS, signal);
-      job = await pollAiJob(started.id, { signal });
+      job = await pollAiJob(jobId, { signal });
     }
-    const assistant = messages.find((m) => m.id === assistantId);
     if (!assistant) return;
     if (job.status === 'error') {
       assistant.text = job.error ?? 'AI job failed';
@@ -468,12 +470,74 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
       return;
     }
     if (job.proposal) {
-      attachProposal(assistant, job.proposal, snapshotAt);
+      attachProposal(assistant, job.proposal, job.snapshot_at || snapshotAt);
       if (job.archiveFailed) assistant.archiveFailed = true;
     } else if (!assistant.text.trim()) {
       assistant.text = 'Job finished.';
     }
     renderThread();
+  }
+
+  async function runClementineJob(
+    message: string,
+    assistantId: string,
+    snapshotAt: string,
+    signal: AbortSignal
+  ): Promise<void> {
+    let jobId: string;
+    try {
+      const started = await startAiJob(
+        { lesson_id: options.lessonId, agent: agentSlug, message },
+        { signal }
+      );
+      jobId = started.id;
+    } catch (error) {
+      if (error instanceof AiJobConflictError) {
+        jobId = error.jobId;
+      } else {
+        throw error;
+      }
+    }
+    await pollJobUntilSettled(jobId, assistantId, snapshotAt, signal);
+  }
+
+  async function resumeOpenJob(): Promise<void> {
+    try {
+      const inbox = await listAiJobs();
+      const row = inbox.jobs.find((job) => job.lesson_id === options.lessonId);
+      if (!row) return;
+      const job = await pollAiJob(row.id);
+      if (messages.some((msg) => msg.jobId === job.id)) return;
+      messages.push({ id: nextMsgId(), role: 'user', text: job.message });
+      const assistantId = nextMsgId();
+      messages.push({
+        id: assistantId,
+        role: 'assistant',
+        agent: job.agent,
+        text: '',
+        jobId: job.id
+      });
+      if (job.status === 'working') {
+        abort?.abort();
+        abort = new AbortController();
+        setWorkingState(true);
+        try {
+          await pollJobUntilSettled(job.id, assistantId, job.snapshot_at, abort.signal);
+        } finally {
+          setWorkingState(false);
+        }
+      } else if (job.status === 'error') {
+        const assistant = messages.find((msg) => msg.id === assistantId);
+        if (assistant) assistant.text = job.error ?? 'AI job failed';
+      } else if (job.proposal) {
+        const assistant = messages.find((msg) => msg.id === assistantId);
+        if (assistant) attachProposal(assistant, job.proposal, job.snapshot_at);
+      }
+      saveTranscript(options.lessonId, messages);
+      renderShell();
+    } catch {
+      /* inbox is optional on load */
+    }
   }
 
   async function sendMessage(text: string, action?: string): Promise<void> {
@@ -565,6 +629,7 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
   renderPicker();
   renderHero();
   renderShell();
+  void resumeOpenJob();
 
   return {
     setSelection(selection) {

@@ -89,7 +89,7 @@ export default async function handler(request: Request): Promise<Response> {
     subject_id,
     academic_year,
     week_count,
-    terms: defaultScopeTerms(week_count),
+    terms: defaultScopeTerms(week_count, academic_year),
     timeline_items: [],
     status: 'active',
     created_at: timestamp,

@@ -158,11 +158,17 @@ describe('mountLessonEditor', () => {
       if (path === '/api/curriculum') {
         return emptyCurriculum;
       }
+      if (path === '/api/ai/jobs') {
+        return { jobs: [] };
+      }
       if (path.startsWith('/api/lessons/')) {
         return lesson;
       }
       if (path.startsWith('/api/compositions/')) {
         throw new ApiClientError({ code: 'not_found', message: 'Composition not found' });
+      }
+      if (path === '/api/ai/jobs') {
+        return { jobs: [] };
       }
       throw new Error(`Unexpected apiGet path: ${path}`);
     });
@@ -521,6 +527,9 @@ describe('mountLessonEditor', () => {
       if (path.startsWith('/api/lessons/')) {
         return makeLesson({ blocks: [] });
       }
+      if (path === '/api/ai/jobs') {
+        return { jobs: [] };
+      }
       throw new Error(`Unexpected apiGet path: ${path}`);
     });
 
@@ -595,6 +604,9 @@ describe('mountLessonEditor', () => {
       }
       if (path.startsWith('/api/lessons/')) {
         return makeLesson({ blocks: [] });
+      }
+      if (path === '/api/ai/jobs') {
+        return { jobs: [] };
       }
       throw new Error(`Unexpected apiGet path: ${path}`);
     });
@@ -681,6 +693,9 @@ describe('mountLessonEditor', () => {
       if (path.startsWith('/api/lessons/')) {
         return makeLesson({ blocks: [linkedStub()] });
       }
+      if (path === '/api/ai/jobs') {
+        return { jobs: [] };
+      }
       throw new Error(`Unexpected apiGet path: ${path}`);
     });
     apiPutMock.mockResolvedValue(makeLesson());
@@ -723,6 +738,9 @@ describe('mountLessonEditor', () => {
       }
       if (path.startsWith('/api/lessons/')) {
         return makeLesson({ blocks: [linkedStub()] });
+      }
+      if (path === '/api/ai/jobs') {
+        return { jobs: [] };
       }
       throw new Error(`Unexpected apiGet path: ${path}`);
     });
@@ -791,6 +809,9 @@ describe('mountLessonEditor', () => {
       }
       if (path.startsWith('/api/lessons/')) {
         return makeLesson({ blocks: [linkedStub()] });
+      }
+      if (path === '/api/ai/jobs') {
+        return { jobs: [] };
       }
       throw new Error(`Unexpected apiGet path: ${path}`);
     });
@@ -985,6 +1006,9 @@ describe('mountLessonEditor', () => {
       if (path.startsWith('/api/lessons/')) {
         return makeLesson({ blocks: [] });
       }
+      if (path === '/api/ai/jobs') {
+        return { jobs: [] };
+      }
       throw new Error(`Unexpected apiGet path: ${path}`);
     });
 
@@ -1039,6 +1063,9 @@ describe('mountLessonEditor', () => {
       }
       if (path.startsWith('/api/lessons/')) {
         return makeLesson({ blocks: [linkedStub()] });
+      }
+      if (path === '/api/ai/jobs') {
+        return { jobs: [] };
       }
       throw new Error(`Unexpected apiGet path: ${path}`);
     });

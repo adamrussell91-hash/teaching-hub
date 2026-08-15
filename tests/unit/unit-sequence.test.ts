@@ -132,6 +132,7 @@ describe('renderUnitSequence', () => {
   function render(overrides?: {
     currentUnitId?: string;
     today?: string;
+    readOnly?: boolean;
     onMoveUp?: (scheduledId: string) => void;
     onMoveDown?: (scheduledId: string) => void;
     onOverflow?: (scheduledId: string, anchor: HTMLElement) => void;
@@ -144,6 +145,7 @@ describe('renderUnitSequence', () => {
       currentUnitId: overrides?.currentUnitId ?? 'unit_aotfw',
       classId: CLASS_ID,
       today: overrides?.today ?? '2026-08-20',
+      readOnly: overrides?.readOnly,
       onMoveUp: overrides?.onMoveUp,
       onMoveDown: overrides?.onMoveDown,
       onOverflow: overrides?.onOverflow,
@@ -265,6 +267,12 @@ describe('renderUnitSequence', () => {
     }
     expect(controls.hasAttribute('hidden')).toBe(false);
     expect((controls as HTMLElement).style.display).not.toBe('none');
+  });
+
+  it('omits reorder controls in read-only mode', () => {
+    render({ readOnly: true });
+    expect(host.querySelector('.seq__controls')).toBeNull();
+    expect(host.querySelector('a.seq__lesson-link[href="/lessons/l1"]')).not.toBeNull();
   });
 
   it('wires move and overflow callbacks', () => {

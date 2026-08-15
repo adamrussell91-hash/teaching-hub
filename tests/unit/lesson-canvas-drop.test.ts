@@ -39,6 +39,11 @@ describe('insertTypeForParent', () => {
     expect(reason!.length).toBeGreaterThan(0);
   });
 
+  it('allows collection at a homepage or unit page root', () => {
+    expect(insertTypeForParent({ kind: 'root' }, 'collection', 'page')).toBeNull();
+    expect(insertTypeForParent({ kind: 'root' }, 'heading', 'page')).toBeNull();
+  });
+
   it('refuses columns inside columns', () => {
     const reason = insertTypeForParent(
       { kind: 'column', id: 'cols1', columnIndex: 0 },
@@ -76,6 +81,14 @@ describe('insertAt', () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.message).toBe(insertTypeForParent({ kind: 'root' }, 'collection'));
+  });
+
+  it('inserts a collection at page root when rootMode is page', () => {
+    const collection = createBlock('collection', 'coll1');
+    const result = insertAt([], { kind: 'root' }, 0, collection, { rootMode: 'page' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.blocks[0]?.id).toBe('coll1');
   });
 
   it('inserts a heading into a section', () => {

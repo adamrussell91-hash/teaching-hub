@@ -6,8 +6,10 @@ export interface PublishedClassScheduleRow {
   date: string;
   schedule_order: number;
   lesson_id: string;
+  unit_id: string;
   title: string;
   published: boolean;
+  delivery_status?: 'planned' | 'current' | 'delivered' | 'skipped' | 'rescheduled';
 }
 
 export interface PublishedClass {

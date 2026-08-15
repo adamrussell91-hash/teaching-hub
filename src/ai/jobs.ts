@@ -13,7 +13,12 @@ export const AiJobCreateSchema = z.object({
   message: z.string().min(1).max(8000)
 });
 
+export const AiJobPatchSchema = z.object({
+  resolution: z.enum(['accepted', 'rejected', 'dismissed'])
+});
+
 export type AiJobCreate = z.infer<typeof AiJobCreateSchema>;
+export type AiJobPatch = z.infer<typeof AiJobPatchSchema>;
 
 export type AiTranscriptTurn = {
   role: 'user' | 'assistant';
@@ -31,6 +36,7 @@ export type AiJob = {
   error?: string;
   archiveFailed?: boolean;
   created_at: string;
+  resolution?: 'accepted' | 'rejected' | 'dismissed';
 };
 
 export type KernelJobPayload = {

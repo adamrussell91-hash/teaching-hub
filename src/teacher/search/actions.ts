@@ -20,7 +20,7 @@ export function listSearchActions(ctx: SearchActionContext): SearchAction[] {
     { id: 'new-unit', title: 'New Unit', keywords: ['new', 'create', 'unit'] },
     { id: 'new-class', title: 'New Class', keywords: ['new', 'create', 'class'] },
     { id: 'new-scope', title: 'New Scope & Sequence', keywords: ['new', 'create', 'scope'] },
-    { id: 'open-home', title: 'Open Home', keywords: ['home'] }
+    { id: 'open-home', title: 'Open Dashboard', keywords: ['home', 'dashboard'] }
   ];
   if (ctx.todayClassId) {
     actions.push({ id: 'open-today-class', title: "Open Today's Class", keywords: ['today', 'class'] });

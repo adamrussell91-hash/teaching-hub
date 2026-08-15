@@ -3,11 +3,18 @@ import { navigate } from '@/app/router';
 import { renderBlock } from '@/blocks/render';
 import type { PublishedLesson } from '@/schemas/published-lesson';
 import { scheduleNeighbors } from '@/schedule/schedule-neighbors';
+import { formatStudentDate } from '@/student/format';
+import { renderStudentHero } from '@/student/hero';
 import { firstLeadFromBlocks } from '@/student/lesson-lead';
 import {
   fetchPublishedClass,
   type PublishedClass
 } from '@/student/published-class';
+import {
+  createStudentShell,
+  renderStudentChrome,
+  renderStudentStatus
+} from '@/student/shell';
 
 export interface MountStudentLessonViewOptions {
   root: HTMLElement;
@@ -19,76 +26,6 @@ export interface MountStudentLessonViewOptions {
 
 export interface StudentLessonViewHandle {
   dispose(): void;
-}
-
-function createShell(): { surface: HTMLElement; header: HTMLElement; content: HTMLElement } {
-  const surface = document.createElement('div');
-  surface.className = 'student-surface';
-
-  const header = document.createElement('header');
-  header.className = 'student-surface__header';
-
-  const brand = document.createElement('span');
-  brand.className = 'student-surface__brand';
-  brand.textContent = 'Teaching Hub';
-  header.append(brand);
-
-  const content = document.createElement('div');
-  content.className = 'student-surface__content';
-
-  surface.append(header, content);
-  return { surface, header, content };
-}
-
-function renderHeader(header: HTMLElement, unitId: string): void {
-  header.replaceChildren();
-
-  const brand = document.createElement('span');
-  brand.className = 'student-surface__brand';
-  brand.textContent = 'Teaching Hub';
-
-  const back = document.createElement('a');
-  back.className = 'student-surface__back';
-  back.href = `/s/units/${unitId}`;
-  back.textContent = 'Back to unit';
-
-  header.append(brand, back);
-}
-
-function renderClassScopedHeader(
-  header: HTMLElement,
-  classId: string,
-  unitId: string
-): void {
-  header.replaceChildren();
-
-  const brand = document.createElement('span');
-  brand.className = 'student-surface__brand';
-  brand.textContent = 'Teaching Hub';
-
-  const links = document.createElement('div');
-  links.className = 'student-surface__header-links';
-
-  const backClass = document.createElement('a');
-  backClass.className = 'student-surface__back student-surface__back-class';
-  backClass.href = `/s/classes/${classId}`;
-  backClass.textContent = 'Back to class';
-
-  const backUnit = document.createElement('a');
-  backUnit.className = 'student-surface__back student-surface__back-unit';
-  backUnit.href = `/s/units/${unitId}`;
-  backUnit.textContent = 'Back to unit';
-
-  links.append(backClass, backUnit);
-  header.append(brand, links);
-}
-
-function renderStatus(content: HTMLElement, text: string): void {
-  content.replaceChildren();
-  const status = document.createElement('p');
-  status.className = 'teacher-layout__canvas-status';
-  status.textContent = text;
-  content.append(status);
 }
 
 function renderPublishedLesson(
@@ -104,29 +41,10 @@ function renderPublishedLesson(
     cls?.schedule.find((row) => row.lesson_id === lesson.lesson_id)?.date ?? '';
   const lead = firstLeadFromBlocks(lesson.blocks);
 
-  const hero = document.createElement('article');
-  hero.className = 'lesson-hero glass-panel';
-
-  const eyebrow = document.createElement('p');
-  eyebrow.className = 'lesson-hero__eyebrow';
-  eyebrow.textContent = classTitle || 'Lesson';
-  hero.append(eyebrow);
-
-  const title = document.createElement('h1');
-  title.className = 'lesson-hero__title';
-  title.textContent = lesson.title;
-  hero.append(title);
-
-  if (lead) {
-    const leadEl = document.createElement('p');
-    leadEl.className = 'lesson-hero__lead';
-    leadEl.textContent = lead;
-    hero.append(leadEl);
-  }
-
+  let meta: HTMLElement | undefined;
   if (classTitle || scheduleDate) {
-    const meta = document.createElement('aside');
-    meta.className = 'lesson-hero__meta';
+    meta = document.createElement('aside');
+    meta.className = 'lesson-hero__meta student-hero__meta';
     if (classTitle) {
       const classLine = document.createElement('p');
       classLine.className = 'lesson-hero__meta-class';
@@ -136,13 +54,26 @@ function renderPublishedLesson(
     if (scheduleDate) {
       const dateLine = document.createElement('p');
       dateLine.className = 'lesson-hero__meta-date';
-      dateLine.textContent = scheduleDate;
+      dateLine.textContent = formatStudentDate(scheduleDate);
       meta.append(dateLine);
     }
-    hero.append(meta);
   }
 
-  content.append(hero);
+  content.append(
+    renderStudentHero({
+      title: lesson.title,
+      eyebrow: classTitle || 'Lesson',
+      lead: lead ?? undefined,
+      entityId: lesson.lesson_id,
+      cover: lesson.cover,
+      media: lesson.cover ? 'cover' : 'never',
+      extraClass: 'lesson-hero',
+      titleClass: 'lesson-hero__title',
+      eyebrowClass: 'lesson-hero__eyebrow',
+      leadClass: 'lesson-hero__lead',
+      meta
+    })
+  );
 
   const blocks = document.createElement('div');
   blocks.className = 'lesson-blocks';
@@ -150,10 +81,6 @@ function renderPublishedLesson(
     blocks.append(renderBlock(block, 'student', { lessonId: lesson.lesson_id }));
   }
   content.append(blocks);
-}
-
-function wideNavLabels(): boolean {
-  return window.matchMedia('(min-width: 40rem)').matches;
 }
 
 function renderLessonNav(
@@ -166,15 +93,21 @@ function renderLessonNav(
   if (!prev && !next) return;
 
   const nav = document.createElement('nav');
-  nav.className = 'student-lesson__nav';
-  const useTitles = wideNavLabels();
+  nav.className = 'student-lesson__nav student-pager';
+  nav.setAttribute('aria-label', 'Lesson');
 
   if (prev) {
     const href = `/s/classes/${classId}/lessons/${prev.lesson_id}`;
     const link = document.createElement('a');
-    link.className = 'student-lesson__nav-prev';
+    link.className = 'student-lesson__nav-prev student-pager__link';
     link.href = href;
-    link.textContent = useTitles ? prev.title : 'Previous';
+    const dir = document.createElement('span');
+    dir.className = 'student-pager__dir';
+    dir.textContent = 'Previous';
+    const title = document.createElement('span');
+    title.className = 'student-pager__title';
+    title.textContent = prev.title;
+    link.append(dir, title);
     link.addEventListener('click', (event) => {
       event.preventDefault();
       navigate(href);
@@ -185,9 +118,15 @@ function renderLessonNav(
   if (next) {
     const href = `/s/classes/${classId}/lessons/${next.lesson_id}`;
     const link = document.createElement('a');
-    link.className = 'student-lesson__nav-next';
+    link.className = 'student-lesson__nav-next student-pager__link';
     link.href = href;
-    link.textContent = useTitles ? next.title : 'Next';
+    const dir = document.createElement('span');
+    dir.className = 'student-pager__dir';
+    dir.textContent = 'Next';
+    const title = document.createElement('span');
+    title.className = 'student-pager__title';
+    title.textContent = next.title;
+    link.append(dir, title);
     link.addEventListener('click', (event) => {
       event.preventDefault();
       navigate(href);
@@ -212,7 +151,7 @@ function loadErrorMessage(
 
 /**
  * Loads a published lesson snapshot and renders the public student reading
- * surface: minimal chrome, lesson title, and student-visible blocks only.
+ * surface: reading chrome, lesson title, and student-visible blocks only.
  * With `classId`, validates schedule membership and adds class chrome + footer.
  */
 export function mountStudentLessonView(
@@ -222,10 +161,10 @@ export function mountStudentLessonView(
   let disposed = false;
 
   root.replaceChildren();
-  const { surface, header, content } = createShell();
+  const { surface, header, content } = createStudentShell();
   root.append(surface);
-
-  renderStatus(content, 'Loading lesson…');
+  renderStudentChrome(header, { brand: 'Teaching Hub' });
+  renderStudentStatus(content, 'Loading lesson…');
 
   if (classId) {
     void Promise.allSettled([
@@ -235,7 +174,7 @@ export function mountStudentLessonView(
       if (disposed || isStale()) return;
 
       if (lessonResult.status === 'rejected') {
-        renderStatus(
+        renderStatusError(
           content,
           loadErrorMessage(
             lessonResult.reason,
@@ -247,7 +186,7 @@ export function mountStudentLessonView(
       }
 
       if (classResult.status === 'rejected') {
-        renderStatus(
+        renderStatusError(
           content,
           loadErrorMessage(
             classResult.reason,
@@ -262,11 +201,25 @@ export function mountStudentLessonView(
       const cls = classResult.value;
       const row = cls.schedule.find((entry) => entry.lesson_id === lessonId);
       if (!row || !row.published) {
-        renderStatus(content, 'Lesson not found.');
+        renderStatusError(content, 'Lesson not found.');
         return;
       }
 
-      renderClassScopedHeader(header, classId, lesson.unit_id);
+      renderStudentChrome(header, {
+        brand: cls.code || 'Teaching Hub',
+        links: [
+          {
+            href: `/s/classes/${classId}`,
+            label: 'Back to class',
+            className: 'student-surface__back-class'
+          },
+          {
+            href: `/s/units/${lesson.unit_id}`,
+            label: 'Back to unit',
+            className: 'student-surface__back-unit'
+          }
+        ]
+      });
       renderPublishedLesson(content, lesson, { cls });
       renderLessonNav(content, classId, lessonId, cls);
     });
@@ -274,12 +227,19 @@ export function mountStudentLessonView(
     void apiGet<PublishedLesson>(`/api/published/lessons/${lessonId}`)
       .then((lesson) => {
         if (disposed || isStale()) return;
-        renderHeader(header, lesson.unit_id);
+        renderStudentChrome(header, {
+          links: [
+            {
+              href: `/s/units/${lesson.unit_id}`,
+              label: 'Back to unit'
+            }
+          ]
+        });
         renderPublishedLesson(content, lesson);
       })
       .catch((error: unknown) => {
         if (disposed || isStale()) return;
-        renderStatus(content, loadErrorMessage(error, 'Lesson not found.'));
+        renderStatusError(content, loadErrorMessage(error, 'Lesson not found.'));
       });
   }
 
@@ -288,4 +248,8 @@ export function mountStudentLessonView(
       disposed = true;
     }
   };
+}
+
+function renderStatusError(content: HTMLElement, message: string): void {
+  renderStudentStatus(content, message);
 }

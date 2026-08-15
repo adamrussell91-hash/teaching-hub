@@ -1,4 +1,4 @@
-import { draftLessonKey, getContentStore, getJSON, setJSON } from './_shared/blobs.mts';
+import { draftLessonKey, getContentStore, getJSON, setJSON, unitKey } from './_shared/blobs.mts';
 import { getTeacherSession } from './_shared/session.mts';
 import { validateLessonDraft, type Lesson } from './_shared/validate.mts';
 import {
@@ -17,7 +17,11 @@ import {
   tryWriteCheckpoint
 } from './_shared/versions.mts';
 import type { VersionReason } from '../../src/schemas';
-import { LessonSchema } from '../../src/schemas';
+import { LessonSchema, UnitSchema } from '../../src/schemas';
+import {
+  applyLessonLibraryPatch,
+  parseLessonLibraryPatch
+} from '../../src/lessons/library-patch';
 import {
   applyParsedStatus,
   handlePermanentDelete,
@@ -74,9 +78,13 @@ export default async function handler(request: Request, context: FunctionContext
     if (!parsed.ok) {
       return withCors(errorResponse(400, parsed.code, parsed.message), request, env);
     }
-    if (!parsed.hasStatus) {
+    const library = parseLessonLibraryPatch(body);
+    if (!library.ok) {
+      return withCors(errorResponse(400, 'validation_error', library.message), request, env);
+    }
+    if (!parsed.hasStatus && !library.hasPatch) {
       return withCors(
-        errorResponse(400, 'validation_error', 'Provide status'),
+        errorResponse(400, 'validation_error', 'Provide status or library fields'),
         request,
         env
       );
@@ -93,7 +101,35 @@ export default async function handler(request: Request, context: FunctionContext
 
     const nowIso = new Date().toISOString();
     try {
-      const next = applyParsedStatus(existingParsed.data, parsed, nowIso);
+      let next = existingParsed.data;
+      if (parsed.hasStatus) {
+        next = applyParsedStatus(next, parsed, nowIso);
+      }
+      if (library.hasPatch) {
+        const fromUnitId = next.unit_id;
+        next = applyLessonLibraryPatch(next, library.patch);
+        if (library.patch.unit_id && library.patch.unit_id !== fromUnitId) {
+          const fromRaw = await getJSON(store, unitKey(fromUnitId));
+          const toRaw = await getJSON(store, unitKey(library.patch.unit_id));
+          const fromUnit = UnitSchema.safeParse(fromRaw);
+          const toUnit = UnitSchema.safeParse(toRaw);
+          if (!fromUnit.success || !toUnit.success) {
+            return withCors(errorResponse(400, 'validation_error', 'Unit not found'), request, env);
+          }
+          await setJSON(store, unitKey(fromUnitId), {
+            ...fromUnit.data,
+            lesson_ids: fromUnit.data.lesson_ids.filter((entry) => entry !== id),
+            updated_at: nowIso
+          });
+          if (!toUnit.data.lesson_ids.includes(id)) {
+            await setJSON(store, unitKey(library.patch.unit_id), {
+              ...toUnit.data,
+              lesson_ids: [...toUnit.data.lesson_ids, id],
+              updated_at: nowIso
+            });
+          }
+        }
+      }
       const validated = LessonSchema.safeParse({ ...next, updated_at: nowIso });
       if (!validated.success) {
         return withCors(

@@ -1,16 +1,47 @@
 import { isLinkedSection } from '@/blocks/composition-link';
-import { createFromInsertMenu, cloneBlockWithNewIds } from '@/blocks/create-block';
-import { createBlockEditor, createVisibilitySelect } from '@/blocks/editors';
+import {
+  createFromInsertMenu,
+  cloneBlockWithNewIds,
+  type InsertMenuValue
+} from '@/blocks/create-block';
+import {
+  createBlockEditor,
+  createVisibilitySelect,
+  type BlockEditorContext
+} from '@/blocks/editors';
 import { findBlockById } from '@/blocks/find-block';
 import { renderBlock } from '@/blocks/render';
 import type { Block } from '@/schemas/block';
 import type { Lesson } from '@/schemas/lesson';
 import type { Media } from '@/schemas/media';
 import { mountCoverPicker, type CoverPickerHandle } from '@/teacher/cover-picker';
-import { deleteBlocksById, insertAt } from '@/teacher/lesson-canvas/drop';
+import { deleteBlocksById, insertAt, type DropRootMode } from '@/teacher/lesson-canvas/drop';
 import { isTextLike } from '@/teacher/lesson-canvas/kinds';
 
 const DND_MIME = 'application/x-teaching-hub-block';
+
+export type MountBlockCanvasOptions = {
+  blocks: Block[];
+  onChange: (blocks: Block[]) => void;
+  idFactory: () => string;
+  media?: Media[];
+  editorContext?: BlockEditorContext;
+  renderPreview?: (block: Block) => HTMLElement;
+  allowCollectionAtRoot?: boolean;
+  heading?: string;
+  onSelect?: (blockId: string | null) => void;
+  onSaveComposition?: (blockId: string) => void;
+  onEditSource?: (compositionId: string) => void;
+  onDetachComposition?: (blockId: string) => void;
+  onCompositionDrop?: (id: string) => void;
+  renderLinkedPreview?: (compositionId: string) => HTMLElement;
+};
+
+export type BlockCanvasHandle = {
+  update(blocks: Block[], nextMedia?: Media[]): void;
+  insertType(type: InsertMenuValue): void;
+  dispose(): void;
+};
 
 export type MountLessonPageOptions = {
   lesson: Lesson;
@@ -100,18 +131,21 @@ function printIcon(): SVGSVGElement {
   return svg;
 }
 
-export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptions): LessonPageHandle {
-  let lesson = options.lesson;
+export function mountBlockCanvas(
+  host: HTMLElement,
+  options: MountBlockCanvasOptions
+): BlockCanvasHandle {
+  let blocks = options.blocks;
   let selectedId: string | null = null;
-  let coverHandle: CoverPickerHandle | null = null;
   let media = options.media ?? [];
+  const rootMode: DropRootMode = options.allowCollectionAtRoot ? 'page' : 'lesson';
 
   const root = document.createElement('div');
-  root.className = 'lesson-page';
+  root.className = 'lesson-page lesson-page--blocks';
   host.append(root);
 
-  function emit(next: Lesson, rerender = true): void {
-    lesson = next;
+  function emit(next: Block[], rerender = true): void {
+    blocks = next;
     options.onChange(next);
     if (rerender) render();
   }
@@ -123,11 +157,15 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   }
 
   function onBlockChange(updated: Block): void {
-    emit({ ...lesson, blocks: replaceBlockInTree(lesson.blocks, updated) });
+    emit(replaceBlockInTree(blocks, updated));
   }
 
   function latestBlock(id: string, fallback: Block): () => Block {
-    return () => findBlockById(lesson.blocks, id) ?? fallback;
+    return () => findBlockById(blocks, id) ?? fallback;
+  }
+
+  function editorCtx(): BlockEditorContext {
+    return { ...options.editorContext, media };
   }
 
   function setHint(message: string): void {
@@ -149,15 +187,14 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       options.onCompositionDrop?.(payload.id);
       return;
     }
-    const parent = { kind: 'root' as const };
-    const block = createFromInsertMenu(payload.type, options.idFactory());
-    const result = insertAt(lesson.blocks, parent, index, block);
+    const block = createFromInsertMenu(payload.type as InsertMenuValue, options.idFactory());
+    const result = insertAt(blocks, { kind: 'root' }, index, block, { rootMode });
     if (!result.ok) {
       setHint(result.message);
       return;
     }
     setHint('');
-    emit({ ...lesson, blocks: result.blocks });
+    emit(result.blocks);
   }
 
   function createGap(index: number): HTMLElement {
@@ -183,10 +220,10 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     duplicate.addEventListener('click', (event) => {
       event.stopPropagation();
       const clone = cloneBlockWithNewIds(block, options.idFactory);
-      const index = lesson.blocks.findIndex((row) => row.id === block.id);
-      const at = index >= 0 ? index + 1 : lesson.blocks.length;
-      const result = insertAt(lesson.blocks, { kind: 'root' }, at, clone);
-      if (result.ok) emit({ ...lesson, blocks: result.blocks });
+      const index = blocks.findIndex((row) => row.id === block.id);
+      const at = index >= 0 ? index + 1 : blocks.length;
+      const result = insertAt(blocks, { kind: 'root' }, at, clone, { rootMode });
+      if (result.ok) emit(result.blocks);
     });
 
     const remove = document.createElement('button');
@@ -197,7 +234,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       event.stopPropagation();
       selectedId = null;
       options.onSelect?.(null);
-      emit({ ...lesson, blocks: deleteBlocksById(lesson.blocks, [block.id]) });
+      emit(deleteBlocksById(blocks, [block.id]));
     });
 
     bar.append(visibility, duplicate, remove);
@@ -256,77 +293,19 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     return chrome;
   }
 
-  function renderChrome(): HTMLElement {
-    const chrome = document.createElement('div');
-    chrome.className = 'lesson-page__chrome';
-
-    const moreWrap = document.createElement('div');
-    moreWrap.className = 'lesson-page__more';
-
-    const more = document.createElement('button');
-    more.type = 'button';
-    more.className = 'btn btn--ghost lesson-page__more-btn';
-    more.setAttribute('aria-label', 'Page menu');
-    more.textContent = '⋯';
-
-    const menu = document.createElement('div');
-    menu.className = 'lesson-page__menu';
-    menu.hidden = true;
-
-    const save = document.createElement('button');
-    save.type = 'button';
-    save.className = 'btn btn--ghost';
-    save.textContent = 'Save as lesson template';
-    save.addEventListener('click', () => {
-      options.onSaveTemplate?.();
-    });
-    menu.append(save);
-
-    more.addEventListener('click', () => {
-      menu.hidden = !menu.hidden;
-    });
-
-    moreWrap.append(more, menu);
-
-    const print = document.createElement('button');
-    print.type = 'button';
-    print.className = 'lesson-page__print';
-    print.setAttribute('aria-label', 'Print');
-    print.append(printIcon());
-    print.addEventListener('click', () => options.onPrint());
-
-    chrome.append(moreWrap, print);
-    return chrome;
+  function preview(block: Block): HTMLElement {
+    return options.renderPreview?.(block) ?? renderBlock(block, 'teacher');
   }
 
   function render(): void {
-    coverHandle?.dispose();
-    coverHandle = null;
     root.replaceChildren();
 
-    root.append(renderChrome());
-
-    const coverHost = document.createElement('div');
-    coverHost.className = 'lesson-page__cover';
-    coverHandle = mountCoverPicker(coverHost, {
-      cover: lesson.cover ?? null,
-      media,
-      titleFallback: lesson.title,
-      onSave: (cover) => {
-        emit({ ...lesson, ...(cover ? { cover } : { cover: undefined }) }, false);
-      }
-    });
-    root.append(coverHost);
-
-    const title = document.createElement('input');
-    title.type = 'text';
-    title.className = 'lesson-page__title';
-    title.value = lesson.title;
-    title.setAttribute('aria-label', 'Lesson title');
-    title.addEventListener('input', () => {
-      emit({ ...lesson, title: title.value }, false);
-    });
-    root.append(title);
+    if (options.heading) {
+      const heading = document.createElement('h2');
+      heading.className = 'lesson-page__heading class-page__heading';
+      heading.textContent = options.heading;
+      root.append(heading);
+    }
 
     const hint = document.createElement('p');
     hint.className = 'lesson-page__hint';
@@ -336,7 +315,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     const list = document.createElement('div');
     list.className = 'lesson-page__blocks';
 
-    lesson.blocks.forEach((block, index) => {
+    blocks.forEach((block, index) => {
       list.append(createGap(index));
 
       const row = document.createElement('div');
@@ -348,8 +327,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       if (isLinkedSection(block)) {
         row.append(createLinkedChrome(block));
         row.append(
-          options.renderLinkedPreview?.(block.content.link.source_composition_id) ??
-            renderBlock(block, 'teacher')
+          options.renderLinkedPreview?.(block.content.link.source_composition_id) ?? preview(block)
         );
         row.addEventListener('click', (event) => {
           if ((event.target as HTMLElement | null)?.closest('button')) return;
@@ -357,7 +335,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
           options.onSelect?.(block.id);
         });
       } else if (isTextLike(block.block_type)) {
-        const editor = createBlockEditor(block, onBlockChange, latestBlock(block.id, block), { media });
+        const editor = createBlockEditor(block, onBlockChange, latestBlock(block.id, block), editorCtx());
         editor.querySelectorAll('.block-editor__move-up, .block-editor__move-down').forEach((el) => el.remove());
         row.append(editor);
         row.addEventListener('click', () => {
@@ -365,7 +343,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
           options.onSelect?.(block.id);
         });
       } else {
-        row.append(renderBlock(block, 'teacher'));
+        row.append(preview(block));
         row.addEventListener('click', () => select(block.id));
         if (selectedId === block.id) {
           row.append(createToolbar(block));
@@ -375,10 +353,10 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       list.append(row);
     });
 
-    list.append(createGap(lesson.blocks.length));
+    list.append(createGap(blocks.length));
     root.append(list);
 
-    const selected = selectedId ? findBlockById(lesson.blocks, selectedId) : null;
+    const selected = selectedId ? findBlockById(blocks, selectedId) : null;
     if (selected && !isTextLike(selected.block_type) && !isLinkedSection(selected)) {
       const inspector = document.createElement('div');
       inspector.className = 'lesson-page__inspector';
@@ -386,7 +364,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
         selected,
         onBlockChange,
         latestBlock(selected.id, selected),
-        { media }
+        editorCtx()
       );
       editor.querySelectorAll('.block-editor__move-up, .block-editor__move-down').forEach((el) => el.remove());
       inspector.append(editor);
@@ -397,13 +375,141 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   render();
 
   return {
+    update(next: Block[], nextMedia?: Media[]) {
+      blocks = next;
+      if (nextMedia) media = nextMedia;
+      if (selectedId && !findBlockById(blocks, selectedId)) selectedId = null;
+      render();
+    },
+    insertType(type: InsertMenuValue) {
+      const block = createFromInsertMenu(type, options.idFactory());
+      const result = insertAt(blocks, { kind: 'root' }, blocks.length, block, { rootMode });
+      if (!result.ok) {
+        setHint(result.message);
+        return;
+      }
+      setHint('');
+      emit(result.blocks);
+    },
+    dispose() {
+      root.remove();
+    }
+  };
+}
+
+export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptions): LessonPageHandle {
+  let lesson = options.lesson;
+  let coverHandle: CoverPickerHandle | null = null;
+  let media = options.media ?? [];
+
+  const root = document.createElement('div');
+  root.className = 'lesson-page';
+  host.append(root);
+
+  function emitLesson(next: Lesson, rerenderChrome = false): void {
+    lesson = next;
+    options.onChange(next);
+    if (rerenderChrome) renderChrome();
+  }
+
+  const moreWrap = document.createElement('div');
+  moreWrap.className = 'lesson-page__more';
+
+  const more = document.createElement('button');
+  more.type = 'button';
+  more.className = 'btn btn--ghost lesson-page__more-btn';
+  more.setAttribute('aria-label', 'Page menu');
+  more.textContent = '⋯';
+
+  const menu = document.createElement('div');
+  menu.className = 'lesson-page__menu';
+  menu.hidden = true;
+
+  const save = document.createElement('button');
+  save.type = 'button';
+  save.className = 'btn btn--ghost';
+  save.textContent = 'Save as lesson template';
+  save.addEventListener('click', () => {
+    options.onSaveTemplate?.();
+  });
+  menu.append(save);
+
+  more.addEventListener('click', () => {
+    menu.hidden = !menu.hidden;
+  });
+  moreWrap.append(more, menu);
+
+  const print = document.createElement('button');
+  print.type = 'button';
+  print.className = 'lesson-page__print';
+  print.setAttribute('aria-label', 'Print');
+  print.append(printIcon());
+  print.addEventListener('click', () => options.onPrint());
+
+  const chrome = document.createElement('div');
+  chrome.className = 'lesson-page__chrome';
+  chrome.append(moreWrap, print);
+
+  const coverHost = document.createElement('div');
+  coverHost.className = 'lesson-page__cover';
+
+  const title = document.createElement('input');
+  title.type = 'text';
+  title.className = 'lesson-page__title';
+  title.value = lesson.title;
+  title.setAttribute('aria-label', 'Lesson title');
+  title.addEventListener('input', () => {
+    emitLesson({ ...lesson, title: title.value });
+  });
+
+  const canvasHost = document.createElement('div');
+  canvasHost.className = 'lesson-page__canvas';
+
+  root.append(chrome, coverHost, title, canvasHost);
+
+  function mountCover(): void {
+    coverHandle?.dispose();
+    coverHandle = mountCoverPicker(coverHost, {
+      cover: lesson.cover ?? null,
+      media,
+      titleFallback: lesson.title,
+      onSave: (cover) => {
+        emitLesson({ ...lesson, ...(cover ? { cover } : { cover: undefined }) });
+      }
+    });
+  }
+
+  function renderChrome(): void {
+    title.value = lesson.title;
+    mountCover();
+  }
+
+  const canvas = mountBlockCanvas(canvasHost, {
+    blocks: lesson.blocks,
+    media,
+    onChange: (blocks) => {
+      emitLesson({ ...lesson, blocks });
+    },
+    onSelect: options.onSelect,
+    idFactory: options.idFactory,
+    onSaveComposition: options.onSaveComposition,
+    onEditSource: options.onEditSource,
+    onDetachComposition: options.onDetachComposition,
+    onCompositionDrop: options.onCompositionDrop,
+    renderLinkedPreview: options.renderLinkedPreview
+  });
+
+  mountCover();
+
+  return {
     update(next: Lesson, nextMedia?: Media[]) {
       lesson = next;
       if (nextMedia) media = nextMedia;
-      if (selectedId && !findBlockById(lesson.blocks, selectedId)) selectedId = null;
-      render();
+      renderChrome();
+      canvas.update(lesson.blocks, media);
     },
     dispose() {
+      canvas.dispose();
       coverHandle?.dispose();
       coverHandle = null;
       root.remove();

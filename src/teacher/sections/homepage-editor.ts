@@ -1,18 +1,10 @@
 import { ApiClientError } from '@/api/client';
 import {
-  HOMEPAGE_BLOCK_GROUPS,
-  INSERT_MENU_LABEL,
-  createFromInsertMenu,
-  expandGroupTypesForMenu,
-  type InsertMenuValue
-} from '@/blocks/create-block';
-import {
   emptyMessageForCollection,
   resolveCollection,
   type CollectionResolveContext
 } from '@/blocks/collection-resolve';
 import {
-  createBlockEditor,
   renderBlock,
   renderCollectionBlock,
   type BlockEditorContext
@@ -23,6 +15,13 @@ import {
   mountHistoryPanel,
   type HistoryPanelHandle
 } from '@/teacher/history-panel';
+import {
+  mountBlockCanvas,
+  type BlockCanvasHandle
+} from '@/teacher/lesson-canvas/mount-page';
+import { mountLessonPalette } from '@/teacher/lesson-canvas/mount-palette';
+import { homepagePaletteFamilies } from '@/teacher/lesson-canvas/palette-catalog';
+import { readBuilderChromePrefs } from '@/teacher/lesson-canvas/prefs';
 
 export const HOMEPAGE_REGIONS = [
   { key: 'announcements', title: 'Announcements', emptyCopy: 'No announcements yet.' },
@@ -171,12 +170,18 @@ export function mountHomepageEditor(
   container.replaceChildren();
 
   const root = document.createElement('div');
-  root.className = 'homepage-editor';
+  root.className = 'homepage-editor lesson-builder lesson-builder--no-chat';
 
   const errorBanner = document.createElement('p');
   errorBanner.className = 'homepage-editor__error class-page__error';
   errorBanner.hidden = true;
   errorBanner.setAttribute('role', 'alert');
+
+  const railHost = document.createElement('div');
+  railHost.className = 'lesson-builder__rail';
+
+  const pageCol = document.createElement('div');
+  pageCol.className = 'lesson-builder__page';
 
   const toolbar = document.createElement('div');
   toolbar.className = 'homepage-editor__toolbar';
@@ -199,150 +204,74 @@ export function mountHomepageEditor(
   const regionsContainer = document.createElement('div');
   regionsContainer.className = 'homepage-editor__regions';
 
-  root.append(errorBanner, toolbar, regionsContainer);
+  pageCol.append(errorBanner, toolbar, regionsContainer);
+  root.append(railHost, pageCol);
   container.append(root);
 
-  function renderRegionBlocks(
-    regionKey: keyof ClassHomepage,
-    blocksContainer: HTMLElement,
-    blocks: Block[]
-  ): void {
-    blocksContainer.replaceChildren();
+  let activeRegion: keyof ClassHomepage = 'announcements';
+  const canvases = new Map<keyof ClassHomepage, BlockCanvasHandle>();
 
-    if (blocks.length === 0) {
-      const region = HOMEPAGE_REGIONS.find((entry) => entry.key === regionKey);
-      blocksContainer.append(regionEmptyCopy(region?.emptyCopy ?? 'No blocks yet.'));
-      return;
-    }
-
-    blocks.forEach((block, index) => {
-      const row = document.createElement('div');
-      row.className = 'homepage-editor__block-row';
-
-      const controls = document.createElement('div');
-      controls.className = 'homepage-editor__block-controls';
-
-      const upButton = document.createElement('button');
-      upButton.type = 'button';
-      upButton.className = 'btn btn--ghost homepage-editor__reorder';
-      upButton.textContent = '↑';
-      upButton.setAttribute('aria-label', `Move block ${index + 1} up`);
-      upButton.disabled = index === 0;
-      upButton.addEventListener('click', () => moveBlock(regionKey, index, -1));
-
-      const downButton = document.createElement('button');
-      downButton.type = 'button';
-      downButton.className = 'btn btn--ghost homepage-editor__reorder';
-      downButton.textContent = '↓';
-      downButton.setAttribute('aria-label', `Move block ${index + 1} down`);
-      downButton.disabled = index === blocks.length - 1;
-      downButton.addEventListener('click', () => moveBlock(regionKey, index, 1));
-
-      const deleteButton = document.createElement('button');
-      deleteButton.type = 'button';
-      deleteButton.className = 'btn btn--ghost homepage-editor__delete';
-      deleteButton.textContent = 'Delete';
-      deleteButton.setAttribute('aria-label', `Delete block ${index + 1}`);
-      deleteButton.addEventListener('click', () => deleteBlock(regionKey, index));
-
-      controls.append(upButton, downButton, deleteButton);
-
-      const editor = createBlockEditor(
-        block,
-        (updated) => {
-          homepage[regionKey][index] = updated;
-        },
-        () => homepage[regionKey][index]!,
-        editorContext
+  function setActiveRegion(key: keyof ClassHomepage): void {
+    activeRegion = key;
+    regionsContainer.querySelectorAll<HTMLElement>('.homepage-editor__region').forEach((section) => {
+      section.classList.toggle(
+        'homepage-editor__region--active',
+        section.dataset.homepageRegion === key
       );
-
-      row.append(controls, editor);
-      blocksContainer.append(row);
     });
   }
 
-  function renderRegions(): void {
-    regionsContainer.replaceChildren();
+  function renderPreview(block: Block): HTMLElement {
+    return renderHomepageBlock(block, options.resolveContext);
+  }
 
-    for (const region of HOMEPAGE_REGIONS) {
-      const regionSection = document.createElement('section');
-      regionSection.className = 'homepage-editor__region';
-      regionSection.dataset.homepageRegion = region.key;
-
-      const header = document.createElement('div');
-      header.className = 'homepage-editor__region-header';
-
-      const heading = document.createElement('h2');
-      heading.className = 'class-page__heading';
-      heading.textContent = region.title;
-
-      header.append(heading);
-
-      const addBlockBar = document.createElement('div');
-      addBlockBar.className = 'homepage-editor__add-block';
-
-      const addSelectId = `homepage-add-block-${region.key}`;
-      const addLabel = document.createElement('label');
-      addLabel.className = 'homepage-editor__add-block-label';
-      addLabel.htmlFor = addSelectId;
-      addLabel.textContent = 'Add block';
-
-      const addSelect = document.createElement('select');
-      addSelect.id = addSelectId;
-      addSelect.className = 'homepage-editor__add-block-select';
-      for (const group of HOMEPAGE_BLOCK_GROUPS) {
-        const optgroup = document.createElement('optgroup');
-        optgroup.label = group.label;
-        for (const type of expandGroupTypesForMenu(group.types)) {
-          const opt = document.createElement('option');
-          opt.value = type;
-          opt.textContent = INSERT_MENU_LABEL[type];
-          optgroup.append(opt);
-        }
-        addSelect.append(optgroup);
-      }
-
-      const addButton = document.createElement('button');
-      addButton.type = 'button';
-      addButton.className = 'btn btn--secondary homepage-editor__add-block-button';
-      addButton.textContent = 'Add block';
-      addButton.addEventListener('click', () => {
-        addBlock(region.key, addSelect.value as InsertMenuValue);
-      });
-
-      addBlockBar.append(addLabel, addSelect, addButton);
-      header.append(addBlockBar);
-
-      const blocksContainer = document.createElement('div');
-      blocksContainer.className = 'homepage-editor__blocks';
-
-      renderRegionBlocks(region.key, blocksContainer, homepage[region.key]);
-
-      regionSection.append(header, blocksContainer);
-      regionsContainer.append(regionSection);
+  for (const region of HOMEPAGE_REGIONS) {
+    const regionSection = document.createElement('section');
+    regionSection.className = 'homepage-editor__region';
+    regionSection.dataset.homepageRegion = region.key;
+    if (region.key === activeRegion) {
+      regionSection.classList.add('homepage-editor__region--active');
     }
+    regionSection.addEventListener('click', () => setActiveRegion(region.key));
+
+    const canvasHost = document.createElement('div');
+    regionSection.append(canvasHost);
+    regionsContainer.append(regionSection);
+
+    canvases.set(
+      region.key,
+      mountBlockCanvas(canvasHost, {
+        blocks: homepage[region.key],
+        heading: region.title,
+        allowCollectionAtRoot: true,
+        editorContext,
+        renderPreview,
+        idFactory: () => {
+          blockCounter += 1;
+          return `block_homepage_${region.key}_${blockCounter}`;
+        },
+        onChange: (blocks) => {
+          homepage[region.key] = blocks;
+          setActiveRegion(region.key);
+        }
+      })
+    );
   }
 
-  function moveBlock(regionKey: keyof ClassHomepage, index: number, direction: -1 | 1): void {
-    const blocks = homepage[regionKey];
-    const target = index + direction;
-    if (target < 0 || target >= blocks.length) return;
-    const temp = blocks[index]!;
-    blocks[index] = blocks[target]!;
-    blocks[target] = temp;
-    renderRegions();
-  }
+  const palette = mountLessonPalette(railHost, {
+    families: homepagePaletteFamilies(),
+    onInsert: (payload) => {
+      if (payload.kind !== 'block') return;
+      canvases.get(activeRegion)?.insertType(payload.type);
+    },
+    onShelved: (shelved) => {
+      root.classList.toggle('lesson-builder--rail-shelved', shelved);
+    }
+  });
 
-  function deleteBlock(regionKey: keyof ClassHomepage, index: number): void {
-    homepage[regionKey].splice(index, 1);
-    renderRegions();
-  }
-
-  function addBlock(regionKey: keyof ClassHomepage, type: InsertMenuValue): void {
-    blockCounter += 1;
-    const id = `block_homepage_${regionKey}_${blockCounter}`;
-    homepage[regionKey].push(createFromInsertMenu(type, id));
-    renderRegions();
+  if (readBuilderChromePrefs().rail === 'shelved') {
+    palette.setShelved(true);
+    root.classList.add('lesson-builder--rail-shelved');
   }
 
   saveButton.addEventListener('click', () => {
@@ -386,16 +315,19 @@ export function mountHomepageEditor(
       homepage.resources = next.resources;
       homepage.custom = next.custom;
       blockCounter = countBlocks(homepage);
-      renderRegions();
+      canvases.get('announcements')?.update(homepage.announcements);
+      canvases.get('resources')?.update(homepage.resources);
+      canvases.get('custom')?.update(homepage.custom);
       options.onRestored?.(restoredClass);
     }
   });
 
-  renderRegions();
-
   return {
     destroy() {
       destroyed = true;
+      palette.dispose();
+      for (const canvas of canvases.values()) canvas.dispose();
+      canvases.clear();
       historyPanel?.dispose();
       historyPanel = null;
       container.replaceChildren();

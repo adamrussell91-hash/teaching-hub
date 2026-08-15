@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { CommonFields } from './common';
 
 const WeekSchema = z.number().int().positive();
+const CalendarDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 const weekRangeRefine = (i: { start_week: number; end_week: number }) =>
   i.end_week >= i.start_week;
@@ -11,7 +12,9 @@ export const ScopeTermSchema = z.object({
   title: z.string().min(1),
   term_number: z.number().int().positive(),
   start_week: WeekSchema,
-  end_week: WeekSchema
+  end_week: WeekSchema,
+  start_date: CalendarDateSchema.optional(),
+  end_date: CalendarDateSchema.optional()
 }).refine(weekRangeRefine, { message: 'term end_week must be >= start_week' });
 
 const TimelineUnitItemBaseSchema = z.object({
@@ -20,6 +23,8 @@ const TimelineUnitItemBaseSchema = z.object({
   unit_id: z.string().min(1),
   start_week: WeekSchema,
   end_week: WeekSchema,
+  start_date: CalendarDateSchema.optional(),
+  end_date: CalendarDateSchema.optional(),
   order: z.number().int()
 });
 
@@ -29,6 +34,8 @@ const TimelineNoteItemBaseSchema = z.object({
   title: z.string().min(1),
   start_week: WeekSchema,
   end_week: WeekSchema,
+  start_date: CalendarDateSchema.optional(),
+  end_date: CalendarDateSchema.optional(),
   order: z.number().int()
 });
 

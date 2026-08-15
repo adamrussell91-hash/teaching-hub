@@ -14,6 +14,8 @@ describe('teacher shell', () => {
     expect(root.textContent).toContain('Teaching Hub');
     expect(refs.logoutButton).toBeNull();
     expect(root.querySelector('.teacher-layout__logout')).toBeNull();
+    expect(refs.jobsHost).toBeInstanceOf(HTMLElement);
+    expect(root.querySelector('.teacher-layout__jobs')).toBe(refs.jobsHost);
   });
 
   it('renders sign-out and invokes onLogout when clicked', async () => {

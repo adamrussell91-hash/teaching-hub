@@ -103,6 +103,7 @@ describe('buildPublishedClass', () => {
     expect(dto.schedule.map((row) => row.id)).toEqual(['scheduled_a', 'scheduled_b']);
     expect(dto.schedule[0]).toMatchObject({
       lesson_id: 'lesson_a',
+      unit_id: 'unit_aotfw',
       title: 'Lesson A',
       published: true
     });

@@ -1,13 +1,31 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { writeLastAgentSlug } from '@/ai/agents';
 import { streamAiChat } from '@/ai/client';
-import { pollAiJob, startAiJob } from '@/ai/jobs-client';
+import { pollAiJob, startAiJob, listAiJobs, resolveAiJob, AiJobConflictError } from '@/ai/jobs-client';
 import type { AiJob } from '@/ai/jobs';
 import type { AiProposal } from '@/ai/proposals';
 import { mountAiPanel, type AiPanelHandle, type MountAiPanelOptions } from '@/teacher/ai-panel';
 
 vi.mock('@/ai/client', () => ({ streamAiChat: vi.fn() }));
-vi.mock('@/ai/jobs-client', () => ({ startAiJob: vi.fn(), pollAiJob: vi.fn() }));
+vi.mock('@/ai/jobs-client', () => {
+  class MockConflict extends Error {
+    jobId: string;
+    status: string;
+    constructor(jobId: string, status: string) {
+      super('An unresolved job already exists for this lesson');
+      this.name = 'AiJobConflictError';
+      this.jobId = jobId;
+      this.status = status;
+    }
+  }
+  return {
+    startAiJob: vi.fn(),
+    pollAiJob: vi.fn(),
+    listAiJobs: vi.fn(),
+    resolveAiJob: vi.fn(),
+    AiJobConflictError: MockConflict
+  };
+});
 
 class MemoryStorage implements Storage {
   private readonly store = new Map<string, string>();
@@ -40,6 +58,8 @@ class MemoryStorage implements Storage {
 const streamAiChatMock = vi.mocked(streamAiChat);
 const startAiJobMock = vi.mocked(startAiJob);
 const pollAiJobMock = vi.mocked(pollAiJob);
+const listAiJobsMock = vi.mocked(listAiJobs);
+const resolveAiJobMock = vi.mocked(resolveAiJob);
 
 const SNAPSHOT = '2026-01-01T00:00:00.000Z';
 
@@ -149,6 +169,8 @@ describe('mountAiPanel', () => {
     document.body.replaceChildren();
     streamAiChatMock.mockResolvedValue(undefined);
     startAiJobMock.mockResolvedValue({ id: 'job_1', status: 'working' });
+    listAiJobsMock.mockResolvedValue({ jobs: [] });
+    resolveAiJobMock.mockResolvedValue(workingJob({ status: 'done', resolution: 'accepted' }));
     pollAiJobMock.mockResolvedValue({
       ...workingJob(),
       status: 'done',
@@ -400,5 +422,61 @@ describe('mountAiPanel', () => {
     expect(handle.isWorking()).toBe(true);
     expect(mounted.host.classList.contains('ai-panel--working')).toBe(true);
     expect(onWorkingChange).toHaveBeenCalledWith(true);
+  });
+
+  it('restores a finished job as a pending Accept card', async () => {
+    listAiJobsMock.mockResolvedValue({
+      jobs: [
+        {
+          id: 'job_1',
+          lesson_id: 'lesson_1',
+          lesson_title: 'Othello',
+          agent: 'clementine',
+          status: 'done',
+          created_at: SNAPSHOT,
+          message: 'Build a lesson'
+        }
+      ]
+    });
+    pollAiJobMock.mockResolvedValue({
+      ...workingJob(),
+      status: 'done',
+      proposal: replaceLesson
+    });
+
+    const mounted = mountPanel();
+    handle = mounted.handle;
+
+    await vi.waitFor(() => {
+      expect(acceptButton(mounted.host)).toBeTruthy();
+    });
+    expect(mounted.host.textContent).toContain('Build a lesson');
+
+    acceptButton(mounted.host)?.click();
+    expect(mounted.onAcceptProposal).toHaveBeenCalled();
+    await vi.waitFor(() => {
+      expect(resolveAiJobMock).toHaveBeenCalledWith('job_1', 'accepted');
+    });
+  });
+
+  it('resumes an existing job when start returns a conflict', async () => {
+    writeLastAgentSlug('clementine');
+    startAiJobMock.mockRejectedValue(new AiJobConflictError('job_1', 'working'));
+    pollAiJobMock
+      .mockResolvedValueOnce(workingJob())
+      .mockResolvedValue({
+        ...workingJob(),
+        status: 'done',
+        proposal: replaceLesson
+      });
+
+    const mounted = mountPanel();
+    handle = mounted.handle;
+    submitMessage(mounted.host, 'Build again');
+
+    await vi.waitFor(() => {
+      expect(acceptButton(mounted.host)).toBeTruthy();
+    });
+    expect(pollAiJobMock).toHaveBeenCalledWith('job_1', expect.anything());
   });
 });

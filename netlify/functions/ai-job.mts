@@ -1,6 +1,8 @@
-import type { AiJob } from '../../src/ai/jobs.ts';
-import { completeWorkingAiJob } from './_shared/ai-job-complete.mts';
-import { aiJobKey, getContentStore, getJSON } from './_shared/blobs.mts';
+import { AiJobPatchSchema, type AiJob } from '../../src/ai/jobs.ts';
+import { applyJobResolution } from '../../src/ai/jobs-inbox.ts';
+import { writeJobInbox } from './_shared/ai-job-complete.mts';
+import { aiJobKey, getContentStore, getJSON, setJSON } from './_shared/blobs.mts';
+import { staleWorkingJobError } from '../../src/ai/jobs.ts';
 import { getTeacherSession } from './_shared/session.mts';
 import {
   errorResponse,
@@ -21,8 +23,8 @@ export default async function handler(request: Request, context: FunctionContext
   const env = process.env;
 
   if (request.method === 'OPTIONS') return preflightResponse(request, env);
-  if (request.method !== 'GET') {
-    return withCors(methodNotAllowed('GET, OPTIONS'), request, env);
+  if (request.method !== 'GET' && request.method !== 'PATCH') {
+    return withCors(methodNotAllowed('GET, PATCH, OPTIONS'), request, env);
   }
 
   const originGuard = guardRequestOrigin(request, env);
@@ -45,8 +47,40 @@ export default async function handler(request: Request, context: FunctionContext
     return withCors(errorResponse(404, 'not_found', 'Job not found'), request, env);
   }
 
-  const resolved = job.status === 'working' ? await completeWorkingAiJob(store, job, env) : job;
-  return withCors(okResponse(200, resolved), request, env);
+  if (request.method === 'GET') {
+    const stale = staleWorkingJobError(job);
+    if (stale) {
+      await setJSON(store, aiJobKey(stale.id), stale);
+      await writeJobInbox(store, stale);
+      return withCors(okResponse(200, stale), request, env);
+    }
+    return withCors(okResponse(200, job), request, env);
+  }
+
+  let raw: unknown;
+  try {
+    raw = await request.json();
+  } catch {
+    return withCors(errorResponse(400, 'invalid_json', 'Request body is not valid JSON'), request, env);
+  }
+
+  const parsed = AiJobPatchSchema.safeParse(raw);
+  if (!parsed.success) {
+    return withCors(
+      errorResponse(400, 'validation_error', 'Invalid job resolution', parsed.error.flatten()),
+      request,
+      env
+    );
+  }
+
+  const applied = applyJobResolution(job, parsed.data.resolution);
+  if (!applied.ok) {
+    return withCors(errorResponse(400, 'validation_error', applied.message), request, env);
+  }
+
+  await setJSON(store, aiJobKey(applied.job.id), applied.job);
+  await writeJobInbox(store, applied.job);
+  return withCors(okResponse(200, applied.job), request, env);
 }
 
 export const config = { path: '/api/ai/jobs/:id' };

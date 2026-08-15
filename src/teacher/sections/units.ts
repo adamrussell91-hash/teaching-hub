@@ -1,30 +1,47 @@
 import { navigate } from '@/app/router';
-import {
-  HOMEPAGE_BLOCK_GROUPS,
-  INSERT_MENU_LABEL,
-  createFromInsertMenu,
-  expandGroupTypesForMenu,
-  type InsertMenuValue
-} from '@/blocks/create-block';
-import { createBlockEditor } from '@/blocks/registry';
+import { cloneBlocksWithNewIds } from '@/blocks/clone-blocks';
 import type { Block } from '@/schemas';
 import { resolveCoverUrl } from '@/schemas';
 import { mountCoverPicker } from '@/teacher/cover-picker';
 import { mountCreateControl } from '@/teacher/create/control';
 import type { CreateKind } from '@/teacher/create/types';
 import type { CurriculumResponse } from '@/teacher/nav';
-import { cloneBlocksWithNewIds } from '@/blocks/clone-blocks';
 import { createUnitTemplate } from '@/teacher/template-api';
 import { mountHistoryPanel } from '@/teacher/history-panel';
-import {
-  confirmAndArchive,
-  confirmAndTrash,
-  entityPath
-} from '@/teacher/lifecycle-api';
-import type { Unit } from '@/schemas';
+import type { Subject, Unit, Year } from '@/schemas';
 import { patchUnit } from '@/teacher/unit-api';
 import { ApiClientError } from '@/api/client';
 import { renderPageHeader } from '@/teacher/page-header';
+import { gradientForEntityId } from '@/teacher/entity-banner';
+import {
+  mountBlockCanvas,
+  type BlockCanvasHandle
+} from '@/teacher/lesson-canvas/mount-page';
+import { mountLessonPalette } from '@/teacher/lesson-canvas/mount-palette';
+import { homepagePaletteFamilies } from '@/teacher/lesson-canvas/palette-catalog';
+import { readBuilderChromePrefs } from '@/teacher/lesson-canvas/prefs';
+
+export const UNITS_INDEX_GROUP_STORAGE_KEY = 'teaching-hub.units-index-group';
+export type UnitsIndexGroupBy = 'subject' | 'year';
+
+function readUnitsIndexGroupBy(): UnitsIndexGroupBy {
+  try {
+    return localStorage.getItem(UNITS_INDEX_GROUP_STORAGE_KEY) === 'year'
+      ? 'year'
+      : 'subject';
+  } catch {
+    return 'subject';
+  }
+}
+
+function writeUnitsIndexGroupBy(value: UnitsIndexGroupBy): void {
+  try {
+    localStorage.setItem(UNITS_INDEX_GROUP_STORAGE_KEY, value);
+  } catch {
+    // Persistence is convenience; ignore quota / private-mode failures.
+  }
+}
+
 export interface UnitsIndexOptions {
   onCreated?: (kind: CreateKind, id: string) => void | Promise<void>;
   onMutated?: () => void | Promise<void>;
@@ -47,7 +64,16 @@ export function renderUnitsIndex(
   createHost.className = 'units-index__create create-control';
   createHost.dataset.createHost = '';
 
-  renderPageHeader(canvas, { eyebrow: 'Workspace', title: 'Units', actions: [createHost] });
+  const groupByHost = document.createElement('div');
+  groupByHost.className = 'units-index__group-by';
+  groupByHost.setAttribute('role', 'group');
+  groupByHost.setAttribute('aria-label', 'Group units by');
+
+  renderPageHeader(canvas, {
+    eyebrow: 'Workspace',
+    title: 'Units',
+    actions: [groupByHost, createHost]
+  });
 
   const createControl = mountCreateControl(createHost, {
     context: 'units',
@@ -62,11 +88,15 @@ export function renderUnitsIndex(
     .filter((unit) => unit.status === 'active')
     .sort((a, b) => a.title.localeCompare(b.title));
 
+  const root = document.createElement('div');
+  root.className = 'units-index';
+  canvas.append(root);
+
   if (units.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'teacher-layout__canvas-status';
     empty.textContent = 'No units yet.';
-    canvas.append(empty);
+    root.append(empty);
     return {
       dispose: () => {
         for (const dispose of disposers.splice(0).reverse()) dispose();
@@ -74,95 +104,172 @@ export function renderUnitsIndex(
     };
   }
 
-  const grid = document.createElement('div');
-  grid.className = 'home-classes units-index__grid';
+  let groupBy = readUnitsIndexGroupBy();
 
-  for (const unit of units) {
-    const subject = subjectsById.get(unit.subject_id);
-    const year = yearsById.get(unit.year_id);
-    const path = `/units/${unit.id}`;
+  const subjectBtn = document.createElement('button');
+  subjectBtn.type = 'button';
+  subjectBtn.className = 'units-index__group-by-btn';
+  subjectBtn.dataset.unitsGroup = 'subject';
+  subjectBtn.textContent = 'Subject';
 
-    const card = document.createElement('div');
-    card.className = 'units-index__card';
+  const yearBtn = document.createElement('button');
+  yearBtn.type = 'button';
+  yearBtn.className = 'units-index__group-by-btn';
+  yearBtn.dataset.unitsGroup = 'year';
+  yearBtn.textContent = 'Year level';
 
-    const tile = document.createElement('a');
-    tile.className = 'glass-tile home-class-tile entity-cover-tile';
-    tile.href = path;
-    tile.addEventListener('click', (event) => {
-      event.preventDefault();
-      navigate(path);
-    });
+  groupByHost.append(subjectBtn, yearBtn);
 
-    const coverUrl = resolveCoverUrl(unit.cover, curriculum.media);
-    if (coverUrl) {
-      const media = document.createElement('div');
-      media.className = 'entity-cover-tile__media';
-      const img = document.createElement('img');
-      img.src = coverUrl;
-      img.alt = '';
-      media.append(img);
-      tile.append(media);
-    }
+  const listHost = document.createElement('div');
+  listHost.className = 'units-index__list';
+  root.append(listHost);
 
-    const body = document.createElement('div');
-    body.className = 'entity-cover-tile__body';
-
-    const title = document.createElement('p');
-    title.className = 'home-class-tile__title';
-    title.textContent = unit.title;
-
-    const meta = document.createElement('p');
-    meta.className = 'home-class-tile__eyebrow';
-    meta.textContent = [year?.title, subject?.title].filter(Boolean).join(' · ');
-
-    body.append(title, meta);
-    tile.append(body);
-
-    const actions = document.createElement('div');
-    actions.className = 'list-row-actions';
-
-    const archive = document.createElement('button');
-    archive.type = 'button';
-    archive.className = 'btn btn--ghost';
-    archive.textContent = 'Archive';
-    archive.addEventListener('click', () => {
-      void (async () => {
-        try {
-          const ok = await confirmAndArchive(entityPath('unit', unit.id), unit.title);
-          if (ok) await options.onMutated?.();
-        } catch {
-          window.alert('Unable to archive unit.');
-        }
-      })();
-    });
-
-    const trash = document.createElement('button');
-    trash.type = 'button';
-    trash.className = 'btn btn--ghost';
-    trash.textContent = 'Trash';
-    trash.addEventListener('click', () => {
-      void (async () => {
-        try {
-          const ok = await confirmAndTrash('unit', unit.id, unit.title);
-          if (ok) await options.onMutated?.();
-        } catch {
-          window.alert('Unable to move unit to trash.');
-        }
-      })();
-    });
-
-    actions.append(archive, trash);
-    card.append(tile, actions);
-    grid.append(card);
+  function syncGroupButtons(): void {
+    subjectBtn.setAttribute('aria-pressed', groupBy === 'subject' ? 'true' : 'false');
+    yearBtn.setAttribute('aria-pressed', groupBy === 'year' ? 'true' : 'false');
+    subjectBtn.classList.toggle('units-index__group-by-btn--active', groupBy === 'subject');
+    yearBtn.classList.toggle('units-index__group-by-btn--active', groupBy === 'year');
   }
 
-  canvas.append(grid);
+  function renderGroupedList(): void {
+    listHost.replaceChildren();
+    const groups = groupUnits(units, groupBy, yearsById, subjectsById);
+    for (const group of groups) {
+      const section = document.createElement('section');
+      section.className = 'units-index__group';
+
+      const heading = document.createElement('h2');
+      heading.className = 'units-index__group-title';
+      heading.textContent = group.label;
+
+      const grid = document.createElement('div');
+      grid.className = 'home-classes units-index__grid';
+
+      for (const unit of group.units) {
+        grid.append(renderUnitTile(unit, yearsById, subjectsById, curriculum.media));
+      }
+
+      section.append(heading, grid);
+      listHost.append(section);
+    }
+  }
+
+  subjectBtn.addEventListener('click', () => {
+    if (groupBy === 'subject') return;
+    groupBy = 'subject';
+    writeUnitsIndexGroupBy(groupBy);
+    syncGroupButtons();
+    renderGroupedList();
+  });
+  yearBtn.addEventListener('click', () => {
+    if (groupBy === 'year') return;
+    groupBy = 'year';
+    writeUnitsIndexGroupBy(groupBy);
+    syncGroupButtons();
+    renderGroupedList();
+  });
+
+  syncGroupButtons();
+  renderGroupedList();
 
   return {
     dispose: () => {
       for (const dispose of disposers.splice(0).reverse()) dispose();
     }
   };
+}
+
+type UnitGroup = { key: string; label: string; sort: number; units: Unit[] };
+
+function groupUnits(
+  units: Unit[],
+  groupBy: UnitsIndexGroupBy,
+  yearsById: Map<string, Year>,
+  subjectsById: Map<string, Subject>
+): UnitGroup[] {
+  const groups = new Map<string, UnitGroup>();
+
+  for (const unit of units) {
+    const year = yearsById.get(unit.year_id);
+    const subject = subjectsById.get(unit.subject_id);
+    const key =
+      groupBy === 'year'
+        ? (year?.id ?? 'ungrouped')
+        : subject?.title.trim() || 'Ungrouped';
+    const label =
+      groupBy === 'year' ? (year?.title ?? 'Ungrouped') : subject?.title.trim() || 'Ungrouped';
+    const sort = groupBy === 'year' ? (year?.year_level ?? Number.MAX_SAFE_INTEGER) : 0;
+    const existing = groups.get(key);
+    if (existing) {
+      existing.units.push(unit);
+    } else {
+      groups.set(key, { key, label, sort, units: [unit] });
+    }
+  }
+
+  const ordered = [...groups.values()].sort((a, b) => {
+    if (a.sort !== b.sort) return a.sort - b.sort;
+    return a.label.localeCompare(b.label);
+  });
+
+  for (const group of ordered) {
+    group.units.sort((a, b) => {
+      if (groupBy === 'subject') {
+        const yearA = yearsById.get(a.year_id)?.year_level ?? 0;
+        const yearB = yearsById.get(b.year_id)?.year_level ?? 0;
+        if (yearA !== yearB) return yearA - yearB;
+      }
+      return a.title.localeCompare(b.title);
+    });
+  }
+
+  return ordered;
+}
+
+function renderUnitTile(
+  unit: Unit,
+  yearsById: Map<string, Year>,
+  subjectsById: Map<string, Subject>,
+  media: CurriculumResponse['media']
+): HTMLAnchorElement {
+  const subject = subjectsById.get(unit.subject_id);
+  const year = yearsById.get(unit.year_id);
+  const path = `/units/${unit.id}`;
+
+  const tile = document.createElement('a');
+  tile.className = 'glass-tile home-class-tile entity-cover-tile units-index__tile';
+  tile.href = path;
+  tile.addEventListener('click', (event) => {
+    event.preventDefault();
+    navigate(path);
+  });
+
+  const mediaEl = document.createElement('div');
+  mediaEl.className = 'entity-cover-tile__media';
+  const coverUrl = resolveCoverUrl(unit.cover, media);
+  if (coverUrl) {
+    const img = document.createElement('img');
+    img.src = coverUrl;
+    img.alt = '';
+    mediaEl.append(img);
+  } else {
+    mediaEl.style.background = gradientForEntityId(unit.id);
+  }
+
+  const body = document.createElement('div');
+  body.className = 'entity-cover-tile__body';
+
+  const title = document.createElement('p');
+  title.className = 'units-index__title';
+  title.textContent = unit.title;
+
+  const meta = document.createElement('p');
+  meta.className = 'units-index__meta';
+  meta.textContent = [year?.title, subject?.title].filter(Boolean).join(' · ');
+
+  body.append(title, meta);
+  tile.append(mediaEl, body);
+  return tile;
 }
 
 /** @deprecated Prefer renderUnitPage */
@@ -356,12 +463,18 @@ function mountUnitPlanEditor(
   let destroyed = false;
 
   const root = document.createElement('div');
-  root.className = 'unit-plan-editor';
+  root.className = 'unit-plan-editor lesson-builder lesson-builder--no-chat';
 
   const errorBanner = document.createElement('p');
   errorBanner.className = 'class-page__error';
   errorBanner.hidden = true;
   errorBanner.setAttribute('role', 'alert');
+
+  const railHost = document.createElement('div');
+  railHost.className = 'lesson-builder__rail';
+
+  const pageCol = document.createElement('div');
+  pageCol.className = 'lesson-builder__page';
 
   const toolbar = document.createElement('div');
   toolbar.className = 'unit-plan-editor__toolbar';
@@ -371,109 +484,42 @@ function mountUnitPlanEditor(
   saveButton.className = 'btn btn--primary';
   saveButton.textContent = 'Save plan';
 
-  const addSelect = document.createElement('select');
-  addSelect.className = 'unit-plan-editor__add-select';
-  for (const group of HOMEPAGE_BLOCK_GROUPS) {
-    const optgroup = document.createElement('optgroup');
-    optgroup.label = group.label;
-    for (const type of expandGroupTypesForMenu(group.types)) {
-      const opt = document.createElement('option');
-      opt.value = type;
-      opt.textContent = INSERT_MENU_LABEL[type];
-      optgroup.append(opt);
-    }
-    addSelect.append(optgroup);
-  }
+  toolbar.append(saveButton);
 
-  const addButton = document.createElement('button');
-  addButton.type = 'button';
-  addButton.className = 'btn btn--secondary';
-  addButton.textContent = 'Add block';
+  const canvasHost = document.createElement('div');
+  canvasHost.className = 'unit-plan-editor__blocks';
 
-  toolbar.append(addSelect, addButton, saveButton);
-
-  const blocksContainer = document.createElement('div');
-  blocksContainer.className = 'unit-plan-editor__blocks';
-
-  const preview = document.createElement('div');
-  preview.className = 'unit-plan-editor__preview';
-  preview.hidden = true;
-
-  root.append(errorBanner, toolbar, blocksContainer, preview);
+  pageCol.append(errorBanner, toolbar, canvasHost);
+  root.append(railHost, pageCol);
   host.replaceChildren(root);
 
-  function renderBlocks(): void {
-    blocksContainer.replaceChildren();
-    if (blocks.length === 0) {
-      const empty = document.createElement('p');
-      empty.className = 'class-page__empty';
-      empty.textContent = 'No plan blocks yet. Add headings, text, images, and more.';
-      blocksContainer.append(empty);
-      return;
+  const canvas: BlockCanvasHandle = mountBlockCanvas(canvasHost, {
+    blocks,
+    allowCollectionAtRoot: true,
+    idFactory: () => {
+      blockCounter += 1;
+      return `block_unit_${blockCounter}`;
+    },
+    onChange: (next) => {
+      blocks = next;
     }
-
-    blocks.forEach((block, index) => {
-      const row = document.createElement('div');
-      row.className = 'unit-plan-editor__block-row';
-
-      const controls = document.createElement('div');
-      controls.className = 'unit-plan-editor__block-controls';
-
-      const up = document.createElement('button');
-      up.type = 'button';
-      up.className = 'btn btn--ghost';
-      up.textContent = '↑';
-      up.disabled = index === 0;
-      up.addEventListener('click', () => {
-        if (index === 0) return;
-        const tmp = blocks[index]!;
-        blocks[index] = blocks[index - 1]!;
-        blocks[index - 1] = tmp;
-        renderBlocks();
-      });
-
-      const down = document.createElement('button');
-      down.type = 'button';
-      down.className = 'btn btn--ghost';
-      down.textContent = '↓';
-      down.disabled = index === blocks.length - 1;
-      down.addEventListener('click', () => {
-        if (index >= blocks.length - 1) return;
-        const tmp = blocks[index]!;
-        blocks[index] = blocks[index + 1]!;
-        blocks[index + 1] = tmp;
-        renderBlocks();
-      });
-
-      const del = document.createElement('button');
-      del.type = 'button';
-      del.className = 'btn btn--ghost';
-      del.textContent = 'Delete';
-      del.addEventListener('click', () => {
-        blocks.splice(index, 1);
-        renderBlocks();
-      });
-
-      controls.append(up, down, del);
-
-      const editor = createBlockEditor(
-        block,
-        (updated) => {
-          blocks[index] = updated;
-        },
-        () => blocks[index]!
-      );
-
-      row.append(controls, editor);
-      blocksContainer.append(row);
-    });
-  }
-
-  addButton.addEventListener('click', () => {
-    blockCounter += 1;
-    blocks.push(createFromInsertMenu(addSelect.value as InsertMenuValue, `block_unit_${blockCounter}`));
-    renderBlocks();
   });
+
+  const palette = mountLessonPalette(railHost, {
+    families: homepagePaletteFamilies(),
+    onInsert: (payload) => {
+      if (payload.kind !== 'block') return;
+      canvas.insertType(payload.type);
+    },
+    onShelved: (shelved) => {
+      root.classList.toggle('lesson-builder--rail-shelved', shelved);
+    }
+  });
+
+  if (readBuilderChromePrefs().rail === 'shelved') {
+    palette.setShelved(true);
+    root.classList.add('lesson-builder--rail-shelved');
+  }
 
   saveButton.addEventListener('click', () => {
     if (destroyed) return;
@@ -495,11 +541,11 @@ function mountUnitPlanEditor(
       });
   });
 
-  renderBlocks();
-
   return {
     dispose: () => {
       destroyed = true;
+      palette.dispose();
+      canvas.dispose();
       host.replaceChildren();
     }
   };

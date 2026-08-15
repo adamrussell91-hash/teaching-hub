@@ -1,6 +1,8 @@
 import { getApiBaseUrl } from '@/api/config';
+import { apiGet, apiPatch } from '@/api/client';
 import type { AgentSlug } from '@/ai/agents';
 import type { AiJob } from '@/ai/jobs';
+import type { AiJobInbox, AiJobResolution } from '@/ai/jobs-inbox';
 
 export type StartAiJobPayload = {
   lesson_id: string;
@@ -10,17 +12,32 @@ export type StartAiJobPayload = {
 
 export type StartAiJobResult = {
   id: string;
-  status: 'working';
+  status: 'working' | 'done' | 'error';
 };
+
+export class AiJobConflictError extends Error {
+  readonly jobId: string;
+  readonly status: string;
+
+  constructor(jobId: string, status: string) {
+    super('An unresolved job already exists for this lesson');
+    this.name = 'AiJobConflictError';
+    this.jobId = jobId;
+    this.status = status;
+  }
+}
 
 async function readOkData<T>(response: Response): Promise<T> {
   const body = (await response.json()) as {
     ok?: boolean;
     data?: T;
-    error?: { message?: string };
+    error?: { message?: string; code?: string; details?: { id?: string; status?: string } };
   };
   if (body && body.ok === true && body.data !== undefined) {
     return body.data;
+  }
+  if (response.status === 409 && body.error?.details?.id) {
+    throw new AiJobConflictError(body.error.details.id, body.error.details.status ?? 'working');
   }
   throw new Error(body?.error?.message ?? `AI job request failed (${response.status})`);
 }
@@ -52,4 +69,16 @@ export async function pollAiJob(
     signal: options?.signal
   });
   return readOkData<AiJob>(response);
+}
+
+export async function listAiJobs(options?: { baseUrl?: string; signal?: AbortSignal }): Promise<AiJobInbox> {
+  return apiGet<AiJobInbox>('/api/ai/jobs', options);
+}
+
+export async function resolveAiJob(
+  id: string,
+  resolution: AiJobResolution,
+  options?: { baseUrl?: string; signal?: AbortSignal }
+): Promise<AiJob> {
+  return apiPatch<AiJob>(`/api/ai/jobs/${id}`, { resolution }, options);
 }

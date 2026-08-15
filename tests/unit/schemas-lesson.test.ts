@@ -221,6 +221,18 @@ describe('LessonSchema', () => {
     });
     expect(lesson.published_at).toBe('2026-02-01T12:00:00.000Z');
   });
+
+  it('accepts optional tags, review_status, and syllabus outcomes', () => {
+    const lesson = LessonSchema.parse({
+      ...draftLesson,
+      tags: ['assessment', 'module-c'],
+      review_status: 'needs_review',
+      syllabus_outcomes: ['EA12-8']
+    });
+    expect(lesson.tags).toEqual(['assessment', 'module-c']);
+    expect(lesson.review_status).toBe('needs_review');
+    expect(lesson.syllabus_outcomes).toEqual(['EA12-8']);
+  });
 });
 
 describe('PublishedLessonSchema', () => {

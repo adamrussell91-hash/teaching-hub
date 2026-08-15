@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { LESSON_BLOCK_GROUPS } from '@/blocks/create-block';
+import { HOMEPAGE_BLOCK_GROUPS, LESSON_BLOCK_GROUPS } from '@/blocks/create-block';
 import {
   INSERT_MENU_DESCRIPTION,
   blockIconSrc,
+  homepagePaletteFamilies,
   lessonPaletteFamilies
 } from '@/teacher/lesson-canvas/palette-catalog';
 
@@ -43,5 +44,21 @@ describe('lesson palette catalog', () => {
       id: 'comp_1',
       title: 'Hook'
     });
+  });
+});
+
+describe('homepage palette catalog', () => {
+  it('uses homepage groups, includes collection, and omits learning and compositions', () => {
+    const families = homepagePaletteFamilies();
+    expect(families.map((f) => f.id)).toEqual(HOMEPAGE_BLOCK_GROUPS.map((g) => g.label));
+    expect(families.map((f) => f.id)).not.toContain('Learning');
+    expect(families.map((f) => f.id)).not.toContain('Compositions');
+    expect(
+      families.find((f) => f.id === 'Layout')?.cards.some((c) => c.kind === 'block' && c.type === 'collection')
+    ).toBe(true);
+    const types = families.flatMap((f) =>
+      f.cards.filter((c) => c.kind === 'block').map((c) => c.type)
+    );
+    expect(types).not.toEqual(expect.arrayContaining(['flashcards', 'cloze', 'self_check']));
   });
 });

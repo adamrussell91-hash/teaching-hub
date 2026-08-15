@@ -14,6 +14,7 @@ export interface CalendarDayLesson {
   unitId: string;
   title: string;
   status: DeliveryStatus;
+  classId?: string;
 }
 
 export interface ClassCalendarModel {
@@ -35,7 +36,7 @@ export interface ClassCalendarModel {
 type ScheduledInput = Pick<
   ScheduledLesson,
   'id' | 'lesson_id' | 'unit_id' | 'date' | 'delivery_status'
-> & { schedule_order?: number };
+> & { schedule_order?: number; class_id?: string };
 
 export function yearMonthFromDate(date: string): string {
   if (!isCalendarDate(date)) throw new TypeError(`Invalid calendar date: ${date}`);
@@ -86,7 +87,8 @@ function toCalendarDayLesson(
     lessonId: row.lesson_id,
     unitId: row.unit_id,
     title: lessonTitles.get(row.lesson_id) ?? row.lesson_id,
-    status: row.delivery_status
+    status: row.delivery_status,
+    classId: row.class_id
   };
 }
 

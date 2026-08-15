@@ -11,8 +11,10 @@ import {
   type KernelOutcome
 } from '../../../src/ai/jobs.ts';
 import type { Lesson } from '../../../src/schemas/lesson.ts';
+import { syncInboxForJob, type AiJobInbox } from '../../../src/ai/jobs-inbox.ts';
 import {
   aiJobKey,
+  aiJobsInboxKey,
   aiTranscriptKey,
   draftLessonKey,
   getJSON,
@@ -31,8 +33,15 @@ async function loadTranscript(
   return Array.isArray(existing) ? existing : [];
 }
 
+export async function writeJobInbox(store: Store, job: AiJob): Promise<void> {
+  const lesson = await getJSON<Lesson>(store, draftLessonKey(job.lesson_id));
+  const inbox = (await getJSON<AiJobInbox>(store, aiJobsInboxKey())) ?? { jobs: [] };
+  await setJSON(store, aiJobsInboxKey(), syncInboxForJob(inbox, job, lesson?.title ?? 'Lesson'));
+}
+
 async function persistJobResult(store: Store, job: AiJob): Promise<AiJob> {
   await setJSON(store, aiJobKey(job.id), job);
+  await writeJobInbox(store, job);
   if (job.status !== 'done' && job.status !== 'error') return job;
   const existing = await loadTranscript(store, job.lesson_id, job.agent);
   const assistant =

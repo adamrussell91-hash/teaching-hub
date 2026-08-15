@@ -22,7 +22,7 @@ describe('primary nav', () => {
       (el) => el.querySelector('.primary-nav__label')?.textContent
     );
     expect(labels).toEqual([
-      'Home',
+      'Dashboard',
       'Classes',
       'Scope & Sequences',
       'Units',

@@ -57,6 +57,21 @@ describe('ScopeSequenceSchema', () => {
     ).toThrow();
   });
 
+  it('accepts calendar dates on terms and timeline items', () => {
+    const withDates = {
+      ...base,
+      terms: base.terms.map((term, index) => ({
+        ...term,
+        start_date: `2026-0${index + 1}-01`,
+        end_date: `2026-0${index + 1}-20`
+      })),
+      timeline_items: [
+        { ...base.timeline_items[0]!, start_date: '2026-04-27', end_date: '2026-06-12' }
+      ]
+    };
+    expect(ScopeSequenceSchema.parse(withDates).terms[0]?.start_date).toBe('2026-01-01');
+  });
+
   it('rejects invalid kind', () => {
     expect(() =>
       TimelineItemSchema.parse({

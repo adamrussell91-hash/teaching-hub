@@ -125,7 +125,7 @@ describe('mountCreateControl', () => {
 
     const trigger = host.querySelector<HTMLButtonElement>('[data-create-trigger]');
     expect(trigger).toBeTruthy();
-    expect(trigger?.textContent).toMatch(/Create/i);
+    expect(trigger?.getAttribute('aria-label')).toMatch(/Create/i);
 
     trigger?.click();
 
@@ -150,7 +150,7 @@ describe('mountCreateControl', () => {
 
     const trigger = host.querySelector<HTMLButtonElement>('[data-create-trigger]');
     expect(trigger).toBeTruthy();
-    expect(trigger?.textContent).toMatch(/class/i);
+    expect(trigger?.getAttribute('aria-label')).toMatch(/class/i);
 
     trigger?.click();
 

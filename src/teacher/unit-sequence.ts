@@ -1,9 +1,17 @@
 import type { ScheduledLesson, Unit } from '@/schemas';
 import { unitDateProgress, unitDateSpan } from '@/schedule/unit-progress';
 
+export type SequenceUnit = Pick<Unit, 'id' | 'title'> &
+  Partial<Pick<Unit, 'start_date' | 'end_date'>>;
+
+export type SequenceScheduledLesson = Pick<
+  ScheduledLesson,
+  'id' | 'lesson_id' | 'unit_id' | 'date' | 'schedule_order' | 'delivery_status'
+>;
+
 export interface RenderUnitSequenceOptions {
-  units: Unit[];
-  scheduled: ScheduledLesson[];
+  units: SequenceUnit[];
+  scheduled: SequenceScheduledLesson[];
   lessonTitles: Map<string, string>;
   currentUnitId: string;
   classId: string;
@@ -12,11 +20,15 @@ export interface RenderUnitSequenceOptions {
   onMoveDown?: (scheduledId: string) => void;
   onOverflow?: (scheduledId: string, anchor: HTMLElement) => void;
   onNavigate?: (path: string) => void;
+  /** Hide reorder/overflow controls (student / read-only class page). */
+  readOnly?: boolean;
+  lessonHref?: (entry: SequenceScheduledLesson) => string | null;
+  unitHref?: (unitId: string) => string;
 }
 
 type SequenceHandlers = Pick<
   RenderUnitSequenceOptions,
-  'onMoveUp' | 'onMoveDown' | 'onOverflow' | 'onNavigate'
+  'onMoveUp' | 'onMoveDown' | 'onOverflow' | 'onNavigate' | 'readOnly' | 'lessonHref' | 'unitHref'
 >;
 
 const handlersByRoot = new WeakMap<HTMLElement, SequenceHandlers>();
@@ -62,18 +74,18 @@ function formatDateRange(start: string, end: string): string {
   return `${formatShortDate(start)} – ${formatShortDate(end)}`;
 }
 
-function compareScheduled(a: ScheduledLesson, b: ScheduledLesson): number {
+function compareScheduled(a: SequenceScheduledLesson, b: SequenceScheduledLesson): number {
   const byOrder = a.schedule_order - b.schedule_order;
   if (byOrder !== 0) return byOrder;
   return a.date.localeCompare(b.date);
 }
 
-function earliestScheduled(rows: ScheduledLesson[]): ScheduledLesson | undefined {
+function earliestScheduled(rows: SequenceScheduledLesson[]): SequenceScheduledLesson | undefined {
   return [...rows].sort(compareScheduled)[0];
 }
 
-function unitsInScheduleOrder(units: Unit[], scheduled: ScheduledLesson[]): Unit[] {
-  const byUnit = new Map<string, ScheduledLesson[]>();
+function unitsInScheduleOrder(units: SequenceUnit[], scheduled: SequenceScheduledLesson[]): SequenceUnit[] {
+  const byUnit = new Map<string, SequenceScheduledLesson[]>();
   for (const row of scheduled) {
     const list = byUnit.get(row.unit_id) ?? [];
     list.push(row);
@@ -104,12 +116,18 @@ function wireSpaLink(
   });
 }
 
-function lessonMarker(index: number, status: ScheduledLesson['delivery_status']): string {
+function lessonMarker(index: number, status: SequenceScheduledLesson['delivery_status']): string {
   return status === 'delivered' ? '✓' : String(index);
 }
 
+function resolveLessonHref(root: HTMLElement, entry: SequenceScheduledLesson): string | null {
+  const custom = handlersByRoot.get(root)?.lessonHref;
+  if (custom) return custom(entry);
+  return `/lessons/${entry.lesson_id}`;
+}
+
 function buildLessonRow(
-  entry: ScheduledLesson,
+  entry: SequenceScheduledLesson,
   index: number,
   lessonTitles: Map<string, string>,
   root: HTMLElement
@@ -118,10 +136,13 @@ function buildLessonRow(
   const row = document.createElement('div');
   row.className = 'seq__row';
 
-  const link = document.createElement('a');
+  const href = resolveLessonHref(root, entry);
+  const link = document.createElement(href ? 'a' : 'div');
   link.className = 'seq__lesson-link';
-  link.href = `/lessons/${entry.lesson_id}`;
-  wireSpaLink(link, root);
+  if (href && link instanceof HTMLAnchorElement) {
+    link.href = href;
+    wireSpaLink(link, root);
+  }
 
   const marker = document.createElement('span');
   marker.className = 'seq__marker';
@@ -140,6 +161,11 @@ function buildLessonRow(
   status.textContent = entry.delivery_status;
 
   link.append(marker, title, date, status);
+  row.append(link);
+
+  if (handlersByRoot.get(root)?.readOnly) {
+    return row;
+  }
 
   const controls = document.createElement('span');
   controls.className = 'seq__controls';
@@ -175,13 +201,13 @@ function buildLessonRow(
   });
 
   controls.append(up, down, overflow);
-  row.append(link, controls);
+  row.append(controls);
   return row;
 }
 
 function buildUnitDetails(
-  unit: Unit,
-  unitLessons: ScheduledLesson[],
+  unit: SequenceUnit,
+  unitLessons: SequenceScheduledLesson[],
   openIds: Set<string>,
   options: RenderUnitSequenceOptions,
   root: HTMLElement
@@ -194,9 +220,10 @@ function buildUnitDetails(
   const summary = document.createElement('summary');
   summary.className = 'seq__summary';
 
+  const unitHref = handlersByRoot.get(root)?.unitHref?.(unit.id) ?? `/units/${unit.id}`;
   const titleLink = document.createElement('a');
   titleLink.className = 'seq__unit-title';
-  titleLink.href = `/units/${unit.id}`;
+  titleLink.href = unitHref;
   titleLink.textContent = unit.title;
   wireSpaLink(titleLink, root, { stopPropagation: true });
 
@@ -258,13 +285,16 @@ export function renderUnitSequence(
     onMoveUp: options.onMoveUp,
     onMoveDown: options.onMoveDown,
     onOverflow: options.onOverflow,
-    onNavigate: options.onNavigate
+    onNavigate: options.onNavigate,
+    readOnly: options.readOnly,
+    lessonHref: options.lessonHref,
+    unitHref: options.unitHref
   });
 
   const stored = readOpenUnits(options.classId);
   const openIds = new Set(stored ?? [options.currentUnitId]);
 
-  const byUnit = new Map<string, ScheduledLesson[]>();
+  const byUnit = new Map<string, SequenceScheduledLesson[]>();
   for (const row of options.scheduled) {
     const list = byUnit.get(row.unit_id) ?? [];
     list.push(row);

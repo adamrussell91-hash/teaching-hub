@@ -5,12 +5,25 @@ import {
   resolveCollection
 } from '@/blocks/collection-resolve';
 import { renderBlock, renderCollectionBlock } from '@/blocks/render';
-import { renderCoverBanner } from '@/teacher/cover-picker';
+import { localTodayYmd } from '@/schedule/today';
+import {
+  continueLabel,
+  pickStudentContinue,
+  publishedSchedule
+} from '@/student/continue';
+import { formatStudentDate } from '@/student/format';
+import { renderStudentHero } from '@/student/hero';
 import {
   fetchPublishedClass,
   type PublishedClass,
   type PublishedClassScheduleRow
 } from '@/student/published-class';
+import {
+  createStudentShell,
+  renderStudentChrome,
+  renderStudentStatus,
+  studentAnchor
+} from '@/student/shell';
 
 export interface MountStudentClassViewOptions {
   root: HTMLElement;
@@ -29,207 +42,145 @@ const HOMEPAGE_REGIONS = [
   { key: 'custom' as const, title: 'Custom' }
 ];
 
-function createShell(): {
-  surface: HTMLElement;
-  header: HTMLElement;
-  content: HTMLElement;
-} {
-  const surface = document.createElement('div');
-  surface.className = 'student-surface';
-
-  const header = document.createElement('header');
-  header.className = 'student-surface__header';
-  const brand = document.createElement('span');
-  brand.className = 'student-surface__brand';
-  brand.textContent = 'Teaching Hub';
-  header.append(brand);
-
-  const content = document.createElement('div');
-  content.className = 'student-surface__content';
-
-  surface.append(header, content);
-  return { surface, header, content };
-}
-
-function renderStatus(content: HTMLElement, text: string): void {
-  content.replaceChildren();
-  const status = document.createElement('p');
-  status.className = 'teacher-layout__canvas-status';
-  status.textContent = text;
-  content.append(status);
-}
-
-function isLessonPublished(
-  lessonId: string,
-  schedule: PublishedClassScheduleRow[]
-): boolean {
-  return schedule.some((row) => row.lesson_id === lessonId && row.published);
-}
-
-function buildSection(headingText: string, classSection: string): HTMLElement {
-  const section = document.createElement('section');
-  section.className = 'student-class__section';
-  section.dataset.classSection = classSection;
-
-  const heading = document.createElement('h2');
-  heading.className = 'student-class__heading';
-  heading.textContent = headingText;
-  section.append(heading);
-  return section;
+function studentLessonHref(cls: PublishedClass, lessonId: string): string | null {
+  const row = cls.schedule.find((entry) => entry.lesson_id === lessonId);
+  if (!row?.published) return null;
+  return `/s/classes/${cls.id}/lessons/${lessonId}`;
 }
 
 function renderPublishedClass(content: HTMLElement, cls: PublishedClass): void {
   content.replaceChildren();
 
-  const header = document.createElement('header');
-  header.className = 'student-class__header';
-  header.dataset.classSection = 'header';
+  const page = document.createElement('div');
+  page.className = 'student-class';
 
-  header.append(renderCoverBanner(cls.cover, [], cls.title));
+  const today = localTodayYmd();
+  const continueRow = pickStudentContinue(cls.schedule, today);
+  const published = publishedSchedule(cls.schedule);
 
-  const code = document.createElement('h1');
-  code.className = 'student-surface__title';
-  code.textContent = cls.display_name || cls.code;
-  header.append(code);
+  page.append(
+    renderStudentHero({
+      title: cls.title || cls.code,
+      eyebrow: cls.title ? cls.code : undefined,
+      entityId: cls.id,
+      cover: cls.cover
+    })
+  );
 
-  const title = document.createElement('p');
-  title.className = 'student-class__title';
-  title.textContent = cls.title;
-  header.append(title);
-  content.append(header);
+  const layout = document.createElement('div');
+  layout.className = 'student-class__layout';
 
-  // Announcements always first (empty region omitted for students only when empty —
-  // still show if present; teacher always shows empty state).
-  const announcementBlocks = cls.homepage.announcements ?? [];
-  if (announcementBlocks.length > 0) {
-    content.append(renderHomepageRegion(cls, 'announcements', 'Announcements'));
-  }
+  const main = document.createElement('div');
+  main.className = 'student-class__main';
 
-  if (cls.current_unit) {
-    const section = buildSection('Current unit', 'current-unit');
-    const link = document.createElement('a');
-    link.className = 'student-class__link';
-    link.href = `/s/units/${cls.current_unit.id}`;
-    link.textContent = cls.current_unit.title;
-    section.append(link);
-    content.append(section);
-  }
+  if (continueRow) {
+    const href = studentLessonHref(cls, continueRow.lesson_id);
+    if (href) {
+      const card = document.createElement('section');
+      card.className = 'student-continue';
+      card.dataset.classSection = 'continue';
 
-  if (cls.current_lesson) {
-    const section = buildSection('Current lesson', 'current-lesson');
-    const row = document.createElement('div');
-    row.className = 'student-class__current-lesson';
+      const kicker = document.createElement('p');
+      kicker.className = 'student-continue__kicker';
+      kicker.textContent = continueLabel(continueRow.date, today);
 
-    const label = document.createElement('p');
-    label.className = 'student-class__current-lesson-title';
-    label.textContent = cls.current_lesson.title;
-    row.append(label);
+      const title = document.createElement('h2');
+      title.className = 'student-continue__title';
+      title.textContent = continueRow.title;
 
-    if (isLessonPublished(cls.current_lesson.lesson_id, cls.schedule)) {
-      const open = document.createElement('a');
-      open.className = 'btn btn--secondary student-class__open';
-      const href = `/s/classes/${cls.id}/lessons/${cls.current_lesson.lesson_id}`;
-      open.href = href;
-      open.textContent = 'Open';
-      open.addEventListener('click', (event) => {
-        event.preventDefault();
-        navigate(href);
-      });
-      row.append(open);
+      const meta = document.createElement('p');
+      meta.className = 'student-continue__meta';
+      meta.textContent = formatStudentDate(continueRow.date);
+
+      const open = studentAnchor(href, 'student-continue__open', 'Open lesson');
+
+      card.append(kicker, title, meta, open);
+      main.append(card);
     }
-
-    section.append(row);
-    content.append(section);
   }
 
-  const scheduleSection = buildSection('Schedule', 'schedule');
-  if (cls.schedule.length === 0) {
-    const empty = document.createElement('p');
-    empty.className = 'student-class__empty';
-    empty.textContent = 'No scheduled lessons.';
-    scheduleSection.append(empty);
-  } else {
-    const list = document.createElement('ul');
-    list.className = 'student-class__schedule';
+  if (published.length > 0) {
+    const section = document.createElement('section');
+    section.className = 'student-schedule';
+    section.dataset.classSection = 'schedule';
 
-    for (const row of cls.schedule) {
+    const heading = document.createElement('h2');
+    heading.className = 'student-section-title';
+    heading.textContent = 'Schedule';
+    section.append(heading);
+
+    const list = document.createElement('ol');
+    list.className = 'student-schedule__list';
+
+    for (const row of published) {
+      const href = studentLessonHref(cls, row.lesson_id);
+      if (!href) continue;
       const item = document.createElement('li');
-      item.className = 'student-class__schedule-row';
-
-      const meta = document.createElement('div');
-      meta.className = 'student-class__schedule-meta';
-
-      const date = document.createElement('span');
-      date.className = 'student-class__schedule-date';
-      date.textContent = row.date;
-
-      const lessonTitle = document.createElement('span');
-      lessonTitle.className = 'student-class__schedule-title';
-      lessonTitle.textContent = row.title;
-
-      meta.append(date, lessonTitle);
-      item.append(meta);
-
-      if (row.published) {
-        const open = document.createElement('a');
-        open.className = 'btn btn--secondary student-class__open';
-        const href = `/s/classes/${cls.id}/lessons/${row.lesson_id}`;
-        open.href = href;
-        open.textContent = 'Open';
-        open.addEventListener('click', (event) => {
-          event.preventDefault();
-          navigate(href);
-        });
-        item.append(open);
-      }
-
+      item.className = 'student-schedule__item';
+      const link = studentAnchor(href, 'student-schedule__link', row.title);
+      const date = document.createElement('time');
+      date.className = 'student-schedule__date';
+      date.dateTime = row.date;
+      date.textContent = formatStudentDate(row.date);
+      item.append(date, link);
       list.append(item);
     }
-
-    scheduleSection.append(list);
+    section.append(list);
+    main.append(section);
   }
-  content.append(scheduleSection);
 
-  const unitsSection = buildSection('Active units', 'active-units');
-  if (cls.active_units.length === 0) {
-    const empty = document.createElement('p');
-    empty.className = 'student-class__empty';
-    empty.textContent = 'No active units.';
-    unitsSection.append(empty);
-  } else {
+  if (cls.active_units.length > 0) {
+    const section = document.createElement('section');
+    section.className = 'student-units';
+    section.dataset.classSection = 'units';
+
+    const heading = document.createElement('h2');
+    heading.className = 'student-section-title';
+    heading.textContent = 'Units';
+    section.append(heading);
+
     const grid = document.createElement('div');
-    grid.className = 'class-page__unit-gallery';
-
+    grid.className = 'student-units__grid';
     for (const unit of cls.active_units) {
-      const href = `/s/units/${unit.id}`;
-      const card = document.createElement('a');
-      card.className = 'class-page__unit-card entity-cover-tile';
-      card.href = href;
-      card.addEventListener('click', (event) => {
-        event.preventDefault();
-        navigate(href);
-      });
-      card.append(renderCoverBanner(unit.cover, [], unit.title));
-      const footer = document.createElement('div');
-      footer.className = 'entity-cover-tile__body';
-      const unitTitle = document.createElement('p');
-      unitTitle.className = 'home-class-tile__title';
-      unitTitle.textContent = unit.title;
-      footer.append(unitTitle);
-      card.append(footer);
+      const card = studentAnchor(`/s/units/${unit.id}`, 'student-unit-card');
+
+      const name = document.createElement('span');
+      name.className = 'student-unit-card__title';
+      name.textContent = unit.title;
+      card.append(name);
+
+      const count = published.filter((row) => row.unit_id === unit.id).length;
+      const meta = document.createElement('span');
+      meta.className = 'student-unit-card__meta';
+      meta.textContent =
+        count === 1 ? '1 published lesson' : `${count} published lessons`;
+      card.append(meta);
+
       grid.append(card);
     }
-
-    unitsSection.append(grid);
+    section.append(grid);
+    main.append(section);
   }
-  content.append(unitsSection);
+
+  const side = document.createElement('aside');
+  side.className = 'student-class__side';
+
+  const announcementBlocks = cls.homepage.announcements ?? [];
+  if (announcementBlocks.length > 0) {
+    side.append(renderHomepageRegion(cls, 'announcements', 'Announcements'));
+  }
 
   for (const region of HOMEPAGE_REGIONS) {
     if (region.key === 'announcements') continue;
     const blocks = cls.homepage[region.key] ?? [];
     if (blocks.length === 0) continue;
-    content.append(renderHomepageRegion(cls, region.key, region.title));
+    side.append(renderHomepageRegion(cls, region.key, region.title));
   }
+
+  layout.append(main);
+  if (side.childElementCount > 0) layout.append(side);
+  page.append(layout);
+  content.append(page);
 }
 
 function renderHomepageRegion(
@@ -237,8 +188,15 @@ function renderHomepageRegion(
   key: 'announcements' | 'resources' | 'custom',
   title: string
 ): HTMLElement {
-  const section = buildSection(title, `homepage-${key}`);
+  const section = document.createElement('section');
+  section.className = 'student-panel student-class__section';
+  section.dataset.classSection = `homepage-${key}`;
   section.dataset.homepageRegion = key;
+
+  const heading = document.createElement('h2');
+  heading.className = 'student-section-title student-class__heading';
+  heading.textContent = title;
+  section.append(heading);
 
   const list = document.createElement('div');
   list.className = 'student-class__blocks';
@@ -250,7 +208,7 @@ function renderHomepageRegion(
           lesson_id: l.id,
           title: l.title
         })),
-        schedule: cls.schedule.map((row) => ({
+        schedule: cls.schedule.map((row: PublishedClassScheduleRow) => ({
           lesson_id: row.lesson_id,
           title: row.title,
           schedule_order: row.schedule_order,
@@ -282,7 +240,7 @@ function renderHomepageRegion(
 
 /**
  * Loads a published class and renders the public student class surface:
- * header, current unit/lesson, schedule, active units, and homepage regions.
+ * hero, continue card, published schedule, units, and homepage regions.
  */
 export function mountStudentClassView(
   options: MountStudentClassViewOptions
@@ -291,14 +249,17 @@ export function mountStudentClassView(
   let disposed = false;
 
   root.replaceChildren();
-  const { surface, content } = createShell();
+  const { surface, header, content } = createStudentShell(
+    'student-surface__content--class'
+  );
   root.append(surface);
-
-  renderStatus(content, 'Loading class…');
+  renderStudentChrome(header, { brand: 'Teaching Hub' });
+  renderStudentStatus(content, 'Loading class…');
 
   void fetchPublishedClass(classId)
     .then((cls) => {
       if (disposed || isStale()) return;
+      renderStudentChrome(header, { brand: cls.code || 'Teaching Hub' });
       renderPublishedClass(content, cls);
     })
     .catch((error: unknown) => {
@@ -307,7 +268,7 @@ export function mountStudentClassView(
         error instanceof ApiClientError && error.code === 'not_found'
           ? 'Class not found.'
           : 'Unable to load class. Please refresh to try again.';
-      renderStatus(content, message);
+      renderStudentStatus(content, message);
     });
 
   return {

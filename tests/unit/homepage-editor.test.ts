@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Block } from '@/schemas/block';
 import type { ClassHomepage } from '@/schemas/class';
 import {
@@ -72,11 +72,22 @@ describe('renderHomepageRegionsView', () => {
   });
 });
 
+function insertPaletteType(root: HTMLElement, type: string, family = 'Basic'): void {
+  root.querySelector<HTMLButtonElement>(`.lesson-palette__family[data-family="${family}"]`)?.click();
+  root.querySelector<HTMLButtonElement>(`.lesson-palette__card[data-block-type="${type}"]`)?.click();
+}
+
 describe('mountHomepageEditor', () => {
   let container: HTMLElement;
 
   beforeEach(() => {
     container = document.createElement('div');
+    document.body.append(container);
+  });
+
+  afterEach(() => {
+    container.remove();
+    document.body.replaceChildren();
   });
 
   it('does not offer learning activities in homepage block pickers', () => {
@@ -86,13 +97,19 @@ describe('mountHomepageEditor', () => {
       onCancel: vi.fn()
     });
 
-    const select = container.querySelector<HTMLSelectElement>('.homepage-editor__add-block-select')!;
-    expect([...select.querySelectorAll('optgroup')].map((group) => group.label)).not.toContain(
-      'Learning'
+    expect(container.querySelector('.homepage-editor__add-block-select')).toBeNull();
+    expect(container.querySelector('.lesson-palette')).not.toBeNull();
+    const families = [...container.querySelectorAll('.lesson-palette__family')].map(
+      (el) => el.getAttribute('data-family')
     );
-    expect([...select.options].map((option) => option.value)).not.toEqual(
-      expect.arrayContaining(['flashcards', 'cloze', 'self_check'])
+    expect(families).not.toContain('Learning');
+    expect(families).toContain('Layout');
+    container.querySelector<HTMLButtonElement>('.lesson-palette__family[data-family="Layout"]')?.click();
+    const types = [...container.querySelectorAll('.lesson-palette__card')].map(
+      (el) => el.getAttribute('data-block-type')
     );
+    expect(types).toContain('collection');
+    expect(types).not.toEqual(expect.arrayContaining(['flashcards', 'cloze', 'self_check']));
   });
 
   it('calls onSave with the edited homepage', async () => {
@@ -105,10 +122,7 @@ describe('mountHomepageEditor', () => {
       onCancel
     });
 
-    const region = container.querySelector('[data-homepage-region="announcements"]');
-    const select = region?.querySelector<HTMLSelectElement>('.homepage-editor__add-block-select');
-    select!.value = 'heading';
-    region?.querySelector<HTMLButtonElement>('.homepage-editor__add-block-button')?.click();
+    insertPaletteType(container, 'heading');
 
     container.querySelector<HTMLButtonElement>('.homepage-editor__save')?.click();
 

@@ -14,10 +14,10 @@ const MENU_ITEMS: ReadonlyArray<{ kind: CreateKind; label: string }> = [
 const CONTEXT_DIRECT: Partial<
   Record<CreateContext, { kind: CreateKind; label: string }>
 > = {
-  classes: { kind: 'class', label: '+ Create class' },
-  'scope-sequences': { kind: 'scope_sequence', label: '+ New scope' },
-  units: { kind: 'unit', label: '+ New unit' },
-  lessons: { kind: 'lesson', label: '+ New lesson' }
+  classes: { kind: 'class', label: 'Create class' },
+  'scope-sequences': { kind: 'scope_sequence', label: 'New scope' },
+  units: { kind: 'unit', label: 'New unit' },
+  lessons: { kind: 'lesson', label: 'New lesson' }
 };
 
 export function mountCreateControl(
@@ -92,15 +92,16 @@ export function mountCreateControl(
 
   const trigger = document.createElement('button');
   trigger.type = 'button';
-  trigger.className = 'btn btn--decisive';
+  trigger.className = 'icon-plus-btn';
   trigger.dataset.createTrigger = '';
+  trigger.textContent = '+';
 
   const direct = CONTEXT_DIRECT[options.context];
   if (direct) {
-    trigger.textContent = direct.label;
+    trigger.setAttribute('aria-label', direct.label);
     trigger.addEventListener('click', () => openKind(direct.kind));
   } else {
-    trigger.textContent = '+ Create';
+    trigger.setAttribute('aria-label', 'Create');
     trigger.setAttribute('aria-haspopup', 'menu');
     trigger.addEventListener('click', (event) => {
       event.stopPropagation();

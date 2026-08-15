@@ -1,23 +1,25 @@
 import { navigate } from '@/app/router';
 import { pastelFromId } from '@/design/pastel';
 import type { ScopeSequence, TimelineItem, Unit } from '@/schemas';
+import {
+  academicYearBounds,
+  diffDays,
+  formatDateRange,
+  pxPerDay,
+  resolveItemSpan,
+  resolveTermSpan,
+  termContainingDate,
+  weekToDate,
+  type TimelineZoom
+} from '@/scope/timeline-dates';
 import { applyDragDelta } from '@/scope/timeline-drag';
-import { findFirstFreeStart, weeksToLabel } from '@/scope/timeline-weeks';
+import { findFirstFreeStart } from '@/scope/timeline-weeks';
+import { resolveScheduleToday } from '@/schedule/today';
 import type { CurriculumResponse } from '@/teacher/nav';
 import { patchScopeSequence } from '@/teacher/scope-api';
 import { renderPageHeader } from '@/teacher/page-header';
 
-type DragMode = 'move' | 'resize-start' | 'resize-end';
-
-interface ActiveDrag {
-  mode: DragMode;
-  itemId: string;
-  startX: number;
-  origin: { start_week: number; end_week: number };
-  current: { start_week: number; end_week: number };
-  moved: boolean;
-  el: HTMLElement;
-}
+export const SCOPE_TIMELINE_ZOOM_KEY = 'teaching-hub.scope-timeline-zoom';
 
 export interface ScopeTimelineEditorOptions {
   onPatched?: (scope: ScopeSequence) => void;
@@ -35,10 +37,9 @@ function itemLabel(
   return unitsById.get(item.unit_id)?.title ?? 'Unknown unit';
 }
 
-function positionStyle(startWeek: number, endWeek: number, weekCount: number): string {
-  const left = ((startWeek - 1) / weekCount) * 100;
-  const width = ((endWeek - startWeek + 1) / weekCount) * 100;
-  return `left:${left}%;width:${width}%`;
+function isAssessmentItem(item: TimelineItem): boolean {
+  if (item.kind !== 'note') return false;
+  return /assessment/i.test(item.title);
 }
 
 function nextOrder(items: TimelineItem[]): number {
@@ -83,12 +84,20 @@ function renderStatus(canvas: HTMLElement, message: string): void {
   canvas.append(status);
 }
 
-function renderEmptyInspector(inspector: HTMLElement): void {
-  inspector.replaceChildren();
-  const empty = document.createElement('p');
-  empty.className = 'scope-timeline__inspector-empty';
-  empty.textContent = 'Select an item…';
-  inspector.append(empty);
+function readZoom(): TimelineZoom {
+  try {
+    return localStorage.getItem(SCOPE_TIMELINE_ZOOM_KEY) === 'year' ? 'year' : 'month';
+  } catch {
+    return 'month';
+  }
+}
+
+function writeZoom(zoom: TimelineZoom): void {
+  try {
+    localStorage.setItem(SCOPE_TIMELINE_ZOOM_KEY, zoom);
+  } catch {
+    // Persistence is convenience.
+  }
 }
 
 function openAddUnitPicker(options: {
@@ -169,6 +178,17 @@ function openAddUnitPicker(options: {
   document.body.append(backdrop);
 }
 
+function datesForWeekSpan(
+  scope: ScopeSequence,
+  startWeek: number,
+  endWeek: number
+): { start_date: string; end_date: string } {
+  return {
+    start_date: weekToDate(startWeek, scope.terms, scope.academic_year),
+    end_date: weekToDate(endWeek, scope.terms, scope.academic_year)
+  };
+}
+
 export function renderScopeTimelineEditor(
   canvas: HTMLElement,
   curriculum: CurriculumResponse,
@@ -194,11 +214,26 @@ export function renderScopeTimelineEditor(
 
   let scope: ScopeSequence = initial;
   let selectedId: string | null = null;
+  let tab: 'timeline' | 'map' = 'timeline';
+  let zoom = readZoom();
   let saving = false;
-  let activeDrag: ActiveDrag | null = null;
   let suppressClick = false;
 
+  type DragMode = 'move' | 'resize-start' | 'resize-end';
+  let activeDrag: {
+    mode: DragMode;
+    itemId: string;
+    startX: number;
+    origin: { start_week: number; end_week: number };
+    current: { start_week: number; end_week: number };
+    moved: boolean;
+    bar: HTMLElement;
+    labelWrap: HTMLElement;
+  } | null = null;
+
   const unitsById = new Map(curriculum.units.map((unit) => [unit.id, unit]));
+  const year = curriculum.years.find((entry) => entry.id === subject.year_id);
+  const todayYmd = resolveScheduleToday(curriculum.schedule_anchor_date);
 
   canvas.replaceChildren();
   renderPageHeader(canvas, { eyebrow: 'Scope & Sequence', title: subject.title });
@@ -206,20 +241,85 @@ export function renderScopeTimelineEditor(
   const root = document.createElement('div');
   root.className = 'scope-timeline';
 
+  const tabs = document.createElement('div');
+  tabs.className = 'scope-timeline__tabs';
+  tabs.setAttribute('role', 'tablist');
+
+  const timelineTab = document.createElement('button');
+  timelineTab.type = 'button';
+  timelineTab.className = 'scope-timeline__tab';
+  timelineTab.dataset.scopeTab = 'timeline';
+  timelineTab.textContent = 'Timeline';
+
+  const mapTab = document.createElement('button');
+  mapTab.type = 'button';
+  mapTab.className = 'scope-timeline__tab';
+  mapTab.dataset.scopeTab = 'map';
+  mapTab.textContent = 'Curriculum Map';
+
+  tabs.append(timelineTab, mapTab);
+
   const toolbar = document.createElement('div');
   toolbar.className = 'scope-timeline__toolbar';
 
+  const actions = document.createElement('div');
+  actions.className = 'scope-timeline__actions';
+
   const addUnit = document.createElement('button');
   addUnit.type = 'button';
-  addUnit.className = 'btn btn--secondary scope-timeline__add-unit';
-  addUnit.textContent = 'Add Unit';
+  addUnit.className = 'btn btn--primary scope-timeline__add-unit';
+  addUnit.textContent = '+ Add Unit';
 
   const addNote = document.createElement('button');
   addNote.type = 'button';
-  addNote.className = 'btn btn--secondary scope-timeline__add-note';
+  addNote.className = 'btn btn--ghost scope-timeline__add-note';
   addNote.textContent = 'Add note';
 
-  toolbar.append(addUnit, addNote);
+  const meta = document.createElement('span');
+  meta.className = 'scope-timeline__meta';
+
+  actions.append(addUnit, addNote, meta);
+
+  const controls = document.createElement('div');
+  controls.className = 'scope-timeline__controls';
+
+  const termJump = document.createElement('div');
+  termJump.className = 'scope-timeline__term-jump';
+  for (const term of [...scope.terms].sort((a, b) => a.term_number - b.term_number)) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'scope-timeline__term-jump-btn';
+    btn.dataset.termNumber = String(term.term_number);
+    btn.textContent = `T${term.term_number}`;
+    btn.setAttribute('aria-label', `Jump to ${term.title}`);
+    termJump.append(btn);
+  }
+
+  const todayBtn = document.createElement('button');
+  todayBtn.type = 'button';
+  todayBtn.className = 'scope-timeline__today';
+  todayBtn.textContent = 'Today';
+
+  const zoomSeg = document.createElement('div');
+  zoomSeg.className = 'scope-timeline__zoom';
+  zoomSeg.setAttribute('role', 'group');
+  zoomSeg.setAttribute('aria-label', 'Timeline zoom');
+
+  const zoomMonth = document.createElement('button');
+  zoomMonth.type = 'button';
+  zoomMonth.className = 'scope-timeline__zoom-btn';
+  zoomMonth.dataset.zoom = 'month';
+  zoomMonth.textContent = 'Month';
+
+  const zoomYear = document.createElement('button');
+  zoomYear.type = 'button';
+  zoomYear.className = 'scope-timeline__zoom-btn';
+  zoomYear.dataset.zoom = 'year';
+  zoomYear.textContent = 'Year';
+
+  zoomSeg.append(zoomMonth, zoomYear);
+  controls.append(termJump, todayBtn, zoomSeg);
+  toolbar.append(actions, controls);
 
   const banner = document.createElement('div');
   banner.className = 'scope-timeline__banner';
@@ -232,39 +332,17 @@ export function renderScopeTimelineEditor(
   const main = document.createElement('div');
   main.className = 'scope-timeline__main';
 
-  const course = document.createElement('p');
-  course.className = 'scope-timeline__course';
-
-  const termsRow = document.createElement('div');
-  termsRow.className = 'scope-timeline__terms';
-  termsRow.style.setProperty('--week-count', String(scope.week_count));
-
-  for (const term of scope.terms) {
-    const band = document.createElement('div');
-    band.className = 'scope-timeline__term';
-    band.style.cssText = positionStyle(term.start_week, term.end_week, scope.week_count);
-    band.textContent = term.title;
-    termsRow.append(band);
-  }
-
-  const track = document.createElement('div');
-  track.className = 'scope-timeline__track';
-  track.style.setProperty('--week-count', String(scope.week_count));
-
-  const weekMarks = document.createElement('div');
-  weekMarks.className = 'scope-timeline__week-marks';
-  for (let week = 1; week <= scope.week_count; week++) {
-    const mark = document.createElement('span');
-    mark.className = 'scope-timeline__week-mark';
-    mark.textContent = String(week);
-    weekMarks.append(mark);
-  }
-
-  const itemsLayer = document.createElement('div');
-  itemsLayer.className = 'scope-timeline__items';
+  const viewHost = document.createElement('div');
+  viewHost.className = 'scope-timeline__view';
 
   const inspector = document.createElement('aside');
   inspector.className = 'scope-timeline__inspector';
+  inspector.hidden = true;
+
+  main.append(viewHost);
+  body.append(main, inspector);
+  root.append(tabs, toolbar, banner, body);
+  canvas.append(root);
 
   const showBanner = (message: string, tone: 'error' | 'info' = 'error'): void => {
     banner.hidden = false;
@@ -305,7 +383,7 @@ export function renderScopeTimelineEditor(
             const updated = await patchScopeSequence(scope.id, { timeline_items: nextItems });
             applyScope(updated);
             hideBanner();
-            refreshItems();
+            paintView();
             setSelection(selectedId);
             lastOk = true;
           } catch {
@@ -324,18 +402,46 @@ export function renderScopeTimelineEditor(
     return inFlight;
   };
 
+  const closeInspector = (): void => {
+    selectedId = null;
+    inspector.hidden = true;
+    inspector.replaceChildren();
+    for (const el of viewHost.querySelectorAll('.scope-timeline__item--selected')) {
+      el.classList.remove('scope-timeline__item--selected');
+    }
+  };
+
   const renderInspectorContent = (item: TimelineItem): void => {
+    inspector.hidden = false;
     inspector.replaceChildren();
 
-    const kind = document.createElement('p');
-    kind.className = 'scope-timeline__inspector-kind';
-    kind.textContent = item.kind === 'unit' ? 'Unit' : 'Note';
+    const top = document.createElement('div');
+    top.className = 'scope-timeline__inspector-top';
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'scope-timeline__inspector-close';
+    close.setAttribute('aria-label', 'Close');
+    close.textContent = '✕';
+    close.addEventListener('click', closeInspector);
+    top.append(close);
 
-    const weeks = document.createElement('p');
-    weeks.className = 'scope-timeline__inspector-weeks';
-    weeks.textContent = weeksToLabel(item.start_week, item.end_week);
+    const span = resolveItemSpan(
+      item,
+      scope.terms,
+      scope.academic_year,
+      item.kind === 'unit' ? unitsById.get(item.unit_id) : undefined
+    );
+    const term = termContainingDate(scope.terms, scope.academic_year, span.start);
+    const tag = document.createElement('p');
+    tag.className = 'scope-timeline__inspector-kind';
+    tag.textContent = [
+      term ? `TERM ${term.term_number}` : item.kind === 'unit' ? 'Unit' : 'Note',
+      isAssessmentItem(item) ? 'ASSESSMENT' : null
+    ]
+      .filter(Boolean)
+      .join(' · ');
 
-    inspector.append(kind);
+    inspector.append(top, tag);
 
     if (item.kind === 'note') {
       const titleInput = document.createElement('input');
@@ -353,21 +459,22 @@ export function renderScopeTimelineEditor(
             : entry
         );
         void persistItems(items).then((ok) => {
-          if (!ok) {
-            titleInput.value = previousTitle;
-          }
+          if (!ok) titleInput.value = previousTitle;
         });
       });
+      const weeks = document.createElement('p');
+      weeks.className = 'scope-timeline__inspector-weeks';
+      weeks.textContent = formatDateRange(span.start, span.end);
       inspector.append(titleInput, weeks);
 
       const deleteBtn = document.createElement('button');
       deleteBtn.type = 'button';
       deleteBtn.className = 'btn btn--ghost scope-timeline__delete-note';
-      deleteBtn.textContent = 'Delete note';
+      deleteBtn.textContent = 'Delete';
       deleteBtn.addEventListener('click', () => {
         const items = scope.timeline_items.filter((entry) => entry.id !== item.id);
         void persistItems(items).then((ok) => {
-          if (ok) setSelection(null);
+          if (ok) closeInspector();
         });
       });
       inspector.append(deleteBtn);
@@ -377,12 +484,42 @@ export function renderScopeTimelineEditor(
     const title = document.createElement('h2');
     title.className = 'scope-timeline__inspector-title';
     title.textContent = itemLabel(item, unitsById);
-    inspector.append(title, weeks);
+
+    const weeks = document.createElement('p');
+    weeks.className = 'scope-timeline__inspector-weeks';
+    weeks.textContent = formatDateRange(span.start, span.end);
+
+    const unit = unitsById.get(item.unit_id);
+    const desc = document.createElement('p');
+    desc.className = 'scope-timeline__inspector-desc';
+    desc.textContent = unit?.description?.trim() || 'No description yet.';
+
+    const lessonCount = unit?.lesson_ids.length ?? 0;
+    const lessonsStat = document.createElement('div');
+    lessonsStat.className = 'scope-timeline__inspector-stat';
+    const lessonsLabel = document.createElement('span');
+    lessonsLabel.textContent = 'Lessons planned';
+    const lessonsValue = document.createElement('span');
+    lessonsValue.textContent = String(lessonCount);
+    lessonsStat.append(lessonsLabel, lessonsValue);
+
+    const assessStat = document.createElement('div');
+    assessStat.className = 'scope-timeline__inspector-stat';
+    const assessLabel = document.createElement('span');
+    assessLabel.textContent = 'Assessments';
+    const assessValue = document.createElement('span');
+    assessValue.textContent = '0';
+    assessStat.append(assessLabel, assessValue);
+
+    inspector.append(title, weeks, desc, lessonsStat, assessStat);
+
+    const actionsRow = document.createElement('div');
+    actionsRow.className = 'scope-timeline__inspector-actions';
 
     const open = document.createElement('a');
     open.className = 'btn btn--secondary scope-timeline__open-unit';
     open.href = `/units/${item.unit_id}`;
-    open.textContent = 'Open unit';
+    open.textContent = 'Edit';
     open.addEventListener('click', (event) => {
       event.preventDefault();
       navigate(`/units/${item.unit_id}`);
@@ -391,35 +528,63 @@ export function renderScopeTimelineEditor(
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.className = 'btn btn--ghost scope-timeline__remove-unit';
-    remove.textContent = 'Remove from timeline';
+    remove.textContent = 'Delete';
     remove.addEventListener('click', () => {
       const items = scope.timeline_items.filter((entry) => entry.id !== item.id);
       void persistItems(items).then((ok) => {
-        if (ok) setSelection(null);
+        if (ok) closeInspector();
       });
     });
 
-    inspector.append(open, remove);
+    actionsRow.append(open, remove);
+    inspector.append(actionsRow);
   };
 
   const setSelection = (itemId: string | null): void => {
     selectedId = itemId;
-    for (const el of itemsLayer.querySelectorAll<HTMLElement>('.scope-timeline__item')) {
+    for (const el of viewHost.querySelectorAll<HTMLElement>('[data-item-id]')) {
       el.classList.toggle('scope-timeline__item--selected', el.dataset.itemId === selectedId);
     }
     const item = scope.timeline_items.find((entry) => entry.id === selectedId);
     if (!item) {
-      renderEmptyInspector(inspector);
+      closeInspector();
       return;
     }
     renderInspectorContent(item);
   };
 
-  const applyItemPosition = (
-    el: HTMLElement,
+  const yearBounds = (): { start: string; days: number; ppd: number; totalW: number } => {
+    const bounds = academicYearBounds(scope.academic_year);
+    const ppd = pxPerDay(zoom);
+    return { start: bounds.start, days: bounds.days, ppd, totalW: bounds.days * ppd };
+  };
+
+  const offsetPx = (ymd: string, start: string, ppd: number): number =>
+    diffDays(start, ymd) * ppd;
+
+  const positionForWeeks = (
+    startWeek: number,
+    endWeek: number
+  ): { left: number; width: number } => {
+    const { start, ppd } = yearBounds();
+    const spanStart = weekToDate(startWeek, scope.terms, scope.academic_year);
+    const spanEnd = weekToDate(endWeek, scope.terms, scope.academic_year);
+    return {
+      left: offsetPx(spanStart, start, ppd),
+      width: Math.max(diffDays(spanStart, spanEnd) * ppd, ppd * 1.2)
+    };
+  };
+
+  const applyBarPosition = (
+    bar: HTMLElement,
+    labelWrap: HTMLElement,
     weeks: { start_week: number; end_week: number }
   ): void => {
-    el.style.cssText = positionStyle(weeks.start_week, weeks.end_week, scope.week_count);
+    const pos = positionForWeeks(weeks.start_week, weeks.end_week);
+    bar.style.left = `${pos.left}px`;
+    bar.style.width = `${pos.width}px`;
+    labelWrap.style.left = `${pos.left}px`;
+    labelWrap.style.width = `${pos.width}px`;
   };
 
   const endDrag = async (event: PointerEvent): Promise<void> => {
@@ -427,43 +592,31 @@ export function renderScopeTimelineEditor(
     const drag = activeDrag;
     activeDrag = null;
     document.body.classList.remove('scope-timeline--dragging');
-    drag.el.removeEventListener('pointermove', onPointerMove);
-    drag.el.removeEventListener('pointerup', onPointerUp);
-    drag.el.removeEventListener('pointercancel', onPointerUp);
-
-    if (drag.el.hasPointerCapture?.(event.pointerId)) {
-      drag.el.releasePointerCapture(event.pointerId);
+    drag.bar.removeEventListener('pointermove', onPointerMove);
+    drag.bar.removeEventListener('pointerup', onPointerUp);
+    drag.bar.removeEventListener('pointercancel', onPointerUp);
+    if (drag.bar.hasPointerCapture?.(event.pointerId)) {
+      drag.bar.releasePointerCapture(event.pointerId);
     }
-
     if (!drag.moved) return;
     suppressClick = true;
-
     const changed =
       drag.current.start_week !== drag.origin.start_week ||
       drag.current.end_week !== drag.origin.end_week;
     if (!changed) return;
-
+    const dates = datesForWeekSpan(scope, drag.current.start_week, drag.current.end_week);
     const items = scope.timeline_items.map((entry) =>
-      entry.id === drag.itemId
-        ? { ...entry, start_week: drag.current.start_week, end_week: drag.current.end_week }
-        : entry
+      entry.id === drag.itemId ? { ...entry, ...drag.current, ...dates } : entry
     );
-
     const ok = await persistItems(items);
-    if (!ok) {
-      refreshItems();
-      setSelection(selectedId);
-    }
+    if (!ok) paintView();
   };
 
   const onPointerMove = (event: PointerEvent): void => {
     if (!activeDrag) return;
-    const trackWidth = track.getBoundingClientRect().width;
-    if (trackWidth <= 0) return;
-
-    const deltaWeeks = Math.round(
-      ((event.clientX - activeDrag.startX) / trackWidth) * scope.week_count
-    );
+    const weekPx = yearBounds().ppd * 7;
+    if (weekPx <= 0) return;
+    const deltaWeeks = Math.round((event.clientX - activeDrag.startX) / weekPx);
     const next = applyDragDelta(
       activeDrag.mode,
       activeDrag.origin,
@@ -472,7 +625,7 @@ export function renderScopeTimelineEditor(
     );
     activeDrag.current = next;
     if (deltaWeeks !== 0) activeDrag.moved = true;
-    applyItemPosition(activeDrag.el, next);
+    applyBarPosition(activeDrag.bar, activeDrag.labelWrap, next);
   };
 
   const onPointerUp = (event: PointerEvent): void => {
@@ -483,7 +636,8 @@ export function renderScopeTimelineEditor(
     event: PointerEvent,
     item: TimelineItem,
     mode: DragMode,
-    el: HTMLElement
+    bar: HTMLElement,
+    labelWrap: HTMLElement
   ): void => {
     if (event.button !== 0 || activeDrag || saving) return;
     event.preventDefault();
@@ -495,109 +649,422 @@ export function renderScopeTimelineEditor(
       origin: { start_week: item.start_week, end_week: item.end_week },
       current: { start_week: item.start_week, end_week: item.end_week },
       moved: false,
-      el
+      bar,
+      labelWrap
     };
     document.body.classList.add('scope-timeline--dragging');
-    el.setPointerCapture?.(event.pointerId);
-    el.addEventListener('pointermove', onPointerMove);
-    el.addEventListener('pointerup', onPointerUp);
-    el.addEventListener('pointercancel', onPointerUp);
+    bar.setPointerCapture?.(event.pointerId);
+    bar.addEventListener('pointermove', onPointerMove);
+    bar.addEventListener('pointerup', onPointerUp);
+    bar.addEventListener('pointercancel', onPointerUp);
   };
 
-  const refreshItems = (): void => {
-    itemsLayer.replaceChildren();
-    const unitCount = scope.timeline_items.filter((entry) => entry.kind === 'unit').length;
-    course.textContent = `${unitCount} ${unitCount === 1 ? 'unit' : 'units'} · ${scope.week_count} weeks`;
-    const sortedItems = [...scope.timeline_items].sort(
-      (a, b) => a.order - b.order || a.start_week - b.start_week
-    );
+  let scrollEl: HTMLElement | null = null;
 
-    for (const item of sortedItems) {
-      const el = document.createElement('button');
-      el.type = 'button';
-      el.className = `scope-timeline__item scope-timeline__item--${item.kind}`;
-      el.dataset.itemId = item.id;
-      el.dataset.kind = item.kind;
+  const scrollToYmd = (ymd: string, pad = 30): void => {
+    if (!scrollEl) return;
+    const { start, ppd } = yearBounds();
+    scrollEl.scrollTo({ left: Math.max(offsetPx(ymd, start, ppd) - pad, 0), behavior: 'smooth' });
+  };
+
+  const paintTimeline = (): void => {
+    const { start, days, ppd, totalW } = yearBounds();
+    const card = document.createElement('div');
+    card.className = 'scope-gantt';
+
+    const scroll = document.createElement('div');
+    scroll.className = 'scope-gantt__scroll';
+    scrollEl = scroll;
+
+    const inner = document.createElement('div');
+    inner.className = 'scope-gantt__inner';
+    inner.style.width = `${totalW}px`;
+
+    const months = document.createElement('div');
+    months.className = 'scope-gantt__months';
+    for (let month = 0; month < 12; month += 1) {
+      const mStart = `${scope.academic_year}-${String(month + 1).padStart(2, '0')}-01`;
+      const mEnd =
+        month === 11
+          ? `${scope.academic_year + 1}-01-01`
+          : `${scope.academic_year}-${String(month + 2).padStart(2, '0')}-01`;
+      const left = offsetPx(mStart, start, ppd);
+      const width = diffDays(mStart, mEnd) * ppd;
+      const cell = document.createElement('div');
+      cell.className = 'scope-gantt__month';
+      cell.style.left = `${left}px`;
+      cell.style.width = `${width}px`;
+      const useShort = zoom === 'year' || width < 70;
+      cell.textContent = new Date(`${mStart}T00:00:00Z`).toLocaleDateString('en-AU', {
+        month: useShort ? 'short' : 'long',
+        timeZone: 'UTC'
+      });
+      months.append(cell);
+    }
+
+    const ticks = document.createElement('div');
+    ticks.className = 'scope-gantt__ticks';
+    if (zoom === 'month') {
+      for (let d = 0; d < days; d += 7) {
+        const tickDate = new Date(Date.UTC(scope.academic_year, 0, 1 + d));
+        const tick = document.createElement('div');
+        tick.className = 'scope-gantt__tick';
+        tick.style.left = `${d * ppd}px`;
+        tick.style.width = `${7 * ppd}px`;
+        tick.textContent = String(tickDate.getUTCDate());
+        ticks.append(tick);
+      }
+    } else {
+      for (let month = 0; month < 12; month += 1) {
+        const mStart = `${scope.academic_year}-${String(month + 1).padStart(2, '0')}-01`;
+        const tick = document.createElement('div');
+        tick.className = 'scope-gantt__tick';
+        tick.style.left = `${offsetPx(mStart, start, ppd)}px`;
+        tick.textContent = new Date(`${mStart}T00:00:00Z`).toLocaleDateString('en-AU', {
+          month: 'short',
+          timeZone: 'UTC'
+        });
+        ticks.append(tick);
+      }
+    }
+
+    const bands = document.createElement('div');
+    bands.className = 'scope-gantt__bands';
+    for (const term of scope.terms) {
+      const span = resolveTermSpan(term, scope.academic_year);
+      const band = document.createElement('div');
+      band.className = 'scope-gantt__band scope-timeline__term';
+      band.style.left = `${offsetPx(span.start, start, ppd)}px`;
+      band.style.width = `${Math.max(diffDays(span.start, span.end) * ppd, ppd)}px`;
+      const label = document.createElement('span');
+      label.className = 'scope-gantt__band-label';
+      label.textContent = `TERM ${term.term_number}`;
+      band.append(label);
+      bands.append(band);
+    }
+
+    const todayLine = document.createElement('div');
+    todayLine.className = 'scope-gantt__today-line';
+    todayLine.style.left = `${offsetPx(todayYmd, start, ppd)}px`;
+    const todayBadge = document.createElement('span');
+    todayBadge.className = 'scope-gantt__today-badge';
+    todayBadge.textContent = String(new Date(`${todayYmd}T00:00:00Z`).getUTCDate());
+    todayLine.append(todayBadge);
+    bands.append(todayLine);
+
+    const rows = document.createElement('div');
+    rows.className = 'scope-gantt__rows';
+
+    const sorted = [...scope.timeline_items].sort((a, b) => {
+      const aSpan = resolveItemSpan(
+        a,
+        scope.terms,
+        scope.academic_year,
+        a.kind === 'unit' ? unitsById.get(a.unit_id) : undefined
+      );
+      const bSpan = resolveItemSpan(
+        b,
+        scope.terms,
+        scope.academic_year,
+        b.kind === 'unit' ? unitsById.get(b.unit_id) : undefined
+      );
+      return aSpan.start.localeCompare(bSpan.start) || a.order - b.order;
+    });
+
+    for (const item of sorted) {
+      const unit = item.kind === 'unit' ? unitsById.get(item.unit_id) : undefined;
+      const span = resolveItemSpan(item, scope.terms, scope.academic_year, unit);
+      const left = offsetPx(span.start, start, ppd);
+      const width = Math.max(diffDays(span.start, span.end) * ppd, ppd * 1.2);
+
+      const row = document.createElement('div');
+      row.className = `scope-gantt__row scope-timeline__item scope-timeline__item--${item.kind}`;
+      row.dataset.itemId = item.id;
+      row.dataset.kind = item.kind;
       if (item.kind === 'unit') {
-        el.dataset.unitId = item.unit_id;
-        el.dataset.tint = pastelFromId(item.unit_id);
+        row.dataset.unitId = item.unit_id;
+        row.dataset.tint = pastelFromId(item.unit_id);
+      } else {
+        row.classList.add('scope-timeline__item--navy');
       }
-      if (item.kind === 'note') {
-        el.classList.add('scope-timeline__item--navy');
-      }
-      applyItemPosition(el, item);
-      el.setAttribute('aria-label', itemLabel(item, unitsById));
+
+      const bar = document.createElement('div');
+      bar.className = 'scope-gantt__bar';
+      if (item.kind === 'unit') bar.dataset.tint = pastelFromId(item.unit_id);
+      if (isAssessmentItem(item)) bar.classList.add('scope-gantt__bar--assessment');
+      bar.style.left = `${left}px`;
+      bar.style.width = `${width}px`;
 
       const handleStart = document.createElement('span');
       handleStart.className = 'scope-timeline__handle scope-timeline__handle--start';
       handleStart.setAttribute('aria-hidden', 'true');
-
-      const label = document.createElement('span');
-      label.className = 'scope-timeline__item-label';
-      label.textContent = itemLabel(item, unitsById);
-
       const handleEnd = document.createElement('span');
       handleEnd.className = 'scope-timeline__handle scope-timeline__handle--end';
       handleEnd.setAttribute('aria-hidden', 'true');
+      bar.append(handleStart, handleEnd);
 
-      el.append(handleStart, label, handleEnd);
+      const labelWrap = document.createElement('div');
+      labelWrap.className = 'scope-gantt__label-wrap';
+      labelWrap.style.left = `${left}px`;
+      labelWrap.style.width = `${width}px`;
 
-      el.addEventListener('click', (event) => {
+      const label = document.createElement('div');
+      label.className = 'scope-gantt__label';
+
+      const tri = document.createElement('span');
+      tri.className = 'scope-gantt__tri';
+      tri.setAttribute('aria-hidden', 'true');
+      tri.textContent = '▶';
+
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'scope-gantt__chip';
+      if (item.kind === 'unit') chip.dataset.tint = pastelFromId(item.unit_id);
+      chip.textContent = itemLabel(item, unitsById);
+
+      const subjTag = document.createElement('span');
+      subjTag.className = 'scope-gantt__tag scope-gantt__tag--subject';
+      subjTag.textContent = subject.title;
+
+      const yearTag = document.createElement('span');
+      yearTag.className = 'scope-gantt__tag scope-gantt__tag--year';
+
+      label.append(tri, chip, subjTag);
+      if (year?.title) {
+        yearTag.textContent = year.title;
+        label.append(yearTag);
+      }
+      if (isAssessmentItem(item)) {
+        const assess = document.createElement('span');
+        assess.className = 'scope-gantt__tag scope-gantt__tag--assess';
+        assess.textContent = 'Assessment';
+        label.append(assess);
+      }
+
+      labelWrap.append(label);
+      row.append(bar, labelWrap);
+
+      const select = (): void => {
         if (suppressClick) {
-          event.preventDefault();
           suppressClick = false;
           return;
         }
         setSelection(item.id);
+      };
+      chip.addEventListener('click', (event) => {
+        event.stopPropagation();
+        select();
       });
-
-      el.addEventListener('pointerdown', (event) => {
+      row.addEventListener('click', select);
+      bar.addEventListener('pointerdown', (event) => {
         const target = event.target;
         if (!(target instanceof Element)) return;
         if (target.closest('.scope-timeline__handle--start')) {
-          startDrag(event, item, 'resize-start', el);
+          startDrag(event, item, 'resize-start', bar, labelWrap);
           return;
         }
         if (target.closest('.scope-timeline__handle--end')) {
-          startDrag(event, item, 'resize-end', el);
+          startDrag(event, item, 'resize-end', bar, labelWrap);
           return;
         }
-        if (target.closest('.scope-timeline__handle')) return;
-        startDrag(event, item, 'move', el);
+        startDrag(event, item, 'move', bar, labelWrap);
       });
-
       if (item.kind === 'unit') {
-        el.addEventListener('dblclick', () => {
+        row.addEventListener('dblclick', () => {
+          if (suppressClick) return;
+          navigate(`/units/${item.unit_id}`);
+        });
+        chip.addEventListener('dblclick', () => {
           if (suppressClick) return;
           navigate(`/units/${item.unit_id}`);
         });
       }
 
-      itemsLayer.append(el);
+      rows.append(row);
     }
+
+    inner.append(months, ticks, bands, rows);
+    scroll.append(inner);
+    card.append(scroll);
+
+    if (sorted.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'scope-gantt__empty';
+      const icon = document.createElement('div');
+      icon.className = 'scope-gantt__empty-icon';
+      icon.setAttribute('aria-hidden', 'true');
+      const heading = document.createElement('h2');
+      heading.textContent = 'Map out your year';
+      const copy = document.createElement('p');
+      copy.textContent =
+        "This scope & sequence doesn't have any units yet. Add your first unit and it'll appear here on the weeks it runs.";
+      const emptyAdd = document.createElement('button');
+      emptyAdd.type = 'button';
+      emptyAdd.className = 'btn btn--primary';
+      emptyAdd.textContent = '+ Add Unit';
+      emptyAdd.addEventListener('click', () => addUnit.click());
+      empty.append(icon, heading, copy, emptyAdd);
+      card.append(empty);
+    }
+
+    const hint = document.createElement('p');
+    hint.className = 'scope-gantt__hint';
+    hint.textContent =
+      'Scroll to browse the year · titles stay pinned to the left as you scroll past a unit’s start.';
+
+    viewHost.replaceChildren(card, hint);
+
+    requestAnimationFrame(() => {
+      const first = scope.terms[0];
+      if (!first) return;
+      const span = resolveTermSpan(first, scope.academic_year);
+      scroll.scrollLeft = Math.max(offsetPx(span.start, start, ppd) - 30, 0);
+    });
+  };
+
+  const paintMap = (): void => {
+    scrollEl = null;
+    const wrap = document.createElement('div');
+    wrap.className = 'scope-map';
+
+    const cols = document.createElement('div');
+    cols.className = 'scope-map__columns';
+
+    for (const term of [...scope.terms].sort((a, b) => a.term_number - b.term_number)) {
+      const span = resolveTermSpan(term, scope.academic_year);
+      const col = document.createElement('section');
+      col.className = 'scope-map__col';
+
+      const head = document.createElement('header');
+      head.className = 'scope-map__head';
+      const name = document.createElement('span');
+      name.className = 'scope-map__term-name';
+      name.textContent = `TERM ${term.term_number}`;
+      const range = document.createElement('span');
+      range.className = 'scope-map__term-range';
+      range.textContent = formatDateRange(span.start, span.end);
+      head.append(name, range);
+
+      const bodyEl = document.createElement('div');
+      bodyEl.className = 'scope-map__body';
+
+      const termItems = scope.timeline_items.filter((item) => {
+        const itemSpan = resolveItemSpan(
+          item,
+          scope.terms,
+          scope.academic_year,
+          item.kind === 'unit' ? unitsById.get(item.unit_id) : undefined
+        );
+        return itemSpan.start <= span.end && itemSpan.end >= span.start;
+      });
+
+      const addForTerm = (): void => {
+        hideBanner();
+        openAddUnitPicker({
+          units: availableUnits(curriculum, subject.id, scope),
+          onChoose: (unitId) => placeUnit(unitId, term.start_week)
+        });
+      };
+
+      if (termItems.length === 0) {
+        const slot = document.createElement('button');
+        slot.type = 'button';
+        slot.className = 'scope-map__add scope-map__add--empty';
+        slot.textContent = '+ Add unit';
+        slot.addEventListener('click', addForTerm);
+        bodyEl.append(slot);
+      } else {
+        for (const item of termItems) {
+          const card = document.createElement('button');
+          card.type = 'button';
+          card.className = `scope-map__card scope-timeline__item scope-timeline__item--${item.kind}`;
+          card.dataset.itemId = item.id;
+          if (item.kind === 'unit') {
+            card.dataset.unitId = item.unit_id;
+            card.dataset.tint = pastelFromId(item.unit_id);
+          }
+          const itemSpan = resolveItemSpan(
+            item,
+            scope.terms,
+            scope.academic_year,
+            item.kind === 'unit' ? unitsById.get(item.unit_id) : undefined
+          );
+          const title = document.createElement('span');
+          title.className = 'scope-map__card-title';
+          title.textContent = itemLabel(item, unitsById);
+          const dates = document.createElement('span');
+          dates.className = 'scope-map__card-dates';
+          dates.textContent = formatDateRange(itemSpan.start, itemSpan.end);
+          card.append(title, dates);
+          card.addEventListener('click', () => setSelection(item.id));
+          bodyEl.append(card);
+        }
+        const mini = document.createElement('button');
+        mini.type = 'button';
+        mini.className = 'scope-map__add scope-map__add--mini';
+        mini.textContent = '+ Add unit';
+        mini.addEventListener('click', addForTerm);
+        bodyEl.append(mini);
+      }
+
+      col.append(head, bodyEl);
+      cols.append(col);
+    }
+
+    wrap.append(cols);
+    viewHost.replaceChildren(wrap);
+  };
+
+  const paintView = (): void => {
+    const unitCount = scope.timeline_items.filter((entry) => entry.kind === 'unit').length;
+    meta.textContent = `${unitCount} ${unitCount === 1 ? 'unit' : 'units'} · ${scope.academic_year}`;
+    timelineTab.classList.toggle('scope-timeline__tab--active', tab === 'timeline');
+    mapTab.classList.toggle('scope-timeline__tab--active', tab === 'map');
+    controls.hidden = tab !== 'timeline';
+    zoomMonth.classList.toggle('scope-timeline__zoom-btn--active', zoom === 'month');
+    zoomYear.classList.toggle('scope-timeline__zoom-btn--active', zoom === 'year');
+    zoomMonth.setAttribute('aria-pressed', zoom === 'month' ? 'true' : 'false');
+    zoomYear.setAttribute('aria-pressed', zoom === 'year' ? 'true' : 'false');
+    if (tab === 'timeline') paintTimeline();
+    else paintMap();
+  };
+
+  const placeUnit = (unitId: string, preferredStart?: number): void => {
+    let start: number | null = null;
+    if (preferredStart != null) {
+      const end = preferredStart + UNIT_SPAN - 1;
+      const fits = end <= scope.week_count;
+      const overlaps = scope.timeline_items.some(
+        (item) => !(end < item.start_week || preferredStart > item.end_week)
+      );
+      if (fits && !overlaps) start = preferredStart;
+    }
+    if (start === null) {
+      start = findFirstFreeStart(scope.week_count, UNIT_SPAN, scope.timeline_items);
+    }
+    if (start === null) {
+      showBanner('No free span available for a 4-week unit.');
+      return;
+    }
+    const end_week = start + UNIT_SPAN - 1;
+    const item: TimelineItem = {
+      id: newItemId(),
+      kind: 'unit',
+      unit_id: unitId,
+      start_week: start,
+      end_week,
+      order: nextOrder(scope.timeline_items),
+      ...datesForWeekSpan(scope, start, end_week)
+    };
+    selectedId = item.id;
+    void persistItems([...scope.timeline_items, item]);
   };
 
   addUnit.addEventListener('click', () => {
     hideBanner();
     openAddUnitPicker({
       units: availableUnits(curriculum, subject.id, scope),
-      onChoose: (unitId) => {
-        const start = findFirstFreeStart(scope.week_count, UNIT_SPAN, scope.timeline_items);
-        if (start === null) {
-          showBanner('No free span available for a 4-week unit.');
-          return;
-        }
-        const item: TimelineItem = {
-          id: newItemId(),
-          kind: 'unit',
-          unit_id: unitId,
-          start_week: start,
-          end_week: start + UNIT_SPAN - 1,
-          order: nextOrder(scope.timeline_items)
-        };
-        selectedId = item.id;
-        void persistItems([...scope.timeline_items, item]);
-      }
+      onChoose: (unitId) => placeUnit(unitId)
     });
   });
 
@@ -605,19 +1072,66 @@ export function renderScopeTimelineEditor(
     hideBanner();
     const selected = scope.timeline_items.find((entry) => entry.id === selectedId);
     const startWeek = selected?.start_week ?? 1;
+    const dates = datesForWeekSpan(scope, startWeek, startWeek);
     const item: TimelineItem = {
       id: newItemId(),
       kind: 'note',
       title: 'Note',
       start_week: startWeek,
       end_week: startWeek,
-      order: nextOrder(scope.timeline_items)
+      order: nextOrder(scope.timeline_items),
+      ...dates
     };
     selectedId = item.id;
     void persistItems([...scope.timeline_items, item]);
   });
 
-  refreshItems();
+  timelineTab.addEventListener('click', () => {
+    if (tab === 'timeline') return;
+    tab = 'timeline';
+    paintView();
+    setSelection(selectedId);
+  });
+  mapTab.addEventListener('click', () => {
+    if (tab === 'map') return;
+    tab = 'map';
+    paintView();
+    setSelection(selectedId);
+  });
+
+  zoomMonth.addEventListener('click', () => {
+    if (zoom === 'month') return;
+    zoom = 'month';
+    writeZoom(zoom);
+    paintView();
+    setSelection(selectedId);
+  });
+  zoomYear.addEventListener('click', () => {
+    if (zoom === 'year') return;
+    zoom = 'year';
+    writeZoom(zoom);
+    paintView();
+    setSelection(selectedId);
+  });
+
+  termJump.addEventListener('click', (event) => {
+    const btn = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-term-number]');
+    if (!btn) return;
+    const n = Number(btn.dataset.termNumber);
+    const term = scope.terms.find((entry) => entry.term_number === n);
+    if (!term) return;
+    tab = 'timeline';
+    paintView();
+    scrollToYmd(resolveTermSpan(term, scope.academic_year).start);
+  });
+
+  todayBtn.addEventListener('click', () => {
+    tab = 'timeline';
+    paintView();
+    scrollToYmd(todayYmd, 260);
+  });
+
+  paintView();
 
   const initialNoteId = options?.selectedNoteId;
   if (
@@ -626,12 +1140,6 @@ export function renderScopeTimelineEditor(
   ) {
     setSelection(initialNoteId);
   } else {
-    renderEmptyInspector(inspector);
+    inspector.hidden = true;
   }
-
-  track.append(weekMarks, itemsLayer);
-  main.append(course, termsRow, track);
-  body.append(main, inspector);
-  root.append(toolbar, banner, body);
-  canvas.append(root);
 }

@@ -1,8 +1,13 @@
 import { apiGet, ApiClientError } from '@/api/client';
-import { navigate } from '@/app/router';
 import { renderBlock } from '@/blocks/render';
 import type { PublishedUnit } from '@/schemas/published-unit';
-import { renderCoverBanner } from '@/teacher/cover-picker';
+import { renderStudentHero } from '@/student/hero';
+import {
+  createStudentShell,
+  renderStudentChrome,
+  renderStudentStatus,
+  studentAnchor
+} from '@/student/shell';
 
 export interface MountStudentUnitViewOptions {
   root: HTMLElement;
@@ -15,50 +20,22 @@ export interface StudentUnitViewHandle {
   dispose(): void;
 }
 
-function createShell(): {
-  surface: HTMLElement;
-  header: HTMLElement;
-  content: HTMLElement;
-} {
-  const surface = document.createElement('div');
-  surface.className = 'student-surface';
-
-  const header = document.createElement('header');
-  header.className = 'student-surface__header';
-  const brand = document.createElement('span');
-  brand.className = 'student-surface__brand';
-  brand.textContent = 'Teaching Hub';
-  header.append(brand);
-
-  const content = document.createElement('div');
-  content.className = 'student-surface__content';
-
-  surface.append(header, content);
-  return { surface, header, content };
-}
-
-function renderStatus(content: HTMLElement, text: string): void {
-  content.replaceChildren();
-  const status = document.createElement('p');
-  status.className = 'teacher-layout__canvas-status';
-  status.textContent = text;
-  content.append(status);
-}
-
 function renderPublishedUnit(content: HTMLElement, unit: PublishedUnit): void {
   content.replaceChildren();
 
-  content.append(renderCoverBanner(unit.cover, [], unit.title));
-
-  const title = document.createElement('h1');
-  title.className = 'student-surface__title';
-  title.textContent = unit.title;
-  content.append(title);
+  content.append(
+    renderStudentHero({
+      title: unit.title,
+      eyebrow: 'Unit',
+      entityId: unit.unit_id,
+      cover: unit.cover
+    })
+  );
 
   const planBlocks = unit.blocks ?? [];
   if (planBlocks.length > 0) {
     const plan = document.createElement('section');
-    plan.className = 'student-unit__plan';
+    plan.className = 'student-panel student-unit__plan';
     plan.dataset.unitSection = 'plan';
     for (const block of planBlocks) {
       plan.append(renderBlock(block, 'student'));
@@ -74,33 +51,35 @@ function renderPublishedUnit(content: HTMLElement, unit: PublishedUnit): void {
     return;
   }
 
-  const list = document.createElement('ul');
+  const list = document.createElement('ol');
   list.className = 'student-unit__lesson-list';
 
-  for (const lesson of unit.lessons) {
+  unit.lessons.forEach((lesson, index) => {
     const item = document.createElement('li');
     item.className = 'student-unit__lesson-item';
 
-    const link = document.createElement('a');
-    link.className = 'student-unit__lesson-link';
     const href = `/s/lessons/${lesson.lesson_id}`;
-    link.href = href;
-    link.textContent = lesson.title;
-    link.addEventListener('click', (event) => {
-      event.preventDefault();
-      navigate(href);
-    });
+    const link = studentAnchor(href, 'student-unit__lesson-link student-lesson-card');
 
+    const indexEl = document.createElement('span');
+    indexEl.className = 'student-lesson-card__index';
+    indexEl.textContent = String(index + 1).padStart(2, '0');
+
+    const title = document.createElement('span');
+    title.className = 'student-lesson-card__title';
+    title.textContent = lesson.title;
+
+    link.append(indexEl, title);
     item.append(link);
     list.append(item);
-  }
+  });
 
   content.append(list);
 }
 
 /**
  * Loads a published unit and renders the public student unit surface:
- * cover, plan overview blocks, and published lesson links.
+ * cover hero, plan overview blocks, and published lesson links.
  */
 export function mountStudentUnitView(
   options: MountStudentUnitViewOptions
@@ -109,10 +88,10 @@ export function mountStudentUnitView(
   let disposed = false;
 
   root.replaceChildren();
-  const { surface, content } = createShell();
+  const { surface, header, content } = createStudentShell();
   root.append(surface);
-
-  renderStatus(content, 'Loading unit…');
+  renderStudentChrome(header, { brand: 'Teaching Hub' });
+  renderStudentStatus(content, 'Loading unit…');
 
   void apiGet<PublishedUnit>(`/api/published/units/${unitId}`)
     .then((unit) => {
@@ -125,7 +104,7 @@ export function mountStudentUnitView(
         error instanceof ApiClientError && error.code === 'not_found'
           ? 'Unit not found.'
           : 'Unable to load unit. Please refresh to try again.';
-      renderStatus(content, message);
+      renderStudentStatus(content, message);
     });
 
   return {

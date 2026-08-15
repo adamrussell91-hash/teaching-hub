@@ -11,8 +11,7 @@ import { navigate } from '@/app/router';
 import { patchClass, patchScheduledLesson } from '@/teacher/schedule-api';
 import {
   renderClassesIndex,
-  renderClassPage,
-  resolveTeachingFocus
+  renderClassPage
 } from '@/teacher/sections/classes';
 import type { CurriculumResponse } from '@/teacher/nav';
 import type { Block } from '@/schemas/block';
@@ -168,10 +167,11 @@ describe('classes section', () => {
   it('renders glass class tiles that open the class page', () => {
     renderClassesIndex(canvas, curriculum);
     expect(canvas.querySelector('.page-header__title')?.textContent).toBe('Classes');
-    expect(canvas.querySelector('[data-create-trigger]')?.textContent).toMatch(/class/i);
+    expect(canvas.querySelector('[data-create-trigger]')?.getAttribute('aria-label')).toMatch(
+      /class/i
+    );
     expect(canvas.textContent).toContain('12ENGADV1');
-    expect(canvas.textContent).toContain('2026');
-    expect(canvas.textContent).toContain('English Advanced');
+    expect(canvas.textContent).toContain('Year 12 English Advanced');
 
     const tile = canvas.querySelector<HTMLAnchorElement>(
       'a.home-class-tile[href="/classes/class_2026_12engadv1"]'
@@ -192,31 +192,30 @@ describe('classes section', () => {
   it('renders recomposed class page with banner, calendar, and sequence', () => {
     renderClassPage(canvas, curriculum, 'class_2026_12engadv1');
 
-    expect(canvas.querySelector('.entity-banner__title')?.textContent).toBe('12ENGADV1');
-    expect(canvas.querySelector('.entity-banner__eyebrow')?.textContent).toBe(
-      'Year 12 · English Advanced'
+    expect(canvas.querySelector('.entity-banner__title')?.textContent).toBe(
+      'Year 12 English Advanced'
     );
+    expect(canvas.querySelector('.entity-banner__eyebrow')?.textContent).toBe('12ENGADV1');
     expect(canvas.querySelector('.page-header__eyebrow')?.textContent).toBe('Classes');
     expect(canvas.querySelector('.page-header__title')?.textContent).toBe(
       'Year 12 English Advanced'
     );
-    // Class code once in the banner title — not repeated as a separate page heading.
+    // Class code once in the banner eyebrow — not the main display name.
     const codeMatches = canvas.textContent?.match(/12ENGADV1/g) ?? [];
     expect(codeMatches.length).toBe(1);
 
     expect(canvas.querySelector('.class-page__edit-homepage')?.textContent).toBe('Edit page');
     expect(canvas.querySelector('.class-page__view-as-student')).not.toBeNull();
 
-    expect(canvas.textContent).toMatch(/Teaching today/i);
-    expect(canvas.textContent).toContain('Memory');
+    expect(canvas.querySelector('.class-page__teaching-today')).toBeNull();
+    expect(canvas.querySelector('[data-class-section="unit-progress"]')).toBeNull();
     expect(canvas.querySelector('.class-calendar')).not.toBeNull();
     expect(canvas.querySelector('.unit-sequence')).not.toBeNull();
     expect(canvas.querySelector('a.seq__lesson-link[href="/lessons/lesson_aotfw_008"]')).not.toBeNull();
 
     expect(canvas.textContent).toMatch(/Artist of the Floating World/);
-    expect(canvas.textContent).toMatch(/Week/);
-    expect(canvas.textContent).toMatch(/days left|Not scheduled/);
-    expect(canvas.textContent).toMatch(/Dates from the schedule/);
+    expect(canvas.textContent).not.toMatch(/Dates from the schedule/);
+    expect(canvas.textContent).not.toMatch(/Up next/i);
 
     expect(canvas.textContent).toMatch(/Announcements/i);
     expect(canvas.textContent).toMatch(/Resources/i);
@@ -237,27 +236,14 @@ describe('classes section', () => {
     expect(unitLink).not.toBeNull();
   });
 
-  it('opens teaching-today lesson from the focus card', () => {
+  it('opens a lesson from the unit sequence', () => {
     renderClassPage(canvas, curriculum, 'class_2026_12engadv1');
     const link = canvas.querySelector<HTMLAnchorElement>(
-      '[data-class-section="teaching-today"] a.class-page__teaching-title'
+      'a.seq__lesson-link[href="/lessons/lesson_aotfw_008"]'
     );
-    expect(link?.getAttribute('href')).toBe('/lessons/lesson_aotfw_008');
+    expect(link).not.toBeNull();
     link?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     expect(navigate).toHaveBeenCalledWith('/lessons/lesson_aotfw_008');
-  });
-
-  it('labels tomorrow as Up next when nothing is scheduled today', () => {
-    const withoutToday: CurriculumResponse = {
-      ...curriculum,
-      scheduled_lessons: [scheduledPlanned],
-      schedule_anchor_date: '2026-08-12'
-    };
-    renderClassPage(canvas, withoutToday, 'class_2026_12engadv1');
-    const focus = canvas.querySelector('[data-class-section="teaching-today"]');
-    expect(focus?.textContent).toMatch(/Up next/i);
-    expect(focus?.textContent).toContain('Intro');
-    expect(focus?.textContent).not.toMatch(/Teaching today/i);
   });
 
   it('shows not found for unknown class', () => {
@@ -333,9 +319,9 @@ describe('classes section', () => {
     expect(canvas.querySelector('.homepage-editor__save')).not.toBeNull();
 
     const region = canvas.querySelector('[data-homepage-region="announcements"]');
-    const select = region?.querySelector<HTMLSelectElement>('.homepage-editor__add-block-select');
-    select!.value = 'heading';
-    region?.querySelector<HTMLButtonElement>('.homepage-editor__add-block-button')?.click();
+    expect(region).not.toBeNull();
+    canvas.querySelector<HTMLButtonElement>('.lesson-palette__family[data-family="Basic"]')?.click();
+    canvas.querySelector<HTMLButtonElement>('.lesson-palette__card[data-block-type="heading"]')?.click();
 
     canvas.querySelector<HTMLButtonElement>('.homepage-editor__save')?.click();
 
@@ -359,10 +345,8 @@ describe('classes section', () => {
 
     canvas.querySelector<HTMLButtonElement>('.class-page__edit-homepage')?.click();
 
-    const region = canvas.querySelector('[data-homepage-region="announcements"]');
-    const select = region?.querySelector<HTMLSelectElement>('.homepage-editor__add-block-select');
-    select!.value = 'heading';
-    region?.querySelector<HTMLButtonElement>('.homepage-editor__add-block-button')?.click();
+    canvas.querySelector<HTMLButtonElement>('.lesson-palette__family[data-family="Basic"]')?.click();
+    canvas.querySelector<HTMLButtonElement>('.lesson-palette__card[data-block-type="heading"]')?.click();
 
     canvas.querySelector<HTMLButtonElement>('.homepage-editor__cancel')?.click();
 
@@ -379,24 +363,5 @@ describe('classes section', () => {
     expect(canvas.querySelector('.entity-banner')).not.toBeNull();
     handle.dispose();
     expect(canvas.querySelector('.entity-banner')).toBeNull();
-  });
-});
-
-describe('resolveTeachingFocus', () => {
-  it('prefers today, then upcoming, then last taught', () => {
-    const today = resolveTeachingFocus(
-      [scheduledCurrent, scheduledPlanned],
-      '2026-08-12'
-    );
-    expect(today?.label).toBe('Teaching today');
-    expect(today?.entry.id).toBe('scheduled_aotfw_008');
-
-    const upNext = resolveTeachingFocus([scheduledPlanned], '2026-08-12');
-    expect(upNext?.label).toBe('Up next');
-    expect(upNext?.entry.id).toBe('scheduled_aotfw_001');
-
-    const last = resolveTeachingFocus([scheduledCurrent], '2026-08-14');
-    expect(last?.label).toBe('Last taught');
-    expect(last?.entry.id).toBe('scheduled_aotfw_008');
   });
 });

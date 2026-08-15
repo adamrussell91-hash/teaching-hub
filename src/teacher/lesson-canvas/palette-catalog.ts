@@ -1,4 +1,5 @@
 import {
+  HOMEPAGE_BLOCK_GROUPS,
   LESSON_BLOCK_GROUPS,
   INSERT_MENU_LABEL,
   expandGroupTypesForMenu,
@@ -70,10 +71,10 @@ export type PaletteFamily = {
   cards: PaletteCard[];
 };
 
-export function lessonPaletteFamilies(
-  compositions: Array<{ id: string; title: string }>
+function familiesFromGroups(
+  groups: typeof LESSON_BLOCK_GROUPS
 ): PaletteFamily[] {
-  const families: PaletteFamily[] = LESSON_BLOCK_GROUPS.map((group) => ({
+  return groups.map((group) => ({
     id: group.label,
     cards: expandGroupTypesForMenu(group.types).map((type) => ({
       kind: 'block' as const,
@@ -83,6 +84,16 @@ export function lessonPaletteFamilies(
       iconSrc: blockIconSrc(type)
     }))
   }));
+}
+
+export function homepagePaletteFamilies(): PaletteFamily[] {
+  return familiesFromGroups(HOMEPAGE_BLOCK_GROUPS);
+}
+
+export function lessonPaletteFamilies(
+  compositions: Array<{ id: string; title: string }>
+): PaletteFamily[] {
+  const families: PaletteFamily[] = familiesFromGroups(LESSON_BLOCK_GROUPS);
 
   families.push({
     id: 'Compositions',

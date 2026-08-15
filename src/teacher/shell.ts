@@ -5,6 +5,7 @@ export interface TeacherShellRefs {
   main: HTMLElement;
   contextBar: HTMLElement;
   canvas: HTMLElement;
+  jobsHost: HTMLElement;
   logoutButton: HTMLButtonElement | null;
 }
 
@@ -37,6 +38,10 @@ export function renderTeacherShell(
   brand.className = 'teacher-layout__rail-brand';
   brand.textContent = 'Teaching Hub';
 
+  const jobsHost = document.createElement('div');
+  jobsHost.className = 'teacher-layout__jobs';
+  jobsHost.dataset.jobsHost = '';
+
   let logoutButton: HTMLButtonElement | null = null;
   if (options.onLogout) {
     logoutButton = document.createElement('button');
@@ -50,9 +55,9 @@ export function renderTeacherShell(
         if (logoutButton) logoutButton.disabled = false;
       });
     });
-    brandRow.append(brand, logoutButton);
+    brandRow.append(brand, jobsHost, logoutButton);
   } else {
-    brandRow.append(brand);
+    brandRow.append(brand, jobsHost);
   }
 
   const railNav = document.createElement('div');
@@ -74,7 +79,7 @@ export function renderTeacherShell(
   layout.append(rail, main);
   root.append(layout);
 
-  return { root, rail, railNav, main, contextBar, canvas, logoutButton };
+  return { root, rail, railNav, main, contextBar, canvas, jobsHost, logoutButton };
 }
 
 export interface ContextBarConfig {

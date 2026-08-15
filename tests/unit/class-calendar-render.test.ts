@@ -286,12 +286,13 @@ describe('renderClassCalendar', () => {
     });
     renderClassCalendar(host, emptyModel, {
       onSelectDate: vi.fn(),
-      onShiftMonth: vi.fn()
+      onShiftMonth: vi.fn(),
+      onScheduleLesson: vi.fn()
     });
     const emptyDetail = host.querySelector('.class-calendar__detail')!;
     expect(emptyDetail.textContent).toContain('No lessons scheduled this day.');
     expect(
-      emptyDetail.querySelector('button')?.textContent?.trim()
+      emptyDetail.querySelector('button')?.getAttribute('aria-label')
     ).toBe('Schedule a lesson');
   });
 
@@ -306,5 +307,36 @@ describe('renderClassCalendar', () => {
     expect(cell.getAttribute('aria-label')).toBe(
       '12 August, Narrative Structure and Unreliable Memory'
     );
+  });
+
+  it('renders week and timeline views from the view tabs', () => {
+    const onViewChange = vi.fn();
+    const onSelectDate = vi.fn();
+    const model = modelForAugust();
+    renderClassCalendar(host, model, {
+      onSelectDate,
+      onShiftMonth: vi.fn(),
+      onViewChange,
+      view: 'week',
+      chipMeta: () => '12ENA6'
+    });
+
+    expect(host.querySelector('.class-calendar__week')).not.toBeNull();
+    expect(host.querySelector('[role="grid"]')).toBeNull();
+    const todayCol = host.querySelector('.class-calendar__week-day[data-today="true"]');
+    expect(todayCol?.getAttribute('data-date')).toBe('2026-08-12');
+    expect(host.querySelector('.event-chip__meta')?.textContent).toBe('12ENA6');
+
+    host.querySelector<HTMLButtonElement>('[data-calendar-view="timeline"]')!.click();
+    expect(onViewChange).toHaveBeenCalledWith('timeline');
+
+    renderClassCalendar(host, model, {
+      onSelectDate,
+      onShiftMonth: vi.fn(),
+      onViewChange,
+      view: 'timeline'
+    });
+    expect(host.querySelector('.class-calendar__timeline')).not.toBeNull();
+    expect(host.textContent).toContain('Narrative Structure');
   });
 });

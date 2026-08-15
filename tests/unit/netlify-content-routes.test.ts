@@ -288,7 +288,7 @@ describe('GET /api/curriculum', () => {
       ])
     );
     expect(body.data.lessons).toEqual([
-      {
+      expect.objectContaining({
         id: 'lesson_aotfw_008',
         title: 'Memory, Identity and Ono',
         slug: 'memory_identity_and_ono',
@@ -296,8 +296,10 @@ describe('GET /api/curriculum', () => {
         sequence: 8,
         status: 'active',
         published: true,
-        updated_at: '2026-01-01T00:00:00.000Z'
-      }
+        updated_at: '2026-01-01T00:00:00.000Z',
+        created_at: '2026-01-01T00:00:00.000Z',
+        attachment_count: 0
+      })
     ]);
     const lesson = body.data.lessons.find((l: { id: string }) => l.id === 'lesson_aotfw_008');
     expect(lesson.updated_at).toBeTruthy();
@@ -698,22 +700,22 @@ describe('GET /api/published/classes/:id', () => {
       lesson_id: 'lesson_b'
     });
     expect(body.data.schedule).toEqual([
-      {
+      expect.objectContaining({
         id: 'scheduled_a',
         date: '2026-08-11',
         schedule_order: 1,
         lesson_id: 'lesson_a',
         title: 'Lesson A',
         published: true
-      },
-      {
+      }),
+      expect.objectContaining({
         id: 'scheduled_b',
         date: '2026-08-12',
         schedule_order: 2,
         lesson_id: 'lesson_b',
         title: 'Lesson B',
         published: false
-      }
+      })
     ]);
   });
 });

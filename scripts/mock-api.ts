@@ -18,6 +18,7 @@ import {
   lessonTemplateKey,
   unitTemplateKey,
   aiJobKey,
+  aiJobsInboxKey,
   aiTranscriptKey
 } from '../src/storage/keys';
 import {
@@ -74,6 +75,7 @@ import {
 } from '../src/blocks/resolve-linked-sections';
 import { runContentSearch } from '../src/search/run-content-search';
 import { applyScheduleUnit } from '../src/schedule/schedule-unit';
+import { defaultScopeTerms } from '../src/scope/timeline-dates';
 import { reorderScheduledLesson } from '../src/schedule/reorder';
 import { buildPublishedClass } from '../src/schedule/build-published-class';
 import { unitContentChanged } from '../src/recovery/versions';
@@ -102,9 +104,21 @@ import { parseStatusPatch } from '../netlify/functions/_shared/lifecycle-routes.
 import {
   appendTranscriptTurns,
   fixtureReplaceLessonProposal,
+  staleWorkingJobError,
   type AiJob,
   type AiTranscriptTurn
 } from '../src/ai/jobs';
+import {
+  applyJobResolution,
+  syncInboxForJob,
+  unresolvedJobForLesson,
+  type AiJobInbox
+} from '../src/ai/jobs-inbox';
+import { toCurriculumLessonSummary } from '../src/curriculum/lesson-summary';
+import {
+  applyLessonLibraryPatch,
+  parseLessonLibraryPatch
+} from '../src/lessons/library-patch';
 
 export const SESSION_COOKIE_NAME = 'teaching_hub_session';
 
@@ -359,21 +373,6 @@ function newId(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function defaultScopeTerms(weekCount = 40) {
-  const termWeeks = weekCount / 4;
-  return [1, 2, 3, 4].map((term_number) => {
-    const start_week = (term_number - 1) * termWeeks + 1;
-    const end_week = term_number * termWeeks;
-    return {
-      id: `term_t${term_number}`,
-      title: `Term ${term_number}`,
-      term_number,
-      start_week,
-      end_week
-    };
-  });
-}
-
 interface SessionTokenPayload {
   expiresAt: number;
 }
@@ -404,18 +403,6 @@ function buildSessionCookie(token: string): string {
 
 function buildClearedSessionCookie(): string {
   return `${SESSION_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`;
-}
-
-interface CurriculumLessonSummary {
-  id: string;
-  title: string;
-  slug: string;
-  unit_id: string;
-  sequence: number;
-  status: string;
-  published: boolean;
-  updated_at: string;
-  published_at?: string;
 }
 
 const DEFAULT_SCHEDULE_ANCHOR_DATE = '2026-08-12';
@@ -489,20 +476,12 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const units = seedIds.units
       .map((id) => store.getJSON(unitKey(id)))
       .filter((u): u is Record<string, unknown> => Boolean(u));
-    const lessons: CurriculumLessonSummary[] = seedIds.lessons
+    const lessons = seedIds.lessons
       .map((id) => store.getJSON<Lesson>(draftLessonKey(id)))
       .filter((lesson): lesson is Lesson => Boolean(lesson))
-      .map((lesson) => ({
-        id: lesson.id,
-        title: lesson.title,
-        slug: lesson.slug,
-        unit_id: lesson.unit_id,
-        sequence: lesson.sequence,
-        status: lesson.status,
-        published: store.get(publishedLessonKey(lesson.id)) !== undefined,
-        updated_at: lesson.updated_at,
-        ...(lesson.published_at ? { published_at: lesson.published_at } : {})
-      }));
+      .map((lesson) =>
+        toCurriculumLessonSummary(lesson, store.get(publishedLessonKey(lesson.id)) !== undefined)
+      );
 
     const classes = seedIds.classes
       .map((id) => store.getJSON<Class>(classKey(id)))
@@ -602,8 +581,12 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     if (!statusFields.ok) {
       return errorResponse(400, statusFields.code, statusFields.message);
     }
-    if (!statusFields.hasStatus) {
-      return errorResponse(400, 'validation_error', 'Provide status');
+    const libraryFields = parseLessonLibraryPatch(body);
+    if (!libraryFields.ok) {
+      return errorResponse(400, 'validation_error', libraryFields.message);
+    }
+    if (!statusFields.hasStatus && !libraryFields.hasPatch) {
+      return errorResponse(400, 'validation_error', 'Provide status or library fields');
     }
 
     const existing = store.getJSON<Lesson>(draftLessonKey(id));
@@ -615,12 +598,23 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
 
     const timestamp = nowIso();
     try {
-      const next = applyStatusTransition(
-        existingParsed.data,
-        statusFields.status!,
-        timestamp,
-        statusFields.trash_reason
-      );
+      let next = existingParsed.data;
+      if (statusFields.hasStatus && statusFields.status) {
+        next = applyStatusTransition(
+          next,
+          statusFields.status,
+          timestamp,
+          statusFields.trash_reason
+        );
+      }
+      if (libraryFields.hasPatch) {
+        const fromUnitId = next.unit_id;
+        next = applyLessonLibraryPatch(next, libraryFields.patch);
+        if (libraryFields.patch.unit_id && libraryFields.patch.unit_id !== fromUnitId) {
+          const moved = moveLessonUnit(fromUnitId, libraryFields.patch.unit_id, id, timestamp);
+          if (!moved.ok) return errorResponse(400, 'validation_error', moved.message);
+        }
+      }
       const validated = LessonSchema.safeParse({ ...next, updated_at: timestamp });
       if (!validated.success) {
         return errorResponse(400, 'validation_error', 'Lesson data is invalid', validated.error.flatten());
@@ -630,6 +624,34 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     } catch (err) {
       return mapLifecycleError(err);
     }
+  }
+
+  function moveLessonUnit(
+    fromUnitId: string,
+    toUnitId: string,
+    lessonId: string,
+    timestamp: string
+  ): { ok: true } | { ok: false; message: string } {
+    const fromRaw = store.getJSON(unitKey(fromUnitId));
+    const toRaw = store.getJSON(unitKey(toUnitId));
+    const fromParsed = UnitSchema.safeParse(fromRaw);
+    const toParsed = UnitSchema.safeParse(toRaw);
+    if (!fromParsed.success || !toParsed.success) {
+      return { ok: false, message: 'Unit not found' };
+    }
+    store.setJSON(unitKey(fromUnitId), {
+      ...fromParsed.data,
+      lesson_ids: fromParsed.data.lesson_ids.filter((entry) => entry !== lessonId),
+      updated_at: timestamp
+    });
+    if (!toParsed.data.lesson_ids.includes(lessonId)) {
+      store.setJSON(unitKey(toUnitId), {
+        ...toParsed.data,
+        lesson_ids: [...toParsed.data.lesson_ids, lessonId],
+        updated_at: timestamp
+      });
+    }
+    return { ok: true };
   }
 
   async function handleGetTrash(cookie: string | null | undefined): Promise<MockResponse> {
@@ -1947,7 +1969,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       subject_id,
       academic_year,
       week_count,
-      terms: defaultScopeTerms(week_count),
+      terms: defaultScopeTerms(week_count, academic_year),
       timeline_items: [],
       status: 'active',
       created_at: timestamp,
@@ -2801,6 +2823,33 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
   const MEDIA_FILE_RE = /^\/api\/media\/([^/]+)\/file$/;
   const MEDIA_ID_RE = /^\/api\/media\/([^/]+)$/;
   const AI_JOB_RE = /^\/api\/ai\/jobs\/([^/]+)$/;
+  const AI_JOB_RUN_RE = /^\/api\/ai\/jobs\/([^/]+)\/run$/;
+
+  function readJobInbox(): AiJobInbox {
+    return store.getJSON<AiJobInbox>(aiJobsInboxKey()) ?? { jobs: [] };
+  }
+
+  function writeJobInbox(job: AiJob): void {
+    const lesson = store.getJSON<Lesson>(draftLessonKey(job.lesson_id));
+    store.setJSON(aiJobsInboxKey(), syncInboxForJob(readJobInbox(), job, lesson?.title ?? 'Lesson'));
+  }
+
+  function completeMockJob(job: AiJob): AiJob {
+    if (job.status !== 'working') return job;
+    const proposal = fixtureReplaceLessonProposal();
+    const done: AiJob = { ...job, status: 'done', proposal };
+    store.setJSON(aiJobKey(job.id), done);
+    const existing = store.getJSON<AiTranscriptTurn[]>(aiTranscriptKey(job.lesson_id, job.agent));
+    store.setJSON(
+      aiTranscriptKey(job.lesson_id, job.agent),
+      appendTranscriptTurns(existing, [
+        { role: 'user', content: job.message },
+        { role: 'assistant', content: 'Proposed a replace_lesson draft.' }
+      ])
+    );
+    writeJobInbox(done);
+    return done;
+  }
 
   async function handle(
     method: string,
@@ -2918,6 +2967,12 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       ]);
     }
 
+    if (method === 'GET' && path === '/api/ai/jobs') {
+      const session = getSession(cookie);
+      if (!session.authenticated) return unauthorizedResponse();
+      return okResponse(200, readJobInbox());
+    }
+
     if (method === 'POST' && path === '/api/ai/jobs') {
       const session = getSession(cookie);
       if (!session.authenticated) return unauthorizedResponse();
@@ -2938,6 +2993,13 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       }
       const lesson = store.getJSON<Lesson>(draftLessonKey(req.lesson_id));
       if (!lesson) return notFoundResponse('Lesson not found');
+      const existing = unresolvedJobForLesson(readJobInbox(), req.lesson_id);
+      if (existing) {
+        return errorResponse(409, 'conflict', 'An unresolved job already exists for this lesson', {
+          id: existing.id,
+          status: existing.status
+        });
+      }
       const now = nowIso();
       const id = newId('ai_job');
       const job: AiJob = {
@@ -2950,7 +3012,21 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
         created_at: now
       };
       store.setJSON(aiJobKey(id), job);
+      writeJobInbox(job);
+      setTimeout(() => {
+        const current = store.getJSON<AiJob>(aiJobKey(id));
+        if (current?.status === 'working') completeMockJob(current);
+      }, 0);
       return okResponse(202, { id, status: 'working' });
+    }
+
+    const aiJobRunMatch = AI_JOB_RUN_RE.exec(path);
+    if (aiJobRunMatch && method === 'POST') {
+      const session = getSession(cookie);
+      if (!session.authenticated) return unauthorizedResponse();
+      const job = store.getJSON<AiJob>(aiJobKey(aiJobRunMatch[1]!));
+      if (!job) return notFoundResponse('Job not found');
+      return okResponse(200, completeMockJob(job));
     }
 
     const aiJobMatch = AI_JOB_RE.exec(path);
@@ -2960,21 +3036,32 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       const id = aiJobMatch[1]!;
       const job = store.getJSON<AiJob>(aiJobKey(id));
       if (!job) return notFoundResponse('Job not found');
-      if (job.status === 'working') {
-        const proposal = fixtureReplaceLessonProposal();
-        const done: AiJob = { ...job, status: 'done', proposal };
-        store.setJSON(aiJobKey(id), done);
-        const existing = store.getJSON<AiTranscriptTurn[]>(aiTranscriptKey(job.lesson_id, job.agent));
-        store.setJSON(
-          aiTranscriptKey(job.lesson_id, job.agent),
-          appendTranscriptTurns(existing, [
-            { role: 'user', content: job.message },
-            { role: 'assistant', content: 'Proposed a replace_lesson draft.' }
-          ])
-        );
-        return okResponse(200, done);
+      const stale = staleWorkingJobError(job);
+      if (stale) {
+        store.setJSON(aiJobKey(id), stale);
+        writeJobInbox(stale);
+        return okResponse(200, stale);
       }
       return okResponse(200, job);
+    }
+
+    if (aiJobMatch && method === 'PATCH') {
+      const session = getSession(cookie);
+      if (!session.authenticated) return unauthorizedResponse();
+      const id = aiJobMatch[1]!;
+      const job = store.getJSON<AiJob>(aiJobKey(id));
+      if (!job) return notFoundResponse('Job not found');
+      if (!body || typeof body !== 'object' || typeof (body as { resolution?: unknown }).resolution !== 'string') {
+        return errorResponse(400, 'validation_error', 'Invalid job resolution');
+      }
+      const applied = applyJobResolution(
+        job,
+        (body as { resolution: 'accepted' | 'rejected' | 'dismissed' }).resolution
+      );
+      if (!applied.ok) return errorResponse(400, 'validation_error', applied.message);
+      store.setJSON(aiJobKey(id), applied.job);
+      writeJobInbox(applied.job);
+      return okResponse(200, applied.job);
     }
 
     if (method === 'POST' && path === '/api/classes') return handlePostClass(cookie, body);

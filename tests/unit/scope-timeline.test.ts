@@ -101,10 +101,10 @@ const scope: ScopeSequence = {
   academic_year: 2026,
   week_count: 40,
   terms: [
-    { id: 'term_t1', title: 'Term 1', term_number: 1, start_week: 1, end_week: 10 },
-    { id: 'term_t2', title: 'Term 2', term_number: 2, start_week: 11, end_week: 20 },
-    { id: 'term_t3', title: 'Term 3', term_number: 3, start_week: 21, end_week: 30 },
-    { id: 'term_t4', title: 'Term 4', term_number: 4, start_week: 31, end_week: 40 }
+    { id: 'term_t1', title: 'Term 1', term_number: 1, start_week: 1, end_week: 10, start_date: '2026-01-28', end_date: '2026-04-10' },
+    { id: 'term_t2', title: 'Term 2', term_number: 2, start_week: 11, end_week: 20, start_date: '2026-04-27', end_date: '2026-07-03' },
+    { id: 'term_t3', title: 'Term 3', term_number: 3, start_week: 21, end_week: 30, start_date: '2026-07-20', end_date: '2026-09-25' },
+    { id: 'term_t4', title: 'Term 4', term_number: 4, start_week: 31, end_week: 40, start_date: '2026-10-12', end_date: '2026-12-18' }
   ],
   timeline_items: [
     {
@@ -155,23 +155,29 @@ describe('scope timeline editor', () => {
     canvas = document.createElement('div');
   });
 
-  it('renders subject heading, term labels, and seeded unit title', () => {
+  it('renders subject heading, term bands, and seeded unit title', () => {
     renderScopeTimelineEditor(canvas, curriculum, 'subject_y12_engadv');
     expect(canvas.querySelector('.page-header__title')?.textContent).toBe('English Advanced');
-    const terms = [...canvas.querySelectorAll('.scope-timeline__term')].map((el) => el.textContent);
-    expect(terms).toEqual(['Term 1', 'Term 2', 'Term 3', 'Term 4']);
+    const terms = [...canvas.querySelectorAll('.scope-gantt__band-label')].map((el) => el.textContent);
+    expect(terms).toEqual(['TERM 1', 'TERM 2', 'TERM 3', 'TERM 4']);
     const unitItem = canvas.querySelector<HTMLElement>('.scope-timeline__item--unit');
-    expect(unitItem?.textContent).toBe('Artist of the Floating World');
+    expect(unitItem?.querySelector('.scope-gantt__chip')?.textContent).toBe(
+      'Artist of the Floating World'
+    );
     expect(unitItem?.dataset.tint).toBe(pastelFromId(unitItem!.dataset.unitId!));
     const noteItem = canvas.querySelector('.scope-timeline__item--note');
-    expect(noteItem?.textContent).toBe('Assessment week');
+    expect(noteItem?.querySelector('.scope-gantt__chip')?.textContent).toBe('Assessment week');
     expect(noteItem?.classList.contains('scope-timeline__item--navy')).toBe(true);
-    expect(canvas.querySelector('.scope-timeline__inspector-empty')?.textContent).toMatch(
-      /Select an item/i
-    );
+    expect(canvas.querySelector('.scope-timeline__inspector')?.hasAttribute('hidden')).toBe(true);
   });
 
-  it('selects an item and populates the inspector', () => {
+  it('does not keep an empty detail panel in view', () => {
+    renderScopeTimelineEditor(canvas, curriculum, 'subject_y12_engadv');
+    expect(canvas.querySelector('.scope-timeline__inspector-empty')).toBeNull();
+    expect(canvas.querySelector('.scope-timeline__inspector')?.hasAttribute('hidden')).toBe(true);
+  });
+
+  it('selects an item and populates the inspector with dates', () => {
     renderScopeTimelineEditor(canvas, curriculum, 'subject_y12_engadv');
     const unitItem = canvas.querySelector<HTMLElement>('.scope-timeline__item--unit');
     unitItem?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -180,8 +186,9 @@ describe('scope timeline editor', () => {
       'Artist of the Floating World'
     );
     expect(canvas.querySelector('.scope-timeline__inspector-weeks')?.textContent).toBe(
-      'Weeks 12–18'
+      '4 May – 15 Jun'
     );
+    expect(canvas.querySelector('.scope-timeline__inspector')?.hasAttribute('hidden')).toBe(false);
   });
 
   it('opens a unit from the inspector', () => {
@@ -229,7 +236,7 @@ describe('scope timeline editor', () => {
   it('shows Unknown unit when the unit blob is missing', () => {
     const noUnits = makeCurriculum({ units: [] });
     renderScopeTimelineEditor(canvas, noUnits, 'subject_y12_engadv');
-    expect(canvas.querySelector('.scope-timeline__item--unit')?.textContent).toBe('Unknown unit');
+    expect(canvas.querySelector('.scope-gantt__chip')?.textContent).toBe('Unknown unit');
   });
 
   it('lists only subject units not already on the timeline in Add Unit modal', () => {
@@ -277,7 +284,7 @@ describe('scope timeline editor', () => {
     expect(added).toMatchObject({ kind: 'unit', unit_id: 'unit_hamlet', start_week: 1, end_week: 4 });
 
     await vi.waitFor(() => {
-      const titles = [...canvas.querySelectorAll('.scope-timeline__item--unit')].map(
+      const titles = [...canvas.querySelectorAll('.scope-timeline__item--unit .scope-gantt__chip')].map(
         (el) => el.textContent
       );
       expect(titles).toContain('Hamlet');
@@ -472,17 +479,44 @@ describe('scope timeline editor', () => {
     });
   });
 
-  it('renders resize handles on timeline items', () => {
+  it('weights Add Unit as the primary action', () => {
     renderScopeTimelineEditor(canvas, curriculum, 'subject_y12_engadv');
-    const unitItem = canvas.querySelector('.scope-timeline__item--unit');
-    expect(unitItem?.querySelector('.scope-timeline__handle--start')).toBeTruthy();
-    expect(unitItem?.querySelector('.scope-timeline__handle--end')).toBeTruthy();
-    const noteItem = canvas.querySelector('.scope-timeline__item--note');
-    expect(noteItem?.querySelector('.scope-timeline__handle--start')).toBeTruthy();
-    expect(noteItem?.querySelector('.scope-timeline__handle--end')).toBeTruthy();
+    expect(canvas.querySelector('.scope-timeline__add-unit')?.className).toMatch(/btn--primary/);
+    expect(canvas.querySelector('.scope-timeline__add-note')?.className).toMatch(/btn--ghost/);
   });
 
-  it('moves an item via pointer drag and PATCHes updated weeks', async () => {
+  it('switches to the curriculum map with per-term add slots', () => {
+    renderScopeTimelineEditor(canvas, curriculum, 'subject_y12_engadv');
+    canvas.querySelector<HTMLButtonElement>('[data-scope-tab="map"]')?.click();
+    expect(canvas.querySelectorAll('.scope-map__col')).toHaveLength(4);
+    expect(canvas.querySelector('.scope-map__add--empty')).toBeTruthy();
+    expect(canvas.querySelector('.scope-map__add--mini')).toBeTruthy();
+  });
+
+  it('shows the empty-year prompt when there are no timeline items', () => {
+    const empty = cloneScope();
+    empty.timeline_items = [];
+    renderScopeTimelineEditor(canvas, makeCurriculum({ scope_sequences: [empty] }), 'subject_y12_engadv');
+    expect(canvas.textContent).toMatch(/Map out your year/);
+    expect(canvas.querySelector('.scope-gantt__month')).toBeTruthy();
+  });
+
+  it('abbreviates month labels at year zoom', () => {
+    renderScopeTimelineEditor(canvas, curriculum, 'subject_y12_engadv');
+    canvas.querySelector<HTMLButtonElement>('[data-zoom="year"]')?.click();
+    const labels = [...canvas.querySelectorAll('.scope-gantt__month')].map((el) => el.textContent);
+    expect(labels[0]).toBe('Jan');
+    expect(labels.every((label) => label && label.length <= 4)).toBe(true);
+  });
+
+  it('renders resize handles on timeline bars', () => {
+    renderScopeTimelineEditor(canvas, curriculum, 'subject_y12_engadv');
+    const bar = canvas.querySelector('.scope-timeline__item--unit .scope-gantt__bar');
+    expect(bar?.querySelector('.scope-timeline__handle--start')).toBeTruthy();
+    expect(bar?.querySelector('.scope-timeline__handle--end')).toBeTruthy();
+  });
+
+  it('moves a bar via pointer drag and PATCHes weeks plus dates', async () => {
     const local = makeCurriculum();
     const updated = cloneScope();
     const unitItem = updated.timeline_items.find((item) => item.id === 'ti_unit_aotfw');
@@ -493,44 +527,15 @@ describe('scope timeline editor', () => {
     patchScopeSequenceMock.mockResolvedValue(updated);
 
     renderScopeTimelineEditor(canvas, local, 'subject_y12_engadv');
-    const track = canvas.querySelector<HTMLElement>('.scope-timeline__track');
-    const item = canvas.querySelector<HTMLElement>('.scope-timeline__item--unit');
-    expect(track && item).toBeTruthy();
+    const bar = canvas.querySelector<HTMLElement>('.scope-timeline__item--unit .scope-gantt__bar');
+    expect(bar).toBeTruthy();
 
-    vi.spyOn(track!, 'getBoundingClientRect').mockReturnValue({
-      width: 400,
-      height: 40,
-      top: 0,
-      left: 0,
-      bottom: 40,
-      right: 400,
-      x: 0,
-      y: 0,
-      toJSON: () => ({})
-    });
-
-    item!.dispatchEvent(
-      new PointerEvent('pointerdown', {
-        bubbles: true,
-        clientX: 100,
-        button: 0,
-        pointerId: 1
-      })
+    // Month zoom: 6.4px/day → 44.8px/week. 90px ≈ 2 weeks.
+    bar!.dispatchEvent(
+      new PointerEvent('pointerdown', { bubbles: true, clientX: 100, button: 0, pointerId: 1 })
     );
-    item!.dispatchEvent(
-      new PointerEvent('pointermove', {
-        bubbles: true,
-        clientX: 120,
-        pointerId: 1
-      })
-    );
-    item!.dispatchEvent(
-      new PointerEvent('pointerup', {
-        bubbles: true,
-        clientX: 120,
-        pointerId: 1
-      })
-    );
+    bar!.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: 190, pointerId: 1 }));
+    bar!.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, clientX: 190, pointerId: 1 }));
 
     await vi.waitFor(() => {
       expect(patchScopeSequenceMock).toHaveBeenCalledTimes(1);
@@ -539,7 +544,9 @@ describe('scope timeline editor', () => {
     const [, body] = patchScopeSequenceMock.mock.calls[0]!;
     expect(body.timeline_items.find((entry) => entry.id === 'ti_unit_aotfw')).toMatchObject({
       start_week: 14,
-      end_week: 20
+      end_week: 20,
+      start_date: '2026-05-18',
+      end_date: '2026-06-29'
     });
   });
 
@@ -547,51 +554,21 @@ describe('scope timeline editor', () => {
     const local = makeCurriculum();
     const updated = cloneScope();
     const unitItem = updated.timeline_items.find((item) => item.id === 'ti_unit_aotfw');
-    if (unitItem) {
-      unitItem.end_week = 20;
-    }
+    if (unitItem) unitItem.end_week = 20;
     patchScopeSequenceMock.mockResolvedValue(updated);
 
     renderScopeTimelineEditor(canvas, local, 'subject_y12_engadv');
-    const track = canvas.querySelector<HTMLElement>('.scope-timeline__track');
-    const item = canvas.querySelector<HTMLElement>('.scope-timeline__item--unit');
-    const handle = item?.querySelector<HTMLElement>('.scope-timeline__handle--end');
-    expect(track && item && handle).toBeTruthy();
-
-    vi.spyOn(track!, 'getBoundingClientRect').mockReturnValue({
-      width: 400,
-      height: 40,
-      top: 0,
-      left: 0,
-      bottom: 40,
-      right: 400,
-      x: 0,
-      y: 0,
-      toJSON: () => ({})
-    });
+    const handle = canvas.querySelector<HTMLElement>(
+      '.scope-timeline__item--unit .scope-timeline__handle--end'
+    );
+    const bar = canvas.querySelector<HTMLElement>('.scope-timeline__item--unit .scope-gantt__bar');
+    expect(handle && bar).toBeTruthy();
 
     handle!.dispatchEvent(
-      new PointerEvent('pointerdown', {
-        bubbles: true,
-        clientX: 100,
-        button: 0,
-        pointerId: 1
-      })
+      new PointerEvent('pointerdown', { bubbles: true, clientX: 100, button: 0, pointerId: 1 })
     );
-    item!.dispatchEvent(
-      new PointerEvent('pointermove', {
-        bubbles: true,
-        clientX: 120,
-        pointerId: 1
-      })
-    );
-    item!.dispatchEvent(
-      new PointerEvent('pointerup', {
-        bubbles: true,
-        clientX: 120,
-        pointerId: 1
-      })
-    );
+    bar!.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: 190, pointerId: 1 }));
+    bar!.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, clientX: 190, pointerId: 1 }));
 
     await vi.waitFor(() => {
       expect(patchScopeSequenceMock).toHaveBeenCalledTimes(1);
@@ -604,58 +581,29 @@ describe('scope timeline editor', () => {
     });
   });
 
-  it('reverts and shows a banner when drag persist fails', async () => {
+  it('reverts the bar when drag persist fails', async () => {
     const local = makeCurriculum();
     patchScopeSequenceMock.mockRejectedValue(new Error('network'));
 
     renderScopeTimelineEditor(canvas, local, 'subject_y12_engadv');
-    const track = canvas.querySelector<HTMLElement>('.scope-timeline__track');
-    const item = canvas.querySelector<HTMLElement>('.scope-timeline__item--unit');
-    expect(track && item).toBeTruthy();
+    const bar = canvas.querySelector<HTMLElement>('.scope-timeline__item--unit .scope-gantt__bar');
+    const originLeft = bar!.style.left;
 
-    vi.spyOn(track!, 'getBoundingClientRect').mockReturnValue({
-      width: 400,
-      height: 40,
-      top: 0,
-      left: 0,
-      bottom: 40,
-      right: 400,
-      x: 0,
-      y: 0,
-      toJSON: () => ({})
-    });
-
-    item!.dispatchEvent(
-      new PointerEvent('pointerdown', {
-        bubbles: true,
-        clientX: 100,
-        button: 0,
-        pointerId: 1
-      })
+    bar!.dispatchEvent(
+      new PointerEvent('pointerdown', { bubbles: true, clientX: 100, button: 0, pointerId: 1 })
     );
-    item!.dispatchEvent(
-      new PointerEvent('pointermove', {
-        bubbles: true,
-        clientX: 120,
-        pointerId: 1
-      })
-    );
-    item!.dispatchEvent(
-      new PointerEvent('pointerup', {
-        bubbles: true,
-        clientX: 120,
-        pointerId: 1
-      })
-    );
+    bar!.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: 190, pointerId: 1 }));
+    bar!.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, clientX: 190, pointerId: 1 }));
 
     await vi.waitFor(() => {
-      const banner = canvas.querySelector<HTMLElement>('.scope-timeline__banner');
-      expect(banner?.hidden).toBe(false);
-      expect(banner?.textContent).toMatch(/Unable to save timeline/i);
+      expect(canvas.querySelector('.scope-timeline__banner')?.textContent).toMatch(
+        /Unable to save timeline/i
+      );
     });
 
-    const refreshed = canvas.querySelector<HTMLElement>('.scope-timeline__item--unit');
-    // weeks 12–18 of 40 → left ((12-1)/40)*100 ≈ 27.5%
-    expect(parseFloat(refreshed?.style.left || '')).toBeCloseTo(27.5, 5);
+    const refreshed = canvas.querySelector<HTMLElement>(
+      '.scope-timeline__item--unit .scope-gantt__bar'
+    );
+    expect(refreshed?.style.left).toBe(originLeft);
   });
 });

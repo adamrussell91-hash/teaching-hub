@@ -74,6 +74,10 @@ export function aiJobKey(id: string): string {
   return `ai_jobs/${id}`;
 }
 
+export function aiJobsInboxKey(): string {
+  return 'ai_jobs/_inbox';
+}
+
 export function aiTranscriptKey(lessonId: string, agent: string): string {
   return `ai_transcripts/${lessonId}/${agent}`;
 }

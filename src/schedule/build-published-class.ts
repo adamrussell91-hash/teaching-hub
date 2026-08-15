@@ -68,8 +68,10 @@ export function buildPublishedClass(input: {
         date: row.date,
         schedule_order: row.schedule_order,
         lesson_id: row.lesson_id,
+        unit_id: row.unit_id,
         title: lesson?.title ?? row.lesson_id,
-        published: publishedLessonIds.has(row.lesson_id)
+        published: publishedLessonIds.has(row.lesson_id),
+        delivery_status: row.delivery_status
       };
     });
 

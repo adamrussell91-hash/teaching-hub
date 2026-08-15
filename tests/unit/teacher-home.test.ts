@@ -9,8 +9,37 @@ import type { CurriculumResponse } from '@/teacher/nav';
 const ISO = '2026-01-01T00:00:00.000Z';
 
 const curriculum: CurriculumResponse = {
-  years: [],
-  subjects: [],
+  years: [
+    {
+      id: 'year_12',
+      type: 'year',
+      title: 'Year 12',
+      slug: 'year_12',
+      status: 'active',
+      created_at: ISO,
+      updated_at: ISO,
+      schema_version: 1,
+      year_level: 12,
+      subject_ids: ['subject_y12_engadv']
+    }
+  ],
+  subjects: [
+    {
+      id: 'subject_y12_engadv',
+      type: 'subject',
+      title: 'English Advanced',
+      display_title: 'Year 12 English Advanced',
+      slug: 'english_advanced',
+      status: 'active',
+      created_at: ISO,
+      updated_at: ISO,
+      schema_version: 1,
+      year_id: 'year_12',
+      unit_ids: ['unit_aotfw'],
+      outcome_ids: [],
+      class_ids: ['class_2026_12engadv1']
+    }
+  ],
   units: [],
   schedule_anchor_date: '2026-08-12',
   classes: [
@@ -18,7 +47,7 @@ const curriculum: CurriculumResponse = {
       id: 'class_2026_12engadv1',
       type: 'class',
       code: '12ENGADV1',
-      title: 'Year 12 English Advanced',
+      title: '12ENGADV1',
       slug: '12engadv1',
       academic_year: 2026,
       year_id: 'year_12',
@@ -99,39 +128,32 @@ describe('teacher home dashboard', () => {
     dispose?.();
   });
 
-  it('renders Clinical Glass structure with clock, signals, week, and classes', () => {
+  it('renders a cover banner, clock, calendar, and classes without signal tiles', () => {
     const result = renderTeacherHome(canvas, curriculum);
     dispose = result.dispose;
 
+    expect(canvas.querySelector('.entity-banner__title')?.textContent).toBe('Dashboard');
+    expect(canvas.querySelector('.entity-banner__edit')?.textContent).toBe('Change cover');
     expect(
       canvas.querySelector('[data-home-hero-clock], .home-dashboard__hero-time')
     ).not.toBeNull();
-    expect(canvas.querySelector('[data-home-panel="signals"]')).not.toBeNull();
-    expect(canvas.querySelector('[data-home-panel="week"]')).not.toBeNull();
+    expect(canvas.querySelector('[data-home-panel="signals"]')).toBeNull();
+    expect(canvas.querySelector('.home-today')).toBeNull();
+    expect(canvas.querySelector('.class-calendar')).not.toBeNull();
     expect(canvas.querySelector('[data-home-panel="classes"]')).not.toBeNull();
-    expect(canvas.textContent).toContain('Teaching Dashboard');
-    expect(canvas.querySelector('.page-header__title')?.textContent).toBe('Teaching Dashboard');
-    expect(canvas.querySelector('.home-today')).not.toBeNull();
-    expect(canvas.querySelector('.home-today')?.textContent).toContain('Memory');
-    const chip = canvas.querySelector<HTMLAnchorElement>(
-      'a.event-chip[href="/lessons/lesson_aotfw_008"]'
-    );
-    expect(chip).not.toBeNull();
-    expect(chip?.dataset.tint).toMatch(/blue|sage|peach|gold|lilac/);
-    expect(canvas.textContent).toMatch(/\b\d{1,2}\b/);
-
-    const unpublishedTile = [...canvas.querySelectorAll('.home-signal')].find((el) =>
-      el.textContent?.includes('Unpublished')
-    );
-    expect(unpublishedTile?.classList.contains('home-signal--emphasis')).toBe(true);
+    expect(canvas.querySelector('.page-header__title')).toBeNull();
   });
 
-  it('shows weekday day numbers in week columns and lesson links', () => {
+  it('shows weekday day numbers, today, class meta on chips, and lesson links', () => {
     const result = renderTeacherHome(canvas, curriculum);
     dispose = result.dispose;
 
+    const todayCol = canvas.querySelector('.class-calendar__week-day[data-today="true"]');
+    expect(todayCol?.getAttribute('data-date')).toBe('2026-08-12');
+    expect(todayCol?.querySelector('.class-calendar__day-num')?.textContent).toBe('12');
+
     const dayNumbers = [
-      ...canvas.querySelectorAll('.home-week__day-number')
+      ...canvas.querySelectorAll('.class-calendar__week-day .class-calendar__day-num')
     ].map((el) => el.textContent);
     expect(dayNumbers).toEqual(['10', '11', '12', '13', '14']);
 
@@ -139,13 +161,31 @@ describe('teacher home dashboard', () => {
       'a.event-chip[href="/lessons/lesson_aotfw_008"]'
     );
     expect(lessonLink).not.toBeNull();
-    expect(lessonLink?.textContent).toContain('Memory');
+    expect(lessonLink?.querySelector('.event-chip__title')?.textContent).toBe('Memory');
+    expect(lessonLink?.querySelector('.event-chip__meta')?.textContent).toBe('12ENGADV1');
+    expect(lessonLink?.dataset.tint).toMatch(/blue|sage|peach|gold|lilac/);
 
     lessonLink?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     expect(navigate).toHaveBeenCalledWith('/lessons/lesson_aotfw_008');
   });
 
-  it('links class tiles to /classes/:id', () => {
+  it('switches month and timeline views', () => {
+    const result = renderTeacherHome(canvas, curriculum);
+    dispose = result.dispose;
+
+    canvas.querySelector<HTMLButtonElement>('[data-calendar-view="month"]')!.click();
+    expect(canvas.querySelector('[role="grid"]')).not.toBeNull();
+    expect(
+      canvas.querySelector('.class-calendar__day[data-today="true"]')
+    ).not.toBeNull();
+
+    canvas.querySelector<HTMLButtonElement>('[data-calendar-view="timeline"]')!.click();
+    expect(canvas.querySelector('.class-calendar__timeline')).not.toBeNull();
+    expect(canvas.textContent).toContain('Memory');
+    expect(canvas.querySelector('.class-calendar__timeline-today')?.textContent).toBe('Today');
+  });
+
+  it('links class tiles with year-subject titles, not the class code as the heading', () => {
     const result = renderTeacherHome(canvas, curriculum);
     dispose = result.dispose;
 
@@ -153,6 +193,10 @@ describe('teacher home dashboard', () => {
       'a.home-class-tile[href="/classes/class_2026_12engadv1"]'
     );
     expect(classTile).not.toBeNull();
+    expect(classTile?.querySelector('.home-class-tile__title')?.textContent).toBe(
+      'Year 12 English Advanced'
+    );
+    expect(classTile?.querySelector('.home-class-tile__eyebrow')?.textContent).toBe('12ENGADV1');
     classTile?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     expect(navigate).toHaveBeenCalledWith('/classes/class_2026_12engadv1');
   });

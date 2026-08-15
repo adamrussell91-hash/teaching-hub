@@ -16,6 +16,7 @@ import {
   mediaFileKey,
   compositionKey,
   aiJobKey,
+  aiJobsInboxKey,
   aiTranscriptKey
 } from '@/storage/keys';
 import { MockStore } from '../../scripts/mock-store';
@@ -71,6 +72,7 @@ describe('storage key helpers', () => {
 
   it('builds AI job and transcript keys', () => {
     expect(aiJobKey('job_1')).toBe('ai_jobs/job_1');
+    expect(aiJobsInboxKey()).toBe('ai_jobs/_inbox');
     expect(aiTranscriptKey('lesson_aotfw_008', 'clementine')).toBe(
       'ai_transcripts/lesson_aotfw_008/clementine'
     );

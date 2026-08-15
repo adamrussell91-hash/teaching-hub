@@ -6,6 +6,7 @@ import {
 } from './_shared/blobs.mts';
 import { getTeacherSession } from './_shared/session.mts';
 import type { Lesson } from './_shared/validate.mts';
+import { toCurriculumLessonSummary } from '../../src/curriculum/lesson-summary';
 import {
   errorResponse,
   guardRequestOrigin,
@@ -16,18 +17,6 @@ import {
   preflightResponse,
   withCors
 } from './_shared/http.mts';
-
-interface CurriculumLessonSummary {
-  id: string;
-  title: string;
-  slug: string;
-  unit_id: string;
-  sequence: number;
-  status: string;
-  published: boolean;
-  updated_at: string;
-  published_at?: string;
-}
 
 const DRAFT_LESSON_PREFIX = 'lessons/';
 const PUBLISHED_LESSON_PREFIX = 'published/lessons/';
@@ -70,17 +59,9 @@ async function buildCurriculum(store: ContentStore) {
 
   const publishedIds = new Set(publishedList.blobs.map((blob) => blob.key.slice(PUBLISHED_LESSON_PREFIX.length)));
 
-  const lessonSummaries: CurriculumLessonSummary[] = lessons.map((lesson) => ({
-    id: lesson.id,
-    title: lesson.title,
-    slug: lesson.slug,
-    unit_id: lesson.unit_id,
-    sequence: lesson.sequence,
-    status: lesson.status,
-    published: publishedIds.has(lesson.id),
-    updated_at: lesson.updated_at,
-    ...(lesson.published_at ? { published_at: lesson.published_at } : {})
-  }));
+  const lessonSummaries = lessons.map((lesson) =>
+    toCurriculumLessonSummary(lesson, publishedIds.has(lesson.id))
+  );
 
   return {
     years,

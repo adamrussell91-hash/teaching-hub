@@ -59,6 +59,7 @@ function sampleClass(overrides: Partial<PublishedClass> = {}): PublishedClass {
         date: '2026-08-11',
         schedule_order: 1,
         lesson_id: 'lesson_aotfw_001',
+        unit_id: 'unit_aotfw',
         title: 'Intro',
         published: true
       },
@@ -67,6 +68,7 @@ function sampleClass(overrides: Partial<PublishedClass> = {}): PublishedClass {
         date: '2026-08-12',
         schedule_order: 2,
         lesson_id: 'lesson_aotfw_008',
+        unit_id: 'unit_aotfw',
         title: 'Memory, Identity and Ono',
         published: false
       }
@@ -86,7 +88,7 @@ describe('mountStudentClassView', () => {
     document.body.replaceChildren();
   });
 
-  it('renders header, current unit/lesson, schedule Open for published only, and homepage blocks', async () => {
+  it('renders student hero, continue card, units, published links, and homepage blocks', async () => {
     vi.mocked(apiGet).mockResolvedValue(sampleClass());
 
     const root = document.createElement('div');
@@ -94,34 +96,37 @@ describe('mountStudentClassView', () => {
     mountStudentClassView({ root, classId: CLASS_ID });
 
     await vi.waitFor(() => {
-      expect(root.textContent).toContain('12ENGADV1');
-      expect(root.textContent).toContain('Year 12 English Advanced');
+      expect(root.querySelector('.student-hero__title')?.textContent).toBe(
+        'Year 12 English Advanced'
+      );
+      expect(root.querySelector('.student-hero__eyebrow')?.textContent).toBe('12ENGADV1');
       expect(root.textContent).toContain('Artist of the Floating World');
-      expect(root.textContent).toContain('Memory, Identity and Ono');
       expect(root.textContent).toContain('Welcome back');
     });
 
     expect(apiGet).toHaveBeenCalledWith(`/api/published/classes/${CLASS_ID}`);
+    expect(root.querySelector('.class-calendar')).toBeNull();
+    expect(root.querySelector('.unit-sequence')).toBeNull();
+    expect(root.querySelector('.entity-banner')).toBeNull();
+    expect(root.querySelector('.class-page')).toBeNull();
+    expect(root.querySelector('[data-class-section="current-unit"]')).toBeNull();
+    expect(root.querySelector('[data-class-section="current-lesson"]')).toBeNull();
 
-    const unitLink = root.querySelector(
-      '[data-class-section="current-unit"] a.student-class__link'
-    );
+    const unitLink = root.querySelector('a.student-unit-card');
     expect(unitLink?.getAttribute('href')).toBe('/s/units/unit_aotfw');
 
     const currentOpen = root.querySelector(
-      '[data-class-section="current-lesson"] a.student-class__open'
+      `.student-schedule__link[href="/s/classes/${CLASS_ID}/lessons/lesson_aotfw_008"]`
     );
     expect(currentOpen).toBeNull();
 
-    const scheduleOpens = [
-      ...root.querySelectorAll('[data-class-section="schedule"] a.student-class__open')
-    ];
-    expect(scheduleOpens).toHaveLength(1);
-    expect(scheduleOpens[0].getAttribute('href')).toBe(
-      `/s/classes/${CLASS_ID}/lessons/lesson_aotfw_001`
+    const publishedOpen = root.querySelector(
+      `.student-schedule__link[href="/s/classes/${CLASS_ID}/lessons/lesson_aotfw_001"]`
     );
-    expect(scheduleOpens[0].textContent).toBe('Open');
+    expect(publishedOpen).not.toBeNull();
+    expect(publishedOpen?.textContent).toContain('Intro');
 
+    expect(root.querySelector('.student-continue')).toBeTruthy();
     expect(root.querySelector('[data-homepage-region="announcements"]')).toBeTruthy();
     expect(root.querySelector('[data-homepage-region="resources"]')).toBeNull();
     expect(root.querySelector('[data-homepage-region="custom"]')).toBeNull();
@@ -136,6 +141,7 @@ describe('mountStudentClassView', () => {
             date: '2026-08-12',
             schedule_order: 1,
             lesson_id: 'lesson_aotfw_008',
+            unit_id: 'unit_aotfw',
             title: 'Memory, Identity and Ono',
             published: true
           }
@@ -149,11 +155,9 @@ describe('mountStudentClassView', () => {
 
     await vi.waitFor(() => {
       const open = root.querySelector(
-        '[data-class-section="current-lesson"] a.student-class__open'
+        `a[href="/s/classes/${CLASS_ID}/lessons/lesson_aotfw_008"]`
       );
-      expect(open?.getAttribute('href')).toBe(
-        `/s/classes/${CLASS_ID}/lessons/lesson_aotfw_008`
-      );
+      expect(open).not.toBeNull();
     });
   });
 

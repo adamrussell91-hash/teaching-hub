@@ -1,7 +1,7 @@
 import { mountCreateControl } from '@/teacher/create/control';
 import type { CreateKind } from '@/teacher/create/types';
 import type { CurriculumResponse } from '@/teacher/nav';
-import { renderLessonList } from '@/teacher/lesson-list';
+import { promptLessonFromTemplate, renderLessonsLibrary } from '@/teacher/lessons-library/render';
 import { renderPageHeader } from '@/teacher/page-header';
 
 export interface LessonsIndexOptions {
@@ -22,7 +22,21 @@ export function renderLessonsIndex(
   createHost.className = 'lessons-index__create create-control';
   createHost.dataset.createHost = '';
 
-  renderPageHeader(canvas, { eyebrow: 'Workspace', title: 'Lessons', actions: [createHost] });
+  const templateBtn = document.createElement('button');
+  templateBtn.type = 'button';
+  templateBtn.className = 'btn btn--ghost';
+  templateBtn.textContent = 'From template';
+  templateBtn.addEventListener('click', () => {
+    void promptLessonFromTemplate(curriculum).then((id) => {
+      if (id) void options.onCreated?.('lesson', id);
+    });
+  });
+
+  renderPageHeader(canvas, {
+    eyebrow: 'Workspace',
+    title: 'Lessons',
+    actions: [templateBtn, createHost]
+  });
 
   const createControl = mountCreateControl(createHost, {
     context: 'lessons',
@@ -35,7 +49,8 @@ export function renderLessonsIndex(
   listHost.className = 'lessons-index__list';
 
   canvas.append(listHost);
-  renderLessonList(listHost, curriculum, { heading: null, onMutated: options.onMutated });
+  const library = renderLessonsLibrary(listHost, curriculum, { onMutated: options.onMutated });
+  disposers.push(library.dispose);
 
   return {
     dispose: () => {

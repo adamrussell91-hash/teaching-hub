@@ -39,7 +39,7 @@ describe('mountStudentUnitView', () => {
     mountStudentUnitView({ root, unitId: 'unit_aotfw' });
 
     await vi.waitFor(() => {
-      expect(root.textContent).toContain('AOTFW Unit');
+      expect(root.querySelector('.student-hero__title')?.textContent).toBe('AOTFW Unit');
       const links = [...root.querySelectorAll('a.student-unit__lesson-link')];
       expect(links).toHaveLength(2);
       expect(links[0].getAttribute('href')).toBe('/s/lessons/lesson_aotfw_008');

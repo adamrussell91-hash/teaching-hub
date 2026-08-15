@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createBlock } from '@/blocks/create-block';
+import type { Block } from '@/schemas/block';
 import type { Lesson } from '@/schemas/lesson';
 import { isTextLike } from '@/teacher/lesson-canvas/kinds';
-import { mountLessonPage } from '@/teacher/lesson-canvas/mount-page';
+import { mountBlockCanvas, mountLessonPage } from '@/teacher/lesson-canvas/mount-page';
 
 const MIME = 'application/x-teaching-hub-block';
 const ISO = '2026-01-01T00:00:00.000Z';
@@ -242,5 +243,57 @@ describe('mountLessonPage', () => {
 
     expect(onCompositionDrop).toHaveBeenCalledWith('composition_1');
     expect(onChange).not.toHaveBeenCalled();
+  });
+});
+
+describe('mountBlockCanvas', () => {
+  let host: HTMLElement;
+  let ids: string[];
+
+  beforeEach(() => {
+    host = document.createElement('div');
+    document.body.append(host);
+    ids = ['new_1', 'new_2'];
+  });
+
+  afterEach(() => {
+    host.remove();
+    document.body.replaceChildren();
+  });
+
+  it('renders page blocks without lesson cover, title, or print chrome', () => {
+    const heading = createBlock('heading', 'h1');
+    mountBlockCanvas(host, {
+      blocks: [heading],
+      onChange: vi.fn(),
+      idFactory: () => ids.shift() ?? 'new_x',
+      heading: 'Announcements'
+    });
+
+    expect(host.querySelector('.lesson-page__heading')?.textContent).toBe('Announcements');
+    expect(host.querySelector('.lesson-page__title')).toBeNull();
+    expect(host.querySelector('.lesson-page__cover')).toBeNull();
+    expect(host.querySelector('[aria-label="Print"]')).toBeNull();
+    expect(host.querySelector('[aria-label="Page menu"]')).toBeNull();
+    expect(host.querySelector('.lesson-page__gap')).not.toBeNull();
+  });
+
+  it('inserts a collection on drop and via insertType at page root', () => {
+    const onChange = vi.fn();
+    const handle = mountBlockCanvas(host, {
+      blocks: [],
+      onChange,
+      idFactory: () => ids.shift() ?? 'new_x',
+      allowCollectionAtRoot: true
+    });
+
+    dispatchDrop(host.querySelector('.lesson-page__gap')!, { kind: 'block', type: 'collection' });
+    expect(onChange).toHaveBeenCalled();
+    expect((onChange.mock.calls[0]![0] as Block[])[0]?.block_type).toBe('collection');
+
+    onChange.mockClear();
+    handle.update([]);
+    handle.insertType('heading');
+    expect((onChange.mock.calls.at(-1)?.[0] as Block[])[0]?.block_type).toBe('heading');
   });
 });

@@ -19,6 +19,7 @@ import {
   versionsPrefix,
   aiUsageLogKey,
   aiJobKey,
+  aiJobsInboxKey,
   aiTranscriptKey
 } from '../../../src/storage/keys';
 
@@ -45,6 +46,7 @@ export {
   versionsPrefix,
   aiUsageLogKey,
   aiJobKey,
+  aiJobsInboxKey,
   aiTranscriptKey
 };
 

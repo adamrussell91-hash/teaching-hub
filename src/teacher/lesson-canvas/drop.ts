@@ -19,12 +19,17 @@ export type DropParent =
 
 type DropResult = { ok: true; blocks: Block[] } | { ok: false; message: string };
 
-const ROOT_CHILD_TYPES = NEW_BLOCK_TYPES.filter((t) => t !== 'collection');
+export type DropRootMode = 'lesson' | 'page';
 
-function allowedTypesFor(parent: DropParent): readonly NewBlockType[] {
+export type DropOptions = { rootMode?: DropRootMode };
+
+const LESSON_ROOT_CHILD_TYPES = NEW_BLOCK_TYPES.filter((t) => t !== 'collection');
+const PAGE_ROOT_CHILD_TYPES = NEW_BLOCK_TYPES;
+
+function allowedTypesFor(parent: DropParent, rootMode: DropRootMode): readonly NewBlockType[] {
   switch (parent.kind) {
     case 'root':
-      return ROOT_CHILD_TYPES;
+      return rootMode === 'page' ? PAGE_ROOT_CHILD_TYPES : LESSON_ROOT_CHILD_TYPES;
     case 'section':
       return SECTION_CHILD_TYPES;
     case 'column':
@@ -34,8 +39,8 @@ function allowedTypesFor(parent: DropParent): readonly NewBlockType[] {
   }
 }
 
-function rejectReason(parent: DropParent, type: NewBlockType): string {
-  if (parent.kind === 'root' && type === 'collection') {
+function rejectReason(parent: DropParent, type: NewBlockType, rootMode: DropRootMode): string {
+  if (parent.kind === 'root' && type === 'collection' && rootMode !== 'page') {
     return 'Collection cannot be added to a lesson page.';
   }
   if (parent.kind === 'column' && type === 'columns') {
@@ -44,8 +49,12 @@ function rejectReason(parent: DropParent, type: NewBlockType): string {
   return `${type} is not allowed in this ${parent.kind}.`;
 }
 
-export function insertTypeForParent(parent: DropParent, type: NewBlockType): string | null {
-  return allowedTypesFor(parent).includes(type) ? null : rejectReason(parent, type);
+export function insertTypeForParent(
+  parent: DropParent,
+  type: NewBlockType,
+  rootMode: DropRootMode = 'lesson'
+): string | null {
+  return allowedTypesFor(parent, rootMode).includes(type) ? null : rejectReason(parent, type, rootMode);
 }
 
 function linkedSectionWriteError(blocks: Block[], parent: DropParent): string | null {
@@ -195,11 +204,13 @@ export function insertAt(
   blocks: Block[],
   parent: DropParent,
   index: number,
-  block: Block
+  block: Block,
+  options: DropOptions = {}
 ): DropResult {
+  const rootMode = options.rootMode ?? 'lesson';
   const linked = linkedSectionWriteError(blocks, parent);
   if (linked) return { ok: false, message: linked };
-  const reason = insertTypeForParent(parent, block.block_type as NewBlockType);
+  const reason = insertTypeForParent(parent, block.block_type as NewBlockType, rootMode);
   if (reason) return { ok: false, message: reason };
   const next = updateListAtParent(blocks, parent, (list) => {
     const at = Math.max(0, Math.min(index, list.length));
@@ -257,14 +268,19 @@ export function moveBlockTo(
   blocks: Block[],
   blockId: string,
   parent: DropParent,
-  index: number
+  index: number,
+  options: DropOptions = {}
 ): DropResult {
   const location = findBlockLocation(blocks, blockId);
   const moving = findBlockById(blocks, blockId);
   if (!location || !moving) return { ok: false, message: 'Block not found.' };
   const linked = linkedSectionWriteError(blocks, parent);
   if (linked) return { ok: false, message: linked };
-  const reason = insertTypeForParent(parent, moving.block_type as NewBlockType);
+  const reason = insertTypeForParent(
+    parent,
+    moving.block_type as NewBlockType,
+    options.rootMode ?? 'lesson'
+  );
   if (reason) return { ok: false, message: reason };
 
   const without = deleteBlocksById(blocks, [blockId]);
@@ -272,7 +288,7 @@ export function moveBlockTo(
   if (sameParent(location.parent, parent) && location.index < index) {
     destIndex = index - 1;
   }
-  return insertAt(without, parent, destIndex, moving);
+  return insertAt(without, parent, destIndex, moving, options);
 }
 
 export function reorderSiblings(

@@ -3,15 +3,14 @@ import { navigate } from '@/app/router';
 import type { CollectionResolveContext } from '@/blocks/collection-resolve';
 import type { Class, ScheduledLesson, Unit } from '@/schemas';
 import { resolveCoverUrl } from '@/schemas';
-import { daysBetween } from '@/schedule/calendar-dates';
 import {
   buildClassCalendarModel,
   shiftYearMonth,
   yearMonthFromDate
 } from '@/schedule/class-calendar-model';
 import { resolveScheduleToday } from '@/schedule/today';
-import { unitDateProgress, unitDateSpan } from '@/schedule/unit-progress';
-import { renderClassCalendar } from '@/teacher/class-calendar';
+import { classDisplayTitle, classEyebrow } from '@/teacher/class-heading';
+import { renderClassCalendar, type ScheduleCalendarView } from '@/teacher/class-calendar';
 import { mountCreateControl } from '@/teacher/create/control';
 import type { CreateKind } from '@/teacher/create/types';
 import { renderEntityBanner } from '@/teacher/entity-banner';
@@ -63,6 +62,7 @@ export function renderClassesIndex(
   });
   disposers.push(createControl.dispose);
 
+  const yearsById = new Map(curriculum.years.map((year) => [year.id, year]));
   const subjectsById = new Map(curriculum.subjects.map((subject) => [subject.id, subject]));
   const classes = curriculum.classes
     .filter((cls) => cls.status === 'active')
@@ -78,7 +78,6 @@ export function renderClassesIndex(
     grid.append(empty);
   } else {
     for (const cls of classes) {
-      const subject = subjectsById.get(cls.subject_id);
       const path = `/classes/${cls.id}`;
 
       const card = document.createElement('div');
@@ -109,11 +108,11 @@ export function renderClassesIndex(
 
       const eyebrow = document.createElement('p');
       eyebrow.className = 'home-class-tile__eyebrow';
-      eyebrow.textContent = [String(cls.academic_year), subject?.title].filter(Boolean).join(' · ');
+      eyebrow.textContent = classEyebrow(cls);
 
       const title = document.createElement('p');
       title.className = 'home-class-tile__title';
-      title.textContent = cls.code || cls.title;
+      title.textContent = classDisplayTitle(cls, yearsById, subjectsById);
 
       body.append(eyebrow, title);
       tile.append(body);
@@ -204,19 +203,17 @@ export function renderClassPage(
   editButton.className = 'btn btn--secondary class-page__edit-homepage';
   editButton.textContent = 'Edit page';
 
-  renderPageHeader(canvas, {
-    eyebrow: 'Classes',
-    title: pageClass.title || pageClass.code,
-    actions: [viewAsStudent, editButton]
-  });
-
   const yearsById = new Map(curriculum.years.map((year) => [year.id, year]));
   const subjectsById = new Map(curriculum.subjects.map((subject) => [subject.id, subject]));
   const unitsById = new Map(curriculum.units.map((unit) => [unit.id, unit]));
-  const lessonsById = new Map(curriculum.lessons.map((lesson) => [lesson.id, lesson]));
+  const classTitle = classDisplayTitle(pageClass, yearsById, subjectsById);
 
-  const year = yearsById.get(cls.year_id);
-  const subject = subjectsById.get(cls.subject_id);
+  renderPageHeader(canvas, {
+    eyebrow: 'Classes',
+    title: classTitle,
+    actions: [viewAsStudent, editButton]
+  });
+
   const today = resolveScheduleToday(curriculum.schedule_anchor_date);
 
   const classScheduled = curriculum.scheduled_lessons
@@ -241,8 +238,8 @@ export function renderClassPage(
   const banner = renderEntityBanner(bannerHost, {
     cover: cls.cover,
     media: curriculum.media,
-    title: cls.code || cls.title,
-    eyebrow: [year?.title, subject?.title].filter(Boolean).join(' · '),
+    title: classTitle,
+    eyebrow: classEyebrow(cls),
     entityId: cls.id,
     editable: true,
     onSave: async (cover) => {
@@ -259,16 +256,14 @@ export function renderClassPage(
   const main = document.createElement('div');
   main.className = 'class-page__main';
 
-  // 3. Teaching today
-  main.append(buildTeachingTodayCard(classScheduled, lessonsById, today));
-
-  // 4. Calendar — local state, re-paint host only
+  // Calendar — local state, re-paint host only
   const calendarHost = document.createElement('div');
   calendarHost.className = 'class-page__calendar-host';
   main.append(calendarHost);
 
   let selectedDate = today;
   let viewMonth = yearMonthFromDate(today);
+  let calendarView: ScheduleCalendarView = 'month';
   let monthDelta = 0;
 
   const paintCalendar = (): void => {
@@ -280,6 +275,12 @@ export function renderClassPage(
       viewMonth
     });
     renderClassCalendar(calendarHost, model, {
+      view: calendarView,
+      onViewChange: (next) => {
+        calendarView = next;
+        monthDelta = 0;
+        paintCalendar();
+      },
       onSelectDate: (date) => {
         selectedDate = date;
         viewMonth = yearMonthFromDate(date);
@@ -298,15 +299,6 @@ export function renderClassPage(
     });
   };
   paintCalendar();
-
-  // 5. Unit progress
-  const progressUnits =
-    cls.current_unit_id && unitsById.has(cls.current_unit_id)
-      ? [unitsById.get(cls.current_unit_id)!]
-      : activeUnits;
-  for (const unit of progressUnits) {
-    main.append(buildUnitProgressCard(unit, classScheduled, today));
-  }
 
   // Error banner for sequence mutations
   const errorBanner = document.createElement('p');
@@ -436,131 +428,6 @@ export function renderClassPage(
   };
 }
 
-function buildTeachingTodayCard(
-  scheduled: ScheduledLesson[],
-  lessonsById: Map<string, { id: string; title: string }>,
-  today: string
-): HTMLElement {
-  const section = document.createElement('section');
-  section.className = 'class-page__teaching-today';
-  section.dataset.classSection = 'teaching-today';
-
-  const focus = resolveTeachingFocus(scheduled, today);
-  if (!focus) {
-    section.append(emptyCopy('No scheduled lessons.'));
-    return section;
-  }
-
-  const lesson = lessonsById.get(focus.entry.lesson_id);
-  const title = lesson?.title ?? focus.entry.lesson_id;
-  const path = `/lessons/${focus.entry.lesson_id}`;
-
-  const label = document.createElement('p');
-  label.className = 'class-page__teaching-label';
-  label.textContent = focus.label;
-
-  const link = document.createElement('a');
-  link.className = 'class-page__teaching-title';
-  link.href = path;
-  link.textContent = title;
-  link.addEventListener('click', (event) => {
-    event.preventDefault();
-    navigate(path);
-  });
-
-  section.append(label, link);
-  return section;
-}
-
-function buildUnitProgressCard(
-  unit: Unit,
-  scheduled: ScheduledLesson[],
-  today: string
-): HTMLElement {
-  const section = document.createElement('section');
-  section.className = 'class-page__unit-progress';
-  section.dataset.classSection = 'unit-progress';
-
-  const path = `/units/${unit.id}`;
-  const link = document.createElement('a');
-  link.className = 'class-page__unit-progress-title';
-  link.href = path;
-  link.textContent = unit.title;
-  link.addEventListener('click', (event) => {
-    event.preventDefault();
-    navigate(path);
-  });
-  section.append(link);
-
-  const span = unitDateSpan(unit, scheduled);
-  const meta = document.createElement('p');
-  meta.className = 'class-page__unit-progress-meta';
-
-  if (!span) {
-    meta.textContent = 'Not scheduled';
-    section.append(meta);
-    return section;
-  }
-
-  const { daysElapsed, daysRemaining } = unitDateProgress(span, today);
-  const totalDays = Math.max(1, daysBetween(span.start, span.end));
-  const weeksTotal = Math.max(1, Math.ceil((totalDays + 1) / 7));
-  const weekNow = Math.min(weeksTotal, Math.max(1, Math.floor(daysElapsed / 7) + 1));
-  meta.textContent = `Week ${weekNow} of ${weeksTotal} · ${daysRemaining} teaching days left`;
-  section.append(meta);
-
-  if (span.source === 'scheduled') {
-    const note = document.createElement('p');
-    note.className = 'class-page__unit-progress-note';
-    note.textContent = 'Dates from the schedule';
-    section.append(note);
-  }
-
-  return section;
-}
-
-/** Prefer today's lesson, else next upcoming, else last taught. */
-export function resolveTeachingFocus(
-  scheduled: ScheduledLesson[],
-  today: string
-): {
-  entry: ScheduledLesson;
-  label: 'Teaching today' | 'Up next' | 'Last taught';
-} | null {
-  if (scheduled.length === 0) return null;
-
-  const todayEntries = scheduled
-    .filter((entry) => entry.date === today)
-    .sort((a, b) => a.schedule_order - b.schedule_order);
-  if (todayEntries[0]) {
-    return { entry: todayEntries[0], label: 'Teaching today' };
-  }
-
-  const upcoming = scheduled
-    .filter((entry) => entry.date > today)
-    .sort((a, b) => {
-      const byDate = a.date.localeCompare(b.date);
-      if (byDate !== 0) return byDate;
-      return a.schedule_order - b.schedule_order;
-    });
-  if (upcoming[0]) {
-    return { entry: upcoming[0], label: 'Up next' };
-  }
-
-  const past = scheduled
-    .filter((entry) => entry.date < today)
-    .sort((a, b) => {
-      const byDate = b.date.localeCompare(a.date);
-      if (byDate !== 0) return byDate;
-      return b.schedule_order - a.schedule_order;
-    });
-  if (past[0]) {
-    return { entry: past[0], label: 'Last taught' };
-  }
-
-  return null;
-}
-
 function collectionContextForClass(
   cls: Class,
   curriculum: CurriculumResponse
@@ -620,11 +487,4 @@ function compareScheduledLessons(a: ScheduledLesson, b: ScheduledLesson): number
   const byOrder = a.schedule_order - b.schedule_order;
   if (byOrder !== 0) return byOrder;
   return a.date.localeCompare(b.date);
-}
-
-function emptyCopy(text: string): HTMLElement {
-  const empty = document.createElement('p');
-  empty.className = 'class-page__empty';
-  empty.textContent = text;
-  return empty;
 }

@@ -12,6 +12,14 @@ export interface CurriculumLessonSummary {
   published: boolean;
   updated_at: string;
   published_at?: string;
+  created_at?: string;
+  tags?: string[];
+  author_id?: string;
+  author_name?: string;
+  review_status?: 'needs_review' | 'none';
+  syllabus_outcomes?: string[];
+  excerpt?: string;
+  attachment_count?: number;
 }
 
 export interface CurriculumResponse {
@@ -109,8 +117,9 @@ export function renderClassesNav(
 
   const add = document.createElement('button');
   add.type = 'button';
-  add.className = 'btn btn--ghost rail-classes__new';
-  add.textContent = '+ New class';
+  add.className = 'icon-plus-btn rail-classes__new';
+  add.setAttribute('aria-label', 'New class');
+  add.textContent = '+';
   add.addEventListener('click', () => options.onCreateClass?.());
   container.append(add);
 }
