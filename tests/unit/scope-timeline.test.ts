@@ -8,7 +8,7 @@ vi.mock('@/teacher/scope-api', () => ({
 import { navigate } from '@/app/router';
 import { pastelFromId } from '@/design/pastel';
 import { patchScopeSequence } from '@/teacher/scope-api';
-import { renderScopeTimelineEditor } from '@/teacher/sections/scope-timeline';
+import { renderScopeTimelineEditor, SCOPE_TIMELINE_ZOOM_KEY } from '@/teacher/sections/scope-timeline';
 import type { CurriculumResponse } from '@/teacher/nav';
 import type { ScopeSequence, Subject, Unit, Year } from '@/schemas';
 
@@ -152,6 +152,11 @@ describe('scope timeline editor', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    try {
+      localStorage.removeItem(SCOPE_TIMELINE_ZOOM_KEY);
+    } catch {
+      /* no localStorage in some test environments */
+    }
     canvas = document.createElement('div');
   });
 
