@@ -297,4 +297,46 @@ describe('AI context builder', () => {
     expect(prompt).toContain('shorten');
     expect(prompt).toContain('Be precise.');
   });
+
+  it('builds a whole-lesson prompt without a selected-block hard stop', () => {
+    const lesson = lessonFixture({ title: 'Empty draft', id: 'lesson_empty' });
+    const base = {
+      agentName: "Ann O'Tation",
+      protocol: 'Be precise.',
+      lesson,
+      scope: 'lesson' as const
+    };
+
+    for (const selectedBlockId of ['' as const, null]) {
+      const prompt = buildAiSystemPrompt({ ...base, selectedBlockId });
+      expect(prompt).toContain('Scope: lesson');
+      expect(prompt).not.toContain('No focus block found.');
+      expect(prompt).toContain('Lesson outline');
+      expect(prompt).toContain('[]');
+      expect(prompt).toContain('propose_replace_lesson');
+      expect(prompt).toContain('propose_delete_blocks');
+      expect(prompt).toContain('propose_reorder_blocks');
+    }
+  });
+
+  it('includes full lesson JSON when fullLesson is true', () => {
+    const heading = createBlock('heading', 'h_full');
+    if (heading.block_type !== 'heading') throw new Error('expected heading');
+    heading.content.text = 'Opening';
+    const lesson = lessonFixture({ title: 'Full draft', blocks: [heading] });
+    const prompt = buildAiSystemPrompt({
+      agentName: 'Professor Clementine Haig',
+      protocol: 'Be precise.',
+      lesson,
+      scope: 'lesson',
+      selectedBlockId: null,
+      fullLesson: true
+    });
+    expect(prompt).toContain('"blocks":');
+    expect(prompt).toContain('h_full');
+    expect(prompt).toContain('Opening');
+    expect(prompt).toContain('Lesson outline');
+    expect(prompt).toContain('"id":"h_full"');
+    expect(prompt).toContain('"block_type":"heading"');
+  });
 });

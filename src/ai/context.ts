@@ -10,22 +10,27 @@ export interface AiContextInput {
   protocol: string;
   lesson: Lesson;
   scope: AiScope;
-  selectedBlockId: string;
+  selectedBlockId: string | null;
   action?: string;
   yearLabel?: string;
   subjectLabel?: string;
+  fullLesson?: boolean;
+}
+
+function lessonOutline(blocks: Block[]): Array<{ id: string; block_type: string }> {
+  return blocks.map((block) => ({ id: block.id, block_type: block.block_type }));
 }
 
 export function buildAiSystemPrompt(input: AiContextInput): string {
-  const selected = findBlockById(input.lesson.blocks, input.selectedBlockId);
+  const selectedId = input.selectedBlockId || null;
+  const selected = selectedId ? findBlockById(input.lesson.blocks, selectedId) : null;
   const section =
-    input.scope === 'section'
-      ? findEnclosingSection(input.lesson.blocks, input.selectedBlockId) ??
+    input.scope === 'section' && selectedId
+      ? findEnclosingSection(input.lesson.blocks, selectedId) ??
         (selected?.block_type === 'section' ? selected : null)
       : null;
 
-  const focus: Block | null =
-    input.scope === 'section' ? section : selected;
+  const focus: Block | null = input.scope === 'section' ? section : selected;
 
   const actions = focus ? actionsForBlockType(focus.block_type) : [];
   const actionHint = input.action
@@ -34,16 +39,16 @@ export function buildAiSystemPrompt(input: AiContextInput): string {
 
   const schemaHint = focus
     ? `Focus block_type: ${focus.block_type}. Respond with tools when changing content. Preserve id "${focus.id}" on replace.`
-    : 'No focus block found.';
+    : 'No block is selected. You may propose schema-valid changes to any part of the lesson (title, cover, any block). Selection is a hint when present.';
 
-  return [
+  const parts = [
     `You are ${input.agentName} assisting inside Teaching Hub (Australian English).`,
     '',
     input.protocol.trim(),
     '',
     '## Output rules',
     '- Use tools to propose schema-valid block changes. Do not claim the lesson was already updated.',
-    '- Prefer propose_replace_block / propose_replace_section / propose_insert_blocks / review_only.',
+    '- Prefer propose_replace_block / propose_replace_section / propose_insert_blocks / propose_replace_lesson / propose_delete_blocks / propose_reorder_blocks / review_only.',
     '- Never invent storage keys, publish, delete lessons, or change Class/Unit relationships.',
     '- Keep proposals minimal and schema-valid.',
     '',
@@ -53,12 +58,21 @@ export function buildAiSystemPrompt(input: AiContextInput): string {
     `Lesson title: ${input.lesson.title}`,
     `Lesson id: ${input.lesson.id}`,
     `Scope: ${input.scope}`,
-    `Selected block id: ${input.selectedBlockId}`,
+    `Selected block id: ${selectedId ?? ''}`,
     schemaHint,
     `Available actions for this type: ${actions.map((a) => a.id).join(', ') || '(freeform only)'}`,
     actionHint,
     '',
+    '## Lesson outline',
+    JSON.stringify(lessonOutline(input.lesson.blocks)),
+    '',
     '## Focus JSON',
     focus ? JSON.stringify(focus) : 'null'
-  ].join('\n');
+  ];
+
+  if (input.fullLesson) {
+    parts.push('', '## Lesson JSON', JSON.stringify(input.lesson));
+  }
+
+  return parts.join('\n');
 }

@@ -117,7 +117,7 @@ export default async function handler(request: Request): Promise<Response> {
     protocol,
     lesson,
     scope: body.scope,
-    selectedBlockId: body.selected_block_id ?? '',
+    selectedBlockId: body.selected_block_id ?? null,
     action: body.action
   });
 
