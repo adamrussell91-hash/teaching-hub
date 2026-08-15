@@ -160,6 +160,21 @@ describe('mountLessonPage', () => {
     expect(next.blocks.map((b) => b.id)).toEqual(['new_1', 'h1', 'cm1']);
   });
 
+  it('inserts an embed block when an embed:pdf palette payload is dropped at root', () => {
+    const { onChange } = mount();
+    const gap = host.querySelector('.lesson-page__gap')!;
+
+    dispatchDrop(gap, { kind: 'block', type: 'embed:pdf' });
+
+    expect(onChange).toHaveBeenCalled();
+    const next = onChange.mock.calls.at(-1)?.[0] as Lesson;
+    expect(next.blocks[0]?.block_type).toBe('embed');
+    expect(next.blocks[0]?.id).toBe('new_1');
+    if (next.blocks[0]?.block_type === 'embed') {
+      expect(next.blocks[0].content.provider).toBe('pdf');
+    }
+  });
+
   it('shows a hint and does not insert an invalid collection drop at root', () => {
     const { onChange } = mount();
     const gap = host.querySelector('.lesson-page__gap')!;

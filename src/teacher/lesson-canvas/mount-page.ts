@@ -1,4 +1,4 @@
-import { createFromInsertMenu, cloneBlockWithNewIds, type NewBlockType } from '@/blocks/create-block';
+import { createFromInsertMenu, cloneBlockWithNewIds } from '@/blocks/create-block';
 import { createBlockEditor, createVisibilitySelect } from '@/blocks/editors';
 import { findBlockById } from '@/blocks/find-block';
 import { renderBlock } from '@/blocks/render';
@@ -6,7 +6,7 @@ import type { Block } from '@/schemas/block';
 import type { Lesson } from '@/schemas/lesson';
 import type { Media } from '@/schemas/media';
 import { mountCoverPicker, type CoverPickerHandle } from '@/teacher/cover-picker';
-import { deleteBlocksById, insertAt, insertTypeForParent } from '@/teacher/lesson-canvas/drop';
+import { deleteBlocksById, insertAt } from '@/teacher/lesson-canvas/drop';
 import { isTextLike } from '@/teacher/lesson-canvas/kinds';
 
 const DND_MIME = 'application/x-teaching-hub-block';
@@ -132,11 +132,6 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     const type = readDropType(event);
     if (!type) return;
     const parent = { kind: 'root' as const };
-    const reason = insertTypeForParent(parent, type as NewBlockType);
-    if (reason) {
-      setHint(reason);
-      return;
-    }
     const block = createFromInsertMenu(type, options.idFactory());
     const result = insertAt(lesson.blocks, parent, index, block);
     if (!result.ok) {
