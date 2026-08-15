@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('@/app/router', () => ({ navigate: vi.fn() }));
 vi.mock('@/teacher/schedule-api', () => ({
@@ -9,6 +9,7 @@ vi.mock('@/teacher/schedule-api', () => ({
 
 import { navigate } from '@/app/router';
 import { patchClass, patchScheduledLesson } from '@/teacher/schedule-api';
+import { closeScheduleOverflow } from '@/teacher/schedule-overflow';
 import {
   renderClassesIndex,
   renderClassPage
@@ -162,6 +163,10 @@ describe('classes section', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     canvas = document.createElement('div');
+  });
+
+  afterEach(() => {
+    closeScheduleOverflow();
   });
 
   it('renders glass class tiles that open the class page', () => {
@@ -356,6 +361,47 @@ describe('classes section', () => {
       'Nothing posted. Students see announcements at the top of their class page.'
     );
     expect(canvas.querySelector('.class-page__edit-homepage')).not.toBeNull();
+  });
+
+  it('sets the current scheduled lesson from the sequence overflow', async () => {
+    const onScheduleMutated = vi.fn().mockResolvedValue(undefined);
+    renderClassPage(canvas, curriculum, 'class_2026_12engadv1', { onScheduleMutated });
+
+    const plannedRow = canvas.querySelector(
+      'a.seq__lesson-link[href="/lessons/lesson_aotfw_001"]'
+    )?.parentElement;
+    plannedRow?.querySelector<HTMLButtonElement>('[aria-label="More actions"]')?.click();
+    document.querySelector<HTMLButtonElement>('[data-schedule-action="set-current"]')?.click();
+
+    await vi.waitFor(() => {
+      expect(patchClass).toHaveBeenCalledWith('class_2026_12engadv1', {
+        current_scheduled_lesson_id: 'scheduled_aotfw_001'
+      });
+      expect(onScheduleMutated).toHaveBeenCalled();
+    });
+  });
+
+  it('changes a scheduled date from the calendar detail overflow', async () => {
+    const onScheduleMutated = vi.fn().mockResolvedValue(undefined);
+    renderClassPage(canvas, curriculum, 'class_2026_12engadv1', { onScheduleMutated });
+
+    canvas
+      .querySelector<HTMLButtonElement>(
+        '.class-calendar__detail-row [aria-label="More actions"]'
+      )
+      ?.click();
+    document.querySelector<HTMLButtonElement>('[data-schedule-action="change-date"]')?.click();
+    const input = document.querySelector<HTMLInputElement>('.schedule-overflow input[type="date"]');
+    expect(input?.value).toBe('2026-08-12');
+    input!.value = '2026-08-20';
+    input!.dispatchEvent(new Event('change', { bubbles: true }));
+
+    await vi.waitFor(() => {
+      expect(patchScheduledLesson).toHaveBeenCalledWith('scheduled_aotfw_008', {
+        date: '2026-08-20'
+      });
+      expect(onScheduleMutated).toHaveBeenCalled();
+    });
   });
 
   it('returns a dispose that tears down the banner', () => {

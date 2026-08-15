@@ -9,6 +9,7 @@ import {
   type TrashSummary
 } from '@/teacher/lifecycle-api';
 import { renderPageHeader } from '@/teacher/page-header';
+import { downloadPortableExport, pushGithubBackup } from '@/teacher/export-api';
 
 const TYPE_LABELS: Record<LifecycleEntityType, string> = {
   lesson: 'Lesson',
@@ -33,7 +34,33 @@ function formatTrashedAt(value?: string): string {
 
 export function renderTrashSection(canvas: HTMLElement): { dispose: () => void } {
   canvas.replaceChildren();
-  renderPageHeader(canvas, { eyebrow: 'Workspace', title: 'Trash' });
+  const backup = document.createElement('button');
+  backup.type = 'button';
+  backup.className = 'btn btn--secondary';
+  backup.dataset.export = 'archive';
+  backup.textContent = 'Backup Now';
+  backup.addEventListener('click', () => {
+    void downloadPortableExport('archive').catch(() => {
+      window.alert('Unable to build a backup.');
+    });
+  });
+
+  const github = document.createElement('button');
+  github.type = 'button';
+  github.className = 'btn btn--secondary';
+  github.dataset.backup = 'github';
+  github.textContent = 'Backup to GitHub';
+  github.addEventListener('click', () => {
+    void pushGithubBackup()
+      .then((result) => {
+        window.alert(`GitHub backup saved.\n${result.commit_url || result.path}`);
+      })
+      .catch(() => {
+        window.alert('Unable to push a GitHub backup. Check that GitHub backup is configured.');
+      });
+  });
+
+  renderPageHeader(canvas, { eyebrow: 'Workspace', title: 'Trash', actions: [backup, github] });
 
   const root = document.createElement('div');
   root.className = 'trash-page';

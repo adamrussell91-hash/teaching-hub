@@ -12,6 +12,7 @@ import type { Subject, Unit, Year } from '@/schemas';
 import { patchUnit } from '@/teacher/unit-api';
 import { ApiClientError } from '@/api/client';
 import { renderPageHeader } from '@/teacher/page-header';
+import { downloadPortableExport } from '@/teacher/export-api';
 import { gradientForEntityId } from '@/teacher/entity-banner';
 import {
   mountBlockCanvas,
@@ -299,7 +300,22 @@ export function renderUnitPage(
     return { dispose: () => undefined };
   }
 
-  const pageHeader = renderPageHeader(canvas, { eyebrow: 'Units', title: unit.title });
+  const exportBtn = document.createElement('button');
+  exportBtn.type = 'button';
+  exportBtn.className = 'btn btn--secondary';
+  exportBtn.dataset.export = 'unit';
+  exportBtn.textContent = 'Export JSON';
+  exportBtn.addEventListener('click', () => {
+    void downloadPortableExport('unit', unit.id, unit.slug).catch(() => {
+      window.alert('Unable to export this unit.');
+    });
+  });
+
+  const pageHeader = renderPageHeader(canvas, {
+    eyebrow: 'Units',
+    title: unit.title,
+    actions: [exportBtn]
+  });
   const heading = pageHeader.querySelector('.page-header__title');
 
   const root = document.createElement('div');

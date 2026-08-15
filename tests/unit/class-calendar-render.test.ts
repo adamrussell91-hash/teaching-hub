@@ -261,6 +261,31 @@ describe('renderClassCalendar', () => {
     expect(host.querySelector('[role="grid"]')!.getAttribute('data-motion')).toBe('back');
   });
 
+  it('puts an overflow control on day-detail rows when onLessonOverflow is set', () => {
+    const onLessonOverflow = vi.fn();
+    const model = modelForAugust();
+    renderClassCalendar(host, model, {
+      onSelectDate: vi.fn(),
+      onShiftMonth: vi.fn(),
+      onLessonOverflow
+    });
+
+    const overflow = host.querySelector<HTMLButtonElement>(
+      '.class-calendar__detail-row [aria-label="More actions"]'
+    );
+    expect(overflow).not.toBeNull();
+    overflow!.click();
+    expect(onLessonOverflow).toHaveBeenCalledWith('s1', overflow);
+  });
+
+  it('omits calendar overflow when onLessonOverflow is missing', () => {
+    renderClassCalendar(host, modelForAugust(), {
+      onSelectDate: vi.fn(),
+      onShiftMonth: vi.fn()
+    });
+    expect(host.querySelector('.class-calendar__detail [aria-label="More actions"]')).toBeNull();
+  });
+
   it('renders day detail with lesson links, unit titles, and empty state', () => {
     const withLessons = modelForAugust();
     renderClassCalendar(host, withLessons, {

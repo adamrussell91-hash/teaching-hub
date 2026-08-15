@@ -22,6 +22,7 @@ import {
   type HomepageEditorHandle
 } from '@/teacher/sections/homepage-editor';
 import { patchClass, patchScheduledLesson } from '@/teacher/schedule-api';
+import { openScheduleOverflow } from '@/teacher/schedule-overflow';
 import {
   confirmAndArchive,
   confirmAndTrash,
@@ -266,6 +267,11 @@ export function renderClassPage(
   let calendarView: ScheduleCalendarView = 'month';
   let monthDelta = 0;
 
+  const errorBanner = document.createElement('p');
+  errorBanner.className = 'class-page__error';
+  errorBanner.hidden = true;
+  errorBanner.setAttribute('role', 'alert');
+
   const paintCalendar = (): void => {
     const model = buildClassCalendarModel({
       scheduled: classScheduled,
@@ -295,16 +301,13 @@ export function renderClassPage(
       monthDelta,
       unitTitles,
       onNavigate: navigate,
-      onScheduleLesson: () => options.onScheduleUnit?.()
+      onScheduleLesson: () => options.onScheduleUnit?.(),
+      onLessonOverflow: (scheduledId, anchor) => {
+        openLessonOverflow(cls, classScheduled, scheduledId, anchor, options, errorBanner);
+      }
     });
   };
   paintCalendar();
-
-  // Error banner for sequence mutations
-  const errorBanner = document.createElement('p');
-  errorBanner.className = 'class-page__error';
-  errorBanner.hidden = true;
-  errorBanner.setAttribute('role', 'alert');
   main.append(errorBanner);
 
   // 6. Unit sequence
@@ -328,6 +331,9 @@ export function renderClassPage(
       void runScheduleMutation(options, errorBanner, async () => {
         await patchScheduledLesson(scheduledId, { direction: 'down' });
       });
+    },
+    onOverflow: (scheduledId, anchor) => {
+      openLessonOverflow(cls, classScheduled, scheduledId, anchor, options, errorBanner);
     },
     onNavigate: navigate
   });
@@ -457,6 +463,32 @@ function collectionContextForClass(
     unitLessons,
     schedule
   };
+}
+
+function openLessonOverflow(
+  cls: Class,
+  scheduled: ScheduledLesson[],
+  scheduledId: string,
+  anchor: HTMLElement,
+  options: ClassPageOptions,
+  errorBanner: HTMLElement
+): void {
+  const row = scheduled.find((entry) => entry.id === scheduledId);
+  if (!row) return;
+  openScheduleOverflow(anchor, {
+    currentDate: row.date,
+    isCurrent: cls.current_scheduled_lesson_id === scheduledId,
+    onSetCurrent: () => {
+      void runScheduleMutation(options, errorBanner, async () => {
+        await patchClass(cls.id, { current_scheduled_lesson_id: scheduledId });
+      });
+    },
+    onChangeDate: (date) => {
+      void runScheduleMutation(options, errorBanner, async () => {
+        await patchScheduledLesson(scheduledId, { date });
+      });
+    }
+  });
 }
 
 async function runScheduleMutation(

@@ -11,6 +11,7 @@ import { cloneBlocksWithNewIds } from '@/blocks/clone-blocks';
 import { createFromInsertMenu } from '@/blocks/create-block';
 import { findBlockById } from '@/blocks/find-block';
 import { openPrintLesson } from '@/print/open-print';
+import { downloadPortableExport } from '@/teacher/export-api';
 import type { CompositionSummary, CompositionTemplate } from '@/schemas/composition';
 import type { Lesson } from '@/schemas/lesson';
 import type { Media } from '@/schemas/media';
@@ -441,6 +442,11 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       idFactory: nextId,
       onSaveTemplate: () => {
         void saveLessonAsTemplate();
+      },
+      onExport: () => {
+        void downloadPortableExport('lesson', lesson.id, lesson.slug).catch(() => {
+          window.alert('Unable to export this lesson.');
+        });
       },
       onSaveComposition: (blockId) => {
         void saveBlockAsComposition(blockId);

@@ -249,12 +249,12 @@ Phase 14 **core** is done when:
 - Accidental soft-deletes are recoverable via Trash
 - Permanent delete cannot silently break schedules/classes/media refs
 - Teachers need not fear experimenting with Lessons
-- Export / GitHub backup remain explicitly deferred
+- JSON export / Backup Now shipped later; GitHub backup still deferred
 
 ## Follow-ups (not this slice)
 
-- Lesson / Unit / full-archive JSON export
-- Backup Now + portable GitHub content backup
+- Lesson / Unit / full-archive JSON export — shipped
+- Backup Now (JSON download) — shipped; GitHub portable backup still later
 - Optional “Restore and republish” confirm
 - Force-delete with explicit cascade policy
 - Richer archive browser / year rollover UX

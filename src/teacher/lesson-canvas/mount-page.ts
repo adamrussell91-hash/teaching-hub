@@ -51,6 +51,7 @@ export type MountLessonPageOptions = {
   onSelect?: (blockId: string | null) => void;
   idFactory: () => string;
   onSaveTemplate?: () => void;
+  onExport?: () => void;
   onSaveComposition?: (blockId: string) => void;
   onEditSource?: (compositionId: string) => void;
   onDetachComposition?: (blockId: string) => void;
@@ -432,7 +433,15 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   save.addEventListener('click', () => {
     options.onSaveTemplate?.();
   });
-  menu.append(save);
+
+  const exportBtn = document.createElement('button');
+  exportBtn.type = 'button';
+  exportBtn.className = 'btn btn--ghost';
+  exportBtn.textContent = 'Export JSON';
+  exportBtn.addEventListener('click', () => {
+    options.onExport?.();
+  });
+  menu.append(exportBtn, save);
 
   more.addEventListener('click', () => {
     menu.hidden = !menu.hidden;

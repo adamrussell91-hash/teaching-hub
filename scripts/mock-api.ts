@@ -116,6 +116,12 @@ import {
 } from '../src/ai/jobs-inbox';
 import { toCurriculumLessonSummary } from '../src/curriculum/lesson-summary';
 import {
+  buildArchiveExport,
+  buildLessonExport,
+  buildUnitExport
+} from '../src/export/portable';
+import { GITHUB_BACKUP_PATH } from '../src/export/github-backup';
+import {
   applyLessonLibraryPatch,
   parseLessonLibraryPatch
 } from '../src/lessons/library-patch';
@@ -558,6 +564,82 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const session = getSession(cookie);
     if (!session.authenticated) return unauthorizedResponse();
     return okResponse(200, buildCurriculum());
+  }
+
+  function listStored<T>(prefix: string): T[] {
+    return store
+      .listKeys(prefix)
+      .map((key) => store.getJSON<T>(key))
+      .filter((row): row is T => Boolean(row));
+  }
+
+  function handleGetExport(
+    cookie: string | null | undefined,
+    query: URLSearchParams
+  ): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+    const kind = query.get('kind');
+    const id = query.get('id');
+    const createdAt = nowIso();
+
+    if (kind === 'lesson') {
+      if (!id) return errorResponse(400, 'validation_error', 'id is required');
+      const row = store.getJSON<Lesson>(draftLessonKey(id));
+      if (!row) return notFoundResponse('Lesson not found');
+      return okResponse(200, buildLessonExport(row, createdAt));
+    }
+
+    if (kind === 'unit') {
+      if (!id) return errorResponse(400, 'validation_error', 'id is required');
+      const row = store.getJSON<Unit>(unitKey(id));
+      if (!row) return notFoundResponse('Unit not found');
+      const lessons = row.lesson_ids
+        .map((lessonId) => store.getJSON<Lesson>(draftLessonKey(lessonId)))
+        .filter((entry): entry is Lesson => Boolean(entry));
+      return okResponse(200, buildUnitExport(row, lessons, createdAt));
+    }
+
+    if (kind === 'archive') {
+      return okResponse(
+        200,
+        buildArchiveExport(
+          {
+            years: listStored('years/'),
+            subjects: listStored('subjects/'),
+            units: listStored('units/'),
+            lessons: listStored<Lesson>('lessons/'),
+            classes: listStored('classes/'),
+            scheduled_lessons: listStored('scheduled_lessons/'),
+            scope_sequences: listStored('scope_sequences/'),
+            media: listStored('media/').filter((entry) => {
+              const parsed = MediaSchema.safeParse(entry);
+              return parsed.success;
+            }),
+            compositions: listStored('templates/compositions/'),
+            lesson_templates: listStored('templates/lessons/'),
+            unit_templates: listStored('templates/units/'),
+            schedule_anchor_date:
+              store.getJSON<{ date: string }>(scheduleAnchorKey())?.date ??
+              DEFAULT_SCHEDULE_ANCHOR_DATE
+          },
+          createdAt
+        )
+      );
+    }
+
+    return errorResponse(400, 'validation_error', 'kind must be lesson, unit, or archive');
+  }
+
+  function handlePostGithubBackup(cookie: string | null | undefined): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+    return okResponse(200, {
+      path: GITHUB_BACKUP_PATH,
+      sha: 'mock-sha',
+      commit_url: 'https://github.com/example/teaching-hub-content/commit/mock',
+      html_url: 'https://github.com/example/teaching-hub-content/blob/main/content_backup/teaching-hub-archive.json'
+    });
   }
 
   function handleGetDraftLesson(cookie: string | null | undefined, id: string): MockResponse {
@@ -2866,6 +2948,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     if (method === 'GET' && path === '/api/session') return handleSession(cookie);
     if (method === 'POST' && path === '/api/logout') return handleLogout();
     if (method === 'GET' && path === '/api/curriculum') return handleGetCurriculum(cookie);
+    if (method === 'GET' && path === '/api/export') return handleGetExport(cookie, query);
+    if (method === 'POST' && path === '/api/backup/github') return handlePostGithubBackup(cookie);
     if (method === 'GET' && path === '/api/trash') return handleGetTrash(cookie);
     if (method === 'GET' && path === '/api/search') {
       return handleGetSearch(cookie, query.get('q') ?? '');

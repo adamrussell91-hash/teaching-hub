@@ -240,6 +240,7 @@ describe('units', () => {
     expect(canvas.querySelector('.page-header__title')?.textContent).toBe(
       'Artist of the Floating World'
     );
+    expect(canvas.querySelector('[data-export="unit"]')?.textContent).toMatch(/Export JSON/);
     expect(canvas.querySelector('[data-unit-section="plan"]')).toBeTruthy();
     const titles = [...canvas.querySelectorAll('.lesson-list__title')].map((el) => el.textContent);
     expect(titles).toEqual(['Introduction', 'Themes']);

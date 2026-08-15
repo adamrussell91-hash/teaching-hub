@@ -1,10 +1,12 @@
 import { findBlockById } from '../../src/blocks/find-block.ts';
 import { agentBySlug } from '../../src/ai/agents.ts';
 import { pullArchive } from '../../src/ai/archiveKernel.ts';
+import { matchCompositionFill } from '../../src/ai/composition-fill.ts';
 import { buildAiSystemPrompt } from '../../src/ai/context.ts';
 import { protocolForAgent } from '../../src/ai/protocols.ts';
 import { AI_TOOLS, AiChatRequestSchema, parseToolProposal } from '../../src/ai/proposals.ts';
 import type { Lesson } from '../../src/schemas/lesson.ts';
+import { CompositionTemplateSchema, type CompositionTemplate } from '../../src/schemas/composition.ts';
 import {
   createAnthropicStreamer,
   AnthropicStreamError
@@ -112,6 +114,19 @@ export default async function handler(request: Request): Promise<Response> {
     protocol = `${protocol}\n\n${archive.note}`;
   }
 
+  const { blobs: compositionBlobs } = await store.list({ prefix: 'templates/compositions/' });
+  const library = (
+    await Promise.all(compositionBlobs.map((blob) => getJSON<CompositionTemplate>(store, blob.key)))
+  ).flatMap((entry) => {
+    const parsed = CompositionTemplateSchema.safeParse(entry);
+    return parsed.success ? [parsed.data] : [];
+  });
+  const compositionFill = matchCompositionFill({
+    action: body.action,
+    message: body.message,
+    library
+  });
+
   const system = buildAiSystemPrompt({
     agentName: agent.name,
     protocol,
@@ -119,7 +134,8 @@ export default async function handler(request: Request): Promise<Response> {
     scope: body.scope,
     selectedBlockId: body.selected_block_id ?? null,
     action: body.action,
-    fullLesson: body.agent === 'clementine'
+    fullLesson: body.agent === 'clementine',
+    compositionFill: compositionFill ?? undefined
   });
 
   const history = (body.history ?? []).map((m) => ({

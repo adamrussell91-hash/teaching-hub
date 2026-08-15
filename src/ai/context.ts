@@ -1,6 +1,7 @@
 import type { Block } from '@/schemas/block';
 import type { Lesson } from '@/schemas/lesson';
 import type { AiScope } from '@/ai/proposals';
+import type { CompositionFillMatch } from '@/ai/composition-fill';
 import { findBlockById } from '@/blocks/find-block';
 import { findEnclosingSection } from '@/ai/block-tree';
 import { actionsForBlockType } from '@/ai/capabilities';
@@ -15,6 +16,7 @@ export interface AiContextInput {
   yearLabel?: string;
   subjectLabel?: string;
   fullLesson?: boolean;
+  compositionFill?: CompositionFillMatch;
 }
 
 function lessonOutline(blocks: Block[]): Array<{ id: string; block_type: string }> {
@@ -72,6 +74,17 @@ export function buildAiSystemPrompt(input: AiContextInput): string {
 
   if (input.fullLesson) {
     parts.push('', '## Lesson JSON', JSON.stringify(input.lesson));
+  }
+
+  if (input.compositionFill) {
+    parts.push(
+      '',
+      '## Composition fill',
+      `Fill the approved ${input.compositionFill.title} composition (${input.compositionFill.source} template ${input.compositionFill.id}).`,
+      'Keep this structure. Fill existing blocks from the selected text or lesson. Do not invent a new page architecture.',
+      'Return schema-valid blocks that match this tree (preserve block_type sequence; you may replace ids when inserting).',
+      JSON.stringify(input.compositionFill.root)
+    );
   }
 
   return parts.join('\n');

@@ -1,4 +1,5 @@
 import type { Block } from '@/schemas/block';
+import { COMPOSITION_FILL_ACTIONS } from '@/ai/composition-fill';
 
 export interface AiAction {
   id: string;
@@ -12,7 +13,8 @@ const TEXTISH: AiAction[] = [
   { id: 'simplify', label: 'Simplify' },
   { id: 'change_reading_level', label: 'Change reading level' },
   { id: 'summarise', label: 'Summarise' },
-  { id: 'generate_questions', label: 'Generate questions' }
+  { id: 'generate_questions', label: 'Generate questions' },
+  ...COMPOSITION_FILL_ACTIONS
 ];
 
 const QUESTION_SET: AiAction[] = [
@@ -37,7 +39,8 @@ const LESSON: AiAction[] = [
   { id: 'build_lesson', label: 'Build lesson' },
   { id: 'reorganise', label: 'Reorganise' },
   { id: 'expand', label: 'Expand' },
-  { id: 'condense', label: 'Condense' }
+  { id: 'condense', label: 'Condense' },
+  ...COMPOSITION_FILL_ACTIONS
 ];
 
 const MEDIA: AiAction[] = [

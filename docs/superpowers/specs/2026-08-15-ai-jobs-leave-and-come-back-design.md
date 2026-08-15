@@ -5,7 +5,7 @@
 **Product name:** Teaching Hub  
 **Slice:** Durable Clementine jobs that finish with no tab open; a small chrome Jobs panel; resume Accept in the lesson chat  
 **Depends on:** `/api/ai/jobs` Blobs records, `completeWorkingAiJob`, lesson builder chat, teacher shell rail  
-**Does not include:** Partial Accept, live streaming onto the page, auto-publish, homepage/unit canvas, SortableJS, student-view rewrite
+**Does not include:** SortableJS. **Won’t do:** live streaming onto the page; auto-publish. (Partial Accept, homepage/unit canvas, and student-view rewrite shipped in later slices.)
 
 ## Goal
 

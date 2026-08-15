@@ -2984,6 +2984,33 @@ a:hover {
   text-decoration: none;
   color: inherit;
   min-width: 0;
+  flex: 1;
+}
+
+.class-calendar__detail-row {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-1);
+}
+
+.class-calendar__detail-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-6);
+  flex-shrink: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: var(--warm-white);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.class-calendar__detail-more:hover {
+  border-color: var(--wave);
+  color: var(--wave);
 }
 
 .class-calendar__detail-lesson:hover {
@@ -7134,6 +7161,29 @@ input.scope-timeline__note-title:focus-visible {
   gap: var(--space-2);
 }
 
+.lesson-page__more {
+  position: relative;
+}
+
+.lesson-page__menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 20;
+  min-width: 12rem;
+  padding: var(--space-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  box-shadow: var(--shadow);
+}
+
+.lesson-page__menu .btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+}
+
 .lesson-page__print {
   display: inline-flex;
   align-items: center;
@@ -7421,4 +7471,35 @@ input.scope-timeline__note-title:focus-visible {
   display: grid;
   gap: var(--space-3);
   justify-items: start;
+}
+
+.schedule-overflow {
+  position: absolute;
+  z-index: 40;
+  min-width: 10rem;
+  padding: var(--space-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  box-shadow: var(--shadow);
+}
+
+.schedule-overflow__item,
+.schedule-overflow__date {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.schedule-overflow__item:hover {
+  background: color-mix(in srgb, var(--navy) 8%, transparent);
 }

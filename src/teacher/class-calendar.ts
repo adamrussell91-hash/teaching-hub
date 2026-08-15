@@ -19,6 +19,8 @@ export interface RenderClassCalendarOptions {
   onViewChange?: (view: ScheduleCalendarView) => void;
   /** Secondary line on lesson chips (e.g. class code on the dashboard). */
   chipMeta?: (lesson: CalendarDayLesson) => string | undefined;
+  /** Teacher ⋯ on day-detail rows. Dashboard omits this. */
+  onLessonOverflow?: (scheduledId: string, anchor: HTMLElement) => void;
 }
 
 type CalendarHandlers = {
@@ -29,6 +31,7 @@ type CalendarHandlers = {
   lessonHref?: (lesson: CalendarDayLesson) => string | null;
   onViewChange?: (view: ScheduleCalendarView) => void;
   chipMeta?: (lesson: CalendarDayLesson) => string | undefined;
+  onLessonOverflow?: (scheduledId: string, anchor: HTMLElement) => void;
   today: string;
   selectedDate: string;
   view: ScheduleCalendarView;
@@ -59,7 +62,8 @@ export function renderClassCalendar(
     lessonHref,
     view = 'month',
     onViewChange,
-    chipMeta
+    chipMeta,
+    onLessonOverflow
   }: RenderClassCalendarOptions
 ): void {
   let root = host.querySelector<HTMLElement>(':scope > .class-calendar');
@@ -131,6 +135,7 @@ export function renderClassCalendar(
     lessonHref,
     onViewChange,
     chipMeta,
+    onLessonOverflow,
     today: model.today,
     selectedDate: model.selectedDate,
     view
@@ -450,6 +455,9 @@ function renderDayDetail(
   list.className = 'class-calendar__detail-list';
 
   for (const lesson of model.dayLessons) {
+    const wrap = document.createElement('div');
+    wrap.className = 'class-calendar__detail-row';
+
     const href = resolveLessonHref(root, lesson);
     const row = document.createElement(href ? 'a' : 'div');
     row.className = 'class-calendar__detail-lesson';
@@ -469,7 +477,24 @@ function renderDayDetail(
     meta.textContent = [chip, unitName, lesson.status].filter(Boolean).join(' · ');
 
     row.append(title, meta);
-    list.append(row);
+    wrap.append(row);
+
+    const overflow = handlersByRoot.get(root)?.onLessonOverflow;
+    if (overflow) {
+      const more = document.createElement('button');
+      more.type = 'button';
+      more.className = 'class-calendar__detail-more';
+      more.setAttribute('aria-label', 'More actions');
+      more.textContent = '⋯';
+      more.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        handlersByRoot.get(root)?.onLessonOverflow?.(lesson.scheduledId, more);
+      });
+      wrap.append(more);
+    }
+
+    list.append(wrap);
   }
 
   detail.append(list);

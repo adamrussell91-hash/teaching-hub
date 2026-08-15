@@ -76,7 +76,7 @@ describe('mountLessonPage', () => {
     document.body.replaceChildren();
   });
 
-  function mount(lesson: Lesson = makeLesson(), extras: { onSaveTemplate?: () => void } = {}) {
+  function mount(lesson: Lesson = makeLesson(), extras: { onSaveTemplate?: () => void; onExport?: () => void } = {}) {
     const onChange = vi.fn();
     const onPrint = vi.fn();
     const onSelect = vi.fn();
@@ -193,6 +193,18 @@ describe('mountLessonPage', () => {
     expect(print).not.toBeNull();
     print!.click();
     expect(onPrint).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls onExport from the page menu', () => {
+    const onExport = vi.fn();
+    mount(makeLesson(), { onExport });
+    const exportBtn = [...host.querySelectorAll('button')].find((btn) =>
+      btn.textContent?.includes('Export JSON')
+    );
+    expect(exportBtn).toBeTruthy();
+    host.querySelector<HTMLButtonElement>('[aria-label="Page menu"]')!.click();
+    exportBtn!.click();
+    expect(onExport).toHaveBeenCalledTimes(1);
   });
 
   it('hides Save as lesson template until the overflow menu is opened', () => {

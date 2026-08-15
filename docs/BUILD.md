@@ -20,13 +20,12 @@ Block primitives: [`docs/specs/03_BLOCK_SYSTEM.md`](specs/03_BLOCK_SYSTEM.md)
 
 Suggested order for continuing builder / teaching-page work (adjust as needed):
 
-1. **AI composition fill / whole-lesson scope** (Phase 13D–E) — agent panel WIP may still need polish before fully shipped
-2. **Class page follow-ups** — wire richer overflow actions (set-current / date edit), student class view parity
+1. **Production hardening** (Phase 15)
 
-Larger product tracks (not “next block”, but still ahead):
+### Won’t do
 
-- Export / portable backup follow-up (JSON export, Backup Now / GitHub) — deferred from versioning core
-- Production hardening (Phase 15)
+- Live streaming AI blocks onto the lesson page (page stays unchanged until Accept)
+- Auto-publish from AI
 
 ---
 
@@ -34,6 +33,10 @@ Larger product tracks (not “next block”, but still ahead):
 
 | Date | Slice | Outcome |
 |------|--------|---------|
+| 2026-08-15 | **GitHub content backup** | Trash **Backup to GitHub** commits the portable archive JSON to `content_backup/` (env token/repo; not after every edit; no secrets/media bytes) |
+| 2026-08-15 | **AI composition fill** | Quick actions + chat phrasing fill Reading Comprehension / Vocabulary Study / Source Analysis skeletons (library title match when present); Ann chat injects structure, does not invent layout |
+| 2026-08-15 | **JSON export / Backup Now** | Lesson, unit, and full-archive JSON download (no secrets, no media bytes, no GitHub push) |
+| 2026-08-15 | **Class schedule overflow** | ⋯ on class calendar detail + unit sequence: Set as current, Change date |
 | 2026-08-13 | **Cotton glass redesign** | Whole-app cotton glass + Life Hub rail; class calendar chips and scope timeline tints — [design](superpowers/specs/2026-08-13-cotton-glass-redesign-design.md) / [plan](superpowers/plans/2026-08-13-cotton-glass-redesign.md) |
 | 2026-08-13 | **Class page redesign** | Month calendar (life-hub model/renderer port), collapsible unit sequence, date-based unit progress (`unit.start_date`/`end_date` optional with scheduled-lesson fallback), read-first cover banner — [`plan`](superpowers/plans/2026-08-12-class-page-redesign.md) |
 | 2026-08-11 | **Versioning / archive / recovery** | Lesson/unit/class-homepage version history (checkpoints, restore draft-only); archive vs trash; dependency-aware permanent delete + Trash UI — [`design`](superpowers/specs/2026-08-11-versioning-archive-recovery-design.md) / [`plan`](superpowers/plans/2026-08-11-versioning-archive-recovery.md) |
@@ -85,7 +88,7 @@ Larger product tracks (not “next block”, but still ahead):
 | 11 Templates / reuse | **Done (v1)** — lesson/unit templates + compositions + linked reuse |
 | 12 Search | **v1 done** — rail + ⌘K panel; client titles + server body scan |
 | 13 AI | **v1 done** — agent panel + block/section proposals; composition/whole-lesson later |
-| 14–15 Versioning / hardening | **Phase 14 core done** — history + archive/trash/restore/permanent delete; export/backup + Phase 15 hardening still ahead |
+| 14–15 Versioning / hardening | **Phase 14 done for v1** — history + trash + JSON export + GitHub snapshot; Phase 15 still ahead |
 ---
 
 ## Projection (backlog — block-focused)
@@ -124,9 +127,12 @@ Unchecked = not built yet.
 - [x] Search
 - [x] AI agent
 - [x] Versioning / archive / recovery
+- [x] JSON export / Backup Now
+- [x] GitHub content backup (manual snapshot; not scheduled)
+- [x] AI composition fill (Phase 13D)
 
 ---
 
 ## Latest note
 
-**2026-08-11** — Versioning / archive / recovery core shipped (history panel, trash, dependency-aware permanent delete). AI agent panel + covers WIP restored onto main. Next up: AI composition/whole-lesson scope; export/portable backup and Phase 15 hardening remain deferred.
+**2026-08-15** — GitHub content backup: Trash **Backup to GitHub** writes the same portable archive JSON to `content_backup/teaching-hub-archive.json` in a configured repo. Not after every edit; no scheduled cron yet. Live streaming and AI auto-publish remain won’t-do. Next: Phase 15.

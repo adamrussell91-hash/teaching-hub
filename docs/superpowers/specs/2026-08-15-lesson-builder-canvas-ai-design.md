@@ -35,12 +35,12 @@ Teachers compose a lesson by dragging block-type cards onto a page that looks li
 
 - Leave Teaching Hub and return later to a finished job (durable-offline jobs)
 - Partial Accept (keep some proposed blocks, dump others)
-- Streaming blocks onto the page with no Accept
+- Streaming blocks onto the page with no Accept — **won’t do**
 - Pure WYSIWYG editors for maps, questions, tables, html apps (inspector stays)
 - Homepage / unit / class-homepage editors switching to this canvas
 - SortableJS
 - Notion / Central Node writes
-- Auto-publish from AI
+- Auto-publish from AI — **won’t do**
 - Student-view redesign (students already consume these blocks)
 
 ## The view
