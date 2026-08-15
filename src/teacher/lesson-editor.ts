@@ -477,6 +477,9 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         ) {
           apply();
         }
+      },
+      onWorkingChange: (working) => {
+        chatStrip.classList.toggle('lesson-builder__chat-strip--working', working);
       }
     });
 
