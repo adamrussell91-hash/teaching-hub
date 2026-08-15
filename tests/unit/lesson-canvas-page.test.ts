@@ -224,4 +224,23 @@ describe('mountLessonPage', () => {
     const gap = host.querySelector<HTMLElement>('.lesson-page__gap')!;
     expect(getComputedStyle(gap).pointerEvents).toBe('auto');
   });
+
+  it('forwards a composition drop to onCompositionDrop without inserting a block', () => {
+    const onChange = vi.fn();
+    const onCompositionDrop = vi.fn();
+    mountLessonPage(host, {
+      lesson: makeLesson({ blocks: [] }),
+      media: [],
+      onChange,
+      onPrint: vi.fn(),
+      onSelect: vi.fn(),
+      idFactory: () => ids.shift() ?? 'new_x',
+      onCompositionDrop
+    });
+    const gap = host.querySelector('.lesson-page__gap')!;
+    dispatchDrop(gap, { kind: 'composition', id: 'composition_1' });
+
+    expect(onCompositionDrop).toHaveBeenCalledWith('composition_1');
+    expect(onChange).not.toHaveBeenCalled();
+  });
 });

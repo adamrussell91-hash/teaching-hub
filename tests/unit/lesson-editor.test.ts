@@ -16,6 +16,15 @@ vi.mock('@/api/client', async () => {
 
 vi.mock('@/ai/client', () => ({ streamAiChat: vi.fn() }));
 
+const historyHarness: { onRestored?: (live: unknown) => void } = {};
+
+vi.mock('@/teacher/history-panel', () => ({
+  mountHistoryPanel: (options: { onRestored: (live: unknown) => void }) => {
+    historyHarness.onRestored = options.onRestored;
+    return { dispose: vi.fn(), refresh: vi.fn() };
+  }
+}));
+
 import { streamAiChat } from '@/ai/client';
 import { apiGet, apiPut, apiPost, apiPatch, ApiClientError } from '@/api/client';
 import { mountLessonEditor, type LessonEditorHandle } from '@/teacher/lesson-editor';
@@ -192,6 +201,7 @@ describe('mountLessonEditor', () => {
     apiPatchMock.mockReset();
     streamAiChatMock.mockReset();
     streamAiChatMock.mockResolvedValue(undefined);
+    historyHarness.onRestored = undefined;
     vi.stubGlobal('localStorage', new MemoryStorage());
     container = document.createElement('div');
     document.body.append(container);
@@ -858,6 +868,95 @@ describe('mountLessonEditor', () => {
       'Built lesson'
     );
     confirmSpy.mockRestore();
+  });
+
+  it('confirms stale Accept after history restore', async () => {
+    mockLessonLoad();
+    streamAiChatMock.mockImplementation(async (_payload, onEvent) => {
+      onEvent({
+        type: 'proposal',
+        proposal: { kind: 'replace_lesson', title: 'Built lesson', blocks: [] }
+      });
+    });
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    mount();
+    await tick();
+
+    const form = refs.canvas.querySelector<HTMLFormElement>('.ai-panel__composer')!;
+    const input = refs.canvas.querySelector<HTMLTextAreaElement>('.ai-panel__input')!;
+    input.value = 'Build a lesson';
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+    await vi.waitFor(() => {
+      const accept = [...refs.canvas.querySelectorAll('button')].find(
+        (btn) => btn.textContent === 'Accept'
+      );
+      expect(accept).toBeTruthy();
+    });
+
+    historyHarness.onRestored?.(makeLesson({ title: 'Older revision' }));
+
+    const accept = [...refs.canvas.querySelectorAll('button')].find(
+      (btn) => btn.textContent === 'Accept'
+    )!;
+    accept.click();
+
+    expect(confirmSpy).toHaveBeenCalledWith(
+      'You edited while the plan was built. Accept replaces the lesson with this plan.'
+    );
+    confirmSpy.mockRestore();
+  });
+
+  it('recedes the flyout during drag so a page gap can receive the drop', async () => {
+    mockLessonLoad(makeLesson({ blocks: [] }));
+    mount();
+    await tick();
+
+    refs.canvas.querySelector<HTMLButtonElement>('[data-family="Basic"]')!.click();
+    const card = refs.canvas.querySelector<HTMLElement>('[data-block-type="heading"]')!;
+    const flyout = refs.canvas.querySelector('.lesson-palette__flyout');
+    const dt = new Map<string, string>();
+    const start = new Event('dragstart', { bubbles: true, cancelable: true });
+    Object.defineProperty(start, 'dataTransfer', {
+      value: {
+        effectAllowed: 'uninitialized',
+        dropEffect: 'none',
+        setData(type: string, value: string) {
+          dt.set(type, value);
+        },
+        getData(type: string) {
+          return dt.get(type) ?? '';
+        }
+      }
+    });
+    card.dispatchEvent(start);
+
+    expect(flyout?.classList.contains('lesson-palette__flyout--receded')).toBe(true);
+
+    const gap = refs.canvas.querySelector('.lesson-page__gap')!;
+    const over = new Event('dragover', { bubbles: true, cancelable: true });
+    Object.defineProperty(over, 'dataTransfer', {
+      value: {
+        dropEffect: 'none',
+        getData(type: string) {
+          return dt.get(type) ?? '';
+        }
+      }
+    });
+    gap.dispatchEvent(over);
+    const drop = new Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(drop, 'dataTransfer', {
+      value: {
+        getData(type: string) {
+          return dt.get(type) ?? '';
+        }
+      }
+    });
+    gap.dispatchEvent(drop);
+    await tick();
+
+    expect(refs.canvas.querySelector('.block-editor[data-block-type="heading"]')).not.toBeNull();
   });
 
   it('asks Copy vs Linked in the palette flyout footer', async () => {

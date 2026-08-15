@@ -449,6 +449,9 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       onDetachComposition: (blockId) => {
         void detachLinkedSection(blockId);
       },
+      onCompositionDrop: (id) => {
+        palette?.showCompositionConfirm(id);
+      },
       renderLinkedPreview: (compositionId) =>
         buildLinkedPreview(compositionId, compositionCache, queueCompositionFetch)
     });
@@ -585,6 +588,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     function applyRestoredLesson(restored: Lesson): void {
       Object.assign(lesson, restored);
       blockCounter = lesson.blocks.length;
+      bumpDraftClock();
       page?.update(lesson);
       const titleEl = refs.contextBar.querySelector('.teacher-layout__context-bar-title');
       if (titleEl) titleEl.textContent = lesson.title || 'Untitled lesson';

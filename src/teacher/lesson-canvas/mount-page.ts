@@ -23,6 +23,7 @@ export type MountLessonPageOptions = {
   onSaveComposition?: (blockId: string) => void;
   onEditSource?: (compositionId: string) => void;
   onDetachComposition?: (blockId: string) => void;
+  onCompositionDrop?: (id: string) => void;
   renderLinkedPreview?: (compositionId: string) => HTMLElement;
 };
 
@@ -68,15 +69,23 @@ function replaceBlockInTree(blocks: Block[], updated: Block): Block[] {
   });
 }
 
-function readDropType(event: Event): string | null {
+function readDropPayload(
+  event: Event
+): { kind: 'block'; type: string } | { kind: 'composition'; id: string } | null {
   const dt = (event as DragEvent).dataTransfer;
   const raw = dt?.getData(DND_MIME) ?? '';
   if (!raw) return null;
   try {
     const parsed: unknown = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object') return null;
-    const type = (parsed as { type?: unknown }).type;
-    return typeof type === 'string' ? type : null;
+    const record = parsed as { kind?: unknown; type?: unknown; id?: unknown };
+    if (record.kind === 'composition' && typeof record.id === 'string') {
+      return { kind: 'composition', id: record.id };
+    }
+    if (typeof record.type === 'string') {
+      return { kind: 'block', type: record.type };
+    }
+    return null;
   } catch {
     return null;
   }
@@ -134,10 +143,14 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
 
   function handleGapDrop(event: Event, index: number): void {
     event.preventDefault();
-    const type = readDropType(event);
-    if (!type) return;
+    const payload = readDropPayload(event);
+    if (!payload) return;
+    if (payload.kind === 'composition') {
+      options.onCompositionDrop?.(payload.id);
+      return;
+    }
     const parent = { kind: 'root' as const };
-    const block = createFromInsertMenu(type, options.idFactory());
+    const block = createFromInsertMenu(payload.type, options.idFactory());
     const result = insertAt(lesson.blocks, parent, index, block);
     if (!result.ok) {
       setHint(result.message);
