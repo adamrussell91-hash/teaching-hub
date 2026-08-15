@@ -61,4 +61,43 @@ describe('mock /api/ai/chat', () => {
     expect(text).toContain('"type":"proposal"');
     expect(text).toContain('"type":"done"');
   });
+
+  it('streams a proposal when selected_block_id is omitted', async () => {
+    const api = createMockApi({ seed, passphrase: PASSPHRASE });
+    const unauth = await api.request('POST', '/api/ai/chat', {
+      body: {
+        lesson_id: 'x',
+        agent: 'ann',
+        message: 'Build a heading'
+      }
+    });
+    expect(unauth.status).toBe(401);
+
+    const auth = await api.request('POST', '/api/auth', { body: { passphrase: PASSPHRASE } });
+    expect(auth.status).toBe(200);
+    const cookie = auth.headers.get('set-cookie');
+    expect(cookie).toBeTruthy();
+
+    const curriculum = await api.request('GET', '/api/curriculum', { cookie });
+    expect(curriculum.status).toBe(200);
+    const data = (await curriculum.json()) as {
+      ok: boolean;
+      data: { lessons: Array<{ id: string }> };
+    };
+    const lessonId = data.data.lessons[0]?.id;
+    expect(lessonId).toBeTruthy();
+
+    const stream = await api.request('POST', '/api/ai/chat', {
+      cookie,
+      body: {
+        lesson_id: lessonId,
+        agent: 'ann',
+        message: 'Build a heading'
+      }
+    });
+    expect(stream.status).toBe(200);
+    expect(stream.headers.get('content-type')).toContain('text/event-stream');
+    const text = await stream.text();
+    expect(text).toMatch(/"type":"(proposal|done)"/);
+  });
 });

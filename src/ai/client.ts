@@ -22,8 +22,8 @@ export type AiStreamEvent =
 export interface AiChatPayload {
   lesson_id: string;
   agent: AgentSlug;
-  scope: AiScope;
-  selected_block_id: string;
+  scope?: AiScope;
+  selected_block_id?: string;
   message: string;
   action?: string;
   history?: Array<{ role: 'user' | 'assistant'; content: string }>;

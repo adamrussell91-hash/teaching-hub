@@ -2849,20 +2849,24 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       if (
         typeof req.lesson_id !== 'string' ||
         typeof req.agent !== 'string' ||
-        typeof req.scope !== 'string' ||
-        typeof req.selected_block_id !== 'string' ||
-        typeof req.message !== 'string'
+        typeof req.message !== 'string' ||
+        (req.scope !== undefined && typeof req.scope !== 'string') ||
+        (req.selected_block_id !== undefined && typeof req.selected_block_id !== 'string')
       ) {
         return errorResponse(400, 'validation_error', 'Invalid AI chat request');
       }
       const lesson = store.getJSON<Lesson>(draftLessonKey(req.lesson_id));
       if (!lesson) return notFoundResponse('Lesson not found');
-      const selected = lesson.blocks.find((b) => b.id === req.selected_block_id);
-      if (!selected) {
+      const selected =
+        typeof req.selected_block_id === 'string'
+          ? lesson.blocks.find((b) => b.id === req.selected_block_id)
+          : undefined;
+      if (req.selected_block_id && !selected) {
         return errorResponse(400, 'validation_error', 'selected_block_id not found');
       }
-      const proposal =
-        selected.block_type === 'rich_text' || selected.block_type === 'heading'
+      const now = new Date().toISOString();
+      const proposal = selected
+        ? selected.block_type === 'rich_text' || selected.block_type === 'heading'
           ? {
               kind: 'replace_block' as const,
               block_id: selected.id,
@@ -2877,7 +2881,26 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
           : {
               kind: 'review_only' as const,
               summary: 'Mock review: keep the focus tight and one teaching move at a time.'
-            };
+            }
+        : {
+            kind: 'replace_lesson' as const,
+            blocks: [
+              {
+                id: 'mock-ai-heading',
+                type: 'block' as const,
+                block_type: 'heading' as const,
+                variant: 'page' as const,
+                visibility: 'student_teacher' as const,
+                content: { text: 'Heading' },
+                layout: {},
+                print: {},
+                settings: {},
+                created_at: now,
+                updated_at: now,
+                schema_version: 1 as const
+              }
+            ]
+          };
       return sseResponse([
         { type: 'status', text: 'Thinking…' },
         { type: 'text', text: 'Mock AI response. ' },
