@@ -1,4 +1,5 @@
 import type { AiJob } from '../../src/ai/jobs.ts';
+import { completeWorkingAiJob } from './_shared/ai-job-complete.mts';
 import { aiJobKey, getContentStore, getJSON } from './_shared/blobs.mts';
 import { getTeacherSession } from './_shared/session.mts';
 import {
@@ -38,12 +39,14 @@ export default async function handler(request: Request, context: FunctionContext
     return withCors(errorResponse(404, 'not_found', 'Job not found'), request, env);
   }
 
-  const job = await getJSON<AiJob>(getContentStore(), aiJobKey(id));
+  const store = getContentStore();
+  const job = await getJSON<AiJob>(store, aiJobKey(id));
   if (!job) {
     return withCors(errorResponse(404, 'not_found', 'Job not found'), request, env);
   }
 
-  return withCors(okResponse(200, job), request, env);
+  const resolved = job.status === 'working' ? await completeWorkingAiJob(store, job, env) : job;
+  return withCors(okResponse(200, resolved), request, env);
 }
 
 export const config = { path: '/api/ai/jobs/:id' };

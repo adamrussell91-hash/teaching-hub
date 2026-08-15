@@ -1,24 +1,6 @@
-import { pullArchive, type ArchivePull } from '../../src/ai/archiveKernel.ts';
-import type { Lesson } from '../../src/schemas/lesson.ts';
-import {
-  AiJobCreateSchema,
-  appendTranscriptTurns,
-  buildKernelJobPayload,
-  fixtureReplaceLessonProposal,
-  proposalFromKernelPayload,
-  type AiJob,
-  type AiTranscriptTurn,
-  type KernelJobPayload
-} from '../../src/ai/jobs.ts';
+import { AiJobCreateSchema, type AiJob } from '../../src/ai/jobs.ts';
 import { newId } from './_shared/create-helpers.mts';
-import {
-  aiJobKey,
-  aiTranscriptKey,
-  draftLessonKey,
-  getContentStore,
-  getJSON,
-  setJSON
-} from './_shared/blobs.mts';
+import { aiJobKey, draftLessonKey, getContentStore, getJSON, setJSON } from './_shared/blobs.mts';
 import { getTeacherSession } from './_shared/session.mts';
 import {
   errorResponse,
@@ -30,65 +12,7 @@ import {
   preflightResponse,
   withCors
 } from './_shared/http.mts';
-
-const DEFAULT_KERNEL_URL = 'https://knowledge-hub-research.adamrussell91.workers.dev';
-
-async function loadTranscript(
-  store: ReturnType<typeof getContentStore>,
-  lessonId: string,
-  agent: string
-): Promise<AiTranscriptTurn[]> {
-  const existing = await getJSON<AiTranscriptTurn[]>(store, aiTranscriptKey(lessonId, agent));
-  return Array.isArray(existing) ? existing : [];
-}
-
-async function persistCompletedJob(
-  store: ReturnType<typeof getContentStore>,
-  job: AiJob,
-  proposal: AiJob['proposal']
-): Promise<AiJob> {
-  const completed: AiJob = { ...job, status: 'done', proposal };
-  await setJSON(store, aiJobKey(job.id), completed);
-  const existing = await loadTranscript(store, job.lesson_id, job.agent);
-  await setJSON(
-    store,
-    aiTranscriptKey(job.lesson_id, job.agent),
-    appendTranscriptTurns(existing, [
-      { role: 'user', content: job.message },
-      { role: 'assistant', content: 'Proposed a replace_lesson draft.' }
-    ])
-  );
-  return completed;
-}
-
-async function tryKernelProposal(input: {
-  url?: string;
-  secret?: string;
-  body: KernelJobPayload;
-}): Promise<{ proposal?: ReturnType<typeof fixtureReplaceLessonProposal>; missing: boolean }> {
-  const secret = input.secret;
-  if (!secret) return { missing: true };
-  const base = (input.url || DEFAULT_KERNEL_URL).replace(/\/+$/, '');
-  try {
-    const response = await fetch(`${base}/lesson_proposal`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'TeachingHub/1.0',
-        'x-research-kernel-secret': secret
-      },
-      body: JSON.stringify(input.body)
-    });
-    if (response.status === 404) return { missing: true };
-    if (!response.ok) return { missing: true };
-    const payload: unknown = await response.json();
-    const proposal = proposalFromKernelPayload(payload);
-    if (!proposal) return { missing: true };
-    return { proposal, missing: false };
-  } catch {
-    return { missing: true };
-  }
-}
+import type { Lesson } from '../../src/schemas/lesson.ts';
 
 export default async function handler(request: Request): Promise<Response> {
   const env = process.env;
@@ -142,35 +66,6 @@ export default async function handler(request: Request): Promise<Response> {
     created_at: now
   };
   await setJSON(store, aiJobKey(id), job);
-
-  // Minutes-scale Clementine runs belong on the research kernel job.
-  // When RESEARCH_KERNEL_URL/secret is unset or /lesson_proposal is missing,
-  // store a schema-valid replace_lesson fixture so local/dev/tests never call Anthropic.
-  const transcript = await loadTranscript(store, body.lesson_id, body.agent);
-  const kernelSecret = env.RESEARCH_KERNEL_SHARED_SECRET;
-  let archive: ArchivePull | undefined;
-  if (kernelSecret) {
-    archive = await pullArchive({
-      query: body.message,
-      documentContext: `${lesson.title}\n${body.message}`,
-      url: env.RESEARCH_KERNEL_URL,
-      secret: kernelSecret
-    });
-  }
-  if (archive?.archiveFailed) job.archiveFailed = true;
-
-  const kernel = await tryKernelProposal({
-    url: env.RESEARCH_KERNEL_URL,
-    secret: kernelSecret,
-    body: buildKernelJobPayload({
-      query: body.message,
-      lesson,
-      transcript,
-      archive
-    })
-  });
-  const proposal = kernel.proposal ?? fixtureReplaceLessonProposal();
-  await persistCompletedJob(store, job, proposal);
 
   return withCors(okResponse(202, { id, status: 'working' }), request, env);
 }

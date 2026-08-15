@@ -101,6 +101,58 @@ export function appendTranscriptTurns(
   return [...prior, ...turns].slice(-max);
 }
 
+export const AI_JOB_STALE_MS = 10 * 60 * 1000;
+
+export type KernelOutcome =
+  | { kind: 'missing' }
+  | { kind: 'failed'; error: string }
+  | { kind: 'ok'; proposal: AiProposal };
+
+export type ClassifyKernelInput = {
+  secret?: string | null;
+  status?: number;
+  payload?: unknown;
+  networkError?: boolean;
+  invalidJson?: boolean;
+};
+
+export function classifyKernelResponse(input: ClassifyKernelInput): KernelOutcome {
+  if (!input.secret) return { kind: 'missing' };
+  if (input.networkError) return { kind: 'failed', error: 'Kernel request failed' };
+  if (input.status === 404) return { kind: 'missing' };
+  if (input.status !== undefined && input.status !== 200) {
+    return { kind: 'failed', error: `Kernel returned HTTP ${input.status}` };
+  }
+  if (input.invalidJson) return { kind: 'failed', error: 'Kernel returned invalid JSON' };
+  const proposal = proposalFromKernelPayload(input.payload);
+  if (!proposal) return { kind: 'failed', error: 'Kernel returned an invalid proposal' };
+  return { kind: 'ok', proposal };
+}
+
+export function applyKernelOutcome(job: AiJob, outcome: KernelOutcome): AiJob {
+  if (outcome.kind === 'missing') {
+    return { ...job, status: 'done', proposal: fixtureReplaceLessonProposal() };
+  }
+  if (outcome.kind === 'failed') {
+    const { proposal: _unused, ...rest } = job;
+    return { ...rest, status: 'error', error: outcome.error };
+  }
+  return { ...job, status: 'done', proposal: outcome.proposal };
+}
+
+export function isStaleWorkingJob(job: AiJob, now = Date.now()): boolean {
+  if (job.status !== 'working') return false;
+  const created = Date.parse(job.created_at);
+  if (Number.isNaN(created)) return false;
+  return now - created > AI_JOB_STALE_MS;
+}
+
+export function staleWorkingJobError(job: AiJob, now = Date.now()): AiJob | null {
+  if (!isStaleWorkingJob(job, now)) return null;
+  const { proposal: _unused, ...rest } = job;
+  return { ...rest, status: 'error', error: 'Job timed out after 10 minutes' };
+}
+
 export function proposalFromKernelPayload(payload: unknown): AiProposal | null {
   if (!payload || typeof payload !== 'object') return null;
   const raw = payload as Record<string, unknown>;
