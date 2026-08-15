@@ -8,6 +8,7 @@ import {
 import { actionsForScope } from '@/ai/capabilities';
 import { streamAiChat, type ArchiveCitation } from '@/ai/client';
 import { pollAiJob, startAiJob } from '@/ai/jobs-client';
+import { AI_JOB_STALE_MS } from '@/ai/jobs';
 import type { AiProposal, AiScope } from '@/ai/proposals';
 import type { Block } from '@/schemas/block';
 
@@ -43,7 +44,8 @@ interface ChatMessage {
   archiveFailed?: boolean;
 }
 
-const POLL_MS = 50;
+const POLL_MS = import.meta.env.MODE === 'test' ? 50 : 1000;
+const MAX_POLLS = Math.ceil(AI_JOB_STALE_MS / 1000);
 
 function transcriptKey(lessonId: string): string {
   return `teaching_hub_ai_transcript_${lessonId}`;
@@ -393,8 +395,8 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
       { signal }
     );
     let job = await pollAiJob(started.id, { signal });
-    let polls = 0;
-    while (job.status === 'working' && !signal.aborted && polls < 120) {
+    let polls = 1;
+    while (job.status === 'working' && !signal.aborted && polls < MAX_POLLS) {
       polls += 1;
       await sleep(POLL_MS, signal);
       job = await pollAiJob(started.id, { signal });
@@ -403,6 +405,11 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
     if (!assistant) return;
     if (job.status === 'error') {
       assistant.text = job.error ?? 'AI job failed';
+      renderThread();
+      return;
+    }
+    if (job.status === 'working') {
+      assistant.text = 'This job is still working and timed out after 10 minutes.';
       renderThread();
       return;
     }

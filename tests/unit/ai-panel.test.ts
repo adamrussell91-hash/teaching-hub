@@ -191,6 +191,25 @@ describe('mountAiPanel', () => {
     expect(mounted.host.querySelector('.ai-panel__proposal')).not.toBeNull();
   });
 
+  it('does not claim Job finished when Clementine is still working after the poll cap', async () => {
+    vi.useFakeTimers();
+    writeLastAgentSlug('clementine');
+    pollAiJobMock.mockReset();
+    pollAiJobMock.mockResolvedValue(workingJob());
+
+    const mounted = mountPanel();
+    handle = mounted.handle;
+    submitMessage(mounted.host, 'Build a long lesson');
+
+    try {
+      await vi.runAllTimersAsync();
+      expect(mounted.host.textContent).not.toContain('Job finished.');
+      expect(mounted.host.textContent).toMatch(/timed out|still working/i);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('keeps Ann on streamAiChat after a block is selected', async () => {
     const mounted = mountPanel();
     handle = mounted.handle;
