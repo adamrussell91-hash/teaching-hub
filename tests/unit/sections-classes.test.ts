@@ -167,6 +167,7 @@ describe('classes section', () => {
 
   afterEach(() => {
     closeScheduleOverflow();
+    document.querySelectorAll('.entity-banner__dialog').forEach((el) => el.remove());
   });
 
   it('renders glass class tiles that open the class page', () => {
@@ -402,6 +403,39 @@ describe('classes section', () => {
       });
       expect(onScheduleMutated).toHaveBeenCalled();
     });
+  });
+
+  it('removes a cover without invoking the page-remount callback or losing homepage edits', async () => {
+    const onScheduleMutated = vi.fn().mockResolvedValue(undefined);
+    const onCoverMutated = vi.fn().mockResolvedValue(undefined);
+    const withCover: CurriculumResponse = {
+      ...curriculum,
+      classes: [{ ...classRow, cover: { url: 'https://cdn.example.com/class.jpg' } }]
+    };
+
+    renderClassPage(canvas, withCover, classRow.id, { onScheduleMutated, onCoverMutated });
+
+    canvas.querySelector<HTMLButtonElement>('.class-page__edit-homepage')?.click();
+    canvas.querySelector<HTMLButtonElement>('.lesson-palette__family[data-family="Basic"]')?.click();
+    canvas
+      .querySelector<HTMLButtonElement>('.lesson-palette__card[data-block-type="heading"]')
+      ?.click();
+    const editor = canvas.querySelector('.homepage-editor');
+    expect(editor).not.toBeNull();
+    expect(editor?.querySelector('[data-block-type="heading"]')).not.toBeNull();
+
+    canvas.querySelector<HTMLButtonElement>('.entity-banner__edit')?.click();
+    [...document.querySelectorAll<HTMLButtonElement>('.entity-banner__dialog button')]
+      .find((button) => button.textContent?.trim() === 'Remove cover')
+      ?.click();
+
+    await vi.waitFor(() => {
+      expect(patchClass).toHaveBeenCalledWith(classRow.id, { cover: null });
+      expect(onCoverMutated).toHaveBeenCalledOnce();
+    });
+    expect(onScheduleMutated).not.toHaveBeenCalled();
+    expect(canvas.querySelector('.homepage-editor')).toBe(editor);
+    expect(editor?.querySelector('[data-block-type="heading"]')).not.toBeNull();
   });
 
   it('returns a dispose that tears down the banner', () => {

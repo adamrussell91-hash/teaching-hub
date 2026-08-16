@@ -462,6 +462,11 @@ function renderTeacherClassRoute(classId: string, token: number): void {
 
   classPageOptions = {
     onScheduleMutated: refreshAfterScheduleMutation,
+    // Cover changes repaint the banner in place; only drop the cache so the
+    // next curriculum request is fresh.
+    onCoverMutated: () => {
+      invalidateCurriculum();
+    },
     onScheduleUnit: () => {
       if (!currentCurriculum) return;
       openScheduleUnitModal({
@@ -615,7 +620,10 @@ function renderTeacherUnitRoute(unitId: string, token: number): void {
       if (token !== renderToken) return;
       teardownUnitPage();
       unitPageHandle = renderUnitPage(refs.canvas, curriculum, unitId, {
-        onMutated: refreshUnit
+        onMutated: refreshUnit,
+        onCoverMutated: () => {
+          invalidateCurriculum();
+        }
       });
       mountTeacherRail(refs, curriculum, 'units');
     } catch (error) {
@@ -641,7 +649,10 @@ function renderTeacherUnitRoute(unitId: string, token: number): void {
     }
     teardownUnitPage();
     unitPageHandle = renderUnitPage(refs.canvas, curriculum, unitId, {
-      onMutated: refreshUnit
+      onMutated: refreshUnit,
+      onCoverMutated: () => {
+        invalidateCurriculum();
+      }
     });
   });
 }

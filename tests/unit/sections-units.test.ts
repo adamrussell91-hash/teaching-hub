@@ -1,15 +1,42 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('@/app/router', () => ({ navigate: vi.fn() }));
+vi.mock('@/teacher/unit-api', () => ({ patchUnit: vi.fn().mockResolvedValue({}) }));
+vi.mock('@/teacher/history-panel', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/teacher/history-panel')>();
+  return {
+    ...actual,
+    mountHistoryPanel: vi.fn(() => ({
+      dispose: vi.fn(),
+      refresh: vi.fn(async () => undefined)
+    }))
+  };
+});
 
 import { navigate } from '@/app/router';
+import { patchUnit } from '@/teacher/unit-api';
+import { mountHistoryPanel, type HistoryPanelHandle } from '@/teacher/history-panel';
 import {
   UNITS_INDEX_GROUP_STORAGE_KEY,
+  renderUnitPage,
   renderUnitsIndex,
   renderUnitStub
 } from '@/teacher/sections/units';
 import type { CurriculumResponse } from '@/teacher/nav';
 import type { Subject, Unit, Year } from '@/schemas';
+
+/** Reaches the `onRestored` callback the unit page handed to the history panel. */
+const lastRestoreCallback = (): ((live: unknown) => void) => {
+  const call = vi.mocked(mountHistoryPanel).mock.calls.at(-1);
+  if (!call) throw new Error('mountHistoryPanel was never called');
+  return call[0].onRestored;
+};
+
+const lastHistoryHandle = (): HistoryPanelHandle => {
+  const result = vi.mocked(mountHistoryPanel).mock.results.at(-1);
+  if (!result || result.type !== 'return') throw new Error('mountHistoryPanel did not return');
+  return result.value;
+};
 
 const ISO = '2026-01-01T00:00:00.000Z';
 
@@ -166,6 +193,7 @@ describe('units', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    document.querySelectorAll('.entity-banner__dialog').forEach((el) => el.remove());
   });
 
   it('lists compact unit cards with cover, title, and year/subject meta', () => {
@@ -261,6 +289,87 @@ describe('units', () => {
     );
     expect(families).not.toContain('Learning');
     expect(families).toContain('Layout');
+  });
+
+  it('uses the shared banner and removes its cover without remounting the unit plan', async () => {
+    const onMutated = vi.fn().mockResolvedValue(undefined);
+    const onCoverMutated = vi.fn().mockResolvedValue(undefined);
+    // renderUnitPage mutates the unit in place, so isolate it from other tests.
+    const isolated = structuredClone(curriculum);
+    vi.mocked(patchUnit).mockResolvedValue({ ...unit, cover: undefined });
+
+    renderUnitPage(canvas, isolated, unit.id, { onMutated, onCoverMutated });
+
+    expect(canvas.querySelector('.entity-banner__edit')?.textContent).toBe('Change cover');
+    expect(canvas.querySelector('.unit-page__cover > .cover-picker')).toBeNull();
+    expect(canvas.querySelector<HTMLImageElement>('.entity-banner__image')?.src).toContain(
+      'aotfw.jpg'
+    );
+    const plan = canvas.querySelector('.unit-plan-editor');
+    expect(plan).not.toBeNull();
+    const bannerRoot = canvas.querySelector('.entity-banner');
+
+    canvas.querySelector<HTMLButtonElement>('.entity-banner__edit')?.click();
+    [...document.querySelectorAll<HTMLButtonElement>('.entity-banner__dialog button')]
+      .find((button) => button.textContent?.trim() === 'Remove cover')
+      ?.click();
+
+    await vi.waitFor(() => {
+      expect(patchUnit).toHaveBeenCalledWith(unit.id, { cover: null });
+      expect(onCoverMutated).toHaveBeenCalledOnce();
+    });
+    expect(onMutated).not.toHaveBeenCalled();
+    expect(canvas.querySelector('.unit-plan-editor')).toBe(plan);
+
+    // The banner repaints in place: image gone, gradient fallback shown.
+    expect(canvas.querySelector('.entity-banner')).toBe(bannerRoot);
+    expect(canvas.querySelector('.entity-banner__image')).toBeNull();
+    expect(canvas.querySelector('.entity-banner__fallback')).not.toBeNull();
+    expect(isolated.units.find((entry) => entry.id === unit.id)?.cover).toBeUndefined();
+
+    // Reopening the dialog reflects the cleared cover rather than stale state.
+    canvas.querySelector<HTMLButtonElement>('.entity-banner__edit')?.click();
+    const remove = [
+      ...document.querySelectorAll<HTMLButtonElement>('.entity-banner__dialog button')
+    ].find((button) => button.textContent?.trim() === 'Remove cover');
+    expect(remove?.disabled).toBe(true);
+  });
+
+  it('applies a restored version in place, clearing an omitted cover', () => {
+    const isolated = structuredClone(curriculum);
+    renderUnitPage(canvas, isolated, unit.id);
+
+    const bannerRoot = canvas.querySelector('.entity-banner');
+    expect(canvas.querySelector('.entity-banner__image')).not.toBeNull();
+
+    const restored = structuredClone(unit);
+    restored.title = 'Restored unit title';
+    delete restored.cover;
+    lastRestoreCallback()(restored);
+
+    expect(canvas.querySelector('.entity-banner')).toBe(bannerRoot);
+    expect(canvas.querySelector('.entity-banner__title')?.textContent).toBe(
+      'Restored unit title'
+    );
+    expect(canvas.querySelector('.page-header__title')?.textContent).toBe('Restored unit title');
+    expect(canvas.querySelector('.entity-banner__image')).toBeNull();
+    expect(isolated.units.find((entry) => entry.id === unit.id)?.cover).toBeUndefined();
+
+    canvas.querySelector<HTMLButtonElement>('.entity-banner__edit')?.click();
+    const remove = [
+      ...document.querySelectorAll<HTMLButtonElement>('.entity-banner__dialog button')
+    ].find((button) => button.textContent?.trim() === 'Remove cover');
+    expect(remove?.disabled).toBe(true);
+  });
+
+  it('disposes the history panel along with the unit page', () => {
+    const isolated = structuredClone(curriculum);
+    const handle = renderUnitPage(canvas, isolated, unit.id);
+    const historyPanel = lastHistoryHandle();
+
+    handle.dispose();
+
+    expect(historyPanel.dispose).toHaveBeenCalledOnce();
   });
 
   it('renders not-found for an unknown unit', () => {

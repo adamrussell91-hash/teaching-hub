@@ -3269,7 +3269,6 @@ a:hover {
   gap: var(--space-6);
 }
 
-.unit-page__header,
 .unit-page__plan,
 .unit-page__lessons {
   padding: var(--space-4) var(--space-5) var(--space-5);
@@ -3278,8 +3277,9 @@ a:hover {
   gap: var(--space-3);
 }
 
-.unit-page__cover {
-  margin: -var(--space-4) -var(--space-5) 0;
+.unit-page__cover,
+.lesson-page__cover {
+  min-width: 0;
 }
 
 .unit-plan-editor__toolbar,
@@ -7368,14 +7368,6 @@ input.scope-timeline__note-title:focus-visible {
 .lesson-page__block:not(.lesson-page__block--selected) .block-editor__heading-variant,
 .lesson-page__block:not(.lesson-page__block--selected) .block-editor__toolbar {
   display: none;
-}
-
-.cover-picker--compact:not(.cover-picker--editing) .cover-picker__toolbar {
-  display: none;
-}
-
-.cover-picker--compact .cover-picker__hero {
-  cursor: pointer;
 }
 
 /* ── Lessons library ─────────────────────────────────────────────────── */

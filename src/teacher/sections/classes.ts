@@ -38,6 +38,8 @@ export interface ClassesIndexOptions {
 
 export interface ClassPageOptions {
   onScheduleMutated?: () => void | Promise<void>;
+  /** Cover-only invalidation; must not remount the page or its editors. */
+  onCoverMutated?: () => void | Promise<void>;
   onScheduleUnit?: () => void;
 }
 
@@ -244,8 +246,10 @@ export function renderClassPage(
     entityId: cls.id,
     editable: true,
     onSave: async (cover) => {
-      await patchClass(cls.id, { cover });
-      await options.onScheduleMutated?.();
+      const saved = await patchClass(cls.id, { cover });
+      if (saved.cover) pageClass.cover = saved.cover;
+      else delete pageClass.cover;
+      await options.onCoverMutated?.();
     }
   });
   disposers.push(banner.dispose);

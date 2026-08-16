@@ -8,7 +8,6 @@ export interface CoverPickerOptions {
   titleFallback?: string;
   onSave: (cover: Cover | null) => void | Promise<void>;
   editable?: boolean;
-  compact?: boolean;
 }
 
 export interface CoverPickerHandle {
@@ -18,7 +17,7 @@ export interface CoverPickerHandle {
 }
 
 /**
- * Cover hero with optional teacher edit: URL + image library pick + clear.
+ * Cover hero with optional teacher edit: URL + image library pick + remove.
  * Prefer `renderEntityBanner` for class-page read view; use this for dialogs
  * and other edit surfaces that need the full toolbar inline.
  */
@@ -32,7 +31,6 @@ export function mountCoverPicker(
 
   const root = document.createElement('div');
   root.className = 'cover-picker';
-  if (options.compact) root.classList.add('cover-picker--compact');
 
   const hero = document.createElement('div');
   hero.className = 'cover-picker__hero';
@@ -74,10 +72,10 @@ export function mountCoverPicker(
   applyBtn.className = 'btn btn--secondary';
   applyBtn.textContent = 'Set URL';
 
-  const clearBtn = document.createElement('button');
-  clearBtn.type = 'button';
-  clearBtn.className = 'btn btn--ghost';
-  clearBtn.textContent = 'Clear';
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.className = 'btn btn--ghost';
+  removeBtn.textContent = 'Remove cover';
 
   const libraryBtn = document.createElement('button');
   libraryBtn.type = 'button';
@@ -89,19 +87,18 @@ export function mountCoverPicker(
   library.hidden = true;
   library.dataset.coverLibrary = '';
 
-  toolbar.append(urlInput, altInput, applyBtn, libraryBtn, clearBtn, library, error);
+  toolbar.append(urlInput, altInput, applyBtn, libraryBtn, removeBtn, library, error);
   root.append(hero, toolbar);
   host.replaceChildren(root);
 
-  if (options.compact && editable) {
-    hero.setAttribute('title', 'Change cover');
-    hero.addEventListener('click', () => {
-      root.classList.toggle('cover-picker--editing');
-    });
-  }
-
   const imageMedia = () =>
     options.media.filter((entry) => entry.media_type === 'image' && entry.status === 'active');
+
+  const syncButtons = (): void => {
+    applyBtn.disabled = busy;
+    libraryBtn.disabled = busy;
+    removeBtn.disabled = busy || current === null;
+  };
 
   const renderPreview = (): void => {
     const url = resolveCoverUrl(current ?? undefined, options.media);
@@ -135,9 +132,7 @@ export function mountCoverPicker(
     if (busy) return;
     busy = true;
     setError(null);
-    applyBtn.disabled = true;
-    clearBtn.disabled = true;
-    libraryBtn.disabled = true;
+    syncButtons();
     try {
       await options.onSave(next);
       current = next;
@@ -146,9 +141,7 @@ export function mountCoverPicker(
       setError(err instanceof Error ? err.message : 'Unable to save cover.');
     } finally {
       busy = false;
-      applyBtn.disabled = false;
-      clearBtn.disabled = false;
-      libraryBtn.disabled = false;
+      syncButtons();
     }
   };
 
@@ -208,7 +201,8 @@ export function mountCoverPicker(
     void persist(candidate.data);
   });
 
-  clearBtn.addEventListener('click', () => {
+  removeBtn.addEventListener('click', () => {
+    if (current === null) return;
     void persist(null);
   });
 
@@ -218,6 +212,7 @@ export function mountCoverPicker(
   });
 
   renderPreview();
+  syncButtons();
 
   return {
     root,

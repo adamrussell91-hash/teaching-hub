@@ -155,6 +155,34 @@ describe('PATCH /api/classes/:id (mock)', () => {
     expect(cls.homepage?.announcements[0]?.content).toEqual({ text: 'Welcome' });
   });
 
+  it('clears cover without changing the homepage announcement', async () => {
+    const seed = freshSeed();
+    const targetClass = seed.classes.find(
+      (row) => (row as { id?: string }).id === CLASS_ID
+    ) as Record<string, unknown>;
+    targetClass.cover = {
+      url: 'https://example.com/class-cover.jpg',
+      alt_text: 'Class cover'
+    };
+    targetClass.homepage = {
+      announcements: [validHeadingBlock],
+      resources: [],
+      custom: []
+    };
+
+    const api = freshApi(seed);
+    const cookie = await signIn(api);
+    const res = await api.request('PATCH', PATH, {
+      cookie,
+      body: { cover: null }
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data).not.toHaveProperty('cover');
+    expect(body.data.homepage.announcements).toEqual([validHeadingBlock]);
+  });
+
   it('rejects invalid homepage blocks with 400', async () => {
     const api = freshApi();
     const cookie = await signIn(api);

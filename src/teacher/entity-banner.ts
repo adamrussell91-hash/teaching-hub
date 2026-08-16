@@ -12,8 +12,17 @@ export interface EntityBannerOptions {
   onSave?: (cover: Cover | null) => void | Promise<void>;
 }
 
+export interface EntityBannerUpdate {
+  cover?: Cover | null;
+  title?: string;
+  eyebrow?: string;
+  /** Late-arriving library; a `media_id` cover can only resolve once it lands. */
+  media?: ReadonlyArray<Media>;
+}
+
 export interface EntityBannerHandle {
   dispose: () => void;
+  update: (next: EntityBannerUpdate) => void;
 }
 
 /** Deterministic hue (0–359) from an entity id for no-cover banners. */
@@ -38,7 +47,9 @@ export function renderEntityBanner(
   options: EntityBannerOptions
 ): EntityBannerHandle {
   let current: Cover | null = options.cover ?? null;
-  const media = options.media;
+  let titleText = options.title;
+  let eyebrowText = options.eyebrow;
+  let media = options.media;
   let dialog: HTMLDialogElement | null = null;
   let pickerDispose: (() => void) | null = null;
   let dialogClosed = true;
@@ -50,15 +61,17 @@ export function renderEntityBanner(
   root.style.overflow = 'hidden';
   root.style.position = 'relative';
 
+  const resolvedUrl = (): string | undefined => resolveCoverUrl(current ?? undefined, media);
+
   const paint = (): void => {
     root.replaceChildren();
 
-    const url = resolveCoverUrl(current ?? undefined, media);
+    const url = resolvedUrl();
     if (url) {
       const img = document.createElement('img');
       img.className = 'entity-banner__image';
       img.src = url;
-      img.alt = coverAltText(current, options.title);
+      img.alt = coverAltText(current, titleText);
       img.style.width = '100%';
       img.style.height = '100%';
       img.style.objectFit = 'cover';
@@ -91,16 +104,16 @@ export function renderEntityBanner(
       ].join(';')
     );
 
-    if (options.eyebrow) {
+    if (eyebrowText) {
       const eyebrow = document.createElement('p');
       eyebrow.className = 'entity-banner__eyebrow';
-      eyebrow.textContent = options.eyebrow;
+      eyebrow.textContent = eyebrowText;
       scrim.append(eyebrow);
     }
 
     const title = document.createElement('p');
     title.className = 'entity-banner__title';
-    title.textContent = options.title;
+    title.textContent = titleText;
     scrim.append(title);
 
     root.append(scrim);
@@ -115,6 +128,29 @@ export function renderEntityBanner(
       });
       root.append(editBtn);
     }
+  };
+
+  /**
+   * Text-only refresh. Title edits arrive one keystroke at a time, and a
+   * repaint there would rebuild the image and the focused edit button.
+   */
+  const patchText = (): void => {
+    const title = root.querySelector('.entity-banner__title');
+    if (title) title.textContent = titleText;
+
+    const eyebrow = root.querySelector('.entity-banner__eyebrow');
+    if (eyebrow && eyebrowText) eyebrow.textContent = eyebrowText;
+
+    const img = root.querySelector<HTMLImageElement>('.entity-banner__image');
+    if (img) img.alt = coverAltText(current, titleText);
+  };
+
+  /**
+   * Repainting detaches the button the dialog would restore focus to, so the
+   * save path has to move focus onto the freshly rendered trigger itself.
+   */
+  const focusEditButton = (): void => {
+    root.querySelector<HTMLButtonElement>('.entity-banner__edit')?.focus();
   };
 
   const closeCoverDialog = (): void => {
@@ -164,13 +200,14 @@ export function renderEntityBanner(
     const picker = mountCoverPicker(pickerHost, {
       cover: current,
       media,
-      titleFallback: options.title,
+      titleFallback: titleText,
       editable: true,
       onSave: async (cover) => {
         await options.onSave?.(cover);
         current = cover;
-        paint();
         closeCoverDialog();
+        paint();
+        focusEditButton();
       }
     });
     pickerDispose = picker.dispose;
@@ -186,6 +223,23 @@ export function renderEntityBanner(
   host.replaceChildren(root);
 
   return {
+    update: (next) => {
+      const previousUrl = resolvedUrl();
+      const hadEyebrow = Boolean(eyebrowText);
+
+      if ('cover' in next) current = next.cover ?? null;
+      if (next.media) media = next.media;
+      if (next.title !== undefined) titleText = next.title;
+      if (next.eyebrow !== undefined) eyebrowText = next.eyebrow;
+
+      // Only a different image, or an eyebrow arriving/leaving, changes the
+      // element structure; everything else is text the current nodes can hold.
+      if (previousUrl !== resolvedUrl() || hadEyebrow !== Boolean(eyebrowText)) {
+        paint();
+        return;
+      }
+      patchText();
+    },
     dispose: () => {
       closeCoverDialog();
       host.replaceChildren();

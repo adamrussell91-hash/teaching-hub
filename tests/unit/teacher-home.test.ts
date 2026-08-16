@@ -126,6 +126,7 @@ describe('teacher home dashboard', () => {
 
   afterEach(() => {
     dispose?.();
+    document.querySelectorAll('.entity-banner__dialog').forEach((el) => el.remove());
   });
 
   it('renders a cover banner, clock, calendar, and classes without signal tiles', () => {
@@ -142,6 +143,34 @@ describe('teacher home dashboard', () => {
     expect(canvas.querySelector('.class-calendar')).not.toBeNull();
     expect(canvas.querySelector('[data-home-panel="classes"]')).not.toBeNull();
     expect(canvas.querySelector('.page-header__title')).toBeNull();
+  });
+
+  it('opens the shared cover dialog from the dashboard banner', () => {
+    const result = renderTeacherHome(canvas, curriculum);
+    dispose = result.dispose;
+
+    expect(canvas.querySelector('.cover-picker')).toBeNull();
+    canvas.querySelector<HTMLButtonElement>('.entity-banner__edit')!.click();
+
+    const dialog = document.querySelector<HTMLDialogElement>('.entity-banner__dialog');
+    expect(dialog).not.toBeNull();
+    expect(dialog?.querySelector('.cover-picker__url')).not.toBeNull();
+    const remove = [...dialog!.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) => button.textContent?.trim() === 'Remove cover'
+    );
+    expect(remove).toBeTruthy();
+  });
+
+  it('dispose closes an open cover dialog', () => {
+    const result = renderTeacherHome(canvas, curriculum);
+    canvas.querySelector<HTMLButtonElement>('.entity-banner__edit')!.click();
+    expect(document.querySelector('.entity-banner__dialog')).not.toBeNull();
+
+    // Asserted before the suite's fallback cleanup gets a chance to help.
+    result.dispose();
+    expect(document.querySelector('.entity-banner__dialog')).toBeNull();
+
+    dispose = result.dispose;
   });
 
   it('shows weekday day numbers, today, class meta on chips, and lesson links', () => {

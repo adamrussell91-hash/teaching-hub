@@ -2,7 +2,6 @@ import { navigate } from '@/app/router';
 import { cloneBlocksWithNewIds } from '@/blocks/clone-blocks';
 import type { Block } from '@/schemas';
 import { resolveCoverUrl } from '@/schemas';
-import { mountCoverPicker } from '@/teacher/cover-picker';
 import { mountCreateControl } from '@/teacher/create/control';
 import type { CreateKind } from '@/teacher/create/types';
 import type { CurriculumResponse } from '@/teacher/nav';
@@ -13,7 +12,7 @@ import { patchUnit } from '@/teacher/unit-api';
 import { ApiClientError } from '@/api/client';
 import { renderPageHeader } from '@/teacher/page-header';
 import { downloadPortableExport } from '@/teacher/export-api';
-import { gradientForEntityId } from '@/teacher/entity-banner';
+import { gradientForEntityId, renderEntityBanner } from '@/teacher/entity-banner';
 import {
   mountBlockCanvas,
   type BlockCanvasHandle
@@ -50,6 +49,8 @@ export interface UnitsIndexOptions {
 
 export interface UnitPageOptions {
   onMutated?: () => void | Promise<void>;
+  /** Cover-only invalidation; must not remount the page or its editors. */
+  onCoverMutated?: () => void | Promise<void>;
 }
 
 export function renderUnitsIndex(
@@ -321,22 +322,24 @@ export function renderUnitPage(
   const root = document.createElement('div');
   root.className = 'unit-page';
 
-  const header = document.createElement('header');
-  header.className = 'unit-page__header glass-panel';
-
   const coverHost = document.createElement('div');
   coverHost.className = 'unit-page__cover';
-  mountCoverPicker(coverHost, {
+  const yearTitle = curriculum.years.find((entry) => entry.id === unit.year_id)?.title;
+  const subjectTitle = curriculum.subjects.find((entry) => entry.id === unit.subject_id)?.title;
+  const banner = renderEntityBanner(coverHost, {
     cover: unit.cover,
     media: curriculum.media,
-    titleFallback: unit.title,
+    title: unit.title,
+    eyebrow: [yearTitle, subjectTitle].filter(Boolean).join(' · '),
+    entityId: unit.id,
+    editable: true,
     onSave: async (cover) => {
-      await patchUnit(unit.id, { cover });
-      await options.onMutated?.();
+      const saved = await patchUnit(unit.id, { cover });
+      if (saved.cover) unit.cover = saved.cover;
+      else delete unit.cover;
+      await options.onCoverMutated?.();
     }
   });
-
-  header.append(coverHost);
 
   const planSection = document.createElement('section');
   planSection.className = 'unit-page__plan glass-panel';
@@ -401,14 +404,19 @@ export function renderUnitPage(
   historyHost.className = 'history-panel-host unit-stub__history';
 
   tools.append(saveTemplate, historyHost);
-  mountHistoryPanel({
+  const historyPanel = mountHistoryPanel({
     kind: 'unit',
     parentId: unitId,
     host: historyHost,
     onRestored: (live) => {
       const restored = live as Unit;
       Object.assign(unit, restored);
+      // Object.assign cannot clear an optional key the restored unit omits,
+      // which would otherwise leave a phantom cover behind.
+      if (restored.cover) unit.cover = restored.cover;
+      else delete unit.cover;
       if (heading) heading.textContent = unit.title;
+      banner.update({ title: unit.title, cover: unit.cover ?? null });
     }
   });
 
@@ -459,11 +467,13 @@ export function renderUnitPage(
     lessonsSection.append(list);
   }
 
-  root.append(header, tools, planSection, lessonsSection);
+  root.append(coverHost, tools, planSection, lessonsSection);
   canvas.append(root);
 
   return {
     dispose: () => {
+      historyPanel.dispose();
+      banner.dispose();
       planEditor.dispose();
     }
   };

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createBlock } from '@/blocks/create-block';
 import type { Block } from '@/schemas/block';
 import type { Lesson } from '@/schemas/lesson';
+import type { Media } from '@/schemas/media';
 import { isTextLike } from '@/teacher/lesson-canvas/kinds';
 import { mountBlockCanvas, mountLessonPage } from '@/teacher/lesson-canvas/mount-page';
 
@@ -44,6 +45,17 @@ function startGripDrag(grip: Element): Dt {
   dispatchWithDt(grip, 'dragstart', dt);
   return dt;
 }
+
+const findButton = (root: ParentNode, label: string): HTMLButtonElement | null =>
+  Array.from(root.querySelectorAll<HTMLButtonElement>('button')).find(
+    (button) => button.textContent?.trim() === label
+  ) ?? null;
+
+/** Drains the picker persist → onSave → repaint promise chain. */
+const flushMicrotasks = (): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
 
 function makeLesson(overrides: Partial<Lesson> = {}): Lesson {
   return {
@@ -126,11 +138,89 @@ describe('mountLessonPage', () => {
     expect(next.title).toBe('Renamed lesson');
   });
 
-  it('mounts a cover host', () => {
-    mount();
-    const cover =
-      host.querySelector('.lesson-page__cover') ?? host.querySelector('.cover-picker');
-    expect(cover).not.toBeNull();
+  it('removes a cover through the shared dialog while an unsaved title edit survives', async () => {
+    const { onChange } = mount(
+      makeLesson({ cover: { url: 'https://cdn.example.com/lesson.jpg' } })
+    );
+
+    // The reading view is a banner: the full picker only lives in the dialog.
+    expect(host.querySelector('.lesson-page__cover .cover-picker')).toBeNull();
+    expect(host.querySelector('.lesson-page__cover .entity-banner')).not.toBeNull();
+    expect(host.querySelector<HTMLImageElement>('.entity-banner__image')?.src).toContain(
+      'cdn.example.com/lesson.jpg'
+    );
+
+    const title = host.querySelector<HTMLInputElement>('.lesson-page__title')!;
+    title.value = 'Renamed lesson';
+    title.dispatchEvent(new Event('input', { bubbles: true }));
+
+    host.querySelector<HTMLElement>('[data-block-id="h1"]')!.click();
+    const editor = host.querySelector<HTMLElement>('.block-editor[data-block-type="heading"]')!;
+
+    host.querySelector<HTMLButtonElement>('.entity-banner__edit')!.click();
+    const dialog = document.querySelector<HTMLDialogElement>('.entity-banner__dialog');
+    expect(dialog).not.toBeNull();
+    findButton(dialog!, 'Remove cover')!.click();
+    await flushMicrotasks();
+
+    const next = onChange.mock.calls.at(-1)?.[0] as Lesson;
+    expect('cover' in next).toBe(false);
+    expect(next.title).toBe('Renamed lesson');
+
+    // No remount: the same title field and the same open editor are still live.
+    expect(host.querySelector('.lesson-page__title')).toBe(title);
+    expect(title.value).toBe('Renamed lesson');
+    expect(editor.isConnected).toBe(true);
+    expect(host.querySelector('.entity-banner__image')).toBeNull();
+  });
+
+  it('keeps the banner image alive while the title is typed', () => {
+    mount(makeLesson({ cover: { url: 'https://cdn.example.com/lesson.jpg' } }));
+    const image = host.querySelector<HTMLImageElement>('.entity-banner__image');
+    const edit = host.querySelector('.entity-banner__edit');
+    expect(image).not.toBeNull();
+
+    const title = host.querySelector<HTMLInputElement>('.lesson-page__title')!;
+    for (const value of ['Renamed', 'Renamed l', 'Renamed lesson']) {
+      title.value = value;
+      title.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    expect(host.querySelector('.entity-banner__image')).toBe(image);
+    expect(host.querySelector('.entity-banner__edit')).toBe(edit);
+    expect(host.querySelector('.entity-banner__title')?.textContent).toBe('Renamed lesson');
+  });
+
+  it('resolves a media_id cover when update delivers the media library', () => {
+    const media: Media[] = [
+      {
+        id: 'media_img',
+        type: 'media',
+        title: 'Lesson banner',
+        slug: 'lesson_banner',
+        status: 'active',
+        created_at: ISO,
+        updated_at: ISO,
+        schema_version: 1,
+        provider: 'external',
+        media_type: 'image',
+        preview_url: 'https://cdn.example.com/library.jpg'
+      }
+    ];
+    const lesson = makeLesson({ cover: { media_id: 'media_img' } });
+    const { handle } = mount(lesson);
+    expect(host.querySelector('.entity-banner__image')).toBeNull();
+
+    handle.update(lesson, media);
+
+    expect(host.querySelector<HTMLImageElement>('.entity-banner__image')?.src).toContain(
+      'cdn.example.com/library.jpg'
+    );
+
+    host.querySelector<HTMLButtonElement>('.entity-banner__edit')!.click();
+    const dialog = document.querySelector<HTMLDialogElement>('.entity-banner__dialog')!;
+    findButton(dialog, 'Choose from library')!.click();
+    expect(dialog.querySelector('.cover-picker__library-item')).not.toBeNull();
   });
 
   it('edits text-like blocks inline without move-up towers', () => {

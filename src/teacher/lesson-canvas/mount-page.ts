@@ -14,7 +14,7 @@ import { renderBlock } from '@/blocks/render';
 import type { Block } from '@/schemas/block';
 import type { Lesson } from '@/schemas/lesson';
 import type { Media } from '@/schemas/media';
-import { mountCoverPicker, type CoverPickerHandle } from '@/teacher/cover-picker';
+import { renderEntityBanner, type EntityBannerHandle } from '@/teacher/entity-banner';
 import {
   deleteBlocksById,
   insertAt,
@@ -622,19 +622,23 @@ export function mountBlockCanvas(
   };
 }
 
+/** Drops the optional key rather than leaving `cover: undefined` behind. */
+function lessonWithoutCover(lesson: Lesson): Lesson {
+  const { cover: _removed, ...rest } = lesson;
+  return rest as Lesson;
+}
+
 export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptions): LessonPageHandle {
   let lesson = options.lesson;
-  let coverHandle: CoverPickerHandle | null = null;
   let media = options.media ?? [];
 
   const root = document.createElement('div');
   root.className = 'lesson-page';
   host.append(root);
 
-  function emitLesson(next: Lesson, rerenderChrome = false): void {
+  function emitLesson(next: Lesson): void {
     lesson = next;
     options.onChange(next);
-    if (rerenderChrome) renderChrome();
   }
 
   const moreWrap = document.createElement('div');
@@ -686,12 +690,25 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   const coverHost = document.createElement('div');
   coverHost.className = 'lesson-page__cover';
 
+  const banner: EntityBannerHandle = renderEntityBanner(coverHost, {
+    cover: lesson.cover ?? null,
+    media,
+    title: lesson.title,
+    entityId: lesson.id,
+    editable: true,
+    onSave: (cover) => {
+      emitLesson(cover ? { ...lesson, cover } : lessonWithoutCover(lesson));
+    }
+  });
+
   const title = document.createElement('input');
   title.type = 'text';
   title.className = 'lesson-page__title';
   title.value = lesson.title;
   title.setAttribute('aria-label', 'Lesson title');
   title.addEventListener('input', () => {
+    // Retitling repaints the banner scrim only; remounting would drop the field.
+    banner.update({ title: title.value });
     emitLesson({ ...lesson, title: title.value });
   });
 
@@ -699,24 +716,6 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   canvasHost.className = 'lesson-page__canvas';
 
   root.append(chrome, coverHost, title, canvasHost);
-
-  function mountCover(): void {
-    coverHandle?.dispose();
-    coverHandle = mountCoverPicker(coverHost, {
-      cover: lesson.cover ?? null,
-      media,
-      titleFallback: lesson.title,
-      compact: true,
-      onSave: (cover) => {
-        emitLesson({ ...lesson, ...(cover ? { cover } : { cover: undefined }) });
-      }
-    });
-  }
-
-  function renderChrome(): void {
-    title.value = lesson.title;
-    mountCover();
-  }
 
   const canvas = mountBlockCanvas(canvasHost, {
     blocks: lesson.blocks,
@@ -733,13 +732,16 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     renderLinkedPreview: options.renderLinkedPreview
   });
 
-  mountCover();
-
   return {
     update(next: Lesson, nextMedia?: Media[]) {
       lesson = next;
       if (nextMedia) media = nextMedia;
-      renderChrome();
+      title.value = lesson.title;
+      banner.update({
+        cover: lesson.cover ?? null,
+        title: lesson.title,
+        ...(nextMedia ? { media } : {})
+      });
       canvas.update(lesson.blocks, media);
     },
     insertType(type: InsertMenuValue) {
@@ -747,8 +749,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     },
     dispose() {
       canvas.dispose();
-      coverHandle?.dispose();
-      coverHandle = null;
+      banner.dispose();
       root.remove();
     }
   };
