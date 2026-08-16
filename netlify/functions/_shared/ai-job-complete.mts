@@ -12,6 +12,7 @@ import {
 } from '../../../src/ai/jobs.ts';
 import type { Lesson } from '../../../src/schemas/lesson.ts';
 import { syncInboxForJob, type AiJobInbox } from '../../../src/ai/jobs-inbox.ts';
+import { emptySearchPack } from '../../../src/ai/search-pack.ts';
 import {
   aiJobKey,
   aiJobsInboxKey,
@@ -65,7 +66,8 @@ async function tryKernelProposal(input: {
   body: KernelJobPayload;
 }): Promise<KernelOutcome> {
   const secret = input.secret;
-  if (!secret) return classifyKernelResponse({ secret });
+  const searchPack = input.body.searchPack;
+  if (!secret) return classifyKernelResponse({ secret, searchPack });
   const base = (input.url || DEFAULT_KERNEL_URL).replace(/\/+$/, '');
   try {
     const response = await fetch(`${base}/lesson_proposal`, {
@@ -88,10 +90,11 @@ async function tryKernelProposal(input: {
       secret,
       status: response.status,
       payload,
-      invalidJson
+      invalidJson,
+      searchPack
     });
   } catch {
-    return classifyKernelResponse({ secret, networkError: true });
+    return classifyKernelResponse({ secret, networkError: true, searchPack });
   }
 }
 
@@ -133,7 +136,8 @@ export async function completeWorkingAiJob(
       query: job.message,
       lesson,
       transcript,
-      archive
+      archive,
+      searchPack: emptySearchPack(job.message)
     })
   });
   return persistJobResult(store, applyKernelOutcome(nextJob, outcome));
