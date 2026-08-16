@@ -1,5 +1,6 @@
 import type { HtmlAppAiLane, HtmlAppAiMessage } from '../../../src/blocks/html-app-ai.ts';
 import { resolveAnthropicModel } from '../../../src/ai/models.ts';
+import { messageForAnthropicHttpError } from './anthropic-stream.mts';
 
 export class ProviderConfigError extends Error {
   constructor(public provider: string) {
@@ -11,11 +12,49 @@ export class ProviderConfigError extends Error {
 export class ProviderUpstreamError extends Error {
   constructor(
     public provider: string,
-    public status: number
+    public status: number,
+    message = `Upstream ${provider} failed (${status})`
   ) {
-    super(`Upstream ${provider} failed (${status})`);
+    super(message);
     this.name = 'ProviderUpstreamError';
   }
+}
+
+function openAiErrorDetails(bodyText: string): { type: string; message: string } {
+  try {
+    const parsed = JSON.parse(bodyText) as {
+      error?: { type?: string; code?: string; message?: string };
+    };
+    return {
+      type: parsed.error?.type ?? parsed.error?.code ?? '',
+      message: parsed.error?.message ?? ''
+    };
+  } catch {
+    return { type: '', message: '' };
+  }
+}
+
+export function messageForProviderHttpError(
+  provider: HtmlAppAiLane['provider'],
+  status: number,
+  bodyText: string
+): string {
+  if (provider === 'anthropic') return messageForAnthropicHttpError(status, bodyText);
+
+  const { type, message } = openAiErrorDetails(bodyText);
+  if (status === 401 || status === 403 || /auth|api.?key/i.test(type)) {
+    return 'OpenAI rejected the API key. Check OPENAI_API_KEY on the Netlify Functions site.';
+  }
+  if (status === 404 || /model/i.test(type) || /model/i.test(message)) {
+    return message
+      ? `OpenAI rejected the model request: ${message}`
+      : 'OpenAI rejected the model request. The configured model may be unavailable.';
+  }
+  if (status === 429 || /rate.?limit/i.test(type)) {
+    return 'OpenAI rate limit hit. Wait a moment and try again.';
+  }
+  if (status >= 500) return `OpenAI is temporarily unavailable (HTTP ${status}).`;
+  return `OpenAI request failed (HTTP ${status}).`;
 }
 
 export async function completeWithProvider(
@@ -38,7 +77,14 @@ export async function completeWithProvider(
         messages: [{ role: 'system', content: lane.system }, ...messages]
       })
     });
-    if (!res.ok) throw new ProviderUpstreamError('openai', res.status);
+    if (!res.ok) {
+      const bodyText = await res.text().catch(() => '');
+      throw new ProviderUpstreamError(
+        'openai',
+        res.status,
+        messageForProviderHttpError('openai', res.status, bodyText)
+      );
+    }
     const body = (await res.json()) as {
       choices?: Array<{ message?: { content?: string } }>;
     };
@@ -63,7 +109,14 @@ export async function completeWithProvider(
       messages: messages.map((m) => ({ role: m.role, content: m.content }))
     })
   });
-  if (!res.ok) throw new ProviderUpstreamError('anthropic', res.status);
+  if (!res.ok) {
+    const bodyText = await res.text().catch(() => '');
+    throw new ProviderUpstreamError(
+      'anthropic',
+      res.status,
+      messageForProviderHttpError('anthropic', res.status, bodyText)
+    );
+  }
   const body = (await res.json()) as {
     content?: Array<{ type?: string; text?: string }>;
   };

@@ -86,7 +86,7 @@ export default async function handler(request: Request): Promise<Response> {
     }
     if (err instanceof ProviderUpstreamError) {
       return withCors(
-        errorResponse(502, 'upstream_error', 'AI provider request failed'),
+        errorResponse(502, 'upstream_error', err.message),
         request,
         env
       );

@@ -185,4 +185,67 @@ describe('POST /api/html-app-ai', () => {
     const sent = JSON.parse(String(init.body)) as { model: string };
     expect(sent.model).toBe(CURRENT_SONNET_MODEL);
   });
+
+  it.each([
+    {
+      provider: 'anthropic' as const,
+      key: 'ANTHROPIC_API_KEY',
+      status: 401,
+      body: { error: { type: 'authentication_error', message: 'invalid x-api-key' } },
+      expected: 'Anthropic rejected the API key'
+    },
+    {
+      provider: 'anthropic' as const,
+      key: 'ANTHROPIC_API_KEY',
+      status: 404,
+      body: { error: { type: 'not_found_error', message: 'model: claude-retired' } },
+      expected: 'Anthropic rejected the model request: model: claude-retired'
+    },
+    {
+      provider: 'openai' as const,
+      key: 'OPENAI_API_KEY',
+      status: 429,
+      body: { error: { type: 'rate_limit_error', message: 'Too many requests' } },
+      expected: 'OpenAI rate limit hit'
+    }
+  ])(
+    'returns the useful $provider failure reason instead of flattening HTTP $status',
+    async ({ provider, key, status, body, expected }) => {
+      process.env[key] = 'test-key';
+      fakeStore.seed(
+        publishedLessonKey('lesson_1'),
+        htmlAppLesson(true, {
+          provider,
+          model: provider === 'anthropic' ? CURRENT_SONNET_MODEL : 'gpt-4o-mini'
+        })
+      );
+      vi.mocked(fetch).mockResolvedValue(
+        new Response(JSON.stringify(body), {
+          status,
+          headers: { 'content-type': 'application/json' }
+        })
+      );
+
+      const res = await handler(
+        new Request(`${FUNCTION_ORIGIN}/api/html-app-ai`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            lesson_id: 'lesson_1',
+            block_id: 'app_1',
+            messages: [{ role: 'user', content: 'Hi' }]
+          })
+        })
+      );
+
+      expect(res.status).toBe(502);
+      const json = (await res.json()) as {
+        ok: false;
+        error: { code: string; message: string };
+      };
+      expect(json.error.code).toBe('upstream_error');
+      expect(json.error.message).toContain(expected);
+      expect(json.error.message).not.toContain('test-key');
+    }
+  );
 });
