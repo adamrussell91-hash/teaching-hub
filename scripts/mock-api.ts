@@ -2974,6 +2974,15 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       return okResponse(200, { text: 'mock-ai-reply' });
     }
 
+    if (method === 'GET' && path === '/api/ai/chat') {
+      const session = getSession(cookie);
+      if (!session.authenticated) return unauthorizedResponse();
+      return okResponse(200, {
+        anthropic_configured: true,
+        model: 'claude-sonnet-4-6'
+      });
+    }
+
     if (method === 'POST' && path === '/api/ai/chat') {
       const session = getSession(cookie);
       if (!session.authenticated) return unauthorizedResponse();

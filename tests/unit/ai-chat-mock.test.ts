@@ -100,4 +100,22 @@ describe('mock /api/ai/chat', () => {
     const text = await stream.text();
     expect(text).toMatch(/"type":"(proposal|done)"/);
   });
+
+  it('reports anthropic readiness on GET /api/ai/chat', async () => {
+    const api = createMockApi({ seed, passphrase: PASSPHRASE });
+    const unauth = await api.request('GET', '/api/ai/chat');
+    expect(unauth.status).toBe(401);
+
+    const auth = await api.request('POST', '/api/auth', { body: { passphrase: PASSPHRASE } });
+    const cookie = auth.headers.get('set-cookie');
+    const status = await api.request('GET', '/api/ai/chat', { cookie });
+    expect(status.status).toBe(200);
+    const body = (await status.json()) as {
+      ok: boolean;
+      data: { anthropic_configured: boolean; model: string };
+    };
+    expect(body.ok).toBe(true);
+    expect(body.data.anthropic_configured).toBe(true);
+    expect(body.data.model).toBe('claude-sonnet-4-6');
+  });
 });

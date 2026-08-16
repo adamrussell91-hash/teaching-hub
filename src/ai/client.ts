@@ -45,13 +45,15 @@ export async function streamAiChat(
 
   if (!response.ok || !response.body) {
     let message = `AI request failed (${response.status})`;
+    let code = 'http_error';
     try {
-      const body = (await response.json()) as { error?: { message?: string } };
+      const body = (await response.json()) as { error?: { code?: string; message?: string } };
       if (body.error?.message) message = body.error.message;
+      if (body.error?.code) code = body.error.code;
     } catch {
       /* ignore */
     }
-    onEvent({ type: 'error', code: 'http_error', message, retryable: response.status >= 500 });
+    onEvent({ type: 'error', code, message, retryable: response.status >= 500 });
     return;
   }
 

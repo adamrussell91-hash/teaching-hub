@@ -1,17 +1,51 @@
 const ANTHROPIC_ORIGIN = 'https://api.anthropic.com';
 const API_VERSION = '2023-06-01';
-const DEFAULT_MODEL = 'claude-sonnet-4-20250514';
+export const DEFAULT_MODEL = 'claude-sonnet-4-6';
 const MAX_TOKENS = 8192;
 const MAX_TOOL_ROUNDS = 4;
 
 export class AnthropicStreamError extends Error {
   constructor(
     public code: string,
-    public retryable: boolean
+    public retryable: boolean,
+    message = 'Anthropic request failed.'
   ) {
-    super('Anthropic request failed.');
+    super(message);
     this.name = 'AnthropicStreamError';
   }
+}
+
+/** Map Anthropic HTTP failures to a teacher-safe message (never includes the API key). */
+export function messageForAnthropicHttpError(status: number, bodyText: string): string {
+  let providerType = '';
+  let providerMessage = '';
+  try {
+    const parsed = JSON.parse(bodyText) as {
+      error?: { type?: string; message?: string };
+      type?: string;
+      message?: string;
+    };
+    providerType = parsed.error?.type ?? parsed.type ?? '';
+    providerMessage = parsed.error?.message ?? parsed.message ?? '';
+  } catch {
+    /* ignore non-JSON bodies */
+  }
+
+  if (status === 401 || status === 403 || providerType === 'authentication_error') {
+    return 'Anthropic rejected the API key. Check ANTHROPIC_API_KEY on the Netlify Functions site.';
+  }
+  if (status === 404 || /model/i.test(providerMessage)) {
+    return providerMessage
+      ? `Anthropic rejected the model request: ${providerMessage}`
+      : 'Anthropic rejected the model request. The configured model may be unavailable.';
+  }
+  if (status === 429 || providerType === 'rate_limit_error') {
+    return 'Anthropic rate limit hit. Wait a moment and try again.';
+  }
+  if (providerMessage) {
+    return `Anthropic error (${status}): ${providerMessage}`;
+  }
+  return `Anthropic request failed (HTTP ${status}).`;
 }
 
 export type StreamEvent =
@@ -130,11 +164,20 @@ async function* streamOnce(args: {
       signal: args.signal
     });
   } catch {
-    throw new AnthropicStreamError('anthropic_unavailable', true);
+    throw new AnthropicStreamError(
+      'anthropic_unavailable',
+      true,
+      'Could not reach Anthropic. Check network connectivity from Netlify Functions.'
+    );
   }
 
   if (!response.ok || !response.body) {
-    throw new AnthropicStreamError('anthropic_http_error', response.status >= 500);
+    const bodyText = await response.text().catch(() => '');
+    throw new AnthropicStreamError(
+      'anthropic_http_error',
+      response.status >= 500 || response.status === 429,
+      messageForAnthropicHttpError(response.status, bodyText)
+    );
   }
 
   const reader = response.body.getReader();

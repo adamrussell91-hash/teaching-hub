@@ -7,7 +7,7 @@ import {
 } from '@/ai/agents';
 import { actionsForScope } from '@/ai/capabilities';
 import { streamAiChat, type ArchiveCitation } from '@/ai/client';
-import { aiFailureCopy } from '@/app/failure';
+import { aiErrorCopy, aiFailureCopy } from '@/app/failure';
 import { pollAiJob, startAiJob, listAiJobs, resolveAiJob, AiJobConflictError } from '@/ai/jobs-client';
 import { AI_JOB_STALE_MS } from '@/ai/jobs';
 import { filterProposal, listPartialAcceptUnits } from '@/ai/partial-accept';
@@ -598,7 +598,7 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
               attachProposal(assistant, event.proposal, snapshotAt);
               renderThread();
             } else if (event.type === 'error') {
-              assistant.text = aiFailureCopy(event.retryable);
+              assistant.text = aiErrorCopy(event);
               renderThread();
             } else if (event.type === 'status' && !assistant.text) {
               assistant.text = event.text;

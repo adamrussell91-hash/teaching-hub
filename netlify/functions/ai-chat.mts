@@ -9,7 +9,8 @@ import type { Lesson } from '../../src/schemas/lesson.ts';
 import { CompositionTemplateSchema, type CompositionTemplate } from '../../src/schemas/composition.ts';
 import {
   createAnthropicStreamer,
-  AnthropicStreamError
+  AnthropicStreamError,
+  DEFAULT_MODEL
 } from './_shared/anthropic-stream.mts';
 import {
   aiUsageLogKey,
@@ -25,6 +26,7 @@ import {
   isConfigured,
   methodNotAllowed,
   misconfiguredResponse,
+  okResponse,
   preflightResponse,
   withCors
 } from './_shared/http.mts';
@@ -37,8 +39,29 @@ export default async function handler(request: Request): Promise<Response> {
   const env = process.env;
 
   if (request.method === 'OPTIONS') return preflightResponse(request, env);
+
+  // Safe readiness probe: never returns the key, only whether chat can talk to Anthropic.
+  if (request.method === 'GET') {
+    const originGuard = guardRequestOrigin(request, env);
+    if (originGuard) return withCors(originGuard, request, env);
+    if (!isConfigured(env)) return withCors(misconfiguredResponse(), request, env);
+    const session = getTeacherSession(request, env);
+    if (!session.authenticated) {
+      return withCors(errorResponse(401, 'unauthorized', 'Authentication required'), request, env);
+    }
+    const key = typeof env.ANTHROPIC_API_KEY === 'string' ? env.ANTHROPIC_API_KEY.trim() : '';
+    return withCors(
+      okResponse(200, {
+        anthropic_configured: key.length > 0,
+        model: DEFAULT_MODEL
+      }),
+      request,
+      env
+    );
+  }
+
   if (request.method !== 'POST') {
-    return withCors(methodNotAllowed('POST, OPTIONS'), request, env);
+    return withCors(methodNotAllowed('GET, POST, OPTIONS'), request, env);
   }
 
   const originGuard = guardRequestOrigin(request, env);
@@ -187,10 +210,16 @@ export default async function handler(request: Request): Promise<Response> {
         }
       } catch (err) {
         const retryable = err instanceof AnthropicStreamError ? err.retryable : true;
+        const message =
+          err instanceof AnthropicStreamError
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : 'AI request failed';
         send({
           type: 'error',
           code: err instanceof AnthropicStreamError ? err.code : 'ai_failed',
-          message: 'AI request failed',
+          message,
           retryable
         });
       } finally {
