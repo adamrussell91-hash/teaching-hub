@@ -15,7 +15,12 @@ import type { Block } from '@/schemas/block';
 import type { Lesson } from '@/schemas/lesson';
 import type { Media } from '@/schemas/media';
 import { mountCoverPicker, type CoverPickerHandle } from '@/teacher/cover-picker';
-import { deleteBlocksById, insertAt, type DropRootMode } from '@/teacher/lesson-canvas/drop';
+import {
+  deleteBlocksById,
+  insertAt,
+  moveBlockTo,
+  type DropRootMode
+} from '@/teacher/lesson-canvas/drop';
 import { isTextLike } from '@/teacher/lesson-canvas/kinds';
 
 const DND_MIME = 'application/x-teaching-hub-block';
@@ -61,6 +66,7 @@ export type MountLessonPageOptions = {
 
 export type LessonPageHandle = {
   update(lesson: Lesson, nextMedia?: Media[]): void;
+  insertType(type: InsertMenuValue): void;
   dispose(): void;
 };
 
@@ -101,18 +107,24 @@ function replaceBlockInTree(blocks: Block[], updated: Block): Block[] {
   });
 }
 
-function readDropPayload(
-  event: Event
-): { kind: 'block'; type: string } | { kind: 'composition'; id: string } | null {
+type DropPayload =
+  | { kind: 'block'; type: string }
+  | { kind: 'composition'; id: string }
+  | { kind: 'move'; blockId: string };
+
+function readDropPayload(event: Event): DropPayload | null {
   const dt = (event as DragEvent).dataTransfer;
   const raw = dt?.getData(DND_MIME) ?? '';
   if (!raw) return null;
   try {
     const parsed: unknown = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object') return null;
-    const record = parsed as { kind?: unknown; type?: unknown; id?: unknown };
+    const record = parsed as { kind?: unknown; type?: unknown; id?: unknown; block_id?: unknown };
     if (record.kind === 'composition' && typeof record.id === 'string') {
       return { kind: 'composition', id: record.id };
+    }
+    if (record.kind === 'move' && typeof record.block_id === 'string') {
+      return { kind: 'move', blockId: record.block_id };
     }
     if (typeof record.type === 'string') {
       return { kind: 'block', type: record.type };
@@ -121,6 +133,31 @@ function readDropPayload(
   } catch {
     return null;
   }
+}
+
+/**
+ * `getData` is blocked during dragover, so acceptance is decided from the
+ * advertised types instead. Without this the browser shows a no-drop cursor.
+ */
+function carriesCanvasPayload(event: Event): boolean {
+  const types = (event as DragEvent).dataTransfer?.types;
+  if (!types) return false;
+  return Array.from(types).includes(DND_MIME);
+}
+
+function scrollElementIntoView(el: Element, block: ScrollLogicalPosition = 'center'): void {
+  const scroll = (el as HTMLElement).scrollIntoView?.bind(el);
+  if (!scroll) return;
+  scroll({ behavior: 'smooth', block, inline: 'nearest' });
+}
+
+function gripIcon(): SVGSVGElement {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.innerHTML =
+    '<path fill="currentColor" d="M9 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm9 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zM9 12a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm9 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zM9 18.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm9 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"/>';
+  return svg;
 }
 
 function printIcon(): SVGSVGElement {
@@ -139,11 +176,18 @@ export function mountBlockCanvas(
   let blocks = options.blocks;
   let selectedId: string | null = null;
   let media = options.media ?? [];
+  let activeDropIndex: number | null = null;
+  let pendingReveal: string | null = null;
   const rootMode: DropRootMode = options.allowCollectionAtRoot ? 'page' : 'lesson';
 
   const root = document.createElement('div');
   root.className = 'lesson-page lesson-page--blocks';
   host.append(root);
+
+  root.addEventListener('dragleave', (event) => {
+    const next = (event as DragEvent).relatedTarget as Node | null;
+    if (!next || !root.contains(next)) clearDropIndicator();
+  });
 
   function emit(next: Block[], rerender = true): void {
     blocks = next;
@@ -155,6 +199,11 @@ export function mountBlockCanvas(
     selectedId = blockId;
     options.onSelect?.(blockId);
     render();
+  }
+
+  function selectAndReveal(blockId: string): void {
+    pendingReveal = blockId;
+    select(blockId);
   }
 
   function onBlockChange(updated: Block): void {
@@ -174,20 +223,64 @@ export function mountBlockCanvas(
     if (hint) hint.textContent = message;
   }
 
-  function handleGapDragOver(event: Event): void {
-    event.preventDefault();
-    const dt = (event as DragEvent).dataTransfer;
-    if (dt) dt.dropEffect = 'copy';
+  function clearDropIndicator(): void {
+    activeDropIndex = null;
+    root
+      .querySelectorAll('.lesson-page__gap--active')
+      .forEach((el) => el.classList.remove('lesson-page__gap--active'));
   }
 
-  function handleGapDrop(event: Event, index: number): void {
+  function showDropIndicator(index: number): void {
+    if (activeDropIndex === index) return;
+    clearDropIndicator();
+    activeDropIndex = index;
+    root
+      .querySelector(`.lesson-page__gap[data-index="${index}"]`)
+      ?.classList.add('lesson-page__gap--active');
+  }
+
+  function autoScrollDuringDrag(event: Event): void {
+    const y = (event as DragEvent).clientY;
+    if (typeof y !== 'number' || typeof window === 'undefined') return;
+    if (typeof window.scrollBy !== 'function') return;
+    const edge = 96;
+    if (y < edge) window.scrollBy({ top: -28, behavior: 'auto' });
+    else if (y > window.innerHeight - edge) window.scrollBy({ top: 28, behavior: 'auto' });
+  }
+
+  function handleDragOverAt(event: Event, index: number): void {
+    if (!carriesCanvasPayload(event)) return;
     event.preventDefault();
+    const dt = (event as DragEvent).dataTransfer;
+    if (dt) dt.dropEffect = dt.effectAllowed === 'move' ? 'move' : 'copy';
+    showDropIndicator(index);
+    autoScrollDuringDrag(event);
+  }
+
+  function handleDropAt(event: Event, index: number): void {
+    event.preventDefault();
+    clearDropIndicator();
     const payload = readDropPayload(event);
     if (!payload) return;
+
     if (payload.kind === 'composition') {
       options.onCompositionDrop?.(payload.id);
       return;
     }
+
+    if (payload.kind === 'move') {
+      const result = moveBlockTo(blocks, payload.blockId, { kind: 'root' }, index, { rootMode });
+      if (!result.ok) {
+        setHint(result.message);
+        return;
+      }
+      setHint('');
+      emit(result.blocks);
+      pendingReveal = payload.blockId;
+      select(payload.blockId);
+      return;
+    }
+
     const block = createFromInsertMenu(payload.type as InsertMenuValue, options.idFactory());
     const result = insertAt(blocks, { kind: 'root' }, index, block, { rootMode });
     if (!result.ok) {
@@ -196,6 +289,7 @@ export function mountBlockCanvas(
     }
     setHint('');
     emit(result.blocks);
+    pendingReveal = block.id;
     select(block.id);
   }
 
@@ -204,9 +298,74 @@ export function mountBlockCanvas(
     gap.className = 'lesson-page__gap';
     gap.dataset.index = String(index);
     gap.style.pointerEvents = 'auto';
-    gap.addEventListener('dragover', handleGapDragOver);
-    gap.addEventListener('drop', (event) => handleGapDrop(event, index));
+    gap.addEventListener('dragover', (event) => handleDragOverAt(event, index));
+    gap.addEventListener('dragenter', (event) => handleDragOverAt(event, index));
+    gap.addEventListener('drop', (event) => handleDropAt(event, index));
     return gap;
+  }
+
+  /** A block body is the target a teacher actually aims at, so it drops too. */
+  function bindRowDropTarget(row: HTMLElement, index: number): void {
+    function indexForPointer(event: Event): number {
+      const y = (event as DragEvent).clientY;
+      const rect = row.getBoundingClientRect();
+      if (typeof y !== 'number' || rect.height === 0) return index;
+      return y > rect.top + rect.height / 2 ? index + 1 : index;
+    }
+    row.addEventListener('dragover', (event) => {
+      handleDragOverAt(event, indexForPointer(event));
+    });
+    row.addEventListener('dragenter', (event) => {
+      handleDragOverAt(event, indexForPointer(event));
+    });
+    row.addEventListener('drop', (event) => {
+      handleDropAt(event, indexForPointer(event));
+    });
+  }
+
+  function createGrip(block: Block, row: HTMLElement): HTMLElement {
+    const grip = document.createElement('button');
+    grip.type = 'button';
+    grip.className = 'lesson-page__grip';
+    grip.draggable = true;
+    grip.setAttribute('aria-label', `Move ${block.block_type.replace(/_/g, ' ')}`);
+    grip.title = 'Drag to move';
+    grip.append(gripIcon());
+    grip.addEventListener('click', (event) => event.stopPropagation());
+    grip.addEventListener('dragstart', (event) => {
+      const dt = event.dataTransfer;
+      if (!dt) return;
+      dt.effectAllowed = 'move';
+      dt.setData(DND_MIME, JSON.stringify({ kind: 'move', block_id: block.id }));
+      dt.setDragImage?.(row, 24, 12);
+      row.classList.add('lesson-page__block--dragging');
+    });
+    grip.addEventListener('dragend', () => {
+      row.classList.remove('lesson-page__block--dragging');
+      clearDropIndicator();
+    });
+    return grip;
+  }
+
+  function moveBy(blockId: string, delta: number): void {
+    const from = blocks.findIndex((row) => row.id === blockId);
+    if (from < 0) return;
+    const to = from + delta;
+    if (to < 0 || to >= blocks.length) return;
+    const result = moveBlockTo(
+      blocks,
+      blockId,
+      { kind: 'root' },
+      delta > 0 ? to + 1 : to,
+      { rootMode }
+    );
+    if (!result.ok) {
+      setHint(result.message);
+      return;
+    }
+    setHint('');
+    pendingReveal = blockId;
+    emit(result.blocks);
   }
 
   function createToolbar(block: Block): HTMLElement {
@@ -214,6 +373,28 @@ export function mountBlockCanvas(
     bar.className = 'lesson-page__toolbar';
 
     const visibility = createVisibilitySelect(block, onBlockChange, latestBlock(block.id, block));
+
+    const index = blocks.findIndex((row) => row.id === block.id);
+
+    const up = document.createElement('button');
+    up.type = 'button';
+    up.className = 'btn btn--ghost lesson-page__move-up';
+    up.textContent = 'Move up';
+    up.disabled = index <= 0;
+    up.addEventListener('click', (event) => {
+      event.stopPropagation();
+      moveBy(block.id, -1);
+    });
+
+    const down = document.createElement('button');
+    down.type = 'button';
+    down.className = 'btn btn--ghost lesson-page__move-down';
+    down.textContent = 'Move down';
+    down.disabled = index < 0 || index >= blocks.length - 1;
+    down.addEventListener('click', (event) => {
+      event.stopPropagation();
+      moveBy(block.id, 1);
+    });
 
     const duplicate = document.createElement('button');
     duplicate.type = 'button';
@@ -239,7 +420,7 @@ export function mountBlockCanvas(
       emit(deleteBlocksById(blocks, [block.id]));
     });
 
-    bar.append(visibility, duplicate, remove);
+    bar.append(visibility, up, down, duplicate, remove);
 
     if (block.block_type === 'section' && !isLinkedSection(block) && options.onSaveComposition) {
       const saveComposition = document.createElement('button');
@@ -325,6 +506,8 @@ export function mountBlockCanvas(
       row.dataset.blockId = block.id;
       row.dataset.blockType = block.block_type;
       if (selectedId === block.id) row.classList.add('lesson-page__block--selected');
+      bindRowDropTarget(row, index);
+      row.append(createGrip(block, row));
 
       if (isLinkedSection(block)) {
         row.append(createLinkedChrome(block));
@@ -348,9 +531,25 @@ export function mountBlockCanvas(
         row.addEventListener('click', () => select(block.id));
       } else {
         row.append(preview(block));
-        row.addEventListener('click', () => select(block.id));
+        row.addEventListener('click', (event) => {
+          if ((event.target as HTMLElement | null)?.closest('.lesson-page__inspector')) return;
+          if (selectedId === block.id) return;
+          selectAndReveal(block.id);
+        });
         if (selectedId === block.id) {
-          row.append(createToolbar(block));
+          const inspector = document.createElement('div');
+          inspector.className = 'lesson-page__inspector';
+          const editor = createBlockEditor(
+            block,
+            onBlockChange,
+            latestBlock(block.id, block),
+            editorCtx()
+          );
+          editor
+            .querySelectorAll('.block-editor__move-up, .block-editor__move-down')
+            .forEach((el) => el.remove());
+          inspector.append(editor);
+          row.append(inspector, createToolbar(block));
         }
       }
 
@@ -360,19 +559,12 @@ export function mountBlockCanvas(
     list.append(createGap(blocks.length));
     root.append(list);
 
-    const selected = selectedId ? findBlockById(blocks, selectedId) : null;
-    if (selected && !isTextLike(selected.block_type) && !isLinkedSection(selected)) {
-      const inspector = document.createElement('div');
-      inspector.className = 'lesson-page__inspector';
-      const editor = createBlockEditor(
-        selected,
-        onBlockChange,
-        latestBlock(selected.id, selected),
-        editorCtx()
-      );
-      editor.querySelectorAll('.block-editor__move-up, .block-editor__move-down').forEach((el) => el.remove());
-      inspector.append(editor);
-      root.append(inspector);
+    if (pendingReveal) {
+      const target = pendingReveal;
+      pendingReveal = null;
+      const row = root.querySelector(`.lesson-page__block[data-block-id="${target}"]`);
+      const editor = row?.querySelector('.lesson-page__inspector') ?? row;
+      if (editor) scrollElementIntoView(editor);
     }
   }
 
@@ -387,14 +579,16 @@ export function mountBlockCanvas(
     },
     insertType(type: InsertMenuValue) {
       const block = createFromInsertMenu(type, options.idFactory());
-      const result = insertAt(blocks, { kind: 'root' }, blocks.length, block, { rootMode });
+      const selectedIndex = selectedId ? blocks.findIndex((row) => row.id === selectedId) : -1;
+      const at = selectedIndex >= 0 ? selectedIndex + 1 : blocks.length;
+      const result = insertAt(blocks, { kind: 'root' }, at, block, { rootMode });
       if (!result.ok) {
         setHint(result.message);
         return;
       }
       setHint('');
       emit(result.blocks);
-      select(block.id);
+      selectAndReveal(block.id);
     },
     dispose() {
       root.remove();
@@ -521,6 +715,9 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       if (nextMedia) media = nextMedia;
       renderChrome();
       canvas.update(lesson.blocks, media);
+    },
+    insertType(type: InsertMenuValue) {
+      canvas.insertType(type);
     },
     dispose() {
       canvas.dispose();

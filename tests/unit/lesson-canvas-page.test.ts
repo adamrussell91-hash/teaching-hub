@@ -18,17 +18,31 @@ class Dt {
   getData(type: string): string {
     return this.store.get(type) ?? '';
   }
+  get types(): string[] {
+    return [...this.store.keys()];
+  }
+  setDragImage(): void {}
 }
 
-function dispatchDrop(el: Element, payload: unknown): void {
+function dispatchWithDt(el: Element, type: string, dt: Dt): Event {
+  const event = new Event(type, { bubbles: true, cancelable: true });
+  Object.defineProperty(event, 'dataTransfer', { value: dt });
+  el.dispatchEvent(event);
+  return event;
+}
+
+function dispatchDrop(el: Element, payload: unknown): { dragoverAccepted: boolean } {
   const dt = new Dt();
   dt.setData(MIME, JSON.stringify(payload));
-  const over = new Event('dragover', { bubbles: true, cancelable: true });
-  Object.defineProperty(over, 'dataTransfer', { value: dt });
-  el.dispatchEvent(over);
-  const drop = new Event('drop', { bubbles: true, cancelable: true });
-  Object.defineProperty(drop, 'dataTransfer', { value: dt });
-  el.dispatchEvent(drop);
+  const over = dispatchWithDt(el, 'dragover', dt);
+  dispatchWithDt(el, 'drop', dt);
+  return { dragoverAccepted: over.defaultPrevented };
+}
+
+function startGripDrag(grip: Element): Dt {
+  const dt = new Dt();
+  dispatchWithDt(grip, 'dragstart', dt);
+  return dt;
 }
 
 function makeLesson(overrides: Partial<Lesson> = {}): Lesson {
@@ -128,6 +142,77 @@ describe('mountLessonPage', () => {
     expect(headingEditor).not.toBeNull();
     expect(host.querySelector('.block-editor__move-up')).toBeNull();
     expect(host.querySelector('.lesson-editor__reorder')).toBeNull();
+  });
+
+  it('keeps a heavy block editor inside the block it belongs to', () => {
+    mount();
+    host.querySelector<HTMLElement>('[data-block-id="cm1"]')!.click();
+
+    const inspector = host.querySelector('.lesson-page__inspector');
+    expect(inspector).not.toBeNull();
+    expect(inspector!.closest('[data-block-id]')?.getAttribute('data-block-id')).toBe('cm1');
+    expect(inspector!.querySelector('.block-editor')).not.toBeNull();
+  });
+
+  it('reorders blocks with the toolbar move controls', () => {
+    const { onChange } = mount();
+    host.querySelector<HTMLElement>('[data-block-id="cm1"]')!.click();
+
+    const up = host.querySelector<HTMLButtonElement>('.lesson-page__move-up');
+    expect(up).not.toBeNull();
+    expect(up!.disabled).toBe(false);
+    up!.click();
+
+    const next = onChange.mock.calls.at(-1)?.[0] as Lesson;
+    expect(next.blocks.map((b) => b.id)).toEqual(['cm1', 'h1']);
+  });
+
+  it('disables move up on the first block and move down on the last', () => {
+    mount();
+    host.querySelector<HTMLElement>('[data-block-id="cm1"]')!.click();
+    expect(host.querySelector<HTMLButtonElement>('.lesson-page__move-down')!.disabled).toBe(true);
+    expect(host.querySelector<HTMLButtonElement>('.lesson-page__move-up')!.disabled).toBe(false);
+  });
+
+  it('accepts a palette drop on a block body, not just the gap between blocks', () => {
+    const { onChange } = mount();
+    const row = host.querySelector('[data-block-id="cm1"]')!;
+
+    const { dragoverAccepted } = dispatchDrop(row, { kind: 'block', type: 'heading' });
+
+    expect(dragoverAccepted).toBe(true);
+    const next = onChange.mock.calls.at(-1)?.[0] as Lesson;
+    expect(next.blocks.map((b) => b.id)).toEqual(['h1', 'new_1', 'cm1']);
+  });
+
+  it('marks the target gap while a drop is hovering so the teacher sees where it lands', () => {
+    mount();
+    const gap = host.querySelector<HTMLElement>('.lesson-page__gap')!;
+    const dt = new Dt();
+    dt.setData(MIME, JSON.stringify({ kind: 'block', type: 'heading' }));
+
+    dispatchWithDt(gap, 'dragover', dt);
+
+    expect(gap.classList.contains('lesson-page__gap--active')).toBe(true);
+  });
+
+  it('moves a block when its grip is dragged onto another block', () => {
+    const lesson = makeLesson({
+      blocks: [createBlock('heading', 'h1'), createBlock('concept_map', 'cm1'), createBlock('heading', 'h2')]
+    });
+    const { onChange } = mount(lesson);
+    const grip = host.querySelector('[data-block-id="h1"] .lesson-page__grip');
+    expect(grip).not.toBeNull();
+
+    const dt = startGripDrag(grip!);
+    expect(JSON.parse(dt.getData(MIME))).toEqual({ kind: 'move', block_id: 'h1' });
+
+    const target = host.querySelector('[data-block-id="h2"]')!;
+    dispatchWithDt(target, 'dragover', dt);
+    dispatchWithDt(target, 'drop', dt);
+
+    const next = onChange.mock.calls.at(-1)?.[0] as Lesson;
+    expect(next.blocks.map((b) => b.id)).toEqual(['cm1', 'h1', 'h2']);
   });
 
   it('renders heavy blocks and shows inspector plus toolbar on select', () => {

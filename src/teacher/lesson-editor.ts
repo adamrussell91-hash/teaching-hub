@@ -414,6 +414,10 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         return;
       }
       palette?.hideCompositionConfirm();
+      if (page) {
+        page.insertType(payload.type);
+        return;
+      }
       const block = createFromInsertMenu(payload.type, nextId());
       const result = insertAt(lesson.blocks, { kind: 'root' }, lesson.blocks.length, block);
       if (!result.ok) {
