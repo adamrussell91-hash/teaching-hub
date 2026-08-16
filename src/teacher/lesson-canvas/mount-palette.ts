@@ -105,11 +105,27 @@ export function mountLessonPalette(
     hideCompositionConfirm();
 
     const footer = document.createElement('div');
-    footer.className = 'lesson-palette__flyout-footer';
+    footer.className = 'confirm-card lesson-palette__flyout-footer';
+
+    const eyebrow = document.createElement('p');
+    eyebrow.className = 'page-header__eyebrow';
+    eyebrow.textContent = 'Insert this composition';
+
+    const title = document.createElement('h2');
+    title.className = 'page-header__title';
+    title.style.fontSize = 'var(--text-lg)';
+    title.textContent = 'Keep in sync, or copy?';
+
+    const supporting = document.createElement('p');
+    supporting.className = 'page-header__supporting';
+    supporting.textContent = 'Linked stays tied to the source. Copy is a snapshot.';
+
+    const actions = document.createElement('div');
+    actions.className = 'confirm-card__actions';
 
     const copyButton = document.createElement('button');
     copyButton.type = 'button';
-    copyButton.className = 'btn btn--secondary lesson-editor__insert-composition-copy';
+    copyButton.className = 'btn btn--ghost lesson-editor__insert-composition-copy';
     copyButton.textContent = 'Copy';
     copyButton.addEventListener('click', (event) => {
       event.stopPropagation();
@@ -119,7 +135,7 @@ export function mountLessonPalette(
 
     const linkedButton = document.createElement('button');
     linkedButton.type = 'button';
-    linkedButton.className = 'btn btn--secondary lesson-editor__insert-composition-linked';
+    linkedButton.className = 'btn btn--primary lesson-editor__insert-composition-linked';
     linkedButton.textContent = 'Linked';
     linkedButton.addEventListener('click', (event) => {
       event.stopPropagation();
@@ -127,7 +143,8 @@ export function mountLessonPalette(
       options.onCompositionChoice?.(id, 'linked');
     });
 
-    footer.append(copyButton, linkedButton);
+    actions.append(copyButton, linkedButton);
+    footer.append(eyebrow, title, supporting, actions);
     flyout.append(footer);
   }
 

@@ -78,14 +78,13 @@ a:hover {
 
 /* ── Glass surface recipe ─────────────────────────────────────────────── */
 
-.glass-panel,
-.sign-in__card {
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.80), rgba(255, 255, 255, 0.52));
-  border: 1px solid rgba(255, 255, 255, 0.92);
+.glass-panel {
+  background: var(--hub-glass-fill);
+  border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  box-shadow: var(--elev-3);
-  backdrop-filter: blur(22px) saturate(115%);
-  -webkit-backdrop-filter: blur(22px) saturate(115%);
+  box-shadow: var(--hub-elev-card);
+  backdrop-filter: blur(var(--hub-glass-blur)) saturate(115%);
+  -webkit-backdrop-filter: blur(var(--hub-glass-blur)) saturate(115%);
 }
 
 /* ── In-canvas page header ────────────────────────────────────────────── */
@@ -128,82 +127,7 @@ a:hover {
   flex-shrink: 0;
 }
 
-/* ── Sign-in ──────────────────────────────────────────────────────────── */
-
-.sign-in {
-  display: grid;
-  place-items: center;
-  min-height: 100dvh;
-  padding: var(--space-8) var(--space-5);
-}
-
-.sign-in__card {
-  width: min(100%, 24rem);
-  padding: var(--space-8) var(--space-6);
-  display: grid;
-  gap: var(--space-5);
-}
-
-.sign-in__brand {
-  font-family: var(--font-ui);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-semibold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.sign-in__title {
-  font-family: var(--font-ui);
-  font-size: var(--text-xl);
-  font-weight: var(--weight-semibold);
-  line-height: 1.2;
-  color: var(--depth);
-}
-
-.sign-in__field {
-  display: grid;
-  gap: var(--space-2);
-}
-
-.sign-in__label {
-  font-family: var(--font-ui);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  color: var(--orca);
-}
-
-.sign-in__input {
-  width: 100%;
-  padding: var(--space-3);
-  font: inherit;
-  font-family: var(--font-ui);
-  font-size: var(--text-base);
-  color: var(--ink);
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-}
-
-.sign-in__input::placeholder {
-  color: var(--shallow);
-}
-
-.sign-in__form {
-  display: grid;
-  gap: var(--space-4);
-}
-
-.sign-in__submit {
-  width: 100%;
-}
-
-.sign-in__error {
-  margin: 0;
-  font-family: var(--font-ui);
-  font-size: var(--text-sm);
-  color: var(--danger);
-}
+/* Sign-in lives in design-kit/sign-in.css */
 
 /* ── Teacher workspace grid ───────────────────────────────────────────── */
 
@@ -6997,12 +6921,7 @@ input.scope-timeline__note-title:focus-visible {
 }
 
 .lesson-palette__flyout-footer {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
   margin-top: var(--space-2);
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--line);
 }
 
 .lesson-page__linked-chrome {
