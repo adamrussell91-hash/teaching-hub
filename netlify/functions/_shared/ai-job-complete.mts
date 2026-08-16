@@ -12,7 +12,7 @@ import {
 } from '../../../src/ai/jobs.ts';
 import type { Lesson } from '../../../src/schemas/lesson.ts';
 import { syncInboxForJob, type AiJobInbox } from '../../../src/ai/jobs-inbox.ts';
-import { emptySearchPack } from '../../../src/ai/search-pack.ts';
+import { buildLessonSearchQuery, searchPublicWeb } from './brave-search.mts';
 import {
   aiJobKey,
   aiJobsInboxKey,
@@ -48,7 +48,9 @@ async function persistJobResult(store: Store, job: AiJob): Promise<AiJob> {
   const assistant =
     job.status === 'error'
       ? `Job failed: ${job.error ?? 'unknown error'}`
-      : 'Proposed a replace_lesson draft.';
+      : job.proposal
+        ? `Proposed a ${job.proposal.kind} change.`
+        : 'Completed without a proposal.';
   await setJSON(
     store,
     aiTranscriptKey(job.lesson_id, job.agent),
@@ -118,15 +120,20 @@ export async function completeWorkingAiJob(
 
   const transcript = await loadTranscript(store, job.lesson_id, job.agent);
   const kernelSecret = env.RESEARCH_KERNEL_SHARED_SECRET;
-  let archive: ArchivePull | undefined;
-  if (kernelSecret) {
-    archive = await pullArchive({
-      query: job.message,
-      documentContext: `${lesson.title}\n${job.message}`,
-      url: env.RESEARCH_KERNEL_URL,
-      secret: kernelSecret
-    });
-  }
+  const [archive, searchPack] = await Promise.all([
+    kernelSecret
+      ? pullArchive({
+          query: job.message,
+          documentContext: `${lesson.title}\n${job.message}`,
+          url: env.RESEARCH_KERNEL_URL,
+          secret: kernelSecret
+        })
+      : Promise.resolve<ArchivePull | undefined>(undefined),
+    searchPublicWeb({
+      query: buildLessonSearchQuery(job.message, lesson.title),
+      apiKey: env.BRAVE_SEARCH_API_KEY
+    })
+  ]);
   const nextJob = archive?.archiveFailed ? { ...job, archiveFailed: true } : job;
 
   const outcome = await tryKernelProposal({
@@ -137,7 +144,7 @@ export async function completeWorkingAiJob(
       lesson,
       transcript,
       archive,
-      searchPack: emptySearchPack(job.message)
+      searchPack
     })
   });
   return persistJobResult(store, applyKernelOutcome(nextJob, outcome));
