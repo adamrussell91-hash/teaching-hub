@@ -1,0 +1,12 @@
+---
+description: Use the hub design kit for all Teaching Hub UI
+alwaysApply: true
+---
+
+# Design kit
+
+Before writing or restyling UI, read `design-kit/AGENTS.md`.
+
+Use `design-kit/tokens.css` (already imported from `src/design/tokens.css`) and overlay `data-hub="teaching"`. Do not invent colours, type sizes, or button styles. New chrome should match `design-kit/snippets/` and `.btn` / `.page-header` already in the app.
+
+Canonical kit: `/Users/adamrussell/Projects/hub-design-kit`
