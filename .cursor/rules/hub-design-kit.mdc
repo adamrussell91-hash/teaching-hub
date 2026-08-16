@@ -1,12 +1,12 @@
 ---
-description: Use the hub design kit for all Teaching Hub UI
+description: Hub design kit is the visual source of truth for all hub sites
 alwaysApply: true
 ---
 
-# Design kit
+# Hub design kit
 
-Before writing or restyling UI, read `design-kit/AGENTS.md`.
+Before any UI work on a hub (new site or an edit), read `AGENTS.md` and use `css/tokens.css`, `css/overlays.css`, `css/chrome.css`, and `snippets/`.
 
-Use `design-kit/tokens.css` (already imported from `src/design/tokens.css`) and overlay `data-hub="teaching"`. Do not invent colours, type sizes, or button styles. New chrome should match `design-kit/snippets/` and `.btn` / `.page-header` already in the app.
-
-Canonical kit: `/Users/adamrussell/Projects/hub-design-kit`
+- Do not invent colours, type sizes, radii, or button styles.
+- Per-hub differences are overlay only: `data-hub="teaching|life|knowledge|tasks"` (glass / tile density). Tasks clones Teaching; see `TASKS.md`.
+- After changing kit CSS, run `scripts/sync-to-hubs.sh`.
