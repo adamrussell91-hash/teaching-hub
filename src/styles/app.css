@@ -162,40 +162,25 @@ a:hover {
   font-weight: var(--weight-semibold);
   letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.55);
-}
-
-.teacher-layout__logout {
-  flex-shrink: 0;
-  margin: 0;
-  min-height: 2rem;
-  padding: var(--space-1) var(--space-2);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: rgba(255, 255, 255, 0.78);
-  font-family: var(--font-ui);
-  font-size: var(--text-2xs);
-  font-weight: var(--weight-medium);
-  letter-spacing: var(--tracking-wide);
-  cursor: pointer;
-}
-
-.teacher-layout__logout:hover:not(:disabled) {
-  color: #fff;
-  border-color: rgba(255, 255, 255, 0.5);
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.teacher-layout__logout:disabled {
-  opacity: 0.55;
-  cursor: wait;
+  line-height: var(--leading-snug);
+  color: var(--on-dark-muted);
+  white-space: nowrap;
 }
 
 .teacher-layout__jobs {
   position: relative;
   flex-shrink: 0;
   margin-left: auto;
+}
+
+/* Discrete sign-out (and any future chrome icons). Lives on main so canvas
+   replaceChildren cannot wipe it. Styles come from design-kit actions.css. */
+.teacher-layout__utilities {
+  position: absolute;
+  top: var(--space-4);
+  right: clamp(var(--space-5), 3vw, var(--space-10));
+  z-index: 5;
+  margin-left: 0;
 }
 
 .ai-jobs-inbox__toggle {
@@ -306,6 +291,7 @@ a:hover {
 }
 
 .teacher-layout__main {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-width: 0;
