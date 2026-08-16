@@ -36,7 +36,7 @@ export const AGENTS: AgentDefinition[] = [
     slug: 'hammond',
     name: 'General Hammond',
     colour: '#2D2D2D',
-    avatarSrc: '/assets/agents/hammond.jpg',
+    avatarSrc: '/assets/agents/hammond.png',
     heroSrc: '/assets/agents/full/hammond.png',
     nameTriggers: ['general hammond', 'hammond'],
     protocolFile: 'hammond-protocol.md'

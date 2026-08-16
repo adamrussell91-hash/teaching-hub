@@ -760,19 +760,8 @@ a:hover {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: 50% 18%;
-  transform: scale(1.45);
+  object-position: center top;
   display: block;
-}
-
-.ai-panel__agent[data-agent="hammond"] .ai-panel__agent-avatar {
-  object-position: 50% 12%;
-  transform: scale(1.85);
-}
-
-.ai-panel__agent[data-agent="clementine"] .ai-panel__agent-avatar {
-  object-position: 50% 12%;
-  transform: scale(1.65);
 }
 
 .ai-panel__scope {
@@ -835,14 +824,8 @@ a:hover {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: 50% 18%;
-  transform: scale(1.45);
+  object-position: center top;
   display: block;
-}
-
-.ai-panel__msg-avatar-wrap[data-agent="hammond"] .ai-panel__msg-avatar {
-  object-position: 50% 12%;
-  transform: scale(1.85);
 }
 
 .ai-panel__bubble {
@@ -6926,15 +6909,22 @@ input.scope-timeline__note-title:focus-visible {
   right: var(--space-6);
   bottom: var(--space-6);
   z-index: 30;
+  display: grid;
+  place-items: center;
   width: 3.2rem;
   height: 3.2rem;
+  padding: 0;
   border: 0;
   border-radius: var(--radius-full);
   color: #fff;
   background: var(--agent-accent, var(--wave));
-  font-size: var(--text-lg);
   box-shadow: var(--elev-4);
   cursor: pointer;
+}
+
+.lesson-builder__chat-fab svg {
+  width: 1.45rem;
+  height: 1.45rem;
 }
 
 .lesson-builder__chat-fab[data-agent="clare"] {
@@ -7241,6 +7231,23 @@ input.scope-timeline__note-title:focus-visible {
   background: var(--cotton);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
+}
+
+.lesson-page__block .block-editor__visibility {
+  display: none;
+}
+
+.lesson-page__block:not(.lesson-page__block--selected) .block-editor__heading-variant,
+.lesson-page__block:not(.lesson-page__block--selected) .block-editor__toolbar {
+  display: none;
+}
+
+.cover-picker--compact:not(.cover-picker--editing) .cover-picker__toolbar {
+  display: none;
+}
+
+.cover-picker--compact .cover-picker__hero {
+  cursor: pointer;
 }
 
 /* ── Lessons library ─────────────────────────────────────────────────── */

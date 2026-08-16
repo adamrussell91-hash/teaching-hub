@@ -148,7 +148,8 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     chatFab.type = 'button';
     chatFab.className = 'lesson-builder__chat-fab';
     chatFab.setAttribute('aria-label', 'Open chat');
-    chatFab.textContent = '💬';
+    chatFab.innerHTML =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4 3.2V16H7.5A2.5 2.5 0 0 1 5 13.5v-7Z"/></svg>';
 
     const aiHost = document.createElement('div');
 

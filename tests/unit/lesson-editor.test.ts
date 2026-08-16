@@ -266,6 +266,9 @@ describe('mountLessonEditor', () => {
     mount();
     await tick();
 
+    refs.canvas.querySelector<HTMLElement>('.lesson-page__block')!.click();
+    await tick();
+
     const editors = refs.canvas.querySelectorAll('.block-editor');
     expect(editors).toHaveLength(1);
     expect(
