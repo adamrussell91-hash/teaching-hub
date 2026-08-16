@@ -46,6 +46,9 @@ vi.mock('../../netlify/functions/_shared/blobs.mts', async (importOriginal) => {
 
 const { draftLessonKey } = await import('../../netlify/functions/_shared/blobs.mts');
 const { createSessionToken } = await import('../../netlify/functions/_shared/auth-security.mts');
+const { BRAVE_SEARCH_MESSAGE_MAX_CHARS } = await import(
+  '../../netlify/functions/_shared/brave-search.mts'
+);
 const handler = (await import('../../netlify/functions/ai-chat.mts')).default;
 
 const FUNCTION_ORIGIN = 'https://api.example.netlify.app';
@@ -186,7 +189,7 @@ function sessionCookie(): string {
   return `teaching_hub_session=${token}`;
 }
 
-function chatRequest(): Request {
+function chatRequest(message = MESSAGE): Request {
   return new Request(`${FUNCTION_ORIGIN}/api/ai/chat`, {
     method: 'POST',
     headers: {
@@ -197,9 +200,20 @@ function chatRequest(): Request {
       lesson_id: LESSON_ID,
       agent: 'ann',
       scope: 'lesson',
-      message: MESSAGE
+      message
     })
   });
+}
+
+function braveQueryParams(fetchMock: ReturnType<typeof destinationFetch>): string[] {
+  return fetchMock.mock.calls
+    .map(([input]) => {
+      const url = new URL(
+        typeof input === 'string' || input instanceof URL ? input : (input as Request).url
+      );
+      return url.origin === 'https://api.search.brave.com' ? url.searchParams.get('q') : null;
+    })
+    .filter((q): q is string => typeof q === 'string');
 }
 
 function destinationFetch(
@@ -338,5 +352,30 @@ describe('POST /api/ai/chat mandatory web search', () => {
     expect(text).toContain('"type":"tool_error"');
     expect(text).toContain(`blocks[0].content.url=${inventedUrl}`);
     expect(text).not.toContain('"type":"proposal"');
+  });
+
+  it('truncates over-length teacher messages so Brave search stays available', async () => {
+    const longMessage = `${'x'.repeat(1200)} ${MESSAGE}`;
+    expect(longMessage.length).toBeGreaterThan(BRAVE_SEARCH_MESSAGE_MAX_CHARS);
+    expect(longMessage.length).toBeLessThanOrEqual(8000);
+
+    const fetchMock = destinationFetch({ position: 'below', blocks: [mindMapBlock()] });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await handler(chatRequest(longMessage));
+    const text = await response.text();
+    const queries = braveQueryParams(fetchMock);
+
+    expect(response.status).toBe(200);
+    expect(queries).toHaveLength(3);
+    for (const q of queries) {
+      expect(q).toContain('\nLesson: Food science');
+      expect(q.startsWith(longMessage.slice(0, BRAVE_SEARCH_MESSAGE_MAX_CHARS))).toBe(true);
+      expect(q.includes(longMessage)).toBe(false);
+      expect(q.length).toBeLessThan(longMessage.length);
+    }
+    expect(anthropicBodies(fetchMock)[0]?.system).toContain('"available":true');
+    expect(anthropicBodies(fetchMock)[0]?.system).toContain('britannica.com');
+    expect(text).toContain('"block_type":"mind_map"');
   });
 });

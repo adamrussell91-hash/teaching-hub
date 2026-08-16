@@ -9,6 +9,24 @@ const DEFAULT_TIMEOUT_MS = 4500;
 const WEB_RESULT_COUNT = 8;
 const MEDIA_RESULT_COUNT = 6;
 
+/** Cap for the teacher-message portion of a Brave `q` (lesson title is appended separately). */
+export const BRAVE_SEARCH_MESSAGE_MAX_CHARS = 360;
+
+/**
+ * Builds a Brave-safe search query: truncated teacher message plus lesson title.
+ * Long messages (schema allows up to 8000 chars) must not blow past provider URL limits
+ * or silently disable search.
+ */
+export function buildLessonSearchQuery(message: string, lessonTitle: string): string {
+  const trimmedMessage = message.trim();
+  const clipped =
+    trimmedMessage.length > BRAVE_SEARCH_MESSAGE_MAX_CHARS
+      ? trimmedMessage.slice(0, BRAVE_SEARCH_MESSAGE_MAX_CHARS)
+      : trimmedMessage;
+  const title = lessonTitle.trim();
+  return title ? `${clipped}\nLesson: ${title}` : clipped;
+}
+
 export interface SearchPublicWebInput {
   query: string;
   apiKey?: string;

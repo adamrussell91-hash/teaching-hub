@@ -8,7 +8,7 @@ import { AI_TOOLS, AiChatRequestSchema, parseToolProposal } from '../../src/ai/p
 import { validateProposalAgainstSearchPack } from '../../src/ai/search-pack-validation.ts';
 import type { Lesson } from '../../src/schemas/lesson.ts';
 import { CompositionTemplateSchema, type CompositionTemplate } from '../../src/schemas/composition.ts';
-import { searchPublicWeb } from './_shared/brave-search.mts';
+import { searchPublicWeb, buildLessonSearchQuery } from './_shared/brave-search.mts';
 import {
   createAnthropicStreamer,
   AnthropicStreamError,
@@ -103,12 +103,6 @@ export default async function handler(request: Request): Promise<Response> {
     return withCors(errorResponse(404, 'not_found', 'Lesson not found'), request, env);
   }
 
-  const searchPack = await searchPublicWeb({
-    query: `${body.message}\nLesson: ${lesson.title}`,
-    apiKey: env.BRAVE_SEARCH_API_KEY
-  });
-  const selection = resolveSelection(lesson.blocks, body.selected_block_id, body.scope);
-
   const apiKey = env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     return withCors(
@@ -117,6 +111,12 @@ export default async function handler(request: Request): Promise<Response> {
       env
     );
   }
+
+  const searchPack = await searchPublicWeb({
+    query: buildLessonSearchQuery(body.message, lesson.title),
+    apiKey: env.BRAVE_SEARCH_API_KEY
+  });
+  const selection = resolveSelection(lesson.blocks, body.selected_block_id, body.scope);
 
   let protocol = protocolForAgent(body.agent);
   let archiveFindings: Array<{ pageId: string; title: string; excerpt: string; stance: string }> = [];
