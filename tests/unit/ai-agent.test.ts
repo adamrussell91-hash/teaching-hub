@@ -3,8 +3,9 @@ import { actionsForBlockType, actionsForScope } from '@/ai/capabilities';
 import { applyProposalToBlocks, applyProposalToLesson } from '@/ai/apply-proposal';
 import { findEnclosingSection, replaceBlockInTree } from '@/ai/block-tree';
 import { buildAiSystemPrompt } from '@/ai/context';
+import { emptySearchPack, type SearchPack } from '@/ai/search-pack';
 import { parseToolProposal } from '@/ai/proposals';
-import { createBlock } from '@/blocks/create-block';
+import { createBlock, NEW_BLOCK_TYPES } from '@/blocks/create-block';
 import { DEFAULT_AGENT_SLUG, agentBySlug, agentColour } from '@/ai/agents';
 import type { Lesson } from '@/schemas/lesson';
 import type { Block } from '@/schemas/block';
@@ -25,6 +26,8 @@ function lessonFixture(overrides: Partial<Lesson> = {}): Lesson {
     ...overrides
   };
 }
+
+const EMPTY_SEARCH_PACK = emptySearchPack('lesson context', '2026-08-16T00:00:00.000Z');
 
 describe('AI agents', () => {
   it('exposes four agents with locked colours', () => {
@@ -290,7 +293,8 @@ describe('AI context builder', () => {
       lesson,
       scope: 'block',
       selectedBlockId: 'c1',
-      action: 'shorten'
+      action: 'shorten',
+      searchPack: EMPTY_SEARCH_PACK
     });
     expect(prompt).toContain('Scope: block');
     expect(prompt).toContain('c1');
@@ -304,7 +308,8 @@ describe('AI context builder', () => {
       agentName: "Ann O'Tation",
       protocol: 'Be precise.',
       lesson,
-      scope: 'lesson' as const
+      scope: 'lesson' as const,
+      searchPack: EMPTY_SEARCH_PACK
     };
 
     for (const selectedBlockId of ['' as const, null]) {
@@ -330,7 +335,8 @@ describe('AI context builder', () => {
       lesson,
       scope: 'lesson',
       selectedBlockId: null,
-      fullLesson: true
+      fullLesson: true,
+      searchPack: EMPTY_SEARCH_PACK
     });
     expect(prompt).toContain('"blocks":');
     expect(prompt).toContain('h_full');
@@ -338,5 +344,89 @@ describe('AI context builder', () => {
     expect(prompt).toContain('Lesson outline');
     expect(prompt).toContain('"id":"h_full"');
     expect(prompt).toContain('"block_type":"heading"');
+  });
+
+  it('grounds content and media in an available search pack', () => {
+    const searchPack: SearchPack = {
+      query: 'cheese',
+      searched_at: '2026-08-16T00:00:00.000Z',
+      available: true,
+      sources: [
+        {
+          title: 'Cheese',
+          url: 'https://www.britannica.com/topic/cheese',
+          snippet: 'A nutritious food made primarily from the milk of cows.',
+          domain: 'britannica.com',
+          education_score: 80
+        }
+      ],
+      images: [],
+      videos: []
+    };
+
+    const prompt = buildAiSystemPrompt({
+      agentName: "Ann O'Tation",
+      protocol: 'Be precise.',
+      lesson: lessonFixture(),
+      scope: 'lesson',
+      selectedBlockId: null,
+      searchPack
+    });
+
+    expect(prompt).toContain('## Search pack');
+    expect(prompt).toContain('https://www.britannica.com/topic/cheese');
+    expect(prompt).toContain('Always ground generated content in this search pack');
+    expect(prompt).toContain('mind_map');
+    expect(prompt).toContain('nodes: 1–24');
+    expect(prompt).toContain('question_set');
+    expect(prompt).toContain('image/video/embed URLs must come from the search pack');
+    expect(prompt).toContain('"block_type":"mind_map"');
+    expect(prompt).toContain('"block_type":"question_set"');
+  });
+
+  it('limits output to text and structure when web search is unavailable', () => {
+    const prompt = buildAiSystemPrompt({
+      agentName: "Ann O'Tation",
+      protocol: 'Be precise.',
+      lesson: lessonFixture(),
+      scope: 'lesson',
+      selectedBlockId: null,
+      searchPack: EMPTY_SEARCH_PACK
+    });
+
+    expect(prompt).toContain('Web search unavailable');
+    expect(prompt).toContain('Build text/structure only');
+    expect(prompt).toContain('omit external media URLs');
+    expect(prompt).toContain('explicitly report that search was unavailable');
+  });
+
+  it.each(NEW_BLOCK_TYPES.filter((type) => type !== 'collection'))(
+    'includes an exact schema example for %s',
+    (type) => {
+      const prompt = buildAiSystemPrompt({
+        agentName: "Ann O'Tation",
+        protocol: 'Be precise.',
+        lesson: lessonFixture(),
+        scope: 'lesson',
+        selectedBlockId: null,
+        searchPack: EMPTY_SEARCH_PACK
+      });
+
+      expect(prompt).toContain('## Exact block JSON examples');
+      expect(prompt).toContain(`"block_type":"${type}"`);
+    }
+  );
+
+  it('does not include collection among lesson schema examples', () => {
+    const prompt = buildAiSystemPrompt({
+      agentName: "Ann O'Tation",
+      protocol: 'Be precise.',
+      lesson: lessonFixture(),
+      scope: 'lesson',
+      selectedBlockId: null,
+      searchPack: EMPTY_SEARCH_PACK
+    });
+
+    expect(prompt).not.toContain('"block_type":"collection"');
   });
 });

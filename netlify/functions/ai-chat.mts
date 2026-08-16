@@ -3,6 +3,7 @@ import { resolveSelection } from '../../src/ai/selection.ts';
 import { pullArchive } from '../../src/ai/archiveKernel.ts';
 import { matchCompositionFill } from '../../src/ai/composition-fill.ts';
 import { buildAiSystemPrompt } from '../../src/ai/context.ts';
+import { emptySearchPack } from '../../src/ai/search-pack.ts';
 import { protocolForAgent } from '../../src/ai/protocols.ts';
 import { AI_TOOLS, AiChatRequestSchema, parseToolProposal } from '../../src/ai/proposals.ts';
 import type { Lesson } from '../../src/schemas/lesson.ts';
@@ -149,7 +150,9 @@ export default async function handler(request: Request): Promise<Response> {
     selectedBlockId: selection.selectedBlockId,
     action: body.action,
     fullLesson: body.agent === 'clementine',
-    compositionFill: compositionFill ?? undefined
+    compositionFill: compositionFill ?? undefined,
+    // Task 5 replaces this compile-safe fallback with route search integration.
+    searchPack: emptySearchPack(body.message)
   });
 
   const history = (body.history ?? []).map((m) => ({
