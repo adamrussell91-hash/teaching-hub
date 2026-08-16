@@ -46,7 +46,7 @@ describe('lesson builder chrome prefs', () => {
   });
 
   it('returns defaults when storage is empty', () => {
-    expect(readBuilderChromePrefs()).toEqual(DEFAULT_BUILDER_CHROME);
+    expect(readBuilderChromePrefs()).toEqual({ rail: 'open', chat: 'shelved' });
   });
 
   it('round-trips shelf state', () => {

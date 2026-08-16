@@ -1,5 +1,6 @@
 import { apiGet, apiPost, ApiClientError } from '@/api/client';
 import { applyProposalToLesson } from '@/ai/apply-proposal';
+import { agentColour, readLastAgentSlug, type AgentSlug } from '@/ai/agents';
 import type { AiProposal, AiScope } from '@/ai/proposals';
 import { insertCompositionRoot } from '@/blocks/composition-insert';
 import {
@@ -132,7 +133,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     refs.canvas.replaceChildren();
 
     const builder = document.createElement('div');
-    builder.className = 'lesson-builder';
+    builder.className = 'lesson-builder lesson-builder--chat-shelved';
 
     const railHost = document.createElement('div');
     railHost.className = 'lesson-builder__rail';
@@ -143,11 +144,11 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     const chatCol = document.createElement('div');
     chatCol.className = 'lesson-builder__chat';
 
-    const chatStrip = document.createElement('button');
-    chatStrip.type = 'button';
-    chatStrip.className = 'lesson-builder__chat-strip';
-    chatStrip.textContent = 'Chat';
-    chatStrip.hidden = true;
+    const chatFab = document.createElement('button');
+    chatFab.type = 'button';
+    chatFab.className = 'lesson-builder__chat-fab';
+    chatFab.setAttribute('aria-label', 'Open chat');
+    chatFab.textContent = '💬';
 
     const aiHost = document.createElement('div');
 
@@ -162,9 +163,15 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     compositionStatus.hidden = true;
 
     pageCol.append(publishPanel, pageHost, compositionStatus);
-    chatCol.append(chatStrip, aiHost);
-    builder.append(railHost, pageCol, chatCol);
+    chatCol.append(aiHost);
+    builder.append(railHost, pageCol, chatCol, chatFab);
     refs.canvas.append(builder);
+
+    function paintChatFab(slug: AgentSlug): void {
+      chatFab.style.setProperty('--agent-accent', agentColour(slug));
+      chatFab.dataset.agent = slug;
+    }
+    paintChatFab(readLastAgentSlug());
 
     function nextId(): string {
       blockCounter += 1;
@@ -207,7 +214,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     function setChatShelved(shelved: boolean): void {
       builder.classList.toggle('lesson-builder--chat-shelved', shelved);
       aiPanel?.setShelved(shelved);
-      chatStrip.hidden = !shelved;
+      chatFab.hidden = !shelved;
       persistChrome();
     }
 
@@ -485,17 +492,21 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         }
       },
       onWorkingChange: (working) => {
-        chatStrip.classList.toggle('lesson-builder__chat-strip--working', working);
-      }
+        chatFab.classList.toggle('lesson-builder__chat-fab--working', working);
+      },
+      onAgentChange: (slug) => {
+        paintChatFab(slug);
+      },
+      onRequestShelve: () => setChatShelved(true)
     });
 
     syncAiSelection();
 
     const prefs = readBuilderChromePrefs();
     if (prefs.rail === 'shelved') setRailShelved(true);
-    if (prefs.chat === 'shelved') setChatShelved(true);
+    setChatShelved(prefs.chat === 'shelved');
 
-    chatStrip.addEventListener('click', () => setChatShelved(false));
+    chatFab.addEventListener('click', () => setChatShelved(false));
 
     function onWindowKeydown(event: KeyboardEvent): void {
       if (disposed || isTypingTarget(event.target)) return;

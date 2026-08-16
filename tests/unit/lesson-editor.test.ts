@@ -236,14 +236,23 @@ describe('mountLessonEditor', () => {
     expect(input?.getAttribute('aria-label')).toBe('Lesson title');
   });
 
-  it('mounts palette, page, and always-on chat without A4 tab or add-block select', async () => {
+  it('mounts palette, page, and a Life Hub chat bubble that opens the right column', async () => {
     mockLessonLoad();
     mount();
     await tick();
 
+    const builder = refs.canvas.querySelector('.lesson-builder')!;
     expect(refs.canvas.querySelector('.lesson-palette')).not.toBeNull();
     expect(refs.canvas.querySelector('.lesson-page')).not.toBeNull();
     expect(refs.canvas.querySelector('.ai-panel')).not.toBeNull();
+    expect(refs.canvas.querySelector('.ai-panel__hero')).toBeNull();
+    expect(builder.classList.contains('lesson-builder--chat-shelved')).toBe(true);
+    const fab = refs.canvas.querySelector<HTMLButtonElement>('.lesson-builder__chat-fab');
+    expect(fab).not.toBeNull();
+    expect(fab?.hidden).toBe(false);
+    fab?.click();
+    expect(builder.classList.contains('lesson-builder--chat-shelved')).toBe(false);
+    expect(fab?.hidden).toBe(true);
     expect(refs.canvas.querySelector('[aria-label="Print"]')).not.toBeNull();
     expect(refs.canvas.querySelector('.lesson-editor__add-block-select')).toBeNull();
     const a4Tab = [...refs.canvas.querySelectorAll('.lesson-editor__mode-tab')].find(
@@ -337,6 +346,22 @@ describe('mountLessonEditor', () => {
     spy.mockRestore();
   });
 
+  it('hides chat via the panel Hide control', async () => {
+    mockLessonLoad();
+    mount();
+    await tick();
+
+    const builder = refs.canvas.querySelector('.lesson-builder')!;
+    refs.canvas.querySelector<HTMLButtonElement>('.lesson-builder__chat-fab')!.click();
+    expect(builder.classList.contains('lesson-builder--chat-shelved')).toBe(false);
+
+    refs.canvas.querySelector<HTMLButtonElement>('.ai-panel__hide')!.click();
+    expect(builder.classList.contains('lesson-builder--chat-shelved')).toBe(true);
+    expect(refs.canvas.querySelector<HTMLButtonElement>('.lesson-builder__chat-fab')?.hidden).toBe(
+      false
+    );
+  });
+
   it('toggles rail and chat with [ and ] when not typing', async () => {
     mockLessonLoad();
     mount();
@@ -344,17 +369,17 @@ describe('mountLessonEditor', () => {
 
     const builder = refs.canvas.querySelector('.lesson-builder')!;
     expect(builder.classList.contains('lesson-builder--rail-shelved')).toBe(false);
-    expect(builder.classList.contains('lesson-builder--chat-shelved')).toBe(false);
+    expect(builder.classList.contains('lesson-builder--chat-shelved')).toBe(true);
 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: '[', bubbles: true }));
     expect(builder.classList.contains('lesson-builder--rail-shelved')).toBe(true);
-    expect(refs.canvas.querySelector('.lesson-builder__chat-strip')).toBeTruthy();
+    expect(refs.canvas.querySelector('.lesson-builder__chat-fab')).toBeTruthy();
 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: ']', bubbles: true }));
-    expect(builder.classList.contains('lesson-builder--chat-shelved')).toBe(true);
-    const strip = refs.canvas.querySelector<HTMLElement>('.lesson-builder__chat-strip');
-    expect(strip).not.toBeNull();
-    expect(strip?.hidden).toBe(false);
+    expect(builder.classList.contains('lesson-builder--chat-shelved')).toBe(false);
+    const fab = refs.canvas.querySelector<HTMLElement>('.lesson-builder__chat-fab');
+    expect(fab).not.toBeNull();
+    expect(fab?.hidden).toBe(true);
 
     const title = refs.canvas.querySelector<HTMLInputElement>('.lesson-page__title')!;
     title.dispatchEvent(new KeyboardEvent('keydown', { key: '[', bubbles: true }));
