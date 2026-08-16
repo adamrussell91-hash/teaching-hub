@@ -196,6 +196,7 @@ export function mountBlockCanvas(
     }
     setHint('');
     emit(result.blocks);
+    select(block.id);
   }
 
   function createGap(index: number): HTMLElement {
@@ -336,13 +337,15 @@ export function mountBlockCanvas(
           options.onSelect?.(block.id);
         });
       } else if (isTextLike(block.block_type)) {
-        const editor = createBlockEditor(block, onBlockChange, latestBlock(block.id, block), editorCtx());
-        editor.querySelectorAll('.block-editor__move-up, .block-editor__move-down').forEach((el) => el.remove());
-        row.append(editor);
-        row.addEventListener('click', () => {
-          selectedId = block.id;
-          options.onSelect?.(block.id);
-        });
+        if (selectedId === block.id) {
+          const editor = createBlockEditor(block, onBlockChange, latestBlock(block.id, block), editorCtx());
+          editor.querySelectorAll('.block-editor__move-up, .block-editor__move-down').forEach((el) => el.remove());
+          row.append(editor);
+          row.append(createToolbar(block));
+        } else {
+          row.append(preview(block));
+        }
+        row.addEventListener('click', () => select(block.id));
       } else {
         row.append(preview(block));
         row.addEventListener('click', () => select(block.id));
@@ -391,6 +394,7 @@ export function mountBlockCanvas(
       }
       setHint('');
       emit(result.blocks);
+      select(block.id);
     },
     dispose() {
       root.remove();
@@ -482,6 +486,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       cover: lesson.cover ?? null,
       media,
       titleFallback: lesson.title,
+      compact: true,
       onSave: (cover) => {
         emitLesson({ ...lesson, ...(cover ? { cover } : { cover: undefined }) });
       }

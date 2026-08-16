@@ -424,6 +424,21 @@ describe('mountAiPanel', () => {
     expect(onWorkingChange).toHaveBeenCalledWith(true);
   });
 
+  it('uses circular picker avatars without a full-body hero and can request hide', () => {
+    const onRequestShelve = vi.fn();
+    const onAgentChange = vi.fn();
+    const mounted = mountPanel({ onRequestShelve, onAgentChange });
+    handle = mounted.handle;
+
+    expect(mounted.host.querySelector('.ai-panel__hero')).toBeNull();
+    expect(mounted.host.querySelectorAll('.ai-panel__agent')).toHaveLength(4);
+    expect(mounted.host.querySelector('[data-agent="hammond"]')).toBeTruthy();
+    expect(onAgentChange).toHaveBeenCalledWith('ann');
+
+    mounted.host.querySelector<HTMLButtonElement>('.ai-panel__hide')!.click();
+    expect(onRequestShelve).toHaveBeenCalledTimes(1);
+  });
+
   it('restores a finished job as a pending Accept card', async () => {
     listAiJobsMock.mockResolvedValue({
       jobs: [

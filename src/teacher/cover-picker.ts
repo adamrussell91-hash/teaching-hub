@@ -8,6 +8,7 @@ export interface CoverPickerOptions {
   titleFallback?: string;
   onSave: (cover: Cover | null) => void | Promise<void>;
   editable?: boolean;
+  compact?: boolean;
 }
 
 export interface CoverPickerHandle {
@@ -31,6 +32,7 @@ export function mountCoverPicker(
 
   const root = document.createElement('div');
   root.className = 'cover-picker';
+  if (options.compact) root.classList.add('cover-picker--compact');
 
   const hero = document.createElement('div');
   hero.className = 'cover-picker__hero';
@@ -90,6 +92,13 @@ export function mountCoverPicker(
   toolbar.append(urlInput, altInput, applyBtn, libraryBtn, clearBtn, library, error);
   root.append(hero, toolbar);
   host.replaceChildren(root);
+
+  if (options.compact && editable) {
+    hero.setAttribute('title', 'Change cover');
+    hero.addEventListener('click', () => {
+      root.classList.toggle('cover-picker--editing');
+    });
+  }
 
   const imageMedia = () =>
     options.media.filter((entry) => entry.media_type === 'image' && entry.status === 'active');

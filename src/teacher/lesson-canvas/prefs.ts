@@ -1,10 +1,10 @@
-export const BUILDER_CHROME_KEY = 'teaching_hub_lesson_builder_chrome';
+export const BUILDER_CHROME_KEY = 'teaching_hub_lesson_builder_chrome_v2';
 
 export type ShelfState = 'open' | 'shelved';
 
 export type BuilderChromePrefs = { rail: ShelfState; chat: ShelfState };
 
-export const DEFAULT_BUILDER_CHROME: BuilderChromePrefs = { rail: 'open', chat: 'open' };
+export const DEFAULT_BUILDER_CHROME: BuilderChromePrefs = { rail: 'open', chat: 'shelved' };
 
 function isShelfState(value: unknown): value is ShelfState {
   return value === 'open' || value === 'shelved';

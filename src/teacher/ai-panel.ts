@@ -32,6 +32,8 @@ export interface MountAiPanelOptions {
   onAcceptProposal: (proposal: AiProposal) => { ok: boolean; message?: string };
   onWorkingChange?: (working: boolean) => void;
   onStaleAccept?: (apply: () => void) => void;
+  onAgentChange?: (slug: AgentSlug) => void;
+  onRequestShelve?: () => void;
 }
 
 interface ChatMessage {
@@ -109,22 +111,21 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
   let abort: AbortController | null = null;
   let msgCounter = 0;
 
+  const toolbar = document.createElement('div');
+  toolbar.className = 'ai-panel__toolbar';
+
   const picker = document.createElement('div');
   picker.className = 'ai-panel__picker';
   picker.setAttribute('role', 'listbox');
   picker.setAttribute('aria-label', 'AI agents');
 
-  const hero = document.createElement('div');
-  hero.className = 'ai-panel__hero';
-  hero.hidden = true;
-
-  const heroImg = document.createElement('img');
-  heroImg.className = 'ai-panel__hero-img';
-  heroImg.alt = '';
-
-  const heroName = document.createElement('p');
-  heroName.className = 'ai-panel__hero-name';
-  hero.append(heroImg, heroName);
+  const hideBtn = document.createElement('button');
+  hideBtn.type = 'button';
+  hideBtn.className = 'btn btn--ghost ai-panel__hide';
+  hideBtn.textContent = 'Hide';
+  hideBtn.setAttribute('aria-label', 'Hide chat');
+  hideBtn.addEventListener('click', () => options.onRequestShelve?.());
+  toolbar.append(picker, hideBtn);
 
   const scopeChip = document.createElement('p');
   scopeChip.className = 'ai-panel__scope';
@@ -154,7 +155,7 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
   sendBtn.textContent = 'Send';
 
   composer.append(input, sendBtn);
-  host.replaceChildren(picker, hero, scopeChip, actionsBar, empty, thread, composer);
+  host.replaceChildren(toolbar, scopeChip, actionsBar, empty, thread, composer);
 
   function nextMsgId(): string {
     msgCounter += 1;
@@ -183,6 +184,7 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
       btn.setAttribute('role', 'option');
       btn.setAttribute('aria-selected', agent.slug === agentSlug ? 'true' : 'false');
       btn.title = agent.name;
+      btn.dataset.agent = agent.slug;
 
       const img = document.createElement('img');
       img.src = agent.avatarSrc;
@@ -192,20 +194,11 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
       btn.addEventListener('click', () => {
         agentSlug = agent.slug;
         writeLastAgentSlug(agent.slug);
+        options.onAgentChange?.(agent.slug);
         renderPicker();
-        renderHero();
       });
       picker.append(btn);
     }
-  }
-
-  function renderHero(): void {
-    const agent = AGENTS.find((a) => a.slug === agentSlug)!;
-    hero.hidden = false;
-    hero.style.setProperty('--agent-colour', agent.colour);
-    heroImg.src = agent.heroSrc;
-    heroImg.alt = agent.name;
-    heroName.textContent = agent.name;
   }
 
   function renderScope(): void {
@@ -304,16 +297,23 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
     for (const msg of messages) {
       const row = document.createElement('div');
       row.className = `ai-panel__msg ai-panel__msg--${msg.role}`;
-      if (msg.agent) row.style.setProperty('--agent-colour', agentColour(msg.agent));
+      if (msg.agent) {
+        row.style.setProperty('--agent-colour', agentColour(msg.agent));
+        row.dataset.agent = msg.agent;
+      }
 
       if (msg.role === 'assistant' && msg.agent) {
         const agent = AGENTS.find((a) => a.slug === msg.agent);
         if (agent) {
+          const wrap = document.createElement('span');
+          wrap.className = 'ai-panel__msg-avatar-wrap';
+          wrap.dataset.agent = agent.slug;
           const avatar = document.createElement('img');
           avatar.className = 'ai-panel__msg-avatar';
           avatar.src = agent.avatarSrc;
           avatar.alt = agent.name;
-          row.append(avatar);
+          wrap.append(avatar);
+          row.append(wrap);
         }
       }
 
@@ -628,7 +628,7 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
   });
 
   renderPicker();
-  renderHero();
+  options.onAgentChange?.(agentSlug);
   renderShell();
   void resumeOpenJob();
 

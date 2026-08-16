@@ -121,6 +121,9 @@ describe('mountLessonPage', () => {
 
   it('edits text-like blocks inline without move-up towers', () => {
     mount();
+    const heading = host.querySelector<HTMLElement>('[data-block-id="h1"]');
+    expect(heading).not.toBeNull();
+    heading!.click();
     const headingEditor = host.querySelector('.block-editor[data-block-type="heading"]');
     expect(headingEditor).not.toBeNull();
     expect(host.querySelector('.block-editor__move-up')).toBeNull();
