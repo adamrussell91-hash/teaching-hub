@@ -1,6 +1,11 @@
+import {
+  DEFAULT_ANTHROPIC_MODEL,
+  resolveAnthropicModel
+} from '../../../src/ai/models.ts';
+
 const ANTHROPIC_ORIGIN = 'https://api.anthropic.com';
 const API_VERSION = '2023-06-01';
-export const DEFAULT_MODEL = 'claude-sonnet-4-6';
+export const DEFAULT_MODEL = DEFAULT_ANTHROPIC_MODEL;
 const MAX_TOKENS = 8192;
 const MAX_TOOL_ROUNDS = 4;
 
@@ -85,7 +90,7 @@ export function createAnthropicStreamer(apiKey: string, fetchImpl: typeof fetch 
           system: options.system,
           messages: roundMessages,
           tools: options.tools,
-          model: options.model ?? DEFAULT_MODEL,
+          model: resolveAnthropicModel(options.model),
           signal: options.signal,
           assistantBlocks
         })) {

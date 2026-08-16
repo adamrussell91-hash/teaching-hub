@@ -1,4 +1,5 @@
 import type { HtmlAppAiLane, HtmlAppAiMessage } from '../../../src/blocks/html-app-ai.ts';
+import { resolveAnthropicModel } from '../../../src/ai/models.ts';
 
 export class ProviderConfigError extends Error {
   constructor(public provider: string) {
@@ -56,7 +57,7 @@ export async function completeWithProvider(
       'content-type': 'application/json'
     },
     body: JSON.stringify({
-      model: lane.model,
+      model: resolveAnthropicModel(lane.model),
       max_tokens: lane.max_tokens,
       system: lane.system,
       messages: messages.map((m) => ({ role: m.role, content: m.content }))

@@ -35,6 +35,7 @@ vi.mock('../../netlify/functions/_shared/blobs.mts', async (importOriginal) => {
 
 const { publishedLessonKey } = await import('../../netlify/functions/_shared/blobs.mts');
 const handler = (await import('../../netlify/functions/html-app-ai.mts')).default;
+const { CURRENT_SONNET_MODEL } = await import('../../src/ai/models.ts');
 
 const FUNCTION_ORIGIN = 'https://api.example.netlify.app';
 
@@ -43,7 +44,7 @@ const timestamps = {
   updated_at: '2026-01-01T00:00:00.000Z'
 };
 
-function htmlAppLesson(ai: boolean) {
+function htmlAppLesson(ai: boolean, lane?: { provider: 'openai' | 'anthropic'; model: string }) {
   return {
     lesson_id: 'lesson_1',
     title: 'L',
@@ -68,8 +69,8 @@ function htmlAppLesson(ai: boolean) {
             ? {
                 ai: {
                   enabled: true,
-                  provider: 'openai',
-                  model: 'gpt-4o-mini',
+                  provider: lane?.provider ?? 'openai',
+                  model: lane?.model ?? 'gpt-4o-mini',
                   system: 'Stay focused.',
                   max_tokens: 256
                 }
@@ -90,6 +91,7 @@ describe('POST /api/html-app-ai', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     delete process.env.OPENAI_API_KEY;
+    delete process.env.ANTHROPIC_API_KEY;
   });
 
   it('returns 400 on bad body', async () => {
@@ -151,5 +153,36 @@ describe('POST /api/html-app-ai', () => {
       messages: Array<{ role: string; content: string }>;
     };
     expect(sent.messages[0]).toEqual({ role: 'system', content: 'Stay focused.' });
+  });
+
+  it('rewrites a retired anthropic model saved in the block', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+    fakeStore.seed(
+      publishedLessonKey('lesson_1'),
+      htmlAppLesson(true, { provider: 'anthropic', model: 'claude-sonnet-4-20250514' })
+    );
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify({ content: [{ type: 'text', text: 'still working' }] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    );
+
+    const res = await handler(
+      new Request(`${FUNCTION_ORIGIN}/api/html-app-ai`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          lesson_id: 'lesson_1',
+          block_id: 'app_1',
+          messages: [{ role: 'user', content: 'Hi' }]
+        })
+      })
+    );
+    expect(res.status).toBe(200);
+
+    const init = vi.mocked(fetch).mock.calls[0]?.[1] as RequestInit;
+    const sent = JSON.parse(String(init.body)) as { model: string };
+    expect(sent.model).toBe(CURRENT_SONNET_MODEL);
   });
 });

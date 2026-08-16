@@ -21,6 +21,7 @@ import {
   aiJobsInboxKey,
   aiTranscriptKey
 } from '../src/storage/keys';
+import { DEFAULT_ANTHROPIC_MODEL } from '../src/ai/models';
 import {
   ALLOWED_MEDIA_MIME,
   MAX_MEDIA_BYTES,
@@ -2979,7 +2980,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       if (!session.authenticated) return unauthorizedResponse();
       return okResponse(200, {
         anthropic_configured: true,
-        model: 'claude-sonnet-4-6'
+        model: DEFAULT_ANTHROPIC_MODEL
       });
     }
 

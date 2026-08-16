@@ -1,4 +1,5 @@
 import katex from 'katex';
+import { DEFAULT_ANTHROPIC_MODEL } from '@/ai/models';
 import type { CollectionLink } from '@/blocks/collection-resolve';
 import { buildChartSvg, escapeXml } from '@/blocks/chart-svg';
 import { layoutConceptMap, layoutMindMap } from '@/blocks/graph-layout';
@@ -676,7 +677,7 @@ export function createHtmlAppEditor(
   aiToggle.addEventListener('change', () => {
     aiFields.hidden = !aiToggle.checked;
     if (aiToggle.checked && !model.value.trim()) {
-      model.value = provider.value === 'anthropic' ? 'claude-sonnet-4-5' : 'gpt-4o-mini';
+      model.value = provider.value === 'anthropic' ? DEFAULT_ANTHROPIC_MODEL : 'gpt-4o-mini';
     }
     emitChange();
   });
