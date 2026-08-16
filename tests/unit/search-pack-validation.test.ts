@@ -530,10 +530,41 @@ describe('validateProposalAgainstSearchPack — html attributes', () => {
         block({ block_type: 'html', content: { html: `<img src='${PACK_IMAGE}' alt="Cheese">` } }),
         block({
           block_type: 'html_app',
-          content: { html: `<iframe SRC=${PACK_VIDEO_URL}></iframe>` }
+          content: { html: `<iframe SRC="${PACK_VIDEO_URL}"></iframe>` }
         })
       ])
     );
+  });
+
+  it('matches HREF and SRC case-insensitively with both quote styles', () => {
+    expectOk(
+      insert([
+        richTextBlock(`<a HREF="${PACK_SOURCE}">Double</a><img SRC='${PACK_IMAGE}' alt="x">`)
+      ])
+    );
+
+    const violations = violationsFor(
+      insert([
+        richTextBlock(`<a HREF='${INVENTED_PAGE}'>Fake</a><img SRC="${INVENTED_IMAGE}">`)
+      ])
+    );
+
+    expect(violations).toEqual([
+      {
+        path: 'blocks[0].content.html',
+        block_type: 'rich_text',
+        field: 'href',
+        value: INVENTED_PAGE,
+        reason: 'not_in_pack'
+      },
+      {
+        path: 'blocks[0].content.html',
+        block_type: 'rich_text',
+        field: 'src',
+        value: INVENTED_IMAGE,
+        reason: 'not_in_pack'
+      }
+    ]);
   });
 
   it('rejects invented https hrefs and srcs in markup', () => {
@@ -579,20 +610,18 @@ describe('validateProposalAgainstSearchPack — html attributes', () => {
     );
   });
 
-  it('catches prefixed url attributes and names them as written', () => {
-    const violations = violationsFor(
-      insert([richTextBlock(`<img data-src="${INVENTED_IMAGE}"><use xlink:href="${PACK_IMAGE}">`)])
+  it('ignores data-src, xlink:href, and unquoted prose urls', () => {
+    expectOk(
+      insert([
+        richTextBlock(
+          [
+            `<img data-src="${INVENTED_IMAGE}">`,
+            `<use xlink:href="${INVENTED_PAGE}">`,
+            `Prose says src=${INVENTED_IMAGE} and href=${INVENTED_PAGE} without quotes`
+          ].join('')
+        )
+      ])
     );
-
-    expect(violations).toEqual([
-      {
-        path: 'blocks[0].content.html',
-        block_type: 'rich_text',
-        field: 'data-src',
-        value: INVENTED_IMAGE,
-        reason: 'not_in_pack'
-      }
-    ]);
   });
 
   it('reports one violation per distinct markup reference', () => {

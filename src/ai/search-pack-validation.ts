@@ -31,10 +31,11 @@ type VideoReference = {
 
 type ExternalReference = UrlReference | VideoReference;
 
-/** Any attribute with a double-quoted, single-quoted, or bare value. */
-const HTML_ATTRIBUTE = /([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'`<>]+))/g;
-/** href and src, including prefixed variants such as data-src and xlink:href. */
-const URL_ATTRIBUTE_NAME = /(?:^|[-:])(?:href|src)$/i;
+/**
+ * Exact href/src only (case-insensitive), single- or double-quoted values.
+ * Does not match data-src, xlink:href, or unquoted prose.
+ */
+const HTML_URL_ATTRIBUTE = /(?<![\w:-])(href|src)\s*=\s*(?:"([^"]*)"|'([^']*)')/gi;
 
 function addUrl(
   references: ExternalReference[],
@@ -53,11 +54,9 @@ function collectHtmlUrls(
   path: string,
   blockType: Block['block_type']
 ): void {
-  for (const match of html.matchAll(HTML_ATTRIBUTE)) {
+  for (const match of html.matchAll(HTML_URL_ATTRIBUTE)) {
     const field = match[1]!.toLowerCase();
-    if (!URL_ATTRIBUTE_NAME.test(field)) continue;
-
-    const value = (match[2] ?? match[3] ?? match[4] ?? '').trim();
+    const value = (match[2] ?? match[3] ?? '').trim();
     if (!value.toLowerCase().startsWith('https://')) continue;
 
     references.push({ kind: 'url', path, field, value, block_type: blockType });
