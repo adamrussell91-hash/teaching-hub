@@ -52,13 +52,26 @@ describe('mock /api/ai/chat', () => {
         agent: 'ann',
         scope: 'block',
         selected_block_id: blockId,
-        message: 'Rewrite this'
+        message: 'build a 10 point mind map on cheese types'
       }
     });
     expect(stream.status).toBe(200);
     expect(stream.headers.get('content-type')).toContain('text/event-stream');
     const text = await stream.text();
     expect(text).toContain('"type":"proposal"');
+    const proposalEvent = text
+      .split('\n')
+      .filter((line) => line.startsWith('data: '))
+      .map((line) => JSON.parse(line.slice(6)) as Record<string, unknown>)
+      .find((event) => event.type === 'proposal') as {
+      proposal: {
+        kind: string;
+        blocks: Array<{ block_type: string; content: { nodes: unknown[] } }>;
+      };
+    };
+    expect(proposalEvent.proposal.kind).toBe('insert_blocks');
+    expect(proposalEvent.proposal.blocks[0]?.block_type).toBe('mind_map');
+    expect(proposalEvent.proposal.blocks[0]?.content.nodes).toHaveLength(10);
     expect(text).toContain('"type":"done"');
   });
 

@@ -3,11 +3,12 @@ import { resolveSelection } from '../../src/ai/selection.ts';
 import { pullArchive } from '../../src/ai/archiveKernel.ts';
 import { matchCompositionFill } from '../../src/ai/composition-fill.ts';
 import { buildAiSystemPrompt } from '../../src/ai/context.ts';
-import { emptySearchPack } from '../../src/ai/search-pack.ts';
 import { protocolForAgent } from '../../src/ai/protocols.ts';
 import { AI_TOOLS, AiChatRequestSchema, parseToolProposal } from '../../src/ai/proposals.ts';
+import { validateProposalAgainstSearchPack } from '../../src/ai/search-pack-validation.ts';
 import type { Lesson } from '../../src/schemas/lesson.ts';
 import { CompositionTemplateSchema, type CompositionTemplate } from '../../src/schemas/composition.ts';
+import { searchPublicWeb } from './_shared/brave-search.mts';
 import {
   createAnthropicStreamer,
   AnthropicStreamError,
@@ -102,6 +103,10 @@ export default async function handler(request: Request): Promise<Response> {
     return withCors(errorResponse(404, 'not_found', 'Lesson not found'), request, env);
   }
 
+  const searchPack = await searchPublicWeb({
+    query: `${body.message}\nLesson: ${lesson.title}`,
+    apiKey: env.BRAVE_SEARCH_API_KEY
+  });
   const selection = resolveSelection(lesson.blocks, body.selected_block_id, body.scope);
 
   const apiKey = env.ANTHROPIC_API_KEY;
@@ -151,8 +156,7 @@ export default async function handler(request: Request): Promise<Response> {
     action: body.action,
     fullLesson: body.agent === 'clementine',
     compositionFill: compositionFill ?? undefined,
-    // Task 5 replaces this compile-safe fallback with route search integration.
-    searchPack: emptySearchPack(body.message)
+    searchPack
   });
 
   const history = (body.history ?? []).map((m) => ({
@@ -190,6 +194,15 @@ export default async function handler(request: Request): Promise<Response> {
             if ('error' in proposal) {
               send({ type: 'tool_error', name: toolEvent.name, error: proposal.error });
               return JSON.stringify({ ok: false, error: proposal.error });
+            }
+            const validation = validateProposalAgainstSearchPack(proposal, searchPack);
+            if (!validation.ok) {
+              const references = validation.violations
+                .map(({ path, value }) => `${path}=${value}`)
+                .join(', ');
+              const error = `Media not in search pack: ${references}`;
+              send({ type: 'tool_error', name: toolEvent.name, error });
+              return JSON.stringify({ ok: false, error });
             }
             send({ type: 'proposal', proposal });
             return JSON.stringify({ ok: true, status: 'awaiting_teacher_accept' });

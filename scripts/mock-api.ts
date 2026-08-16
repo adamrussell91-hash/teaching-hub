@@ -22,6 +22,7 @@ import {
   aiTranscriptKey
 } from '../src/storage/keys';
 import { DEFAULT_ANTHROPIC_MODEL } from '../src/ai/models';
+import type { SearchPack } from '../src/ai/search-pack';
 import {
   ALLOWED_MEDIA_MIME,
   MAX_MEDIA_BYTES,
@@ -128,6 +129,38 @@ import {
 } from '../src/lessons/library-patch';
 
 export const SESSION_COOKIE_NAME = 'teaching_hub_session';
+
+export const MOCK_SEARCH_PACK: SearchPack = {
+  query: 'build a 10 point mind map on cheese types',
+  searched_at: '2026-08-16T10:00:00.000Z',
+  available: true,
+  sources: [
+    {
+      title: 'Cheese',
+      url: 'https://www.britannica.com/topic/cheese',
+      snippet: 'Cheese varieties differ by milk, production, texture, and ageing.',
+      domain: 'www.britannica.com',
+      education_score: 80
+    }
+  ],
+  images: [
+    {
+      image_url: 'https://images.example/cheese.jpg',
+      source_page_url: 'https://www.britannica.com/topic/cheese',
+      title: 'Cheese wheel',
+      width: 1200,
+      height: 800
+    }
+  ],
+  videos: [
+    {
+      provider: 'youtube',
+      external_id: 'dQw4w9WgXcQ',
+      url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      title: 'How cheese is made'
+    }
+  ]
+};
 
 const DEFAULT_PASSPHRASE = 'teaching-hub-local';
 const DEFAULT_SESSION_SECRET = 'local-dev-secret';
@@ -378,6 +411,37 @@ function nowIso(): string {
 
 function newId(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function mockCheeseMindMap(): Block {
+  const nodes = [
+    { id: 'cheese-types', label: 'Cheese types' },
+    ...['Fresh', 'Soft', 'Semi-soft', 'Hard', 'Blue', 'Washed-rind', 'Goat', 'Sheep', 'Processed'].map(
+      (label, index) => ({ id: `cheese-type-${index + 1}`, label })
+    )
+  ];
+  return {
+    id: 'mock-cheese-mind-map',
+    type: 'block',
+    block_type: 'mind_map',
+    variant: 'medium',
+    visibility: 'student_teacher',
+    content: {
+      title: 'Cheese types',
+      nodes,
+      edges: nodes.slice(1).map((node, index) => ({
+        id: `cheese-edge-${index + 1}`,
+        from: 'cheese-types',
+        to: node.id
+      }))
+    },
+    layout: {},
+    print: {},
+    settings: {},
+    created_at: MOCK_SEARCH_PACK.searched_at,
+    updated_at: MOCK_SEARCH_PACK.searched_at,
+    schema_version: 1
+  };
 }
 
 interface SessionTokenPayload {
@@ -3016,42 +3080,49 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
           ? lesson.blocks.find((b) => b.id === req.selected_block_id)
           : undefined;
       const now = new Date().toISOString();
-      const proposal = selected
-        ? selected.block_type === 'rich_text' || selected.block_type === 'heading'
-          ? {
-              kind: 'replace_block' as const,
-              block_id: selected.id,
-              block: {
-                ...selected,
-                content:
-                  selected.block_type === 'heading'
-                    ? { ...selected.content, text: `${selected.content.text || 'Heading'} (AI)` }
-                    : { ...selected.content, html: '<p>Mock AI rewrite.</p>' }
+      const proposal = /mind\s*map.*cheese|cheese.*mind\s*map/i.test(req.message)
+        ? {
+            kind: 'insert_blocks' as const,
+            anchor_block_id: selected?.id,
+            position: 'below' as const,
+            blocks: [mockCheeseMindMap()]
+          }
+        : selected
+          ? selected.block_type === 'rich_text' || selected.block_type === 'heading'
+            ? {
+                kind: 'replace_block' as const,
+                block_id: selected.id,
+                block: {
+                  ...selected,
+                  content:
+                    selected.block_type === 'heading'
+                      ? { ...selected.content, text: `${selected.content.text || 'Heading'} (AI)` }
+                      : { ...selected.content, html: '<p>Mock AI rewrite.</p>' }
+                }
               }
-            }
+            : {
+                kind: 'review_only' as const,
+                summary: 'Mock review: keep the focus tight and one teaching move at a time.'
+              }
           : {
-              kind: 'review_only' as const,
-              summary: 'Mock review: keep the focus tight and one teaching move at a time.'
-            }
-        : {
-            kind: 'replace_lesson' as const,
-            blocks: [
-              {
-                id: 'mock-ai-heading',
-                type: 'block' as const,
-                block_type: 'heading' as const,
-                variant: 'page' as const,
-                visibility: 'student_teacher' as const,
-                content: { text: 'Heading' },
-                layout: {},
-                print: {},
-                settings: {},
-                created_at: now,
-                updated_at: now,
-                schema_version: 1 as const
-              }
-            ]
-          };
+              kind: 'replace_lesson' as const,
+              blocks: [
+                {
+                  id: 'mock-ai-heading',
+                  type: 'block' as const,
+                  block_type: 'heading' as const,
+                  variant: 'page' as const,
+                  visibility: 'student_teacher' as const,
+                  content: { text: 'Heading' },
+                  layout: {},
+                  print: {},
+                  settings: {},
+                  created_at: now,
+                  updated_at: now,
+                  schema_version: 1 as const
+                }
+              ]
+            };
       return sseResponse([
         { type: 'status', text: 'Thinking…' },
         { type: 'text', text: 'Mock AI response. ' },
