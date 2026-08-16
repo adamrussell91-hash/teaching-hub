@@ -21,14 +21,16 @@ export interface SignInOptions {
   onSuccess?: (session: SessionInfo) => void;
 }
 
+/** Passphrase gate from design-kit/snippets/sign-in.html + sign-in.css */
 export function renderSignIn(container: HTMLElement, options?: SignInOptions): void {
   container.replaceChildren();
 
   const wrapper = document.createElement('div');
   wrapper.className = 'sign-in';
 
-  const card = document.createElement('div');
-  card.className = 'sign-in__card';
+  const form = document.createElement('form');
+  form.className = 'sign-in__card';
+  form.noValidate = true;
 
   const brand = document.createElement('p');
   brand.className = 'sign-in__brand';
@@ -38,9 +40,9 @@ export function renderSignIn(container: HTMLElement, options?: SignInOptions): v
   title.className = 'sign-in__title';
   title.textContent = 'Sign in';
 
-  const form = document.createElement('form');
-  form.className = 'sign-in__form';
-  form.noValidate = true;
+  const supporting = document.createElement('p');
+  supporting.className = 'sign-in__supporting';
+  supporting.textContent = 'Curriculum, lessons, and student publishing.';
 
   const field = document.createElement('div');
   field.className = 'sign-in__field';
@@ -71,9 +73,8 @@ export function renderSignIn(container: HTMLElement, options?: SignInOptions): v
   submit.textContent = 'Sign in';
 
   field.append(label, input);
-  form.append(field, error, submit);
-  card.append(brand, title, form);
-  wrapper.append(card);
+  form.append(brand, title, supporting, field, error, submit);
+  wrapper.append(form);
   container.append(wrapper);
 
   form.addEventListener('submit', async (event) => {
