@@ -10,6 +10,7 @@ import {
   createTabsEditor
 } from '@/blocks/layout-editors';
 import { renderCollectionBlock } from '@/blocks/render';
+import { sanitizeRichTextHtml } from '@/blocks/sanitize';
 import { sanitizeSvgMarkup } from '@/blocks/sanitize-svg';
 import { isHttpUrl } from '@/blocks/url-safety';
 import { parseEmbedInput } from '@/blocks/embed-url';
@@ -102,79 +103,83 @@ export function editorShell<T extends Block>(
   return shell;
 }
 
-function wrapSelection(textarea: HTMLTextAreaElement, before: string, after: string): void {
-  const start = textarea.selectionStart;
-  const end = textarea.selectionEnd;
-  const value = textarea.value;
-  const selected = value.slice(start, end);
-
-  if (start === end) {
-    const insert = `${before}${after}`;
-    textarea.value = value.slice(0, start) + insert + value.slice(end);
-    const cursor = start + before.length;
-    textarea.setSelectionRange(cursor, cursor);
-  } else {
-    textarea.value = value.slice(0, start) + before + selected + after + value.slice(end);
-    textarea.setSelectionRange(start, start + before.length + selected.length + after.length);
-  }
-
-  textarea.dispatchEvent(new Event('input', { bubbles: true }));
-  textarea.focus();
+function selectionRangeWithin(surface: HTMLElement): Range | null {
+  const selection = window.getSelection?.();
+  if (!selection || selection.rangeCount === 0) return null;
+  const range = selection.getRangeAt(0);
+  return surface.contains(range.commonAncestorContainer) ? range : null;
 }
 
-function insertAroundOrAppend(textarea: HTMLTextAreaElement, open: string, close: string): void {
-  wrapSelection(textarea, open, close);
+function wrapRangeIn(range: Range, tag: 'strong' | 'em'): void {
+  const wrapper = document.createElement(tag);
+  wrapper.append(range.extractContents());
+  range.insertNode(wrapper);
 }
 
-function createRichTextToolbar(textarea: HTMLTextAreaElement): HTMLElement {
+/**
+ * One list item per paragraph the selection covers, falling back to text lines
+ * when the selection sits inside a single paragraph.
+ */
+function linesForList(surface: HTMLElement, range: Range | null): string[] {
+  const selected = range && !range.collapsed;
+  const scope: ParentNode = selected ? range.cloneContents() : surface;
+  const paragraphs = [...scope.querySelectorAll('p, li, blockquote')]
+    .map((el) => el.textContent?.trim() ?? '')
+    .filter(Boolean);
+  if (paragraphs.length > 0) return paragraphs;
+
+  const text = selected ? range.toString() : (surface.textContent ?? '');
+  const lines = text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  return lines.length > 0 ? lines : [''];
+}
+
+function createRichTextToolbar(args: {
+  surface: HTMLElement;
+  emit: () => void;
+  onToggleSource: () => void;
+}): HTMLElement {
+  const { surface, emit } = args;
+
   const toolbar = document.createElement('div');
   toolbar.className = 'block-editor__toolbar';
   toolbar.setAttribute('role', 'toolbar');
   toolbar.setAttribute('aria-label', 'Formatting');
 
-  const actions: Array<{ label: string; run: () => void }> = [
-    {
-      label: 'Bold',
-      run: () => insertAroundOrAppend(textarea, '<strong>', '</strong>')
-    },
-    {
-      label: 'Italic',
-      run: () => insertAroundOrAppend(textarea, '<em>', '</em>')
-    },
-    {
-      label: 'Bullet list',
-      run: () => {
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-        const selected = textarea.value.slice(start, end).trim();
-        if (selected) {
-          const items = selected
-            .split(/\n+/)
-            .map((line) => `  <li>${line}</li>`)
-            .join('\n');
-          wrapSelection(textarea, `<ul>\n${items}\n</ul>`, '');
-        } else {
-          wrapSelection(textarea, '<ul>\n  <li>', '</li>\n</ul>');
-        }
-      }
-    },
-    {
-      label: 'Numbered list',
-      run: () => {
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-        const selected = textarea.value.slice(start, end).trim();
-        if (selected) {
-          const items = selected
-            .split(/\n+/)
-            .map((line) => `  <li>${line}</li>`)
-            .join('\n');
-          wrapSelection(textarea, `<ol>\n${items}\n</ol>`, '');
-        } else {
-          wrapSelection(textarea, '<ol>\n  <li>', '</li>\n</ol>');
-        }
-      }
+  function applyInline(tag: 'strong' | 'em'): void {
+    const range = selectionRangeWithin(surface);
+    if (!range || range.collapsed) return;
+    wrapRangeIn(range, tag);
+    emit();
+  }
+
+  function applyList(tag: 'ul' | 'ol'): void {
+    const range = selectionRangeWithin(surface);
+    const items = linesForList(surface, range);
+    const list = document.createElement(tag);
+    for (const line of items) {
+      const li = document.createElement('li');
+      li.textContent = line;
+      list.append(li);
     }
+
+    if (range && !range.collapsed) {
+      range.deleteContents();
+      range.insertNode(list);
+    } else {
+      surface.replaceChildren(list);
+    }
+    emit();
+  }
+
+  const actions: Array<{ label: string; run: () => void }> = [
+    { label: 'Bold', run: () => applyInline('strong') },
+    { label: 'Italic', run: () => applyInline('em') },
+    { label: 'Bullet list', run: () => applyList('ul') },
+    { label: 'Numbered list', run: () => applyList('ol') },
+    { label: 'HTML', run: () => args.onToggleSource() }
   ];
 
   for (const action of actions) {
@@ -192,6 +197,11 @@ function createRichTextToolbar(textarea: HTMLTextAreaElement): HTMLElement {
   return toolbar;
 }
 
+/**
+ * Teachers write prose here, so the surface shows formatted text and keeps the
+ * markup out of sight. It renders sanitised html, which makes the editor an
+ * honest preview of what publishing keeps.
+ */
 export function createRichTextEditor(
   block: Extract<Block, { block_type: 'rich_text' }>,
   onChange: BlockChangeHandler<Extract<Block, { block_type: 'rich_text' }>>,
@@ -200,22 +210,53 @@ export function createRichTextEditor(
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
 
-  const textarea = document.createElement('textarea');
-  textarea.className = 'block-editor__html';
-  textarea.value = block.content.html;
-  textarea.rows = 6;
-  textarea.setAttribute('aria-label', 'Rich text HTML');
+  const surface = document.createElement('div');
+  surface.className = 'block-editor__rich';
+  surface.contentEditable = 'true';
+  surface.setAttribute('role', 'textbox');
+  surface.setAttribute('aria-multiline', 'true');
+  surface.setAttribute('aria-label', 'Rich text');
+  surface.innerHTML = sanitizeRichTextHtml(block.content.html);
 
-  const toolbar = createRichTextToolbar(textarea);
+  const source = document.createElement('textarea');
+  source.className = 'block-editor__html';
+  source.value = block.content.html;
+  source.rows = 10;
+  source.hidden = true;
+  source.setAttribute('aria-label', 'Rich text HTML');
 
-  textarea.addEventListener('input', () => {
+  function publish(html: string): void {
     onChange({
       ...getLatest(),
-      content: { html: textarea.value }
+      content: { html }
     });
+  }
+
+  function emitFromSurface(): void {
+    const html = sanitizeRichTextHtml(surface.innerHTML);
+    source.value = html;
+    publish(html);
+  }
+
+  const toolbar = createRichTextToolbar({
+    surface,
+    emit: emitFromSurface,
+    onToggleSource: () => {
+      const showSource = source.hidden;
+      source.hidden = !showSource;
+      surface.hidden = showSource;
+      if (showSource) {
+        source.value = sanitizeRichTextHtml(surface.innerHTML);
+      } else {
+        surface.innerHTML = sanitizeRichTextHtml(source.value);
+      }
+    }
   });
 
-  fields.append(toolbar, textarea);
+  surface.addEventListener('input', emitFromSurface);
+  source.addEventListener('input', () => publish(source.value));
+
+  fields.append(toolbar, surface, source);
   return editorShell(block, onChange, fields, getLatest);
 }
 

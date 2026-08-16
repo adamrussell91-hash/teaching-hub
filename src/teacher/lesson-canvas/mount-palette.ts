@@ -88,6 +88,13 @@ export function mountLessonPalette(
   tab.className = 'lesson-palette__tab';
   tab.textContent = 'Blocks';
 
+  const collapse = document.createElement('button');
+  collapse.type = 'button';
+  collapse.className = 'lesson-palette__collapse';
+  collapse.textContent = 'Hide';
+  collapse.title = 'Hide blocks ([)';
+  collapse.setAttribute('aria-label', 'Hide blocks');
+
   let openId: string | null = null;
   let flyout: HTMLElement | null = null;
 
@@ -240,6 +247,11 @@ export function mountLessonPalette(
     setShelved(false);
   });
 
+  collapse.addEventListener('click', (event) => {
+    event.stopPropagation();
+    setShelved(true);
+  });
+
   function onDocumentClick(event: MouseEvent): void {
     const target = event.target;
     if (target instanceof Node && !host.contains(target)) closeFlyout();
@@ -252,7 +264,7 @@ export function mountLessonPalette(
   document.addEventListener('click', onDocumentClick);
   document.addEventListener('keydown', onDocumentKey);
 
-  host.append(rail, tab);
+  host.append(rail, collapse, tab);
 
   return {
     setShelved,

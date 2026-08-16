@@ -5,12 +5,14 @@ test('teacher publishes lesson visible on student URL', async ({ page, context }
   await page.getByLabel('Passphrase').fill('teaching-hub-local');
   await page.getByRole('button', { name: /sign in/i }).click();
 
-  await expect(page.getByRole('heading', { name: 'Lessons' })).toBeVisible();
+  await page.getByRole('link', { name: 'Lessons' }).click();
+  await expect(page.getByRole('heading', { name: 'Lessons', level: 1 })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Year 12' }).click();
-  await page.getByRole('button', { name: 'English Advanced' }).click();
-  await page.getByRole('button', { name: 'Artist of the Floating World' }).click();
-  await page.getByRole('link', { name: 'Memory, Identity and Ono' }).click();
+  await page
+    .getByRole('listitem')
+    .filter({ hasText: 'Memory, Identity and Ono' })
+    .getByRole('link', { name: 'Open' })
+    .click();
 
   const titleField = page.getByLabel('Lesson title');
   await expect(titleField).toBeVisible();

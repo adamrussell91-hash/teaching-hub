@@ -196,6 +196,9 @@ export function mountBlockCanvas(
   }
 
   function select(blockId: string | null): void {
+    // Re-selecting the open block would rebuild its editor mid-edit, so clicks
+    // inside an already-selected block are left alone.
+    if (selectedId === blockId) return;
     selectedId = blockId;
     options.onSelect?.(blockId);
     render();
@@ -203,11 +206,31 @@ export function mountBlockCanvas(
 
   function selectAndReveal(blockId: string): void {
     pendingReveal = blockId;
+    if (selectedId === blockId) {
+      render();
+      return;
+    }
     select(blockId);
   }
 
+  /**
+   * Content edits must not re-render the canvas: `render()` replaces every row,
+   * which tears the field out from under the teacher and loses focus and caret
+   * after a single keystroke. Only the block's preview needs refreshing.
+   */
   function onBlockChange(updated: Block): void {
-    emit(replaceBlockInTree(blocks, updated));
+    blocks = replaceBlockInTree(blocks, updated);
+    options.onChange(blocks);
+    refreshPreview(updated.id);
+  }
+
+  function refreshPreview(blockId: string): void {
+    const holder = root.querySelector<HTMLElement>(
+      `.lesson-page__block[data-block-id="${blockId}"] > .lesson-page__preview`
+    );
+    if (!holder) return;
+    const block = findBlockById(blocks, blockId);
+    if (block) holder.replaceChildren(preview(block));
   }
 
   function latestBlock(id: string, fallback: Block): () => Block {
@@ -530,7 +553,10 @@ export function mountBlockCanvas(
         }
         row.addEventListener('click', () => select(block.id));
       } else {
-        row.append(preview(block));
+        const previewHolder = document.createElement('div');
+        previewHolder.className = 'lesson-page__preview';
+        previewHolder.append(preview(block));
+        row.append(previewHolder);
         row.addEventListener('click', (event) => {
           if ((event.target as HTMLElement | null)?.closest('.lesson-page__inspector')) return;
           if (selectedId === block.id) return;

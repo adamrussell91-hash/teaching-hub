@@ -48,6 +48,39 @@ describe('mountLessonPalette', () => {
     expect(host.querySelector('[data-family="Compositions"]')).not.toBeNull();
   });
 
+  it('collapses the rail from a visible control and reopens from the tab', () => {
+    const onShelved = vi.fn();
+    mountLessonPalette(host, {
+      families: lessonPaletteFamilies([]),
+      onInsert: vi.fn(),
+      onShelved
+    });
+
+    const collapse = host.querySelector<HTMLButtonElement>('.lesson-palette__collapse');
+    expect(collapse).not.toBeNull();
+
+    collapse!.click();
+    expect(host.classList.contains('lesson-palette--shelved')).toBe(true);
+    expect(onShelved).toHaveBeenLastCalledWith(true);
+
+    host.querySelector<HTMLButtonElement>('.lesson-palette__tab')!.click();
+    expect(host.classList.contains('lesson-palette--shelved')).toBe(false);
+    expect(onShelved).toHaveBeenLastCalledWith(false);
+  });
+
+  it('closes an open flyout when the rail collapses', () => {
+    mountLessonPalette(host, {
+      families: lessonPaletteFamilies([]),
+      onInsert: vi.fn()
+    });
+
+    host.querySelector<HTMLButtonElement>('[data-family="Basic"]')!.click();
+    expect(host.querySelector('.lesson-palette__flyout')).not.toBeNull();
+
+    host.querySelector<HTMLButtonElement>('.lesson-palette__collapse')!.click();
+    expect(host.querySelector('.lesson-palette__flyout')).toBeNull();
+  });
+
   it('opens a flyout of cards with descriptions on family click', () => {
     mountLessonPalette(host, {
       families: lessonPaletteFamilies([]),

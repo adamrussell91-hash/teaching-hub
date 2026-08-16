@@ -13,6 +13,10 @@ import { AI_JOB_STALE_MS } from '@/ai/jobs';
 import { filterProposal, listPartialAcceptUnits } from '@/ai/partial-accept';
 import type { AiProposal, AiScope } from '@/ai/proposals';
 import type { Block } from '@/schemas/block';
+import {
+  readBuilderChromePrefs,
+  writeBuilderChromePrefs
+} from '@/teacher/lesson-canvas/prefs';
 
 export interface AiPanelHandle {
   setSelection(selection: {
@@ -29,6 +33,11 @@ export interface AiPanelHandle {
 export interface MountAiPanelOptions {
   lessonId: string;
   getSnapshotAt: () => string;
+  /**
+   * Saves pending canvas edits. The agent reads the stored draft, so without
+   * this a block added seconds ago is invisible to it.
+   */
+  flushDraft?: () => Promise<void>;
   onAcceptProposal: (proposal: AiProposal) => { ok: boolean; message?: string };
   onWorkingChange?: (working: boolean) => void;
   onStaleAccept?: (apply: () => void) => void;
@@ -130,8 +139,35 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
   const scopeChip = document.createElement('p');
   scopeChip.className = 'ai-panel__scope';
 
+  // Ten suggestion buttons pushed the thread off a laptop screen, so they stay
+  // folded away until the teacher asks for them.
+  let suggestionsOpen = readBuilderChromePrefs().suggestions === 'open';
+
+  const suggestionsToggle = document.createElement('button');
+  suggestionsToggle.type = 'button';
+  suggestionsToggle.className = 'btn btn--ghost ai-panel__suggestions-toggle';
+
   const actionsBar = document.createElement('div');
   actionsBar.className = 'ai-panel__actions';
+
+  function renderSuggestionsToggle(): void {
+    const count = actionsForScope(scope, selectedBlockType).length;
+    suggestionsToggle.hidden = count === 0;
+    suggestionsToggle.textContent = suggestionsOpen
+      ? 'Hide suggestions'
+      : `Suggestions (${count})`;
+    suggestionsToggle.setAttribute('aria-expanded', suggestionsOpen ? 'true' : 'false');
+    actionsBar.hidden = !suggestionsOpen || count === 0;
+  }
+
+  suggestionsToggle.addEventListener('click', () => {
+    suggestionsOpen = !suggestionsOpen;
+    writeBuilderChromePrefs({
+      ...readBuilderChromePrefs(),
+      suggestions: suggestionsOpen ? 'open' : 'shelved'
+    });
+    renderSuggestionsToggle();
+  });
 
   const empty = document.createElement('p');
   empty.className = 'ai-panel__empty';
@@ -155,7 +191,15 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
   sendBtn.textContent = 'Send';
 
   composer.append(input, sendBtn);
-  host.replaceChildren(toolbar, scopeChip, actionsBar, empty, thread, composer);
+  host.replaceChildren(
+    toolbar,
+    scopeChip,
+    suggestionsToggle,
+    actionsBar,
+    empty,
+    thread,
+    composer
+  );
 
   function nextMsgId(): string {
     msgCounter += 1;
@@ -217,6 +261,7 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
   function renderActions(): void {
     actionsBar.replaceChildren();
     const actions = actionsForScope(scope, selectedBlockType);
+    renderSuggestionsToggle();
     for (const action of actions) {
       const btn = document.createElement('button');
       btn.type = 'button';
@@ -434,7 +479,6 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
 
   function renderShell(): void {
     empty.hidden = messages.length > 0;
-    actionsBar.hidden = false;
     composer.hidden = false;
     thread.hidden = false;
     input.disabled = busy;
@@ -546,8 +590,17 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
     const trimmed = text.trim();
     if (!trimmed) return;
 
-    const snapshotAt = currentSnapshot();
     setWorkingState(true);
+
+    // A failed save is not a reason to refuse the request; the agent falls back
+    // to lesson scope when it cannot find the block.
+    try {
+      await options.flushDraft?.();
+    } catch {
+      /* keep going with whatever the server already has */
+    }
+
+    const snapshotAt = currentSnapshot();
 
     messages.push({ id: nextMsgId(), role: 'user', text: trimmed });
     const assistantId = nextMsgId();

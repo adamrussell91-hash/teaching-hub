@@ -256,7 +256,7 @@ describe('CALLOUT_STYLE_CLASS', () => {
 });
 
 describe('block editors', () => {
-  it('createRichTextEditor calls back when HTML changes', () => {
+  it('createRichTextEditor calls back when the formatted text changes', () => {
     const block: Block = {
       ...baseBlock,
       block_type: 'rich_text',
@@ -265,10 +265,10 @@ describe('block editors', () => {
     const onChange = vi.fn();
 
     const editor = createRichTextEditor(block, onChange);
-    const textarea = editor.querySelector<HTMLTextAreaElement>('.block-editor__html')!;
+    const surface = editor.querySelector<HTMLElement>('.block-editor__rich')!;
 
-    textarea.value = '<p>Updated</p>';
-    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    surface.innerHTML = '<p>Updated</p>';
+    surface.dispatchEvent(new Event('input', { bubbles: true }));
 
     expect(onChange).toHaveBeenCalledWith({
       ...block,

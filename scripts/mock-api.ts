@@ -3009,13 +3009,12 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       }
       const lesson = store.getJSON<Lesson>(draftLessonKey(req.lesson_id));
       if (!lesson) return notFoundResponse('Lesson not found');
+      // An id the canvas has but storage does not is a stale hint, not a bad
+      // request: the teacher may have added the block a moment ago.
       const selected =
         typeof req.selected_block_id === 'string'
           ? lesson.blocks.find((b) => b.id === req.selected_block_id)
           : undefined;
-      if (req.selected_block_id && !selected) {
-        return errorResponse(400, 'validation_error', 'selected_block_id not found');
-      }
       const now = new Date().toISOString();
       const proposal = selected
         ? selected.block_type === 'rich_text' || selected.block_type === 'heading'

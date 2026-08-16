@@ -101,6 +101,36 @@ describe('mock /api/ai/chat', () => {
     expect(text).toMatch(/"type":"(proposal|done)"/);
   });
 
+  it('treats an unsaved block id as a hint and still answers', async () => {
+    const api = createMockApi({ seed, passphrase: PASSPHRASE });
+    const auth = await api.request('POST', '/api/auth', { body: { passphrase: PASSPHRASE } });
+    const cookie = auth.headers.get('set-cookie');
+
+    const curriculum = await api.request('GET', '/api/curriculum', { cookie });
+    const data = (await curriculum.json()) as {
+      data: { lessons: Array<{ id: string }> };
+    };
+    const lessonId = data.data.lessons[0]?.id;
+    expect(lessonId).toBeTruthy();
+
+    const stream = await api.request('POST', '/api/ai/chat', {
+      cookie,
+      body: {
+        lesson_id: lessonId,
+        agent: 'ann',
+        scope: 'block',
+        selected_block_id: 'block_added_but_not_saved_yet',
+        message: 'Put three facts about Shakespeare in this box'
+      }
+    });
+
+    expect(stream.status).toBe(200);
+    expect(stream.headers.get('content-type')).toContain('text/event-stream');
+    const text = await stream.text();
+    expect(text).not.toContain('selected_block_id not found');
+    expect(text).toMatch(/"type":"(proposal|done)"/);
+  });
+
   it('reports anthropic readiness on GET /api/ai/chat', async () => {
     const api = createMockApi({ seed, passphrase: PASSPHRASE });
     const unauth = await api.request('GET', '/api/ai/chat');

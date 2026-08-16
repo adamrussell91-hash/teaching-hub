@@ -144,6 +144,51 @@ describe('mountLessonPage', () => {
     expect(host.querySelector('.lesson-editor__reorder')).toBeNull();
   });
 
+  it('survives typing: the field being edited keeps focus and its caret', () => {
+    const { onChange } = mount();
+    host.querySelector<HTMLElement>('[data-block-id="h1"]')!.click();
+
+    const field = host.querySelector<HTMLInputElement>('.block-editor__heading-text')!;
+    // Clicking into the field is how editing starts, and it must not rebuild the row.
+    field.click();
+    expect(field.isConnected).toBe(true);
+
+    field.focus();
+    field.value = 'Guilt';
+    field.setSelectionRange(5, 5);
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(onChange).toHaveBeenCalled();
+    expect(field.isConnected).toBe(true);
+    expect(document.activeElement).toBe(field);
+    expect(field.selectionStart).toBe(5);
+
+    field.value = 'Guilt and complicity';
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+
+    const next = onChange.mock.calls.at(-1)?.[0] as Lesson;
+    const heading = next.blocks.find((b) => b.id === 'h1');
+    expect(heading?.block_type === 'heading' && heading.content.text).toBe(
+      'Guilt and complicity'
+    );
+  });
+
+  it('refreshes a heavy block preview while its editor stays put', () => {
+    mount();
+    host.querySelector<HTMLElement>('[data-block-id="cm1"]')!.click();
+
+    const editor = host.querySelector<HTMLElement>('.lesson-page__inspector .block-editor')!;
+    const captionField = editor.querySelector<HTMLInputElement>('input, textarea');
+    expect(captionField).not.toBeNull();
+
+    captionField!.focus();
+    captionField!.value = 'Ideas map';
+    captionField!.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(editor.isConnected).toBe(true);
+    expect(document.activeElement).toBe(captionField);
+  });
+
   it('keeps a heavy block editor inside the block it belongs to', () => {
     mount();
     host.querySelector<HTMLElement>('[data-block-id="cm1"]')!.click();

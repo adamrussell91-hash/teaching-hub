@@ -271,6 +271,43 @@ describe('mountAiPanel', () => {
     }
   });
 
+  it('saves pending edits before asking, so a just-added block exists server-side', async () => {
+    const order: string[] = [];
+    const flushDraft = vi.fn(async () => {
+      order.push('flush');
+    });
+    streamAiChatMock.mockImplementation(async () => {
+      order.push('stream');
+    });
+
+    const mounted = mountPanel({ flushDraft });
+    handle = mounted.handle;
+    handle.setSelection({ blockId: 'block_new', blockType: 'rich_text', scope: 'block' });
+
+    submitMessage(mounted.host, 'Put three facts about Shakespeare in this box');
+
+    await vi.waitFor(() => {
+      expect(streamAiChatMock).toHaveBeenCalled();
+    });
+    expect(flushDraft).toHaveBeenCalledTimes(1);
+    expect(order).toEqual(['flush', 'stream']);
+  });
+
+  it('still asks when saving first fails', async () => {
+    const flushDraft = vi.fn(async () => {
+      throw new Error('offline');
+    });
+
+    const mounted = mountPanel({ flushDraft });
+    handle = mounted.handle;
+
+    submitMessage(mounted.host, 'Build a heading');
+
+    await vi.waitFor(() => {
+      expect(streamAiChatMock).toHaveBeenCalled();
+    });
+  });
+
   it('keeps Ann on streamAiChat after a block is selected', async () => {
     const mounted = mountPanel();
     handle = mounted.handle;
@@ -284,6 +321,42 @@ describe('mountAiPanel', () => {
     expect(startAiJobMock).not.toHaveBeenCalled();
     expect(streamAiChatMock.mock.calls[0]?.[0]?.agent).toBe('ann');
     expect(streamAiChatMock.mock.calls[0]?.[0]?.selected_block_id).toBe('block_1');
+  });
+
+  it('keeps suggestion buttons out of the way until asked for', () => {
+    const mounted = mountPanel();
+    handle = mounted.handle;
+    handle.setSelection({ blockId: 'block_1', blockType: 'rich_text', scope: 'block' });
+
+    const actions = mounted.host.querySelector<HTMLElement>('.ai-panel__actions');
+    const toggle = mounted.host.querySelector<HTMLButtonElement>('.ai-panel__suggestions-toggle');
+    expect(actions).not.toBeNull();
+    expect(toggle).not.toBeNull();
+    expect(actions!.hidden).toBe(true);
+    expect(toggle!.getAttribute('aria-expanded')).toBe('false');
+
+    toggle!.click();
+    expect(mounted.host.querySelector<HTMLElement>('.ai-panel__actions')!.hidden).toBe(false);
+    expect(
+      mounted.host.querySelector<HTMLButtonElement>('.ai-panel__suggestions-toggle')!
+        .getAttribute('aria-expanded')
+    ).toBe('true');
+
+    toggle!.click();
+    expect(mounted.host.querySelector<HTMLElement>('.ai-panel__actions')!.hidden).toBe(true);
+  });
+
+  it('remembers that suggestions were opened', () => {
+    const first = mountPanel();
+    first.handle.setSelection({ blockId: 'block_1', blockType: 'rich_text', scope: 'block' });
+    first.host.querySelector<HTMLButtonElement>('.ai-panel__suggestions-toggle')!.click();
+    first.handle.dispose();
+
+    const second = mountPanel();
+    handle = second.handle;
+    handle.setSelection({ blockId: 'block_1', blockType: 'rich_text', scope: 'block' });
+
+    expect(second.host.querySelector<HTMLElement>('.ai-panel__actions')!.hidden).toBe(false);
   });
 
   it('shows Lesson or Looking at hint and never disables send', () => {

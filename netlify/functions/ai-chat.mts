@@ -1,5 +1,5 @@
-import { findBlockById } from '../../src/blocks/find-block.ts';
 import { agentBySlug } from '../../src/ai/agents.ts';
+import { resolveSelection } from '../../src/ai/selection.ts';
 import { pullArchive } from '../../src/ai/archiveKernel.ts';
 import { matchCompositionFill } from '../../src/ai/composition-fill.ts';
 import { buildAiSystemPrompt } from '../../src/ai/context.ts';
@@ -101,16 +101,7 @@ export default async function handler(request: Request): Promise<Response> {
     return withCors(errorResponse(404, 'not_found', 'Lesson not found'), request, env);
   }
 
-  if (body.selected_block_id) {
-    const selected = findBlockById(lesson.blocks, body.selected_block_id);
-    if (!selected) {
-      return withCors(
-        errorResponse(400, 'validation_error', 'selected_block_id not found'),
-        request,
-        env
-      );
-    }
-  }
+  const selection = resolveSelection(lesson.blocks, body.selected_block_id, body.scope);
 
   const apiKey = env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -154,8 +145,8 @@ export default async function handler(request: Request): Promise<Response> {
     agentName: agent.name,
     protocol,
     lesson,
-    scope: body.scope,
-    selectedBlockId: body.selected_block_id ?? null,
+    scope: selection.scope,
+    selectedBlockId: selection.selectedBlockId,
     action: body.action,
     fullLesson: body.agent === 'clementine',
     compositionFill: compositionFill ?? undefined

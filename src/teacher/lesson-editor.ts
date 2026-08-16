@@ -201,6 +201,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
 
     function persistChrome(): void {
       writeBuilderChromePrefs({
+        ...readBuilderChromePrefs(),
         rail: builder.classList.contains('lesson-builder--rail-shelved') ? 'shelved' : 'open',
         chat: builder.classList.contains('lesson-builder--chat-shelved') ? 'shelved' : 'open'
       });
@@ -502,7 +503,8 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       onAgentChange: (slug) => {
         paintChatFab(slug);
       },
-      onRequestShelve: () => setChatShelved(true)
+      onRequestShelve: () => setChatShelved(true),
+      flushDraft: () => saveController?.flush() ?? Promise.resolve()
     });
 
     syncAiSelection();

@@ -46,14 +46,27 @@ describe('lesson builder chrome prefs', () => {
   });
 
   it('returns defaults when storage is empty', () => {
-    expect(readBuilderChromePrefs()).toEqual({ rail: 'open', chat: 'shelved' });
+    expect(readBuilderChromePrefs()).toEqual({
+      rail: 'open',
+      chat: 'shelved',
+      suggestions: 'shelved'
+    });
   });
 
   it('round-trips shelf state', () => {
-    const next = { rail: 'shelved', chat: 'open' } as const;
+    const next = { rail: 'shelved', chat: 'open', suggestions: 'open' } as const;
     writeBuilderChromePrefs(next);
     expect(readBuilderChromePrefs()).toEqual(next);
     expect(JSON.parse(localStorage.getItem(BUILDER_CHROME_KEY)!)).toEqual(next);
+  });
+
+  it('keeps prefs saved before suggestions existed', () => {
+    localStorage.setItem(BUILDER_CHROME_KEY, JSON.stringify({ rail: 'shelved', chat: 'open' }));
+    expect(readBuilderChromePrefs()).toEqual({
+      rail: 'shelved',
+      chat: 'open',
+      suggestions: 'shelved'
+    });
   });
 
   it('falls back to defaults on corrupt JSON', () => {
