@@ -81,7 +81,7 @@ export function educationScore(value: string): number {
   const host = new URL(canonicalUrl).hostname.toLowerCase();
   let score = 0;
 
-  if (host.endsWith('.edu') || /(?:^|\.)ac\.[a-z]{2}$/.test(host)) score += 100;
+  if (host.endsWith('.edu') || /(?:^|\.)(?:edu|ac)\.[a-z]{2}$/.test(host)) score += 100;
   if (host.endsWith('.gov') || /(?:^|\.)gov\.[a-z]{2}$/.test(host)) score += 90;
   if (EDUCATIONAL_HOSTS.some((domain) => host === domain || host.endsWith(`.${domain}`))) {
     score += 80;

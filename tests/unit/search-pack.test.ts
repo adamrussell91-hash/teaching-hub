@@ -20,6 +20,14 @@ describe('educationScore', () => {
     expect(educationScore('https://www.cam.ac.uk/research')).toBeGreaterThan(0);
   });
 
+  it('gives international .edu.<cc> hosts the same academic boost as .ac.<cc>', () => {
+    expect(educationScore('https://www.sydney.edu.au/research')).toBe(
+      educationScore('https://www.cam.ac.uk/research')
+    );
+    expect(educationScore('https://www.sydney.edu.au/research')).toBe(100);
+    expect(educationScore('https://notanedu.au/')).toBe(0);
+  });
+
   it('rejects invalid and insecure URLs', () => {
     expect(educationScore('not a URL')).toBe(-1000);
     expect(educationScore('http://www.si.edu/')).toBe(-1000);
