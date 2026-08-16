@@ -33,6 +33,8 @@ import {
   ClassSchema,
   CompositionTemplateSchema,
   CoverPatchSchema,
+  DEFAULT_PEDAGOGICAL_MODE,
+  isPedagogicalMode,
   LessonSchema,
   LessonTemplateSchema,
   PublishableLessonSchema,
@@ -58,6 +60,7 @@ import {
   type Lesson,
   type LessonTemplate,
   type LessonTemplateSummary,
+  type PedagogicalMode,
   type ScheduledLesson,
   type ScopeSequence,
   type Media,
@@ -1951,6 +1954,13 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const record = body as Record<string, unknown>;
     const title = typeof record.title === 'string' ? record.title.trim() : '';
     const unit_id = typeof record.unit_id === 'string' ? record.unit_id : '';
+    let pedagogical_mode: PedagogicalMode = DEFAULT_PEDAGOGICAL_MODE;
+    if (record.pedagogical_mode !== undefined) {
+      if (!isPedagogicalMode(record.pedagogical_mode)) {
+        return errorResponse(400, 'validation_error', 'pedagogical_mode is invalid');
+      }
+      pedagogical_mode = record.pedagogical_mode;
+    }
 
     if (!title || !unit_id) {
       return errorResponse(400, 'validation_error', 'title and unit_id are required');
@@ -1981,6 +1991,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       unit_id,
       sequence: maxSequence + 1,
       blocks: [],
+      pedagogical_mode,
       status: 'active',
       created_at: timestamp,
       updated_at: timestamp,

@@ -1,3 +1,4 @@
+import type { PedagogicalMode } from '@/curriculum/pedagogical-mode';
 import type { CurriculumLessonSummary } from '@/teacher/nav';
 
 export type LessonPublishBadge = 'published' | 'draft' | 'needs_review' | 'archived';
@@ -22,6 +23,8 @@ export type LessonsSmartFilter = 'health' | 'duplicates' | 'today' | null;
 export interface LessonsListState {
   q: string;
   units: string[];
+  subjects: string[];
+  modes: PedagogicalMode[];
   statuses: LessonStatusFilter[];
   tags: string[];
   authors: string[];
@@ -63,6 +66,8 @@ export interface SavedLessonView {
 export const DEFAULT_LESSONS_STATE: LessonsListState = {
   q: '',
   units: [],
+  subjects: [],
+  modes: [],
   statuses: [],
   tags: [],
   authors: [],

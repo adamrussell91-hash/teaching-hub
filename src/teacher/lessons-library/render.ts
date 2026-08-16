@@ -1,5 +1,10 @@
 import { navigate } from '@/app/router';
-import type { Lesson } from '@/schemas/lesson';
+import {
+  PEDAGOGICAL_MODES,
+  PEDAGOGICAL_MODE_LABELS,
+  pedagogicalModeLabel,
+  type PedagogicalMode
+} from '@/curriculum/pedagogical-mode';
 import { selectTodaySchedule } from '@/teacher/home-model';
 import { resolveScheduleToday } from '@/schedule/today';
 import {
@@ -12,12 +17,12 @@ import type { CurriculumResponse } from '@/teacher/nav';
 import { fetchContentSearch } from '@/teacher/search/api';
 import { readRecent } from '@/teacher/search/recent';
 import { listLessonTemplates, useLessonTemplate } from '@/teacher/template-api';
-import { mountHistoryPanel } from '@/teacher/history-panel';
-import { duplicateLesson, getLesson, patchLessonLibrary } from './api';
+import { mountPublicLinkControl } from '@/teacher/public-link';
+import { duplicateLesson, patchLessonLibrary } from './api';
 import { duplicateIdSet, findNearDuplicates } from './duplicates';
 import { exportUnitPack } from './export-unit';
 import { badgeLabel, el, formatLessonCount, formatRelativeTime } from './format';
-import { healthFlagLabel, lessonHealthFlags, lessonsNeedingAttention } from './health';
+import { lessonsNeedingAttention } from './health';
 import {
   readCollapsedUnits,
   readPinnedIds,
@@ -31,7 +36,7 @@ import {
   writeSavedViews
 } from './prefs';
 import { applyLessonsQuery, countActiveFilters, groupLessonsByUnit, lessonBadge } from './query';
-import { parseLessonsSearch, serializeLessonsSearch, writeLessonsSearch } from './state';
+import { parseLessonsSearch, writeLessonsSearch } from './state';
 import { coverageGaps, HSC_ENGLISH_ADVANCED_OUTCOMES } from './syllabus';
 import {
   DEFAULT_LESSONS_STATE,
@@ -139,6 +144,22 @@ export function renderLessonsLibrary(
     selected = new Set();
     patchState({ units: value ? [value] : [] });
   });
+  const subjectSelect = selectControl('Filter by subject', (value) => {
+    selected = new Set();
+    const subjects = value ? [value] : [];
+    let units = state.units;
+    if (value) {
+      const allowed = new Set(
+        curriculum.units.filter((unit) => unit.subject_id === value).map((unit) => unit.id)
+      );
+      units = units.filter((unitId) => allowed.has(unitId));
+    }
+    patchState({ subjects, units });
+  });
+  const modeSelect = selectControl('Filter by pedagogical mode', (value) => {
+    selected = new Set();
+    patchState({ modes: value ? [value as PedagogicalMode] : [] });
+  });
   const statusSelect = selectControl('Filter by status', (value) => {
     selected = new Set();
     patchState({ statuses: value ? [value as LessonStatusFilter] : [] });
@@ -163,7 +184,16 @@ export function renderLessonsLibrary(
     patchState({ density });
   });
 
-  filters.append(unitSelect, statusSelect, tagSelect, sortSelect, smartSelect, densitySelect);
+  filters.append(
+    subjectSelect,
+    unitSelect,
+    modeSelect,
+    statusSelect,
+    tagSelect,
+    sortSelect,
+    smartSelect,
+    densitySelect
+  );
   toolbar.append(search, filters, views);
 
   const viewModes: Array<{ id: LessonsViewMode; label: string }> = [
@@ -244,11 +274,35 @@ export function renderLessonsLibrary(
   }
 
   function fillSelects(): void {
+    subjectSelect.replaceChildren();
+    option(subjectSelect, '', 'All subjects', state.subjects.length === 0);
+    for (const subject of [...curriculum.subjects].sort((a, b) =>
+      (a.display_title || a.title).localeCompare(b.display_title || b.title)
+    )) {
+      option(
+        subjectSelect,
+        subject.id,
+        subject.display_title || subject.title,
+        state.subjects.includes(subject.id)
+      );
+    }
+
+    const subjectFilter = state.subjects[0];
+    const unitsForSelect = [...curriculum.units]
+      .filter((unit) => !subjectFilter || unit.subject_id === subjectFilter)
+      .sort((a, b) => a.title.localeCompare(b.title));
     unitSelect.replaceChildren();
     option(unitSelect, '', 'All units', state.units.length === 0);
-    for (const unit of [...curriculum.units].sort((a, b) => a.title.localeCompare(b.title))) {
+    for (const unit of unitsForSelect) {
       option(unitSelect, unit.id, unit.title, state.units.includes(unit.id));
     }
+
+    modeSelect.replaceChildren();
+    option(modeSelect, '', 'All modes', state.modes.length === 0);
+    for (const mode of PEDAGOGICAL_MODES) {
+      option(modeSelect, mode, PEDAGOGICAL_MODE_LABELS[mode], state.modes.includes(mode));
+    }
+
     statusSelect.replaceChildren();
     option(statusSelect, '', 'Active (draft + published)', state.statuses.length === 0);
     option(statusSelect, 'draft', 'Draft', state.statuses.includes('draft'));
@@ -388,68 +442,43 @@ export function renderLessonsLibrary(
     }
   }
 
-  function openPreview(row: LessonLibraryRow): void {
-    side.hidden = false;
-    side.replaceChildren(el('p', 'lessons-lib__side-status', 'Loading preview…'));
-    void getLesson(row.id)
-      .then((lesson) => {
-        paintPreview(row, lesson);
-      })
-      .catch(() => {
-        side.replaceChildren(el('p', 'lessons-lib__side-status', 'Unable to load preview.'));
-      });
-  }
-
-  function paintPreview(row: LessonLibraryRow, lesson: Lesson): void {
-    side.replaceChildren();
-    const close = el('button', 'btn btn--ghost', 'Close');
-    close.type = 'button';
-    close.addEventListener('click', () => {
-      side.hidden = true;
-      side.replaceChildren();
-    });
-    side.append(el('h2', 'lessons-lib__side-title', lesson.title), close);
-    const badge = lessonBadge(row);
-    const pill = el('span', `status-badge status-badge--${badge}`, badgeLabel(badge));
-    side.append(pill);
-    if (row.excerpt) side.append(el('p', 'lessons-lib__excerpt', row.excerpt));
-    const similar = findNearDuplicates([row, ...curriculum.lessons.filter((item) => item.id !== row.id)])
-      .filter((pair) => pair.ids.includes(row.id))
-      .slice(0, 4);
-    if (similar.length > 0) {
-      side.append(el('p', 'lessons-lib__side-label', 'Similar lessons'));
-      for (const pair of similar) {
-        const otherId = pair.ids[0] === row.id ? pair.ids[1] : pair.ids[0];
-        const other = curriculum.lessons.find((item) => item.id === otherId);
-        if (other) side.append(el('p', 'lessons-lib__similar', other.title));
-      }
-    }
-    const flags = lessonHealthFlags(row, now, extraSets().recentIds);
-    if (flags.length > 0) {
-      side.append(
-        el('p', 'lessons-lib__health', flags.map(healthFlagLabel).join(' · '))
-      );
-    }
-    const historyHost = el('div', 'lessons-lib__history');
-    side.append(historyHost);
-    const history = mountHistoryPanel({
-      kind: 'lesson',
-      parentId: row.id,
-      host: historyHost,
-      onRestored: () => {
-        void options.onMutated?.();
-      }
-    });
-    disposers.push(() => history.dispose());
+  function iconButton(label: string, glyph: string): HTMLButtonElement {
+    const btn = el('button', 'btn btn--ghost lessons-lib__icon-btn', glyph);
+    btn.type = 'button';
+    btn.setAttribute('aria-label', label);
+    btn.title = label;
+    return btn;
   }
 
   function renderCard(row: LessonLibraryRow, compact: boolean): HTMLElement {
     const item = el('li', compact ? 'lesson-list__item lesson-list__item--compact' : 'lesson-list__item');
+    item.classList.add('lesson-list__item--openable');
+    item.tabIndex = 0;
+    item.setAttribute('role', 'link');
+    item.setAttribute('aria-label', `Open ${row.title}`);
+
+    const openLesson = (): void => {
+      navigate(`/lessons/${row.id}`);
+    };
+    item.addEventListener('click', (event) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('button, a, input, .public-link, .list-row-actions')) return;
+      openLesson();
+    });
+    item.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      const target = event.target as HTMLElement | null;
+      if (target !== item) return;
+      event.preventDefault();
+      openLesson();
+    });
+
     const check = document.createElement('input');
     check.type = 'checkbox';
     check.className = 'lessons-lib__check';
     check.checked = selected.has(row.id);
     check.setAttribute('aria-label', `Select ${row.title}`);
+    check.addEventListener('click', (event) => event.stopPropagation());
     check.addEventListener('change', () => {
       if (check.checked) selected.add(row.id);
       else selected.delete(row.id);
@@ -459,7 +488,8 @@ export function renderLessonsLibrary(
     const pin = el('button', 'lessons-lib__pin', pins.has(row.id) ? '★' : '☆');
     pin.type = 'button';
     pin.setAttribute('aria-label', pins.has(row.id) ? 'Unpin lesson' : 'Pin lesson');
-    pin.addEventListener('click', () => {
+    pin.addEventListener('click', (event) => {
+      event.stopPropagation();
       pins = togglePinned(row.id);
       paint();
     });
@@ -467,15 +497,28 @@ export function renderLessonsLibrary(
     const info = el('div', 'lesson-list__info');
     info.append(el('p', 'lesson-list__title', row.title));
     const unit = curriculum.units.find((entry) => entry.id === row.unit_id);
+    const subject = unit
+      ? curriculum.subjects.find((entry) => entry.id === unit.subject_id)
+      : undefined;
     const badge = lessonBadge(row);
     const meta = el('p', 'lesson-list__meta');
     const pill = el('span', `status-badge status-badge--${badge}`, badgeLabel(badge));
+    const modePill = el(
+      'span',
+      'lessons-lib__mode',
+      pedagogicalModeLabel(row.pedagogical_mode)
+    );
     meta.append(
       document.createTextNode(unit?.title ?? row.unit_id),
+      document.createTextNode(' · '),
+      modePill,
       document.createTextNode(' · '),
       pill,
       document.createTextNode(` · ${formatRelativeTime(row.updated_at, now)}`)
     );
+    if (subject) {
+      meta.append(document.createTextNode(` · ${subject.display_title || subject.title}`));
+    }
     info.append(meta);
     if (row.tags && row.tags.length > 0) {
       const tagRow = el('p', 'lessons-lib__tags');
@@ -484,24 +527,23 @@ export function renderLessonsLibrary(
     }
 
     const actions = el('div', 'list-row-actions');
-    const open = el('a', 'btn btn--secondary lesson-list__open', 'Open') as HTMLAnchorElement;
-    open.href = `/lessons/${row.id}`;
-    open.addEventListener('click', (event) => {
-      event.preventDefault();
-      navigate(`/lessons/${row.id}`);
+    actions.addEventListener('click', (event) => event.stopPropagation());
+
+    const linkHost = el('div', 'lessons-lib__public-link');
+    const linkControl = mountPublicLinkControl(linkHost, {
+      kind: 'lesson',
+      id: row.id,
+      published: Boolean(row.published)
     });
-    const peek = el('button', 'btn btn--ghost', 'Preview');
-    peek.type = 'button';
-    peek.addEventListener('click', () => openPreview(row));
-    const dup = el('button', 'btn btn--ghost', 'Duplicate');
-    dup.type = 'button';
+    disposers.push(linkControl.dispose);
+
+    const dup = iconButton('Duplicate', '⧉');
     dup.addEventListener('click', () => {
       void duplicateLesson(row.id)
         .then(() => options.onMutated?.())
         .catch(() => window.alert('Unable to duplicate lesson.'));
     });
-    const archive = el('button', 'btn btn--ghost', 'Archive');
-    archive.type = 'button';
+    const archive = iconButton('Archive', '▣');
     archive.addEventListener('click', () => {
       void (async () => {
         try {
@@ -512,8 +554,7 @@ export function renderLessonsLibrary(
         }
       })();
     });
-    const trash = el('button', 'btn btn--ghost', 'Trash');
-    trash.type = 'button';
+    const trash = iconButton('Trash', '⌫');
     trash.addEventListener('click', () => {
       void (async () => {
         try {
@@ -524,7 +565,7 @@ export function renderLessonsLibrary(
         }
       })();
     });
-    actions.append(open, peek, dup, archive, trash);
+    actions.append(linkHost, dup, archive, trash);
     item.append(check, pin, info, actions);
     return item;
   }
@@ -602,13 +643,25 @@ export function renderLessonsLibrary(
     table.className = 'lessons-table';
     const head = document.createElement('thead');
     const hr = document.createElement('tr');
-    for (const label of ['', 'Title', 'Unit', 'Status', 'Last edited', 'Created', 'Tags']) {
+    for (const label of [
+      '',
+      'Title',
+      'Subject',
+      'Unit',
+      'Mode',
+      'Status',
+      'Last edited',
+      'Created',
+      'Tags',
+      'Link'
+    ]) {
       hr.append(el('th', undefined, label));
     }
     head.append(hr);
     table.append(head);
     const body = document.createElement('tbody');
-    const unitsById = new Map(curriculum.units.map((unit) => [unit.id, unit.title]));
+    const unitsById = new Map(curriculum.units.map((unit) => [unit.id, unit]));
+    const subjectsById = new Map(curriculum.subjects.map((subject) => [subject.id, subject]));
     const virtualHost = el('div', 'lessons-table__scroll');
     listHost.append(virtualHost);
 
@@ -634,17 +687,31 @@ export function renderLessonsLibrary(
         navigate(`/lessons/${row.id}`);
       });
       title.append(link);
+      const unit = unitsById.get(row.unit_id);
+      const subject = unit ? subjectsById.get(unit.subject_id) : undefined;
       const badge = lessonBadge(row);
       const status = document.createElement('td');
       status.append(el('span', `status-badge status-badge--${badge}`, badgeLabel(badge)));
+      const linkCell = document.createElement('td');
+      const linkHost = el('div', 'lessons-lib__public-link');
+      const linkControl = mountPublicLinkControl(linkHost, {
+        kind: 'lesson',
+        id: row.id,
+        published: Boolean(row.published)
+      });
+      disposers.push(linkControl.dispose);
+      linkCell.append(linkHost);
       tr.append(
         checkCell,
         title,
-        el('td', undefined, unitsById.get(row.unit_id) ?? row.unit_id),
+        el('td', undefined, subject ? subject.display_title || subject.title : '—'),
+        el('td', undefined, unit?.title ?? row.unit_id),
+        el('td', undefined, pedagogicalModeLabel(row.pedagogical_mode)),
         status,
         el('td', undefined, formatRelativeTime(row.updated_at, now)),
         el('td', undefined, row.created_at ? formatRelativeTime(row.created_at, now) : '—'),
-        el('td', undefined, (row.tags ?? []).join(', '))
+        el('td', undefined, (row.tags ?? []).join(', ')),
+        linkCell
       );
       return tr;
     };
@@ -733,6 +800,8 @@ export function renderLessonsLibrary(
         state: {
           q: state.q,
           units: state.units,
+          subjects: state.subjects,
+          modes: state.modes,
           statuses: state.statuses,
           tags: state.tags,
           authors: state.authors,

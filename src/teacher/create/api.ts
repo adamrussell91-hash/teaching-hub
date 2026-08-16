@@ -1,5 +1,5 @@
 import { apiPost } from '@/api/client';
-import type { Class, Lesson, ScopeSequence, Unit } from '@/schemas';
+import type { Class, Lesson, PedagogicalMode, ScopeSequence, Unit } from '@/schemas';
 
 export function postClass(body: {
   title: string;
@@ -21,7 +21,11 @@ export function postUnit(body: {
   return apiPost('/api/units', body);
 }
 
-export function postLesson(body: { title: string; unit_id: string }): Promise<Lesson> {
+export function postLesson(body: {
+  title: string;
+  unit_id: string;
+  pedagogical_mode?: PedagogicalMode;
+}): Promise<Lesson> {
   return apiPost('/api/lessons', body);
 }
 

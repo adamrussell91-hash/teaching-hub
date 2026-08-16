@@ -14,6 +14,12 @@ import { renderBlock } from '@/blocks/render';
 import type { Block } from '@/schemas/block';
 import type { Lesson } from '@/schemas/lesson';
 import type { Media } from '@/schemas/media';
+import {
+  PEDAGOGICAL_MODES,
+  PEDAGOGICAL_MODE_LABELS,
+  resolvePedagogicalMode,
+  type PedagogicalMode
+} from '@/curriculum/pedagogical-mode';
 import { renderEntityBanner, type EntityBannerHandle } from '@/teacher/entity-banner';
 import {
   deleteBlocksById,
@@ -712,10 +718,31 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     emitLesson({ ...lesson, title: title.value });
   });
 
+  const modeRow = document.createElement('label');
+  modeRow.className = 'lesson-page__mode';
+  const modeLabel = document.createElement('span');
+  modeLabel.className = 'lesson-page__mode-label';
+  modeLabel.textContent = 'Pedagogical mode';
+  const modeSelect = document.createElement('select');
+  modeSelect.className = 'lesson-page__mode-select';
+  modeSelect.setAttribute('aria-label', 'Pedagogical mode');
+  for (const mode of PEDAGOGICAL_MODES) {
+    const option = document.createElement('option');
+    option.value = mode;
+    option.textContent = PEDAGOGICAL_MODE_LABELS[mode];
+    modeSelect.append(option);
+  }
+  modeSelect.value = resolvePedagogicalMode(lesson.pedagogical_mode);
+  modeSelect.addEventListener('change', () => {
+    const pedagogical_mode = modeSelect.value as PedagogicalMode;
+    emitLesson({ ...lesson, pedagogical_mode });
+  });
+  modeRow.append(modeLabel, modeSelect);
+
   const canvasHost = document.createElement('div');
   canvasHost.className = 'lesson-page__canvas';
 
-  root.append(chrome, coverHost, title, canvasHost);
+  root.append(chrome, coverHost, title, modeRow, canvasHost);
 
   const canvas = mountBlockCanvas(canvasHost, {
     blocks: lesson.blocks,
@@ -737,6 +764,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       lesson = next;
       if (nextMedia) media = nextMedia;
       title.value = lesson.title;
+      modeSelect.value = resolvePedagogicalMode(lesson.pedagogical_mode);
       banner.update({
         cover: lesson.cover ?? null,
         title: lesson.title,

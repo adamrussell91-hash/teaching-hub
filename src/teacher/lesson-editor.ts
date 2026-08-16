@@ -20,6 +20,7 @@ import {
   mountHistoryPanel,
   type HistoryPanelHandle
 } from '@/teacher/history-panel';
+import { mountPublicLinkControl } from '@/teacher/public-link';
 import {
   buildLinkedPreview,
   ensureCompositionCached,
@@ -98,6 +99,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
   let saveController: SaveController | null = null;
   let savePublishHandle: SavePublishHandle | null = null;
   let historyPanel: HistoryPanelHandle | null = null;
+  let publicLinkDispose: (() => void) | null = null;
   let closeEditSourceModal: (() => void) | null = null;
   let editSourceOpenSeq = 0;
   let aiPanel: AiPanelHandle | null = null;
@@ -182,6 +184,11 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     function assignLesson(next: Lesson): void {
       lesson.title = next.title;
       lesson.blocks = next.blocks;
+      if (next.pedagogical_mode) {
+        lesson.pedagogical_mode = next.pedagogical_mode;
+      } else {
+        delete lesson.pedagogical_mode;
+      }
       if (next.cover) {
         lesson.cover = next.cover;
       } else {
@@ -563,6 +570,20 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       link.textContent = studentPath;
 
       publishPanel.append(message, link);
+      refreshPublicLink();
+    }
+
+    const publicLinkHost = document.createElement('div');
+    publicLinkHost.className = 'lesson-editor__public-link';
+
+    function refreshPublicLink(): void {
+      publicLinkDispose?.();
+      publicLinkDispose = mountPublicLinkControl(publicLinkHost, {
+        kind: 'lesson',
+        id: lesson.id,
+        published: Boolean(lesson.published_at),
+        label: 'Student link'
+      }).dispose;
     }
 
     function showPublishIssues(issues: string[]): void {
@@ -607,10 +628,11 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     historyHost.className = 'history-panel-host context-bar__history';
     const actions = refs.contextBar.querySelector('.context-bar__actions');
     if (actions) {
-      actions.append(historyHost);
+      actions.append(publicLinkHost, historyHost);
     } else {
-      refs.contextBar.append(historyHost);
+      refs.contextBar.append(publicLinkHost, historyHost);
     }
+    refreshPublicLink();
 
     function applyRestoredLesson(restored: Lesson): void {
       Object.assign(lesson, restored);
@@ -647,6 +669,8 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       palette = null;
       historyPanel?.dispose();
       historyPanel = null;
+      publicLinkDispose?.();
+      publicLinkDispose = null;
       aiPanel?.dispose();
       aiPanel = null;
       savePublishHandle?.dispose();

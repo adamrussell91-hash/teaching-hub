@@ -45,6 +45,16 @@ export {
   type Lesson
 } from './lesson';
 export {
+  PEDAGOGICAL_MODES,
+  PedagogicalModeSchema,
+  DEFAULT_PEDAGOGICAL_MODE,
+  PEDAGOGICAL_MODE_LABELS,
+  isPedagogicalMode,
+  resolvePedagogicalMode,
+  pedagogicalModeLabel,
+  type PedagogicalMode
+} from '../curriculum/pedagogical-mode';
+export {
   PublishedLessonSchema,
   toPublishedLesson,
   type PublishedLesson

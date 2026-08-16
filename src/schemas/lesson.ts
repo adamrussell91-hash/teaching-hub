@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { PedagogicalModeSchema } from '../curriculum/pedagogical-mode';
 import { CommonFields, IsoDateSchema, TrashFields } from './common';
 import { BlockSchema } from './block';
 import { CoverSchema } from './cover';
@@ -19,7 +20,9 @@ export const LessonSchema = z.object({
   tags: z.array(z.string().min(1).max(40)).max(24).optional(),
   author_id: z.string().min(1).optional(),
   review_status: z.enum(['needs_review', 'none']).optional(),
-  syllabus_outcomes: z.array(z.string().min(1).max(32)).max(24).optional()
+  syllabus_outcomes: z.array(z.string().min(1).max(32)).max(24).optional(),
+  /** Teacher planning metadata; optional for blob/version compatibility. */
+  pedagogical_mode: PedagogicalModeSchema.optional()
 });
 
 function publishBlockIssues(blocks: z.infer<typeof BlockSchema>[]): string | null {

@@ -17,7 +17,14 @@ import {
   preflightResponse,
   withCors
 } from './_shared/http.mts';
-import { LessonSchema, UnitSchema, type Lesson } from '../../src/schemas';
+import {
+  DEFAULT_PEDAGOGICAL_MODE,
+  isPedagogicalMode,
+  LessonSchema,
+  UnitSchema,
+  type Lesson,
+  type PedagogicalMode
+} from '../../src/schemas';
 
 export default async function handler(request: Request): Promise<Response> {
   const env = process.env;
@@ -54,6 +61,17 @@ export default async function handler(request: Request): Promise<Response> {
   const record = body as Record<string, unknown>;
   const title = typeof record.title === 'string' ? record.title.trim() : '';
   const unit_id = typeof record.unit_id === 'string' ? record.unit_id : '';
+  let pedagogical_mode: PedagogicalMode = DEFAULT_PEDAGOGICAL_MODE;
+  if (record.pedagogical_mode !== undefined) {
+    if (!isPedagogicalMode(record.pedagogical_mode)) {
+      return withCors(
+        errorResponse(400, 'validation_error', 'pedagogical_mode is invalid'),
+        request,
+        env
+      );
+    }
+    pedagogical_mode = record.pedagogical_mode;
+  }
 
   if (!title || !unit_id) {
     return withCors(
@@ -92,6 +110,7 @@ export default async function handler(request: Request): Promise<Response> {
     unit_id,
     sequence: maxSequence + 1,
     blocks: [],
+    pedagogical_mode,
     status: 'active',
     created_at: timestamp,
     updated_at: timestamp,

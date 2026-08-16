@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { PedagogicalModeSchema } from '@/curriculum/pedagogical-mode';
 import type { Lesson } from '@/schemas/lesson';
 
 export const LessonLibraryPatchSchema = z.object({
@@ -6,7 +7,8 @@ export const LessonLibraryPatchSchema = z.object({
   review_status: z.enum(['needs_review', 'none']).optional(),
   syllabus_outcomes: z.array(z.string().min(1).max(32)).max(24).optional(),
   unit_id: z.string().min(1).optional(),
-  author_id: z.string().min(1).nullable().optional()
+  author_id: z.string().min(1).nullable().optional(),
+  pedagogical_mode: PedagogicalModeSchema.optional()
 });
 
 export type LessonLibraryPatch = z.infer<typeof LessonLibraryPatchSchema>;
@@ -27,7 +29,10 @@ export function parseLessonLibraryPatch(
       ? { syllabus_outcomes: record.syllabus_outcomes }
       : {}),
     ...(record.unit_id !== undefined ? { unit_id: record.unit_id } : {}),
-    ...(record.author_id !== undefined ? { author_id: record.author_id } : {})
+    ...(record.author_id !== undefined ? { author_id: record.author_id } : {}),
+    ...(record.pedagogical_mode !== undefined
+      ? { pedagogical_mode: record.pedagogical_mode }
+      : {})
   };
   const parsed = LessonLibraryPatchSchema.safeParse(subset);
   if (!parsed.success) {
@@ -46,5 +51,6 @@ export function applyLessonLibraryPatch(lesson: Lesson, patch: LessonLibraryPatc
     if (patch.author_id === null) delete next.author_id;
     else next.author_id = patch.author_id;
   }
+  if (patch.pedagogical_mode !== undefined) next.pedagogical_mode = patch.pedagogical_mode;
   return next;
 }

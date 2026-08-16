@@ -13,6 +13,8 @@ describe('lessons library URL state', () => {
       ...DEFAULT_LESSONS_STATE,
       q: 'floating world',
       units: ['unit_a', 'unit_b'],
+      subjects: ['subject_eng'],
+      modes: ['workshop', 'lab'] as const,
       statuses: ['draft', 'published'] as ('draft' | 'published')[],
       tags: ['assessment', 'module-a'],
       sort: 'title_asc' as const,
@@ -20,17 +22,25 @@ describe('lessons library URL state', () => {
       density: 'compact' as const,
       smart: 'health' as const
     };
-    const search = serializeLessonsSearch(state);
+    const search = serializeLessonsSearch({ ...state, modes: [...state.modes] });
     expect(search.startsWith('?')).toBe(true);
-    expect(parseLessonsSearch(search)).toEqual({ ...state, savedViewId: null });
+    expect(parseLessonsSearch(search)).toEqual({
+      ...state,
+      modes: [...state.modes],
+      savedViewId: null
+    });
   });
 
   it('ignores unknown keys and invalid enums', () => {
-    const parsed = parseLessonsSearch('?q=guilt&sort=nope&view=cards&status=live&unit=unit_1');
+    const parsed = parseLessonsSearch(
+      '?q=guilt&sort=nope&view=cards&status=live&unit=unit_1&subject=sub_1&mode=party'
+    );
     expect(parsed.q).toBe('guilt');
     expect(parsed.sort).toBe('edited_desc');
     expect(parsed.view).toBe('library');
     expect(parsed.units).toEqual(['unit_1']);
+    expect(parsed.subjects).toEqual(['sub_1']);
+    expect(parsed.modes).toEqual([]);
     expect(parsed.statuses).toEqual([]);
   });
 });

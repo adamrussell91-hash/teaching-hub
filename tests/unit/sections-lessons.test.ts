@@ -66,9 +66,9 @@ describe('lessons index', () => {
       /lesson/i
     );
     expect(canvas.querySelector('.lesson-list__title')?.textContent).toBe('Introduction');
-    canvas.querySelector<HTMLAnchorElement>('.lesson-list__open')!.dispatchEvent(
-      new MouseEvent('click', { bubbles: true, cancelable: true })
-    );
+    const card = canvas.querySelector<HTMLElement>('.lesson-list__item--openable')!;
+    expect(card).toBeTruthy();
+    card.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     expect(navigate).toHaveBeenCalledWith('/lessons/lesson_001');
   });
 

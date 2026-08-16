@@ -11,7 +11,6 @@ test('teacher publishes lesson visible on student URL', async ({ page, context }
   await page
     .getByRole('listitem')
     .filter({ hasText: 'Memory, Identity and Ono' })
-    .getByRole('link', { name: 'Open' })
     .click();
 
   const titleField = page.getByLabel('Lesson title');

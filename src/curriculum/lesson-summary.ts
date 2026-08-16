@@ -45,6 +45,7 @@ export function toCurriculumLessonSummary(
       : {}),
     ...(lesson.syllabus_outcomes && lesson.syllabus_outcomes.length > 0
       ? { syllabus_outcomes: lesson.syllabus_outcomes }
-      : {})
+      : {}),
+    ...(lesson.pedagogical_mode ? { pedagogical_mode: lesson.pedagogical_mode } : {})
   };
 }

@@ -1,5 +1,6 @@
 import type { Unit } from '@/schemas';
 import type { CurriculumResponse } from '@/teacher/nav';
+import { resolvePedagogicalMode } from '@/curriculum/pedagogical-mode';
 import { expandQueryTokens, semanticScore } from './semantic';
 import {
   DEFAULT_LESSONS_STATE,
@@ -87,6 +88,8 @@ export function countActiveFilters(state: LessonsListState): number {
   return (
     (state.q.trim() ? 1 : 0) +
     state.units.length +
+    state.subjects.length +
+    state.modes.length +
     state.statuses.length +
     state.tags.length +
     state.authors.length +
@@ -138,9 +141,22 @@ export function applyLessonsQuery(
 
   let rows = library.filter((lesson) => matchesStatus(lesson, state.statuses));
 
+  if (state.subjects.length > 0) {
+    const allowedSubjects = new Set(state.subjects);
+    rows = rows.filter((lesson) => {
+      const unit = unitsById.get(lesson.unit_id);
+      return unit ? allowedSubjects.has(unit.subject_id) : false;
+    });
+  }
+
   if (state.units.length > 0) {
     const allowed = new Set(state.units);
     rows = rows.filter((lesson) => allowed.has(lesson.unit_id));
+  }
+
+  if (state.modes.length > 0) {
+    const allowed = new Set(state.modes);
+    rows = rows.filter((lesson) => allowed.has(resolvePedagogicalMode(lesson.pedagogical_mode)));
   }
 
   if (state.tags.length > 0) {

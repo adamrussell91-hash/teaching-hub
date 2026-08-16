@@ -34,8 +34,9 @@ function lesson(row: LessonLibraryRow): LessonLibraryRow {
 }
 
 const units = [
-  unit({ id: 'unit_aotfw', title: 'Artist of the Floating World' }),
-  unit({ id: 'unit_hamlet', title: 'Hamlet' })
+  unit({ id: 'unit_aotfw', title: 'Artist of the Floating World', subject_id: 'subject_eng' }),
+  unit({ id: 'unit_hamlet', title: 'Hamlet', subject_id: 'subject_eng' }),
+  unit({ id: 'unit_bio', title: 'Cells', subject_id: 'subject_bio', year_id: 'year_11' })
 ];
 
 const lessons: LessonLibraryRow[] = [
@@ -50,7 +51,8 @@ const lessons: LessonLibraryRow[] = [
     updated_at: ISO,
     created_at: ISO,
     tags: ['module-c'],
-    excerpt: 'Guilt and complicity in post-war Japan.'
+    excerpt: 'Guilt and complicity in post-war Japan.',
+    pedagogical_mode: 'lesson'
   }),
   lesson({
     id: 'l2',
@@ -63,7 +65,8 @@ const lessons: LessonLibraryRow[] = [
     updated_at: LATER,
     created_at: ISO,
     tags: ['assessment', 'module-c'],
-    excerpt: 'Passage analysis of memory and art.'
+    excerpt: 'Passage analysis of memory and art.',
+    pedagogical_mode: 'workshop'
   }),
   lesson({
     id: 'l3',
@@ -76,13 +79,55 @@ const lessons: LessonLibraryRow[] = [
     updated_at: LATER,
     created_at: LATER,
     tags: ['assessment'],
-    review_status: 'needs_review'
+    review_status: 'needs_review',
+    pedagogical_mode: 'assessment'
+  }),
+  lesson({
+    id: 'l4',
+    title: 'Microscope lab',
+    slug: 'lab',
+    unit_id: 'unit_bio',
+    sequence: 1,
+    status: 'active',
+    published: false,
+    updated_at: LATER,
+    created_at: ISO,
+    pedagogical_mode: 'lab'
   })
 ];
 
 const curriculum = {
   years: [],
-  subjects: [],
+  subjects: [
+    {
+      id: 'subject_eng',
+      type: 'subject',
+      title: 'English',
+      slug: 'english',
+      status: 'active',
+      created_at: ISO,
+      updated_at: ISO,
+      schema_version: 1,
+      year_id: 'year_12',
+      unit_ids: ['unit_aotfw', 'unit_hamlet'],
+      outcome_ids: [],
+      class_ids: []
+    },
+    {
+      id: 'subject_bio',
+      type: 'subject',
+      title: 'Biology',
+      slug: 'biology',
+      status: 'active',
+      created_at: ISO,
+      updated_at: ISO,
+      schema_version: 1,
+      year_id: 'year_11',
+      unit_ids: ['unit_bio'],
+      outcome_ids: [],
+      class_ids: []
+    }
+  ],
   units,
   lessons,
   classes: [],
@@ -95,8 +140,8 @@ const curriculum = {
 describe('lessons library query', () => {
   it('defaults to active lessons sorted by last edited newest first', () => {
     const result = applyLessonsQuery(curriculum, DEFAULT_LESSONS_STATE);
-    expect(result.totalInLibrary).toBe(2);
-    expect(result.rows.map((r) => r.id)).toEqual(['l2', 'l1']);
+    expect(result.totalInLibrary).toBe(3);
+    expect(result.rows.map((r) => r.id)).toEqual(['l2', 'l4', 'l1']);
   });
 
   it('matches partial query against title, unit, tags, and excerpt', () => {
@@ -121,6 +166,37 @@ describe('lessons library query', () => {
     expect(countActiveFilters(result.state)).toBe(3);
   });
 
+  it('filters by subject and pedagogical mode', () => {
+    const bySubject = applyLessonsQuery(curriculum, {
+      ...DEFAULT_LESSONS_STATE,
+      subjects: ['subject_bio']
+    });
+    expect(bySubject.rows.map((r) => r.id)).toEqual(['l4']);
+
+    const byMode = applyLessonsQuery(curriculum, {
+      ...DEFAULT_LESSONS_STATE,
+      modes: ['workshop']
+    });
+    expect(byMode.rows.map((r) => r.id)).toEqual(['l2']);
+    expect(countActiveFilters(byMode.state)).toBe(1);
+  });
+
+  it('treats missing pedagogical_mode as Lesson', () => {
+    const curriculumWithoutMode = {
+      ...curriculum,
+      lessons: curriculum.lessons.map((row) => {
+        if (row.id !== 'l1') return row;
+        const { pedagogical_mode: _removed, ...rest } = row;
+        return rest;
+      })
+    } as CurriculumResponse;
+    const result = applyLessonsQuery(curriculumWithoutMode, {
+      ...DEFAULT_LESSONS_STATE,
+      modes: ['lesson']
+    });
+    expect(result.rows.map((r) => r.id)).toEqual(['l1']);
+  });
+
   it('includes archived only when that status is selected', () => {
     const result = applyLessonsQuery(curriculum, {
       ...DEFAULT_LESSONS_STATE,
@@ -133,18 +209,22 @@ describe('lessons library query', () => {
   it('groups by unit with published/draft breakdown', () => {
     const result = applyLessonsQuery(curriculum, DEFAULT_LESSONS_STATE);
     const groups = groupLessonsByUnit(result.rows, units);
-    expect(groups).toHaveLength(1);
-    expect(groups[0]?.unitTitle).toBe('Artist of the Floating World');
-    expect(groups[0]?.lessons).toHaveLength(2);
-    expect(groups[0]?.published).toBe(1);
-    expect(groups[0]?.draft).toBe(1);
+    expect(groups.map((group) => group.unitId).sort()).toEqual([
+      'unit_aotfw',
+      'unit_bio'
+    ].sort());
+    const aotfw = groups.find((group) => group.unitId === 'unit_aotfw')!;
+    expect(aotfw.lessons).toHaveLength(2);
+    expect(aotfw.published).toBe(1);
+    expect(aotfw.draft).toBe(1);
   });
 
   it('sorts by title A–Z', () => {
     const result = applyLessonsQuery(curriculum, { ...DEFAULT_LESSONS_STATE, sort: 'title_asc' });
     expect(result.rows.map((r) => r.title)).toEqual([
       'Close reading: floating world',
-      'Introduction to Ono'
+      'Introduction to Ono',
+      'Microscope lab'
     ]);
   });
 });

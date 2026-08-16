@@ -7,6 +7,12 @@ import {
   postUnit
 } from '@/teacher/create/api';
 import type { CreateKind } from '@/teacher/create/types';
+import {
+  DEFAULT_PEDAGOGICAL_MODE,
+  PEDAGOGICAL_MODES,
+  PEDAGOGICAL_MODE_LABELS,
+  type PedagogicalMode
+} from '@/curriculum/pedagogical-mode';
 
 const KIND_TITLES: Record<CreateKind, string> = {
   class: 'New class',
@@ -179,6 +185,13 @@ function buildFields(kind: CreateKind, curriculum: CurriculumResponse): HTMLElem
     wireYearSubjectCascade(form, curriculum);
   } else if (kind === 'lesson') {
     appendLabeledField(form, 'Unit', selectInput('unit_id', units));
+    const modeOptions = PEDAGOGICAL_MODES.map((mode) => ({
+      value: mode,
+      label: PEDAGOGICAL_MODE_LABELS[mode]
+    }));
+    const modeSelect = selectInput('pedagogical_mode', modeOptions);
+    modeSelect.value = DEFAULT_PEDAGOGICAL_MODE;
+    appendLabeledField(form, 'Pedagogical mode', modeSelect);
   } else {
     appendLabeledField(form, 'Subject', selectInput('subject_id', allSubjects));
     appendLabeledField(form, 'Academic year', numberInput('academic_year', currentAcademicYear()));
@@ -212,9 +225,12 @@ async function submitKind(
   }
 
   if (kind === 'lesson') {
+    const modeRaw = fieldValue(form, 'pedagogical_mode') || DEFAULT_PEDAGOGICAL_MODE;
+    const pedagogical_mode = modeRaw as PedagogicalMode;
     const created = await postLesson({
       title: fieldValue(form, 'title'),
-      unit_id: fieldValue(form, 'unit_id')
+      unit_id: fieldValue(form, 'unit_id'),
+      pedagogical_mode
     });
     return { id: created.id };
   }

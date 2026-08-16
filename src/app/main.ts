@@ -230,10 +230,12 @@ function railCreateClassHandler(
   };
 }
 
+import { publicStudentPath, type PublicEntityKind } from '@/teacher/public-link';
+
 function studentPathForTeacherPath(pathname: string): string | null {
   const match = pathname.match(/^\/(lessons|units|classes)\/([^/]+)\/?$/);
   if (!match) return null;
-  return `/s/${match[1]}/${match[2]}`;
+  return publicStudentPath(match[1] as PublicEntityKind, match[2]!);
 }
 
 function createKindForSearchAction(actionId: string): CreateKind | null {

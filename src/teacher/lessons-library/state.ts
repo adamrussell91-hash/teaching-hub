@@ -1,4 +1,8 @@
 import {
+  isPedagogicalMode,
+  type PedagogicalMode
+} from '@/curriculum/pedagogical-mode';
+import {
   DEFAULT_LESSONS_STATE,
   type LessonSortKey,
   type LessonStatusFilter,
@@ -45,10 +49,15 @@ export function parseLessonsSearch(search: string): LessonsListState {
   const statuses = csv(params.get('status')).filter((value): value is LessonStatusFilter =>
     STATUS_KEYS.has(value)
   );
+  const modes = csv(params.get('mode')).filter((value): value is PedagogicalMode =>
+    isPedagogicalMode(value)
+  );
 
   return {
     q: (params.get('q') ?? '').trim(),
     units: csv(params.get('unit')),
+    subjects: csv(params.get('subject')),
+    modes,
     statuses,
     tags: csv(params.get('tag')),
     authors: csv(params.get('author')),
@@ -67,6 +76,8 @@ export function serializeLessonsSearch(state: LessonsListState): string {
   const params = new URLSearchParams();
   if (state.q.trim()) params.set('q', state.q.trim());
   setCsv(params, 'unit', state.units);
+  setCsv(params, 'subject', state.subjects);
+  setCsv(params, 'mode', state.modes);
   setCsv(params, 'status', state.statuses);
   setCsv(params, 'tag', state.tags);
   setCsv(params, 'author', state.authors);
