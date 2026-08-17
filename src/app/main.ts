@@ -12,7 +12,7 @@ import { fetchCurriculum, type CurriculumResponse } from '@/teacher/nav';
 import { renderTeacherRail } from '@/teacher/rail';
 import { renderTeacherHome as renderHomeCanvas } from '@/teacher/home';
 import { openCreateModal } from '@/teacher/create/modal';
-import type { CreateKind } from '@/teacher/create/types';
+import type { CreateKind, CreatedRecord } from '@/teacher/create/types';
 import { mountLessonEditor, type LessonEditorHandle } from '@/teacher/lesson-editor';
 import type { TeacherSection } from '@/teacher/section';
 import { renderResourcesIndex } from '@/teacher/sections/resources';
@@ -45,6 +45,7 @@ import {
   type StudentClassViewHandle
 } from '@/student/class-view';
 import { createCurriculumCache } from './curriculum-cache';
+import { withCreatedEntity } from '@/curriculum/with-created-entity';
 import { navigate, start, type RouteMatch } from './router';
 import { renderPageHeader } from '@/teacher/page-header';
 
@@ -198,15 +199,20 @@ function pathForCreatedEntity(
 async function handleEntityCreated(
   refs: TeacherShellRefs,
   kind: CreateKind,
-  id: string
+  id: string,
+  entity?: CreatedRecord
 ): Promise<void> {
   // Always invalidate + refetch so rail/indexes see the new entity. Do not gate
   // on renderToken — a create that finishes after a concurrent route change
   // must still navigate to the new item with a fresh curriculum cache.
+  // Seed the POST body into the snapshot: Netlify Blobs list is eventually
+  // consistent, so curriculum GET can omit the row we just wrote.
   curriculumCache.invalidate();
   try {
     const refreshed = await curriculumCache.get();
-    navigate(pathForCreatedEntity(kind, id, refreshed));
+    const next = entity ? withCreatedEntity(refreshed, kind, entity) : refreshed;
+    curriculumCache.replace(next);
+    navigate(pathForCreatedEntity(kind, id, next));
   } catch (error) {
     if (error instanceof ApiClientError && error.code === 'unauthorized') {
       session = { authenticated: false };
@@ -228,7 +234,7 @@ function railCreateClassHandler(
     openCreateModal({
       kind: 'class',
       curriculum,
-      onCreated: (kind, id) => handleEntityCreated(refs, kind, id)
+      onCreated: (kind, id, entity) => handleEntityCreated(refs, kind, id, entity)
     });
   };
 }
@@ -292,14 +298,18 @@ function openTeacherSearch(): void {
           openCreateModal({
             kind: createKind,
             curriculum,
-            onCreated: (kind, id) => {
+            onCreated: (kind, id, entity) => {
               if (refs) {
-                void handleEntityCreated(refs, kind, id);
+                void handleEntityCreated(refs, kind, id, entity);
                 return;
               }
               invalidateCurriculum();
               void getCurriculum()
-                .then((next) => navigate(pathForCreatedEntity(kind, id, next)))
+                .then((next) => {
+                  const seeded = entity ? withCreatedEntity(next, kind, entity) : next;
+                  curriculumCache.replace(seeded);
+                  navigate(pathForCreatedEntity(kind, id, seeded));
+                })
                 .catch(() => navigate(pathForCreatedEntity(kind, id, curriculum)));
             }
           });
@@ -410,7 +420,7 @@ function renderTeacherHomeRoute(token: number): void {
   void loadNavAndHandleErrors(refs, token, 'home', undefined, (curriculum) => {
     teardownTeacherHome();
     homeHandle = renderHomeCanvas(refs.canvas, curriculum, {
-      onCreated: (kind, id) => handleEntityCreated(refs, kind, id)
+      onCreated: (kind, id, entity) => handleEntityCreated(refs, kind, id, entity)
     });
   });
 }
@@ -424,7 +434,7 @@ function renderTeacherClassesRoute(token: number): void {
     const remount = (data: CurriculumResponse): void => {
       teardownClassesIndex();
       classesIndexHandle = renderClassesIndex(refs.canvas, data, {
-        onCreated: (kind, id) => handleEntityCreated(refs, kind, id),
+        onCreated: (kind, id, entity) => handleEntityCreated(refs, kind, id, entity),
         onMutated: async () => {
           invalidateCurriculum();
           const next = await getCurriculum();
@@ -573,7 +583,7 @@ function renderTeacherScopeSequencesRoute(token: number): void {
   void loadNavAndHandleErrors(refs, token, 'scope-sequences', undefined, (curriculum) => {
     teardownScopeIndex();
     scopeIndexHandle = renderScopeSequencesIndex(refs.canvas, curriculum, {
-      onCreated: (kind, id) => handleEntityCreated(refs, kind, id)
+      onCreated: (kind, id, entity) => handleEntityCreated(refs, kind, id, entity)
     });
   });
 }
@@ -602,7 +612,7 @@ function renderTeacherUnitsRoute(token: number): void {
     const remount = (data: CurriculumResponse): void => {
       teardownUnitsIndex();
       unitsIndexHandle = renderUnitsIndex(refs.canvas, data, {
-        onCreated: (kind, id) => handleEntityCreated(refs, kind, id),
+        onCreated: (kind, id, entity) => handleEntityCreated(refs, kind, id, entity),
         onMutated: async () => {
           invalidateCurriculum();
           const next = await getCurriculum();
@@ -673,7 +683,7 @@ function renderTeacherLessonsRoute(token: number): void {
     const remount = (data: CurriculumResponse): void => {
       teardownLessonsIndex();
       lessonsIndexHandle = renderLessonsIndex(refs.canvas, data, {
-        onCreated: (kind, id) => handleEntityCreated(refs, kind, id),
+        onCreated: (kind, id, entity) => handleEntityCreated(refs, kind, id, entity),
         onMutated: async () => {
           invalidateCurriculum();
           const next = await getCurriculum();

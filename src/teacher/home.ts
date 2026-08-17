@@ -13,7 +13,7 @@ import {
 } from '@/teacher/class-calendar';
 import { mountCreateControl } from '@/teacher/create/control';
 import { openCreateModal } from '@/teacher/create/modal';
-import type { CreateKind } from '@/teacher/create/types';
+import type { EntityCreatedHandler } from '@/teacher/create/types';
 import {
   readDashboardCover,
   writeDashboardCover
@@ -23,7 +23,7 @@ import { mountHomeClock } from '@/teacher/home-clock';
 import type { CurriculumResponse } from './nav';
 
 export interface TeacherHomeOptions {
-  onCreated?: (kind: CreateKind, id: string) => void | Promise<void>;
+  onCreated?: EntityCreatedHandler;
 }
 
 /**

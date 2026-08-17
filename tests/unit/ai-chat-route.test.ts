@@ -378,4 +378,58 @@ describe('POST /api/ai/chat mandatory web search', () => {
     expect(anthropicBodies(fetchMock)[0]?.system).toContain('britannica.com');
     expect(text).toContain('"block_type":"mind_map"');
   });
+
+  it('opens the SSE stream with Thinking before Brave search returns', async () => {
+    let releaseBrave: () => void = () => undefined;
+    const braveHeld = new Promise<void>((resolve) => {
+      releaseBrave = resolve;
+    });
+
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(
+        typeof input === 'string' || input instanceof URL ? input : input.url
+      );
+      if (url.origin === 'https://api.search.brave.com') {
+        await braveHeld;
+        if (url.pathname === BRAVE_PATHS[0]) return Response.json(WEB_FIXTURE);
+        if (url.pathname === BRAVE_PATHS[1]) return Response.json(IMAGE_FIXTURE);
+        if (url.pathname === BRAVE_PATHS[2]) return Response.json(VIDEO_FIXTURE);
+      }
+      if (url.origin === 'https://api.anthropic.com') {
+        return anthropicDoneReply();
+      }
+      throw new Error(`Unexpected fetch destination: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+    try {
+      const response = await Promise.race([
+        handler(chatRequest()),
+        new Promise<Response>((_, reject) => {
+          setTimeout(
+            () => reject(new Error('handler blocked on Brave search before opening the stream')),
+            200
+          );
+        })
+      ]);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toBeTruthy();
+
+      reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (!buffer.includes('Thinking')) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+      }
+
+      expect(buffer).toContain('Thinking');
+    } finally {
+      releaseBrave();
+      await reader?.cancel().catch(() => undefined);
+    }
+  });
 });

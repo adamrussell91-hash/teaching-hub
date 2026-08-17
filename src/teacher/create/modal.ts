@@ -7,7 +7,7 @@ import {
   postSubject,
   postUnit
 } from '@/teacher/create/api';
-import type { CreateKind } from '@/teacher/create/types';
+import type { CreateKind, CreatedRecord, EntityCreatedHandler } from '@/teacher/create/types';
 import {
   DEFAULT_PEDAGOGICAL_MODE,
   PEDAGOGICAL_MODES,
@@ -158,12 +158,12 @@ function buildFields(kind: CreateKind, curriculum: CurriculumResponse): HTMLElem
 async function submitKind(
   kind: CreateKind,
   form: HTMLElement
-): Promise<{ id: string }> {
+): Promise<{ id: string; entity: CreatedRecord }> {
   if (kind === 'subject') {
     const created = await postSubject({
       title: fieldValue(form, 'title')
     });
-    return { id: created.id };
+    return { id: created.id, entity: created };
   }
 
   if (kind === 'class') {
@@ -174,7 +174,7 @@ async function submitKind(
       year_id: fieldValue(form, 'year_id'),
       subject_id: fieldValue(form, 'subject_id')
     });
-    return { id: created.id };
+    return { id: created.id, entity: created };
   }
 
   if (kind === 'unit') {
@@ -183,7 +183,7 @@ async function submitKind(
       year_id: fieldValue(form, 'year_id'),
       subject_id: fieldValue(form, 'subject_id')
     });
-    return { id: created.id };
+    return { id: created.id, entity: created };
   }
 
   if (kind === 'lesson') {
@@ -194,7 +194,7 @@ async function submitKind(
       unit_id: fieldValue(form, 'unit_id'),
       pedagogical_mode
     });
-    return { id: created.id };
+    return { id: created.id, entity: created };
   }
 
   const created = await postScopeSequence({
@@ -202,13 +202,13 @@ async function submitKind(
     subject_id: fieldValue(form, 'subject_id'),
     academic_year: Number(fieldValue(form, 'academic_year'))
   });
-  return { id: created.id };
+  return { id: created.id, entity: created };
 }
 
 export function openCreateModal(options: {
   kind: CreateKind;
   curriculum: CurriculumResponse;
-  onCreated: (kind: CreateKind, id: string) => void | Promise<void>;
+  onCreated: EntityCreatedHandler;
 }): void {
   const { kind, curriculum, onCreated } = options;
   let submitting = false;
@@ -304,8 +304,8 @@ export function openCreateModal(options: {
     saveBtn.disabled = true;
 
     try {
-      const { id } = await submitKind(kind, fields);
-      await onCreated(kind, id);
+      const { id, entity } = await submitKind(kind, fields);
+      await onCreated(kind, id, entity);
       close();
     } catch (error) {
       const message =

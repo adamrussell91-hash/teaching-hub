@@ -12,7 +12,7 @@ import { resolveScheduleToday } from '@/schedule/today';
 import { classDisplayTitle, classEyebrow } from '@/teacher/class-heading';
 import { renderClassCalendar, type ScheduleCalendarView } from '@/teacher/class-calendar';
 import { mountCreateControl } from '@/teacher/create/control';
-import type { CreateKind } from '@/teacher/create/types';
+import type { EntityCreatedHandler } from '@/teacher/create/types';
 import { renderEntityBanner } from '@/teacher/entity-banner';
 import type { CurriculumResponse } from '@/teacher/nav';
 import {
@@ -32,7 +32,7 @@ import { renderUnitSequence } from '@/teacher/unit-sequence';
 import { renderPageHeader } from '@/teacher/page-header';
 
 export interface ClassesIndexOptions {
-  onCreated?: (kind: CreateKind, id: string) => void | Promise<void>;
+  onCreated?: EntityCreatedHandler;
   onMutated?: () => void | Promise<void>;
 }
 

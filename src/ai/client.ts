@@ -29,56 +29,122 @@ export interface AiChatPayload {
   history?: Array<{ role: 'user' | 'assistant'; content: string }>;
 }
 
+export const AI_STREAM_STALL_MS = 20_000;
+
+const STALL_MESSAGE =
+  'The AI connection stalled before a reply. Try again in a moment.';
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException
+    ? error.name === 'AbortError'
+    : error instanceof Error && error.name === 'AbortError';
+}
+
 export async function streamAiChat(
   payload: AiChatPayload,
   onEvent: (event: AiStreamEvent) => void,
   signal?: AbortSignal
 ): Promise<void> {
-  const baseUrl = getApiBaseUrl();
-  const response = await fetch(`${baseUrl}/api/ai/chat`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
-    body: JSON.stringify(payload),
-    signal
-  });
-
-  if (!response.ok || !response.body) {
-    let message = `AI request failed (${response.status})`;
-    let code = 'http_error';
-    try {
-      const body = (await response.json()) as { error?: { code?: string; message?: string } };
-      if (body.error?.message) message = body.error.message;
-      if (body.error?.code) code = body.error.code;
-    } catch {
-      /* ignore */
+  let terminal = false;
+  const emit = (event: AiStreamEvent): void => {
+    if (event.type === 'done' || event.type === 'error' || event.type === 'proposal') {
+      terminal = true;
     }
-    onEvent({ type: 'error', code, message, retryable: response.status >= 500 });
-    return;
-  }
+    onEvent(event);
+  };
+  const stallError = (): void => {
+    if (terminal) return;
+    emit({
+      type: 'error',
+      code: 'ai_stalled',
+      message: STALL_MESSAGE,
+      retryable: true
+    });
+  };
 
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
+  const fetchAbort = new AbortController();
+  const onUserAbort = (): void => fetchAbort.abort();
+  signal?.addEventListener('abort', onUserAbort, { once: true });
+  let headerTimer: ReturnType<typeof setTimeout> | undefined = setTimeout(
+    () => fetchAbort.abort(),
+    AI_STREAM_STALL_MS
+  );
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const chunks = buffer.split('\n\n');
-    buffer = chunks.pop() ?? '';
-    for (const chunk of chunks) {
-      const line = chunk
-        .split('\n')
-        .map((l) => l.trim())
-        .find((l) => l.startsWith('data:'));
-      if (!line) continue;
+  try {
+    const baseUrl = getApiBaseUrl();
+    const response = await fetch(`${baseUrl}/api/ai/chat`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
+      body: JSON.stringify(payload),
+      signal: fetchAbort.signal
+    });
+    if (headerTimer) clearTimeout(headerTimer);
+    headerTimer = undefined;
+
+    if (!response.ok || !response.body) {
+      let message = `AI request failed (${response.status})`;
+      let code = 'http_error';
       try {
-        const event = JSON.parse(line.slice(5).trim()) as AiStreamEvent;
-        onEvent(event);
+        const body = (await response.json()) as { error?: { code?: string; message?: string } };
+        if (body.error?.message) message = body.error.message;
+        if (body.error?.code) code = body.error.code;
       } catch {
-        /* ignore malformed */
+        /* ignore */
+      }
+      emit({ type: 'error', code, message, retryable: response.status >= 500 });
+      return;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      const stalled = new Promise<'stall'>((resolve) => {
+        timeoutId = setTimeout(() => resolve('stall'), AI_STREAM_STALL_MS);
+      });
+      const outcome = await Promise.race([
+        reader.read().then((result) => ({ kind: 'read' as const, ...result })),
+        stalled.then(() => ({ kind: 'stall' as const }))
+      ]);
+      if (timeoutId) clearTimeout(timeoutId);
+
+      if (outcome.kind === 'stall') {
+        stallError();
+        await reader.cancel().catch(() => undefined);
+        return;
+      }
+      if (outcome.done) break;
+
+      buffer += decoder.decode(outcome.value, { stream: true });
+      const chunks = buffer.split('\n\n');
+      buffer = chunks.pop() ?? '';
+      for (const chunk of chunks) {
+        const line = chunk
+          .split('\n')
+          .map((entry) => entry.trim())
+          .find((entry) => entry.startsWith('data:'));
+        if (!line) continue;
+        try {
+          emit(JSON.parse(line.slice(5).trim()) as AiStreamEvent);
+        } catch {
+          /* ignore malformed */
+        }
       }
     }
+
+    if (!terminal) stallError();
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    if (isAbortError(error)) {
+      stallError();
+      return;
+    }
+    throw error;
+  } finally {
+    if (headerTimer) clearTimeout(headerTimer);
+    signal?.removeEventListener('abort', onUserAbort);
   }
 }

@@ -9,6 +9,7 @@ export function createCurriculumCache(
   fetchCurriculum: () => Promise<CurriculumResponse>
 ): {
   invalidate: () => void;
+  replace: (curriculum: CurriculumResponse) => void;
   get: () => Promise<CurriculumResponse>;
 } {
   let curriculumPromise: Promise<CurriculumResponse> | null = null;
@@ -16,6 +17,9 @@ export function createCurriculumCache(
   return {
     invalidate(): void {
       curriculumPromise = null;
+    },
+    replace(curriculum: CurriculumResponse): void {
+      curriculumPromise = Promise.resolve(curriculum);
     },
     get(): Promise<CurriculumResponse> {
       if (!curriculumPromise) {

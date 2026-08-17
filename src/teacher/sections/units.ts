@@ -3,7 +3,7 @@ import { cloneBlocksWithNewIds } from '@/blocks/clone-blocks';
 import type { Block } from '@/schemas';
 import { resolveCoverUrl } from '@/schemas';
 import { mountCreateControl } from '@/teacher/create/control';
-import type { CreateKind } from '@/teacher/create/types';
+import type { EntityCreatedHandler } from '@/teacher/create/types';
 import type { CurriculumResponse } from '@/teacher/nav';
 import { createUnitTemplate } from '@/teacher/template-api';
 import { mountHistoryPanel } from '@/teacher/history-panel';
@@ -44,7 +44,7 @@ function writeUnitsIndexGroupBy(value: UnitsIndexGroupBy): void {
 }
 
 export interface UnitsIndexOptions {
-  onCreated?: (kind: CreateKind, id: string) => void | Promise<void>;
+  onCreated?: EntityCreatedHandler;
   onMutated?: () => void | Promise<void>;
 }
 

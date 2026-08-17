@@ -112,58 +112,6 @@ export default async function handler(request: Request): Promise<Response> {
     );
   }
 
-  const searchPack = await searchPublicWeb({
-    query: buildLessonSearchQuery(body.message, lesson.title),
-    apiKey: env.BRAVE_SEARCH_API_KEY
-  });
-  const selection = resolveSelection(lesson.blocks, body.selected_block_id, body.scope);
-
-  let protocol = protocolForAgent(body.agent);
-  let archiveFindings: Array<{ pageId: string; title: string; excerpt: string; stance: string }> = [];
-  let archiveFailed = false;
-  const kernelSecret = env.RESEARCH_KERNEL_SHARED_SECRET;
-  if (body.agent === 'clementine' && kernelSecret) {
-    const archive = await pullArchive({
-      query: body.message,
-      documentContext: `${lesson.title}\n${body.message}`,
-      url: env.RESEARCH_KERNEL_URL,
-      secret: kernelSecret
-    });
-    archiveFailed = Boolean(archive.archiveFailed);
-    archiveFindings = archive.findings;
-    protocol = `${protocol}\n\n${archive.note}`;
-  }
-
-  const { blobs: compositionBlobs } = await store.list({ prefix: 'templates/compositions/' });
-  const library = (
-    await Promise.all(compositionBlobs.map((blob) => getJSON<CompositionTemplate>(store, blob.key)))
-  ).flatMap((entry) => {
-    const parsed = CompositionTemplateSchema.safeParse(entry);
-    return parsed.success ? [parsed.data] : [];
-  });
-  const compositionFill = matchCompositionFill({
-    action: body.action,
-    message: body.message,
-    library
-  });
-
-  const system = buildAiSystemPrompt({
-    agentName: agent.name,
-    protocol,
-    lesson,
-    scope: selection.scope,
-    selectedBlockId: selection.selectedBlockId,
-    action: body.action,
-    fullLesson: body.agent === 'clementine',
-    compositionFill: compositionFill ?? undefined,
-    searchPack
-  });
-
-  const history = (body.history ?? []).map((m) => ({
-    role: m.role,
-    content: m.content
-  }));
-
   const streamer = createAnthropicStreamer(apiKey);
   const encoder = new TextEncoder();
   let inputTokens = 0;
@@ -177,6 +125,68 @@ export default async function handler(request: Request): Promise<Response> {
 
       try {
         send({ type: 'status', text: 'Thinking…' });
+
+        const searchPack = await searchPublicWeb({
+          query: buildLessonSearchQuery(body.message, lesson.title),
+          apiKey: env.BRAVE_SEARCH_API_KEY
+        });
+        const selection = resolveSelection(lesson.blocks, body.selected_block_id, body.scope);
+
+        let protocol = protocolForAgent(body.agent);
+        let archiveFindings: Array<{
+          pageId: string;
+          title: string;
+          excerpt: string;
+          stance: string;
+        }> = [];
+        let archiveFailed = false;
+        const kernelSecret = env.RESEARCH_KERNEL_SHARED_SECRET;
+        if (body.agent === 'clementine' && kernelSecret) {
+          const archive = await pullArchive({
+            query: body.message,
+            documentContext: `${lesson.title}\n${body.message}`,
+            url: env.RESEARCH_KERNEL_URL,
+            secret: kernelSecret
+          });
+          archiveFailed = Boolean(archive.archiveFailed);
+          archiveFindings = archive.findings;
+          protocol = `${protocol}\n\n${archive.note}`;
+        }
+
+        const { blobs: compositionBlobs } = await store.list({
+          prefix: 'templates/compositions/'
+        });
+        const library = (
+          await Promise.all(
+            compositionBlobs.map((blob) => getJSON<CompositionTemplate>(store, blob.key))
+          )
+        ).flatMap((entry) => {
+          const parsedTemplate = CompositionTemplateSchema.safeParse(entry);
+          return parsedTemplate.success ? [parsedTemplate.data] : [];
+        });
+        const compositionFill = matchCompositionFill({
+          action: body.action,
+          message: body.message,
+          library
+        });
+
+        const system = buildAiSystemPrompt({
+          agentName: agent.name,
+          protocol,
+          lesson,
+          scope: selection.scope,
+          selectedBlockId: selection.selectedBlockId,
+          action: body.action,
+          fullLesson: body.agent === 'clementine',
+          compositionFill: compositionFill ?? undefined,
+          searchPack
+        });
+
+        const history = (body.history ?? []).map((m) => ({
+          role: m.role,
+          content: m.content
+        }));
+
         if (body.agent === 'clementine' && (archiveFindings.length || archiveFailed)) {
           send({
             type: 'research',
@@ -267,4 +277,4 @@ export default async function handler(request: Request): Promise<Response> {
   );
 }
 
-export const config = { path: '/api/ai/chat' };
+export const config = { path: '/api/ai/chat', timeout: 26 };

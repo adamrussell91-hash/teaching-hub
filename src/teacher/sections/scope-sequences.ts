@@ -1,5 +1,5 @@
 import { mountCreateControl } from '@/teacher/create/control';
-import type { CreateKind } from '@/teacher/create/types';
+import type { EntityCreatedHandler } from '@/teacher/create/types';
 import type { CurriculumResponse } from '@/teacher/nav';
 import { renderPageHeader } from '@/teacher/page-header';
 import { renderScopeOverview, subjectsWithScope } from '@/teacher/sections/scope-overview';
@@ -9,7 +9,7 @@ import {
 } from '@/teacher/sections/scope-timeline';
 
 export interface ScopeSequencesIndexOptions {
-  onCreated?: (kind: CreateKind, id: string) => void | Promise<void>;
+  onCreated?: EntityCreatedHandler;
 }
 
 export function renderScopeSequencesIndex(

@@ -1,6 +1,6 @@
 import type { CurriculumResponse } from '@/teacher/nav';
 import { openCreateModal } from '@/teacher/create/modal';
-import type { CreateContext, CreateKind } from '@/teacher/create/types';
+import type { CreateContext, CreateKind, EntityCreatedHandler } from '@/teacher/create/types';
 
 export type { CreateContext, CreateKind } from '@/teacher/create/types';
 
@@ -26,7 +26,7 @@ export function mountCreateControl(
   options: {
     context: CreateContext;
     curriculum: CurriculumResponse;
-    onCreated: (kind: CreateKind, id: string) => void | Promise<void>;
+    onCreated: EntityCreatedHandler;
   }
 ): { dispose: () => void } {
   host.replaceChildren();

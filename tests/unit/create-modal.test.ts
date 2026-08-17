@@ -262,7 +262,7 @@ describe('mountCreateControl', () => {
         year_id: 'year_12',
         subject_id: 'subject_y12_engadv'
       });
-      expect(onCreated).toHaveBeenCalledWith('class', 'class_new');
+      expect(onCreated).toHaveBeenCalledWith('class', 'class_new', created);
     });
 
     expect(document.querySelector('.create-modal')).toBeNull();
@@ -325,7 +325,7 @@ describe('mountCreateControl', () => {
 
     await vi.waitFor(() => {
       expect(postSubject).toHaveBeenCalledWith({ title: 'History' });
-      expect(onCreated).toHaveBeenCalledWith('subject', 'subject_new');
+      expect(onCreated).toHaveBeenCalledWith('subject', 'subject_new', created);
     });
 
     expect(document.querySelector('.create-modal')).toBeNull();

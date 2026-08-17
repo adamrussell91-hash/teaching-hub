@@ -50,4 +50,19 @@ describe('createCurriculumCache', () => {
     await expect(cache.get()).resolves.toMatchObject({ schedule_anchor_date: '2026-08-12' });
     expect(fetchCurriculum).toHaveBeenCalledTimes(2);
   });
+
+  it('replace seeds a snapshot so the next get does not wait on a stale list', async () => {
+    const fetchCurriculum = vi.fn().mockResolvedValue(emptyCurriculum());
+    const cache = createCurriculumCache(fetchCurriculum);
+    await cache.get();
+
+    const seeded = emptyCurriculum({
+      classes: [{ id: 'class_new' } as never]
+    });
+    cache.replace(seeded);
+
+    const next = await cache.get();
+    expect(next.classes).toEqual([{ id: 'class_new' }]);
+    expect(fetchCurriculum).toHaveBeenCalledTimes(1);
+  });
 });
