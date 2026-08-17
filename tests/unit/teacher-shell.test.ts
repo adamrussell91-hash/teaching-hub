@@ -13,6 +13,7 @@ describe('teacher shell', () => {
     const refs = renderTeacherShell(root);
     expect(root.textContent).toContain('Teaching Hub');
     expect(refs.logoutButton).toBeNull();
+    expect(root.querySelector('.hub-icon-btn')).toBeNull();
     expect(root.querySelector('.teacher-layout__logout')).toBeNull();
     expect(refs.jobsHost).toBeInstanceOf(HTMLElement);
     expect(root.querySelector('.teacher-layout__jobs')).toBe(refs.jobsHost);
@@ -27,7 +28,12 @@ describe('teacher shell', () => {
     const refs = renderTeacherShell(root, { onLogout });
 
     expect(refs.logoutButton).toBeInstanceOf(HTMLButtonElement);
-    expect(refs.logoutButton?.textContent).toBe('Sign out');
+    expect(refs.logoutButton?.classList.contains('hub-icon-btn')).toBe(true);
+    expect(refs.logoutButton?.getAttribute('aria-label')).toBe('Sign out');
+    expect(refs.logoutButton?.textContent).not.toBe('Sign out');
+    expect(root.querySelector('.teacher-layout__utilities .hub-icon-btn')).toBe(refs.logoutButton);
+    expect(refs.main.contains(refs.logoutButton)).toBe(true);
+    expect(refs.rail.contains(refs.logoutButton!)).toBe(false);
 
     refs.logoutButton?.click();
     await vi.waitFor(() => {

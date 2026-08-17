@@ -15,6 +15,14 @@ export interface TeacherShellOptions {
   onLogout?: () => void | Promise<void>;
 }
 
+const SIGN_OUT_ICON = `
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M10 7V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2v-1" />
+    <path d="M15 12H3" />
+    <path d="m7 8-4 4 4 4" />
+  </svg>
+`.trim();
+
 /**
  * Builds the teacher chrome (rail / main / context bar / canvas) and returns
  * references to the mount points callers render into. Replaces any existing
@@ -44,23 +52,7 @@ export function renderTeacherShell(
   jobsHost.className = 'teacher-layout__jobs';
   jobsHost.dataset.jobsHost = '';
 
-  let logoutButton: HTMLButtonElement | null = null;
-  if (options.onLogout) {
-    logoutButton = document.createElement('button');
-    logoutButton.type = 'button';
-    logoutButton.className = 'teacher-layout__logout';
-    logoutButton.textContent = 'Sign out';
-    logoutButton.addEventListener('click', () => {
-      if (!logoutButton) return;
-      logoutButton.disabled = true;
-      void Promise.resolve(options.onLogout?.()).finally(() => {
-        if (logoutButton) logoutButton.disabled = false;
-      });
-    });
-    brandRow.append(brand, jobsHost, logoutButton);
-  } else {
-    brandRow.append(brand, jobsHost);
-  }
+  brandRow.append(brand, jobsHost);
 
   const railNav = document.createElement('div');
   railNav.className = 'teacher-layout__rail-nav';
@@ -78,7 +70,32 @@ export function renderTeacherShell(
   const canvas = document.createElement('div');
   canvas.className = 'teacher-layout__canvas';
 
-  main.append(contextBar, canvas);
+  let logoutButton: HTMLButtonElement | null = null;
+  if (options.onLogout) {
+    const utilities = document.createElement('div');
+    utilities.className = 'hub-utilities teacher-layout__utilities';
+
+    logoutButton = document.createElement('button');
+    logoutButton.type = 'button';
+    logoutButton.className = 'hub-icon-btn';
+    logoutButton.setAttribute('aria-label', 'Sign out');
+    logoutButton.title = 'Sign out';
+    logoutButton.dataset.hubSignOut = '';
+    logoutButton.innerHTML = SIGN_OUT_ICON;
+    logoutButton.addEventListener('click', () => {
+      if (!logoutButton) return;
+      logoutButton.disabled = true;
+      void Promise.resolve(options.onLogout?.()).finally(() => {
+        if (logoutButton) logoutButton.disabled = false;
+      });
+    });
+
+    utilities.append(logoutButton);
+    main.append(utilities, contextBar, canvas);
+  } else {
+    main.append(contextBar, canvas);
+  }
+
   layout.append(rail, main);
   root.append(createSkipLink('teacher-main'), layout);
 
