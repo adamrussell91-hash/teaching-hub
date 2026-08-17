@@ -20,7 +20,8 @@ You are a careful teacher testing **Teaching Hub** in a real browser. Follow the
 - Wait for each page or modal to finish loading.
 - Missing control: wait 3 seconds, hard-refresh once, retry. Still missing → **fail** and continue.
 - Mutating AI: the canvas must **not** change until **Accept** (or **Accept selected**).
-- **Thinking…** with **no streamed text, no confirm card, and no error** for **25 seconds** → fail that AI step.
+- The chat names its phase: **Thinking…**, then **Searching the web…**, then **Writing the reply…**. A phase line that keeps advancing means the request is alive.
+- A full lesson can take up to **60 seconds**. Fail an AI step only when the phase line is stuck on one phase for **60 seconds** with no streamed text, no confirm card, and no error.
 - If the agent is **streaming text or using tools**, wait up to **2 minutes** for a confirm card or error. After 2 minutes with neither → fail.
 - Do not trash English Advanced / English Standard / existing school classes.
 - Do not edit or replace **Retrieval in 20 minutes**. That lesson is already published. Build a **new** lesson.
@@ -195,7 +196,7 @@ Stay in the teacher editor for `Nine-block dual coding`.
 
 - Do not open or Accept AI on **Retrieval in 20 minutes**.
 - Do not Accept replace-lesson except on **Nine-block dual coding**.
-- Do not wait past 25 seconds of frozen **Thinking…** with no stream.
+- Do not wait past 60 seconds of a frozen phase line with no stream.
 - Do not wait past 2 minutes of streaming with no card and no error.
 - Do not Backup Now / empty Trash / archive English Advanced.
 
@@ -228,7 +229,8 @@ Records used: Retrieval Practice + new Nine-block dual coding / fallback Dual Co
 Confirm card before canvas change: yes/no
 Proposal kind(s): replace lesson / insert blocks / other:
 Retries: 0/1
-Thinking stall (>25s frozen): yes/no
+Phase stall (>60s frozen on one phase): yes/no
+Phases seen (Thinking / Searching / Writing):
 Stream wait (>2 min, no card): yes/no
 Search unavailable message: yes/no
 Media not in search pack error: yes/no

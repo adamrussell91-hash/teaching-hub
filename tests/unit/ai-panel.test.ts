@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { writeLastAgentSlug } from '@/ai/agents';
-import { streamAiChat } from '@/ai/client';
+import { streamAiChat, type AiStreamEvent } from '@/ai/client';
 import { pollAiJob, startAiJob, listAiJobs, resolveAiJob, AiJobConflictError } from '@/ai/jobs-client';
 import type { AiJob } from '@/ai/jobs';
 import type { AiProposal } from '@/ai/proposals';
@@ -215,6 +215,36 @@ describe('mountAiPanel', () => {
     expect(payload?.agent).toBe('ann');
     expect(payload?.selected_block_id).toBeUndefined();
     expect(JSON.stringify(payload)).not.toContain('"selected_block_id":null');
+  });
+
+  it('shows the latest progress phase and hands the bubble over to streamed text', async () => {
+    let emit: ((event: AiStreamEvent) => void) | undefined;
+    let finish: () => void = () => undefined;
+    streamAiChatMock.mockImplementation(async (_payload, onEvent) => {
+      emit = onEvent;
+      await new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+    });
+
+    const mounted = mountPanel();
+    handle = mounted.handle;
+    submitMessage(mounted.host, 'Build a dual coding lesson');
+
+    await vi.waitFor(() => {
+      expect(emit).toBeDefined();
+    });
+
+    emit!({ type: 'status', text: 'Thinking…' });
+    emit!({ type: 'status', text: 'Searching the web…' });
+    expect(mounted.host.textContent).toContain('Searching the web…');
+    expect(mounted.host.textContent).not.toContain('Thinking…');
+
+    emit!({ type: 'text', text: 'Here is the lesson.' });
+    expect(mounted.host.textContent).toContain('Here is the lesson.');
+    expect(mounted.host.textContent).not.toContain('Searching the web…');
+
+    finish();
   });
 
   it('routes Clementine through jobs and pulses working until poll completes', async () => {

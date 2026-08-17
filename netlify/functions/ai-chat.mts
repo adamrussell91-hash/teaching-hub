@@ -140,6 +140,7 @@ export default async function handler(request: Request): Promise<Response> {
 
       try {
         send({ type: 'status', text: 'Thinking…' });
+        send({ type: 'status', text: 'Searching the web…' });
 
         const searchPack = await searchPublicWeb({
           query: buildLessonSearchQuery(body.message, lesson.title),
@@ -209,6 +210,7 @@ export default async function handler(request: Request): Promise<Response> {
             archiveFailed
           });
         }
+        send({ type: 'status', text: 'Writing the reply…' });
         for await (const event of streamer.streamMessage({
           system,
           messages: [...history, { role: 'user', content: body.message }],

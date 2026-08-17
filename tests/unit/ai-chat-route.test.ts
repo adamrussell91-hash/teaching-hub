@@ -462,8 +462,8 @@ describe('POST /api/ai/chat mandatory web search', () => {
     const decoder = new TextDecoder();
 
     try {
-      const first = await reader.read();
-      expect(decoder.decode(first.value)).toContain('Thinking');
+      expect(decoder.decode((await reader.read()).value)).toContain('Thinking');
+      expect(decoder.decode((await reader.read()).value)).toContain('Searching the web');
 
       let heartbeat: ReadableStreamReadResult<Uint8Array> | undefined;
       void reader.read().then((result) => {
@@ -477,6 +477,19 @@ describe('POST /api/ai/chat mandatory web search', () => {
       releaseBrave();
       await reader.cancel().catch(() => undefined);
     }
+  });
+
+  it('names the phase the teacher is waiting on', async () => {
+    const fetchMock = destinationFetch({ position: 'below', blocks: [mindMapBlock()] });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const text = await (await handler(chatRequest())).text();
+    const statuses = text
+      .split('\n\n')
+      .flatMap((chunk) => (chunk.startsWith('data: ') ? [JSON.parse(chunk.slice(6))] : []))
+      .flatMap((event) => (event.type === 'status' ? [event.text] : []));
+
+    expect(statuses).toEqual(['Thinking…', 'Searching the web…', 'Writing the reply…']);
   });
 
   it('gives a lesson-sized generation the whole Netlify synchronous budget', () => {

@@ -50,6 +50,8 @@ interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   agent?: AgentSlug;
   text: string;
+  /** Live phase copy shown only while the bubble has no reply text yet. */
+  status?: string;
   proposal?: AiProposal;
   proposalStatus?: 'pending' | 'accepted' | 'rejected';
   selectedKeys?: string[];
@@ -370,7 +372,7 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
 
       const bubble = document.createElement('div');
       bubble.className = 'ai-panel__bubble';
-      bubble.textContent = msg.text;
+      bubble.textContent = msg.text || msg.status || '';
       row.append(bubble);
 
       if (msg.archiveFailed) {
@@ -648,19 +650,22 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
             if (!assistant) return;
             if (event.type === 'text') {
               assistant.text += event.text;
+              assistant.status = undefined;
               renderThread();
             } else if (event.type === 'research') {
               assistant.citations = event.findings;
               assistant.archiveFailed = event.archiveFailed;
               renderThread();
             } else if (event.type === 'proposal') {
+              assistant.status = undefined;
               attachProposal(assistant, event.proposal, snapshotAt);
               renderThread();
             } else if (event.type === 'error') {
+              assistant.status = undefined;
               assistant.text = aiErrorCopy(event);
               renderThread();
             } else if (event.type === 'status' && !assistant.text) {
-              assistant.text = event.text;
+              assistant.status = event.text;
               renderThread();
             }
           },
@@ -677,6 +682,9 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
         }
       }
     } finally {
+      // A phase line is only true mid-turn; it must never outlive the request.
+      const assistant = messages.find((m) => m.id === assistantId);
+      if (assistant) assistant.status = undefined;
       setWorkingState(false);
       saveTranscript(options.lessonId, messages);
       renderShell();
