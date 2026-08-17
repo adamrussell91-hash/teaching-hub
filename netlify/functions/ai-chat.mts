@@ -293,4 +293,4 @@ export default async function handler(request: Request): Promise<Response> {
   );
 }
 
-export const config = { path: '/api/ai/chat', timeout: 26 };
+export const config = { path: '/api/ai/chat', timeout: 60 };

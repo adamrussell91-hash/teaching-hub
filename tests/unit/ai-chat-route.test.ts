@@ -49,7 +49,10 @@ const { createSessionToken } = await import('../../netlify/functions/_shared/aut
 const { BRAVE_SEARCH_MESSAGE_MAX_CHARS } = await import(
   '../../netlify/functions/_shared/brave-search.mts'
 );
-const handler = (await import('../../netlify/functions/ai-chat.mts')).default;
+const { default: handler, config: chatRouteConfig, AI_STREAM_HEARTBEAT_MS } = await import(
+  '../../netlify/functions/ai-chat.mts'
+);
+const { AI_STREAM_STALL_MS } = await import('../../src/ai/client.ts');
 
 const FUNCTION_ORIGIN = 'https://api.example.netlify.app';
 const SESSION_SECRET = 's'.repeat(32);
@@ -474,5 +477,12 @@ describe('POST /api/ai/chat mandatory web search', () => {
       releaseBrave();
       await reader.cancel().catch(() => undefined);
     }
+  });
+
+  it('gives a lesson-sized generation the whole Netlify synchronous budget', () => {
+    // Netlify caps synchronous functions at 60s and does not allow more. A full
+    // nine-block proposal with media routinely outruns a shorter self-imposed cap.
+    expect(chatRouteConfig.timeout).toBe(60);
+    expect(AI_STREAM_HEARTBEAT_MS).toBeLessThan(AI_STREAM_STALL_MS);
   });
 });
