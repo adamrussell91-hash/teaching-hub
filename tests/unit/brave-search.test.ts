@@ -1,6 +1,9 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
-import { searchPublicWeb } from '../../netlify/functions/_shared/brave-search.mts';
+import {
+  buildLessonSearchQuery,
+  searchPublicWeb
+} from '../../netlify/functions/_shared/brave-search.mts';
 
 const API_KEY = 'brave-secret-key-value';
 const SEARCHED_AT = '2026-08-16T10:00:00.000Z';
@@ -97,6 +100,23 @@ const UNAVAILABLE_PACK = {
   images: [],
   videos: []
 };
+
+describe('buildLessonSearchQuery', () => {
+  it('keeps long lesson prompts within Brave’s 50-word limit', () => {
+    const message = `Keep the existing starter heading. Insert additional blocks below it for a Year 12 psychology mini-lesson on dual coding. Australian English.
+
+You MUST propose at least four different Teaching Hub block types in one proposal. Include ALL of the following:
+- rich_text or callout that contains this exact phrase: durable jobs outlive the request
+- image (real https URL from the search pack, with meaningful alt text)
+- video (YouTube or Vimeo from the search pack)`;
+
+    const query = buildLessonSearchQuery(message, 'Job check durable');
+
+    expect(query.trim().split(/\s+/)).toHaveLength(50);
+    expect(query).toContain('dual coding');
+    expect(query.endsWith('Lesson: Job check durable')).toBe(true);
+  });
+});
 
 describe('searchPublicWeb', () => {
   it('queries web, image, and video endpoints once each and returns a normalized pack', async () => {

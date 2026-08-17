@@ -11,6 +11,8 @@ const MEDIA_RESULT_COUNT = 6;
 
 /** Cap for the teacher-message portion of a Brave `q` (lesson title is appended separately). */
 export const BRAVE_SEARCH_MESSAGE_MAX_CHARS = 360;
+/** Brave rejects `q` with HTTP 422 when it contains more than 50 whitespace-delimited words. */
+export const BRAVE_SEARCH_MAX_WORDS = 50;
 
 /**
  * Builds a Brave-safe search query: truncated teacher message plus lesson title.
@@ -24,7 +26,13 @@ export function buildLessonSearchQuery(message: string, lessonTitle: string): st
       ? trimmedMessage.slice(0, BRAVE_SEARCH_MESSAGE_MAX_CHARS)
       : trimmedMessage;
   const title = lessonTitle.trim();
-  return title ? `${clipped}\nLesson: ${title}` : clipped;
+  const titleWords = title ? `Lesson: ${title}`.split(/\s+/) : [];
+  const messageBudget = Math.max(0, BRAVE_SEARCH_MAX_WORDS - titleWords.length);
+  const messageWords = clipped.split(/\s+/).filter(Boolean).slice(0, messageBudget);
+  const messageQuery = messageWords.join(' ');
+  const titleQuery = titleWords.slice(0, BRAVE_SEARCH_MAX_WORDS).join(' ');
+  if (!titleQuery) return messageQuery;
+  return messageQuery ? `${messageQuery}\n${titleQuery}` : titleQuery;
 }
 
 export interface SearchPublicWebInput {
