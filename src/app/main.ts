@@ -182,6 +182,8 @@ function pathForCreatedEntity(
   switch (kind) {
     case 'class':
       return `/classes/${id}`;
+    case 'subject':
+      return location.pathname || '/';
     case 'unit':
       return `/units/${id}`;
     case 'lesson':
@@ -247,6 +249,8 @@ function createKindForSearchAction(actionId: string): CreateKind | null {
       return 'unit';
     case 'new-class':
       return 'class';
+    case 'new-subject':
+      return 'subject';
     case 'new-scope':
       return 'scope_sequence';
     default:

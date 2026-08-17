@@ -51,6 +51,7 @@ import {
   TimelineItemSchema,
   UnitSchema,
   UnitTemplateSchema,
+  YearSchema,
   toPublishedLesson,
   type Block,
   type Class,
@@ -1935,6 +1936,19 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       }
     }
 
+    const rawYear = store.getJSON(yearKey(year_id));
+    const yearParsed = rawYear ? YearSchema.safeParse(rawYear) : null;
+    if (yearParsed?.success && !yearParsed.data.subject_ids.includes(subject_id)) {
+      const updatedYear = YearSchema.safeParse({
+        ...yearParsed.data,
+        subject_ids: [...yearParsed.data.subject_ids, subject_id],
+        updated_at: timestamp
+      });
+      if (updatedYear.success) {
+        store.setJSON(yearKey(year_id), updatedYear.data);
+      }
+    }
+
     store.setJSON(classKey(id), validated.data);
     seedIds.classes.push(id);
     return okResponse(201, validated.data);
@@ -2079,6 +2093,54 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     store.setJSON(draftLessonKey(id), validated.data);
     store.setJSON(unitKey(unit_id), updatedUnit.data);
     seedIds.lessons.push(id);
+    return okResponse(201, validated.data);
+  }
+
+  function handlePostSubject(cookie: string | null | undefined, body: unknown): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+
+    if (typeof body !== 'object' || body === null) {
+      return errorResponse(400, 'validation_error', 'Request body must be a JSON object');
+    }
+
+    const record = body as Record<string, unknown>;
+    const title = typeof record.title === 'string' ? record.title.trim() : '';
+    if (!title) {
+      return errorResponse(400, 'validation_error', 'title is required');
+    }
+
+    const duplicate = seedIds.subjects.some((existingId) => {
+      const existing = store.getJSON(subjectKey(existingId)) as { title?: string } | null;
+      return existing?.title?.toLowerCase() === title.toLowerCase();
+    });
+    if (duplicate) {
+      return errorResponse(409, 'conflict', 'A subject with this title already exists');
+    }
+
+    const timestamp = nowIso();
+    const candidate = {
+      id: newId('subject'),
+      type: 'subject' as const,
+      title,
+      display_title: title,
+      slug: slugify(title),
+      unit_ids: [] as string[],
+      outcome_ids: [] as string[],
+      class_ids: [] as string[],
+      status: 'active' as const,
+      created_at: timestamp,
+      updated_at: timestamp,
+      schema_version: 1 as const
+    };
+
+    const validated = SubjectSchema.safeParse(candidate);
+    if (!validated.success) {
+      return errorResponse(400, 'validation_error', 'Subject data is invalid', validated.error.flatten());
+    }
+
+    store.setJSON(subjectKey(validated.data.id), validated.data);
+    seedIds.subjects.push(validated.data.id);
     return okResponse(201, validated.data);
   }
 
@@ -3240,6 +3302,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     }
 
     if (method === 'POST' && path === '/api/classes') return handlePostClass(cookie, body);
+    if (method === 'POST' && path === '/api/subjects') return handlePostSubject(cookie, body);
     if (method === 'POST' && path === '/api/units') return handlePostUnit(cookie, body);
     if (method === 'POST' && path === '/api/lessons') return handlePostLesson(cookie, body);
     if (method === 'POST' && path === '/api/scope-sequences') {

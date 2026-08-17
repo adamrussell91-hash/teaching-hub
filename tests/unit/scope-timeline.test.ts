@@ -39,7 +39,6 @@ const engAdv: Subject = {
   created_at: ISO,
   updated_at: ISO,
   schema_version: 1,
-  year_id: 'year_12',
   scope_id: 'scope_y12_engadv_2026',
   unit_ids: ['unit_aotfw', 'unit_hamlet'],
   outcome_ids: [],

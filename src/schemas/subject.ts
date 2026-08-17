@@ -5,7 +5,6 @@ export const SubjectSchema = z.object({
   ...CommonFields,
   type: z.literal('subject'),
   display_title: z.string().min(1),
-  year_id: z.string().min(1),
   scope_id: z.string().min(1).optional(),
   unit_ids: z.array(z.string().min(1)),
   outcome_ids: z.array(z.string().min(1)),

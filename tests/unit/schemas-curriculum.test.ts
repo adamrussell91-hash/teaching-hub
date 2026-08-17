@@ -23,9 +23,8 @@ describe('curriculum schemas', () => {
       id: 'subject_y12_engadv',
       type: 'subject',
       title: 'English Advanced',
-      display_title: 'Year 12 English Advanced',
+      display_title: 'English Advanced',
       slug: 'english_advanced',
-      year_id: 'year_12',
       unit_ids: ['unit_aotfw'],
       outcome_ids: [],
       class_ids: [],
@@ -38,11 +37,51 @@ describe('curriculum schemas', () => {
       ...adv,
       id: 'subject_y12_engstd',
       title: 'English Standard',
-      display_title: 'Year 12 English Standard',
+      display_title: 'English Standard',
       slug: 'english_standard',
       unit_ids: []
     });
     expect(adv.id).not.toBe(std.id);
+    expect(adv).not.toHaveProperty('year_id');
+    expect(std).not.toHaveProperty('year_id');
+  });
+
+  it('parses a subject without year_id', () => {
+    const subject = SubjectSchema.parse({
+      id: 'subject_psych',
+      type: 'subject',
+      title: 'Psychology',
+      display_title: 'Psychology',
+      slug: 'psychology',
+      unit_ids: [],
+      outcome_ids: [],
+      class_ids: [],
+      status: 'active',
+      created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
+      schema_version: 1
+    });
+    expect(subject.title).toBe('Psychology');
+    expect(subject.display_title).toBe('Psychology');
+    expect(subject).not.toHaveProperty('year_id');
+  });
+
+  it('rejects a blank subject title', () => {
+    const result = SubjectSchema.safeParse({
+      id: 'subject_blank',
+      type: 'subject',
+      title: '',
+      display_title: 'Psychology',
+      slug: 'psychology',
+      unit_ids: [],
+      outcome_ids: [],
+      class_ids: [],
+      status: 'active',
+      created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
+      schema_version: 1
+    });
+    expect(result.success).toBe(false);
   });
 
   it('parses unit with year_id, subject_id, and lesson_ids', () => {
@@ -71,7 +110,6 @@ describe('curriculum schemas', () => {
       title: 'English Advanced',
       display_title: 'Year 12 English Advanced',
       slug: 'english_advanced',
-      year_id: 'year_12',
       scope_id: 'scope_y12_engadv_2026',
       unit_ids: ['unit_aotfw'],
       outcome_ids: [],

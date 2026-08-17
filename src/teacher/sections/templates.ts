@@ -31,19 +31,26 @@ function pickUnitId(curriculum: CurriculumResponse): string | null {
 function pickSubject(curriculum: CurriculumResponse): { yearId: string; subjectId: string } | null {
   const subjects = [...curriculum.subjects].sort((a, b) => a.title.localeCompare(b.title));
   if (subjects.length === 0) return null;
-  const yearsById = new Map(curriculum.years.map((y) => [y.id, y]));
-  const labels = subjects
-    .map((s, i) => {
-      const year = yearsById.get(s.year_id)?.title ?? '';
-      return `${i + 1}. ${year} · ${s.title}`;
-    })
-    .join('\n');
+  const labels = subjects.map((s, i) => `${i + 1}. ${s.title}`).join('\n');
   const answer = window.prompt(`Create unit under which subject?\n${labels}\nEnter number:`, '1');
   if (!answer) return null;
   const index = Number.parseInt(answer, 10) - 1;
   const subject = subjects[index];
   if (!subject) return null;
-  return { yearId: subject.year_id, subjectId: subject.id };
+
+  const years = [...curriculum.years].sort(
+    (a, b) => a.year_level - b.year_level || a.title.localeCompare(b.title)
+  );
+  if (years.length === 0) return null;
+  if (years.length === 1) return { yearId: years[0]!.id, subjectId: subject.id };
+
+  const yearLabels = years.map((y, i) => `${i + 1}. ${y.title}`).join('\n');
+  const yearAnswer = window.prompt(`Year level for this unit?\n${yearLabels}\nEnter number:`, '1');
+  if (!yearAnswer) return null;
+  const yearIndex = Number.parseInt(yearAnswer, 10) - 1;
+  const year = years[yearIndex];
+  if (!year) return null;
+  return { yearId: year.id, subjectId: subject.id };
 }
 
 export function renderTemplatesPage(

@@ -4,10 +4,11 @@ vi.mock('@/teacher/create/api', () => ({
   postClass: vi.fn(),
   postUnit: vi.fn(),
   postLesson: vi.fn(),
-  postScopeSequence: vi.fn()
+  postScopeSequence: vi.fn(),
+  postSubject: vi.fn()
 }));
 
-import { postClass } from '@/teacher/create/api';
+import { postClass, postSubject } from '@/teacher/create/api';
 import { mountCreateControl } from '@/teacher/create/control';
 import type { CurriculumResponse } from '@/teacher/nav';
 import type { Class, Subject, Unit, Year } from '@/schemas';
@@ -27,20 +28,47 @@ const year: Year = {
   subject_ids: ['subject_y12_engadv']
 };
 
+const year11: Year = {
+  id: 'year_11',
+  type: 'year',
+  title: 'Year 11',
+  slug: 'year_11',
+  status: 'active',
+  created_at: ISO,
+  updated_at: ISO,
+  schema_version: 1,
+  year_level: 11,
+  subject_ids: []
+};
+
 const engAdv: Subject = {
   id: 'subject_y12_engadv',
   type: 'subject',
   title: 'English Advanced',
-  display_title: 'Year 12 English Advanced',
+  display_title: 'English Advanced',
   slug: 'english_advanced',
   status: 'active',
   created_at: ISO,
   updated_at: ISO,
   schema_version: 1,
-  year_id: 'year_12',
   unit_ids: ['unit_partial'],
   outcome_ids: [],
   class_ids: ['class_2026_12engadv1']
+};
+
+const psychology: Subject = {
+  id: 'subject_psych',
+  type: 'subject',
+  title: 'Psychology',
+  display_title: 'Psychology',
+  slug: 'psychology',
+  status: 'active',
+  created_at: ISO,
+  updated_at: ISO,
+  schema_version: 1,
+  unit_ids: [],
+  outcome_ids: [],
+  class_ids: []
 };
 
 const unitPartial: Unit = {
@@ -76,8 +104,8 @@ const classRow: Class = {
 };
 
 const curriculum: CurriculumResponse = {
-  years: [year],
-  subjects: [engAdv],
+  years: [year, year11],
+  subjects: [engAdv, psychology],
   units: [unitPartial],
   lessons: [
     {
@@ -115,7 +143,7 @@ describe('mountCreateControl', () => {
     document.body.replaceChildren();
   });
 
-  it('home context shows Create menu with Class, Unit, Lesson, Scope & Sequence', () => {
+  it('home context shows Create menu with Class, Subject, Unit, Lesson, Scope & Sequence', () => {
     const result = mountCreateControl(host, {
       context: 'home',
       curriculum,
@@ -135,9 +163,9 @@ describe('mountCreateControl', () => {
       (el.textContent ?? '').trim()
     );
     expect(labels).toEqual(
-      expect.arrayContaining(['Class', 'Unit', 'Lesson', 'Scope & Sequence'])
+      expect.arrayContaining(['Class', 'Subject', 'Unit', 'Lesson', 'Scope & Sequence'])
     );
-    expect(menu!.querySelectorAll('[data-create-kind]')).toHaveLength(4);
+    expect(menu!.querySelectorAll('[data-create-kind]')).toHaveLength(5);
   });
 
   it('classes context shows a single New class control without the full four-item menu', () => {
@@ -235,6 +263,69 @@ describe('mountCreateControl', () => {
         subject_id: 'subject_y12_engadv'
       });
       expect(onCreated).toHaveBeenCalledWith('class', 'class_new');
+    });
+
+    expect(document.querySelector('.create-modal')).toBeNull();
+  });
+
+  it('class and unit subject pickers list every subject regardless of selected year', () => {
+    const result = mountCreateControl(host, {
+      context: 'classes',
+      curriculum,
+      onCreated: vi.fn()
+    });
+    dispose = result.dispose;
+
+    host.querySelector<HTMLButtonElement>('[data-create-trigger]')?.click();
+
+    const yearSelect = document.querySelector<HTMLSelectElement>(
+      '[data-create-field="year_id"]'
+    );
+    const subjectSelect = document.querySelector<HTMLSelectElement>(
+      '[data-create-field="subject_id"]'
+    );
+    expect(yearSelect).toBeTruthy();
+    expect(subjectSelect).toBeTruthy();
+
+    if (yearSelect) yearSelect.value = 'year_12';
+    yearSelect?.dispatchEvent(new Event('change'));
+
+    const labels = [...(subjectSelect?.options ?? [])].map((opt) => opt.textContent ?? '');
+    expect(labels).toEqual(expect.arrayContaining(['English Advanced', 'Psychology']));
+    expect(labels.some((label) => /year\s*12/i.test(label))).toBe(false);
+  });
+
+  it('Create Subject requests only a title and calls postSubject', async () => {
+    const created = { ...psychology, id: 'subject_new', title: 'History' };
+    vi.mocked(postSubject).mockResolvedValue(created);
+    const onCreated = vi.fn().mockResolvedValue(undefined);
+
+    const result = mountCreateControl(host, {
+      context: 'home',
+      curriculum,
+      onCreated
+    });
+    dispose = result.dispose;
+
+    host.querySelector<HTMLButtonElement>('[data-create-trigger]')?.click();
+    host.querySelector<HTMLButtonElement>('[data-create-kind="subject"]')?.click();
+
+    const modal = document.querySelector('.create-modal');
+    expect(modal).toBeTruthy();
+    expect(document.body.textContent).toMatch(/New subject/i);
+    expect(document.querySelector('[data-create-field="year_id"]')).toBeNull();
+    expect(document.querySelector('[data-create-field="subject_id"]')).toBeNull();
+    expect(document.querySelectorAll('[data-create-field]')).toHaveLength(1);
+
+    const titleInput = document.querySelector<HTMLInputElement>(
+      '[data-create-field="title"]'
+    );
+    if (titleInput) titleInput.value = 'History';
+    document.querySelector<HTMLButtonElement>('[data-create-action="save"]')?.click();
+
+    await vi.waitFor(() => {
+      expect(postSubject).toHaveBeenCalledWith({ title: 'History' });
+      expect(onCreated).toHaveBeenCalledWith('subject', 'subject_new');
     });
 
     expect(document.querySelector('.create-modal')).toBeNull();

@@ -232,7 +232,10 @@ export function renderScopeTimelineEditor(
   } | null = null;
 
   const unitsById = new Map(curriculum.units.map((unit) => [unit.id, unit]));
-  const year = curriculum.years.find((entry) => entry.id === subject.year_id);
+  const unitYearId = curriculum.units.find((unit) => unit.subject_id === subject.id)?.year_id;
+  const year =
+    curriculum.years.find((entry) => entry.id === unitYearId) ??
+    curriculum.years.find((entry) => entry.subject_ids.includes(subject.id));
   const todayYmd = resolveScheduleToday(curriculum.schedule_anchor_date);
 
   canvas.replaceChildren();

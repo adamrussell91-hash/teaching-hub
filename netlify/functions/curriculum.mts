@@ -2,11 +2,14 @@ import { MediaSchema, type Media } from '../../src/schemas';
 import {
   getContentStore,
   getJSON,
-  scheduleAnchorKey
+  scheduleAnchorKey,
+  setJSON,
+  subjectKey
 } from './_shared/blobs.mts';
 import { getTeacherSession } from './_shared/session.mts';
 import type { Lesson } from './_shared/validate.mts';
 import { toCurriculumLessonSummary } from '../../src/curriculum/lesson-summary';
+import { migrateSubjectRecord } from '../../src/curriculum/migrate-subject';
 import {
   errorResponse,
   guardRequestOrigin,
@@ -63,9 +66,22 @@ async function buildCurriculum(store: ContentStore) {
     toCurriculumLessonSummary(lesson, publishedIds.has(lesson.id))
   );
 
+  const migratedSubjects = subjects.map(migrateSubjectRecord);
+  const subjectsOut = migratedSubjects.every((result) => result.ok)
+    ? await Promise.all(
+        migratedSubjects.map(async (result) => {
+          if (!result.ok) return subjects[0]!;
+          if (result.changed) {
+            await setJSON(store, subjectKey(result.subject.id), result.subject);
+          }
+          return result.subject;
+        })
+      )
+    : subjects;
+
   return {
     years,
-    subjects,
+    subjects: subjectsOut,
     units,
     lessons: lessonSummaries,
     classes,

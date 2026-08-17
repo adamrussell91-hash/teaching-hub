@@ -19,6 +19,7 @@ export function listSearchActions(ctx: SearchActionContext): SearchAction[] {
     { id: 'new-lesson', title: 'New Lesson', keywords: ['new', 'create', 'lesson'] },
     { id: 'new-unit', title: 'New Unit', keywords: ['new', 'create', 'unit'] },
     { id: 'new-class', title: 'New Class', keywords: ['new', 'create', 'class'] },
+    { id: 'new-subject', title: 'New Subject', keywords: ['new', 'create', 'subject'] },
     { id: 'new-scope', title: 'New Scope & Sequence', keywords: ['new', 'create', 'scope'] },
     { id: 'open-home', title: 'Open Dashboard', keywords: ['home', 'dashboard'] }
   ];

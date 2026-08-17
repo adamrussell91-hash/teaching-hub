@@ -108,7 +108,6 @@ const curriculum = {
       created_at: ISO,
       updated_at: ISO,
       schema_version: 1,
-      year_id: 'year_12',
       unit_ids: ['unit_aotfw', 'unit_hamlet'],
       outcome_ids: [],
       class_ids: []
@@ -122,7 +121,6 @@ const curriculum = {
       created_at: ISO,
       updated_at: ISO,
       schema_version: 1,
-      year_id: 'year_11',
       unit_ids: ['unit_bio'],
       outcome_ids: [],
       class_ids: []

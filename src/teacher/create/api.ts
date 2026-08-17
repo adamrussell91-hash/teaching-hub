@@ -1,5 +1,9 @@
 import { apiPost } from '@/api/client';
-import type { Class, Lesson, PedagogicalMode, ScopeSequence, Unit } from '@/schemas';
+import type { Class, Lesson, PedagogicalMode, ScopeSequence, Subject, Unit } from '@/schemas';
+
+export function postSubject(body: { title: string }): Promise<Subject> {
+  return apiPost('/api/subjects', body);
+}
 
 export function postClass(body: {
   title: string;

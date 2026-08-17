@@ -1253,6 +1253,8 @@ function seedCreateParents() {
     type: 'year',
     title: 'Year 12',
     slug: 'year_12',
+    year_level: 12,
+    subject_ids: ['subject_y12_engadv'],
     status: 'active',
     ...timestamps,
     schema_version: 1
@@ -1263,7 +1265,6 @@ function seedCreateParents() {
     title: 'English Advanced',
     slug: 'english_advanced',
     display_title: 'English Advanced',
-    year_id: 'year_12',
     unit_ids: ['unit_aotfw'],
     outcome_ids: [],
     class_ids: [],
@@ -1277,7 +1278,6 @@ function seedCreateParents() {
     title: 'English Standard',
     slug: 'english_standard',
     display_title: 'English Standard',
-    year_id: 'year_12',
     unit_ids: [],
     outcome_ids: [],
     class_ids: [],
@@ -1486,5 +1486,92 @@ describe('POST create endpoints (Netlify)', () => {
       })
     );
     expect(createRes.status).toBe(201);
+  });
+
+  it('POST /api/subjects creates a global subject', async () => {
+    seedCreateParents();
+    const { default: subjectsCreateHandler } = await import(
+      '../../netlify/functions/subjects.mts'
+    );
+
+    const response = await subjectsCreateHandler(
+      request('/api/subjects', {
+        method: 'POST',
+        cookie: sessionCookieHeader(),
+        body: JSON.stringify({ title: 'Psychology' })
+      })
+    );
+    expect(response.status).toBe(201);
+    const body = await response.json();
+    expect(body.ok).toBe(true);
+    expect(body.data.type).toBe('subject');
+    expect(body.data.title).toBe('Psychology');
+    expect(body.data.display_title).toBe('Psychology');
+    expect(body.data.unit_ids).toEqual([]);
+    expect(body.data.outcome_ids).toEqual([]);
+    expect(body.data.class_ids).toEqual([]);
+    expect(body.data).not.toHaveProperty('year_id');
+    expect(fakeStore.raw(`subjects/${body.data.id}`)).toMatchObject({
+      title: 'Psychology',
+      display_title: 'Psychology'
+    });
+  });
+
+  it('POST /api/subjects returns 409 for a duplicate title', async () => {
+    seedCreateParents();
+    const { default: subjectsCreateHandler } = await import(
+      '../../netlify/functions/subjects.mts'
+    );
+
+    const response = await subjectsCreateHandler(
+      request('/api/subjects', {
+        method: 'POST',
+        cookie: sessionCookieHeader(),
+        body: JSON.stringify({ title: 'english advanced' })
+      })
+    );
+    expect(response.status).toBe(409);
+    const body = await response.json();
+    expect(body.error.code).toBe('conflict');
+  });
+
+  it('POST /api/classes adds the subject to the year cache without duplicating', async () => {
+    seedCreateParents();
+
+    const first = await classesCreateHandler(
+      request('/api/classes', {
+        method: 'POST',
+        cookie: sessionCookieHeader(),
+        body: JSON.stringify({
+          title: '12 Eng Std',
+          code: '12ENGSTD1',
+          academic_year: 2026,
+          year_id: 'year_12',
+          subject_id: 'subject_y12_engstd'
+        })
+      })
+    );
+    expect(first.status).toBe(201);
+    expect(fakeStore.raw(yearKey('year_12'))).toMatchObject({
+      subject_ids: ['subject_y12_engadv', 'subject_y12_engstd']
+    });
+
+    const second = await classesCreateHandler(
+      request('/api/classes', {
+        method: 'POST',
+        cookie: sessionCookieHeader(),
+        body: JSON.stringify({
+          title: '12 Eng Std B',
+          code: '12ENGSTD2',
+          academic_year: 2026,
+          year_id: 'year_12',
+          subject_id: 'subject_y12_engstd'
+        })
+      })
+    );
+    expect(second.status).toBe(201);
+    expect(fakeStore.raw(yearKey('year_12'))).toMatchObject({
+      subject_ids: ['subject_y12_engadv', 'subject_y12_engstd']
+    });
   });
 });

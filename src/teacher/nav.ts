@@ -164,7 +164,9 @@ export function renderCurriculumNav(
     if (unit) activeAncestorIds.add(unitNodeId(unit.id));
     if (subject) {
       activeAncestorIds.add(subjectNodeId(subject.id));
-      activeAncestorIds.add(yearNodeId(subject.year_id));
+    }
+    if (unit) {
+      activeAncestorIds.add(yearNodeId(unit.year_id));
     }
   }
 

@@ -198,6 +198,106 @@ describe('POST create endpoints (mock)', () => {
     expect(subject.scope_id).toBe(body.data.id);
   });
 
+  it('POST /api/subjects creates a global subject with empty relation arrays', async () => {
+    const api = freshApi();
+    const cookie = await signIn(api);
+
+    const res = await api.request('POST', '/api/subjects', {
+      cookie,
+      body: { title: 'Psychology' }
+    });
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(body.data.type).toBe('subject');
+    expect(body.data.title).toBe('Psychology');
+    expect(body.data.display_title).toBe('Psychology');
+    expect(body.data.slug).toBeTruthy();
+    expect(body.data.unit_ids).toEqual([]);
+    expect(body.data.outcome_ids).toEqual([]);
+    expect(body.data.class_ids).toEqual([]);
+    expect(body.data).not.toHaveProperty('year_id');
+    expect(body.data.status).toBe('active');
+    expect(body.data.schema_version).toBe(1);
+
+    const curriculum = await (
+      await api.request('GET', '/api/curriculum', { cookie })
+    ).json();
+    const created = curriculum.data.subjects.find((row: Subject) => row.id === body.data.id);
+    expect(created).toBeTruthy();
+    expect(created.title).toBe('Psychology');
+  });
+
+  it('POST /api/subjects returns 400 for a blank title', async () => {
+    const api = freshApi();
+    const cookie = await signIn(api);
+    const res = await api.request('POST', '/api/subjects', {
+      cookie,
+      body: { title: '   ' }
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error.code).toBe('validation_error');
+  });
+
+  it('POST /api/subjects returns 409 for a case-insensitive duplicate title', async () => {
+    const api = freshApi();
+    const cookie = await signIn(api);
+    const res = await api.request('POST', '/api/subjects', {
+      cookie,
+      body: { title: 'english advanced' }
+    });
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error.code).toBe('conflict');
+  });
+
+  it('POST /api/classes adds the subject to the year cache without duplicating', async () => {
+    const seed = freshSeed();
+    const year = seed.years.find((row) => (row as { id: string }).id === YEAR_ID) as {
+      subject_ids: string[];
+    };
+    year.subject_ids = [SUBJECT_ID];
+    const api = freshApi(seed);
+    const cookie = await signIn(api);
+
+    const first = await api.request('POST', '/api/classes', {
+      cookie,
+      body: {
+        title: '12 Eng Std',
+        code: '12ENGSTD1',
+        academic_year: 2026,
+        year_id: YEAR_ID,
+        subject_id: SUBJECT_STD_ID
+      }
+    });
+    expect(first.status).toBe(201);
+
+    const curriculum = await (
+      await api.request('GET', '/api/curriculum', { cookie })
+    ).json();
+    const updatedYear = curriculum.data.years.find((row: { id: string }) => row.id === YEAR_ID);
+    expect(updatedYear.subject_ids).toEqual([SUBJECT_ID, SUBJECT_STD_ID]);
+
+    const second = await api.request('POST', '/api/classes', {
+      cookie,
+      body: {
+        title: '12 Eng Std B',
+        code: '12ENGSTD2',
+        academic_year: 2026,
+        year_id: YEAR_ID,
+        subject_id: SUBJECT_STD_ID
+      }
+    });
+    expect(second.status).toBe(201);
+
+    const afterDup = await (
+      await api.request('GET', '/api/curriculum', { cookie })
+    ).json();
+    const yearAfter = afterDup.data.years.find((row: { id: string }) => row.id === YEAR_ID);
+    expect(yearAfter.subject_ids).toEqual([SUBJECT_ID, SUBJECT_STD_ID]);
+  });
+
   it('keeps GET/PUT /api/lessons/:id working alongside POST /api/lessons', async () => {
     const api = freshApi();
     const cookie = await signIn(api);

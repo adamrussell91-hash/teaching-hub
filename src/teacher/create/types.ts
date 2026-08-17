@@ -1,4 +1,4 @@
-export type CreateKind = 'class' | 'unit' | 'lesson' | 'scope_sequence';
+export type CreateKind = 'class' | 'subject' | 'unit' | 'lesson' | 'scope_sequence';
 
 export type CreateContext =
   | 'home'

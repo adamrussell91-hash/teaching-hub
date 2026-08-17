@@ -34,7 +34,6 @@ const curriculum: CurriculumResponse = {
       created_at: ISO,
       updated_at: ISO,
       schema_version: 1,
-      year_id: 'year_12',
       unit_ids: ['unit_aotfw'],
       outcome_ids: [],
       class_ids: ['class_2026_12engadv1']

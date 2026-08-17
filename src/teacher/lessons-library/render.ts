@@ -745,7 +745,11 @@ export function renderLessonsLibrary(
       const yearNode = el('details', 'lessons-map__node');
       yearNode.open = true;
       yearNode.append(el('summary', undefined, year.title));
-      const subjects = curriculum.subjects.filter((subject) => subject.year_id === year.id);
+      const subjects = curriculum.subjects.filter(
+        (subject) =>
+          year.subject_ids.includes(subject.id) ||
+          curriculum.units.some((unit) => unit.subject_id === subject.id && unit.year_id === year.id)
+      );
       for (const subject of subjects) {
         const subjectNode = el('details', 'lessons-map__node');
         subjectNode.open = true;

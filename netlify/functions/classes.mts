@@ -11,7 +11,7 @@ import {
   preflightResponse,
   withCors
 } from './_shared/http.mts';
-import { ClassSchema, SubjectSchema, type Class } from '../../src/schemas';
+import { ClassSchema, SubjectSchema, YearSchema, type Class } from '../../src/schemas';
 
 export default async function handler(request: Request): Promise<Response> {
   const env = process.env;
@@ -117,6 +117,19 @@ export default async function handler(request: Request): Promise<Response> {
     });
     if (updatedSubject.success) {
       await setJSON(store, subjectKey(subject_id), updatedSubject.data);
+    }
+  }
+
+  const rawYear = await getJSON(store, yearKey(year_id));
+  const yearParsed = rawYear ? YearSchema.safeParse(rawYear) : null;
+  if (yearParsed?.success && !yearParsed.data.subject_ids.includes(subject_id)) {
+    const updatedYear = YearSchema.safeParse({
+      ...yearParsed.data,
+      subject_ids: [...yearParsed.data.subject_ids, subject_id],
+      updated_at: timestamp
+    });
+    if (updatedYear.success) {
+      await setJSON(store, yearKey(year_id), updatedYear.data);
     }
   }
 

@@ -4,6 +4,7 @@ import {
   postClass,
   postLesson,
   postScopeSequence,
+  postSubject,
   postUnit
 } from '@/teacher/create/api';
 import type { CreateKind } from '@/teacher/create/types';
@@ -16,6 +17,7 @@ import {
 
 const KIND_TITLES: Record<CreateKind, string> = {
   class: 'New class',
+  subject: 'New subject',
   unit: 'New unit',
   lesson: 'New lesson',
   scope_sequence: 'New scope & sequence'
@@ -94,59 +96,16 @@ function selectInput(
   return select;
 }
 
-function subjectsForYear(
-  curriculum: CurriculumResponse,
-  yearId: string
+function allSubjectOptions(
+  curriculum: CurriculumResponse
 ): ReadonlyArray<{ value: string; label: string }> {
   return curriculum.subjects
-    .filter((subject) => subject.year_id === yearId)
     .slice()
     .sort((a, b) => a.title.localeCompare(b.title))
     .map((subject) => ({
       value: subject.id,
       label: subject.display_title || subject.title
     }));
-}
-
-function wireYearSubjectCascade(
-  form: HTMLElement,
-  curriculum: CurriculumResponse
-): void {
-  const yearSelect = form.querySelector<HTMLSelectElement>(
-    '[data-create-field="year_id"]'
-  );
-  const subjectSelect = form.querySelector<HTMLSelectElement>(
-    '[data-create-field="subject_id"]'
-  );
-  if (!yearSelect || !subjectSelect) return;
-
-  const refillSubjects = (): void => {
-    const yearId = yearSelect.value;
-    const subjects = yearId ? subjectsForYear(curriculum, yearId) : [];
-    const previous = subjectSelect.value;
-    subjectSelect.replaceChildren();
-
-    const placeholder = document.createElement('option');
-    placeholder.value = '';
-    placeholder.textContent = 'Select…';
-    subjectSelect.append(placeholder);
-
-    for (const opt of subjects) {
-      const option = document.createElement('option');
-      option.value = opt.value;
-      option.textContent = opt.label;
-      subjectSelect.append(option);
-    }
-
-    if (subjects.some((s) => s.value === previous)) {
-      subjectSelect.value = previous;
-    } else if (subjects.length === 1) {
-      subjectSelect.value = subjects[0]!.value;
-    }
-  };
-
-  yearSelect.addEventListener('change', refillSubjects);
-  refillSubjects();
 }
 
 function buildFields(kind: CreateKind, curriculum: CurriculumResponse): HTMLElement {
@@ -158,13 +117,7 @@ function buildFields(kind: CreateKind, curriculum: CurriculumResponse): HTMLElem
     .sort((a, b) => a.year_level - b.year_level || a.title.localeCompare(b.title))
     .map((y) => ({ value: y.id, label: y.title }));
 
-  const allSubjects = curriculum.subjects
-    .slice()
-    .sort((a, b) => a.title.localeCompare(b.title))
-    .map((s) => ({
-      value: s.id,
-      label: s.display_title || s.title
-    }));
+  const allSubjects = allSubjectOptions(curriculum);
 
   const units = curriculum.units
     .slice()
@@ -173,16 +126,18 @@ function buildFields(kind: CreateKind, curriculum: CurriculumResponse): HTMLElem
 
   appendLabeledField(form, 'Title', textInput('title'));
 
+  if (kind === 'subject') {
+    return form;
+  }
+
   if (kind === 'class') {
     appendLabeledField(form, 'Code', textInput('code'));
     appendLabeledField(form, 'Academic year', numberInput('academic_year', currentAcademicYear()));
     appendLabeledField(form, 'Year', selectInput('year_id', years));
-    appendLabeledField(form, 'Subject', selectInput('subject_id', []));
-    wireYearSubjectCascade(form, curriculum);
+    appendLabeledField(form, 'Subject', selectInput('subject_id', allSubjects));
   } else if (kind === 'unit') {
     appendLabeledField(form, 'Year', selectInput('year_id', years));
-    appendLabeledField(form, 'Subject', selectInput('subject_id', []));
-    wireYearSubjectCascade(form, curriculum);
+    appendLabeledField(form, 'Subject', selectInput('subject_id', allSubjects));
   } else if (kind === 'lesson') {
     appendLabeledField(form, 'Unit', selectInput('unit_id', units));
     const modeOptions = PEDAGOGICAL_MODES.map((mode) => ({
@@ -204,6 +159,13 @@ async function submitKind(
   kind: CreateKind,
   form: HTMLElement
 ): Promise<{ id: string }> {
+  if (kind === 'subject') {
+    const created = await postSubject({
+      title: fieldValue(form, 'title')
+    });
+    return { id: created.id };
+  }
+
   if (kind === 'class') {
     const created = await postClass({
       title: fieldValue(form, 'title'),
@@ -343,8 +305,8 @@ export function openCreateModal(options: {
 
     try {
       const { id } = await submitKind(kind, fields);
-      close();
       await onCreated(kind, id);
+      close();
     } catch (error) {
       const message =
         error instanceof ApiClientError

@@ -6,6 +6,7 @@ export type { CreateContext, CreateKind } from '@/teacher/create/types';
 
 const MENU_ITEMS: ReadonlyArray<{ kind: CreateKind; label: string }> = [
   { kind: 'class', label: 'Class' },
+  { kind: 'subject', label: 'Subject' },
   { kind: 'unit', label: 'Unit' },
   { kind: 'lesson', label: 'Lesson' },
   { kind: 'scope_sequence', label: 'Scope & Sequence' }

@@ -60,6 +60,7 @@ describe('listSearchActions', () => {
     expect(ids).toContain('new-lesson');
     expect(ids).toContain('new-unit');
     expect(ids).toContain('new-class');
+    expect(ids).toContain('new-subject');
     expect(ids).toContain('new-scope');
     expect(ids).toContain('open-home');
   });

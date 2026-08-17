@@ -27,7 +27,6 @@ function curriculumFixture(): CurriculumResponse {
         title: 'English Advanced',
         display_title: 'English Advanced',
         slug: 'english-advanced',
-        year_id: 'y12',
         unit_ids: ['u1'],
         outcome_ids: [],
         class_ids: ['c1'],
