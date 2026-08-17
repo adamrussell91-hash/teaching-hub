@@ -97,10 +97,15 @@ async function waitForImages(docEl: HTMLElement, timeoutMs = 1500): Promise<void
 
 export function openPrintLesson(lesson: Lesson): void {
   const docEl = renderPrintLesson(lesson);
-  const printWindow = window.open('', '_blank', 'noopener,noreferrer');
+  const printWindow = window.open('', '_blank');
   if (!printWindow) {
     window.alert('Allow pop-ups to print this lesson.');
     return;
+  }
+  try {
+    printWindow.opener = null;
+  } catch {
+    /* some environments expose opener as read-only */
   }
 
   const { document: doc } = printWindow;

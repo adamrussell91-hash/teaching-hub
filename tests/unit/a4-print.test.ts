@@ -264,4 +264,16 @@ describe('openPrintLesson', () => {
 
     expect(alertSpy).toHaveBeenCalledWith('Allow pop-ups to print this lesson.');
   });
+
+  it('opens the print tab without noopener so the document handle is usable', () => {
+    const printWindow = new Window();
+    (printWindow as unknown as { print: () => void }).print = vi.fn();
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(printWindow as unknown as WindowProxy);
+
+    openPrintLesson(minimalLesson());
+
+    expect(openSpy).toHaveBeenCalled();
+    const features = String(openSpy.mock.calls[0]?.[2] ?? '');
+    expect(features).not.toMatch(/noopener/);
+  });
 });

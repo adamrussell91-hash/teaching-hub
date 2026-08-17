@@ -347,8 +347,8 @@ export function createBlock(type: NewBlockType, id: string): Block {
         variant: 'medium',
         content: {
           cards: [
-            { id: `${id}_c1`, front: '', back: '' },
-            { id: `${id}_c2`, front: '', back: '' }
+            { id: `${id}_c1`, front: 'Term', back: 'Definition' },
+            { id: `${id}_c2`, front: 'Cue', back: 'Answer' }
           ],
           shuffle: false
         }

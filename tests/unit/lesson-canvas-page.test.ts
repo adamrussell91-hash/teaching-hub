@@ -370,6 +370,13 @@ describe('mountLessonPage', () => {
     expect(host.querySelector('.block-editor__move-up')).toBeNull();
   });
 
+  it('inserting flashcards reveals front and back fields on the canvas', () => {
+    const { handle } = mount(makeLesson({ blocks: [] }));
+    handle.insertType('flashcards');
+    expect(host.querySelector('.block-editor__flashcards-front')).not.toBeNull();
+    expect(host.querySelector('.block-editor__flashcards-back')).not.toBeNull();
+  });
+
   it('inserts a heading when a palette payload is dropped on a gap', () => {
     const { onChange } = mount();
     const gaps = host.querySelectorAll('.lesson-page__gap');

@@ -46,6 +46,7 @@ import {
 } from '@/student/class-view';
 import { createCurriculumCache } from './curriculum-cache';
 import { withCreatedEntity } from '@/curriculum/with-created-entity';
+import { withScheduledUnit } from '@/curriculum/with-scheduled-unit';
 import { navigate, start, type RouteMatch } from './router';
 import { renderPageHeader } from '@/teacher/page-header';
 
@@ -455,15 +456,19 @@ function renderTeacherClassRoute(classId: string, token: number): void {
   let currentCurriculum: CurriculumResponse | undefined;
   let classPageOptions: ClassPageOptions;
 
-  const refreshAfterScheduleMutation = async (): Promise<void> => {
+  const refreshAfterScheduleMutation = async (
+    scheduled?: Parameters<typeof withScheduledUnit>[1]
+  ): Promise<void> => {
     invalidateCurriculum();
     try {
       const curriculum = await getCurriculum();
+      const next = scheduled ? withScheduledUnit(curriculum, scheduled) : curriculum;
+      curriculumCache.replace(next);
       if (token !== renderToken) return;
-      currentCurriculum = curriculum;
-      mountTeacherRail(refs, curriculum, 'classes', classId);
+      currentCurriculum = next;
+      mountTeacherRail(refs, next, 'classes', classId);
       teardownClassPage();
-      classPageHandle = renderClassPage(refs.canvas, curriculum, classId, classPageOptions);
+      classPageHandle = renderClassPage(refs.canvas, next, classId, classPageOptions);
     } catch (error) {
       if (token !== renderToken) return;
 

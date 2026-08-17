@@ -1,5 +1,5 @@
 import { ApiClientError } from '@/api/client';
-import type { Class, Unit } from '@/schemas';
+import type { Class, ScheduledLesson, Unit } from '@/schemas';
 import { generateScheduleDates } from '@/schedule/generate-dates';
 import { resolveScheduleToday } from '@/schedule/today';
 import type { CurriculumResponse } from '@/teacher/nav';
@@ -18,7 +18,10 @@ const DEFAULT_MEETING_DAYS = [1, 2, 3, 4, 5];
 export function openScheduleUnitModal(options: {
   curriculum: CurriculumResponse;
   classId: string;
-  onSuccess: () => void | Promise<void>;
+  onSuccess: (result: {
+    class: Class;
+    scheduled_lessons: ScheduledLesson[];
+  }) => void | Promise<void>;
 }): void {
   const cls = options.curriculum.classes.find((entry) => entry.id === options.classId);
   if (!cls) return;
@@ -186,13 +189,13 @@ export function openScheduleUnitModal(options: {
           clearError();
           render();
           try {
-            await postScheduleUnit(options.classId, {
+            const created = await postScheduleUnit(options.classId, {
               unit_id: unit.id,
               start_date: startDate,
               meeting_days: meetingDays
             });
             close();
-            await options.onSuccess();
+            await options.onSuccess(created);
           } catch (error) {
             submitting = false;
             const message =

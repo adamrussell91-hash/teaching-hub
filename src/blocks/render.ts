@@ -1190,14 +1190,25 @@ export function renderFlashcardsBlock(
   root.className = 'block-flashcards';
 
   if (mode === 'teacher') {
-    const preview = document.createElement('div');
-    preview.className = 'block-flashcards__card block-flashcards__card--preview';
-    const front = document.createElement('div');
-    front.className = 'block-flashcards__face block-flashcards__face--front';
-    const firstCard = block.content.cards[0];
-    paintFlashcardFace(front, firstCard?.front ?? '', firstCard);
-    preview.append(front);
-    root.append(preview);
+    const list = document.createElement('ol');
+    list.className = 'block-flashcards__teacher-list';
+    for (const card of block.content.cards) {
+      const item = document.createElement('li');
+      item.className = 'block-flashcards__teacher-card';
+      const front = document.createElement('p');
+      front.className = 'block-flashcards__teacher-front';
+      front.textContent = card.front.trim() || 'Front (required to publish)';
+      const back = document.createElement('p');
+      back.className = 'block-flashcards__teacher-back';
+      back.textContent = card.back.trim() || 'Back (required to publish)';
+      const image = flashcardImage(card);
+      item.append(...(image ? [image, front, back] : [front, back]));
+      list.append(item);
+    }
+    const hint = document.createElement('p');
+    hint.className = 'block-flashcards__teacher-hint';
+    hint.textContent = 'Select this block to edit cards.';
+    root.append(list, hint);
     return wrapBlock(root, block, mode);
   }
 

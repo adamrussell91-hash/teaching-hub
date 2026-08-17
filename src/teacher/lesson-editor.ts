@@ -44,6 +44,7 @@ import {
 } from '@/teacher/lesson-canvas/prefs';
 import { insertAt, nextBlockIdFactory } from '@/teacher/lesson-canvas/drop';
 import { replaceBlockInTree } from '@/ai/block-tree';
+import { openNameModal } from '@/teacher/create/name-modal';
 import { createLessonTemplate } from '@/teacher/template-api';
 import { fetchCurriculum } from '@/teacher/nav';
 import { renderContextBar, type TeacherShellRefs } from '@/teacher/shell';
@@ -302,24 +303,26 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       }
     }
 
-    async function saveLessonAsTemplate(): Promise<void> {
+    function saveLessonAsTemplate(): void {
       const suggested = lesson.title.trim() || 'Lesson template';
-      const title = window.prompt('Lesson template name', suggested);
-      if (title === null) return;
-      const trimmed = title.trim();
-      if (!trimmed) {
-        setCompositionStatus('Lesson template name is required.');
-        return;
-      }
-      try {
-        await createLessonTemplate({
-          title: trimmed,
-          blocks: cloneBlocksWithNewIds(lesson.blocks)
-        });
-        setCompositionStatus(`Saved “${trimmed}” as a lesson template.`);
-      } catch {
-        setCompositionStatus('Unable to save lesson template.');
-      }
+      openNameModal({
+        title: 'Save as lesson template',
+        label: 'Title',
+        defaultValue: suggested,
+        confirmLabel: 'Save',
+        onConfirm: async (trimmed) => {
+          try {
+            await createLessonTemplate({
+              title: trimmed,
+              blocks: cloneBlocksWithNewIds(lesson.blocks)
+            });
+            setCompositionStatus(`Saved “${trimmed}” as a lesson template.`);
+          } catch {
+            setCompositionStatus('Unable to save lesson template.');
+            throw new Error('Unable to save lesson template.');
+          }
+        }
+      });
     }
 
     async function insertSelectedComposition(id: string): Promise<void> {

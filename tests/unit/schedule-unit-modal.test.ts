@@ -246,6 +246,20 @@ describe('schedule unit modal', () => {
     expect(document.body.textContent).toContain('Lesson B');
     expect(document.body.textContent).toMatch(/· Lesson B · 1/);
 
+    const created = {
+      class: { ...classRow, active_unit_ids: ['unit_partial'] },
+      scheduled_lessons: [
+        {
+          ...scheduledA,
+          id: 'scheduled_b',
+          lesson_id: 'lesson_b',
+          date: '2026-08-14',
+          schedule_order: 1
+        }
+      ]
+    };
+    vi.mocked(postScheduleUnit).mockResolvedValueOnce(created);
+
     document.querySelector<HTMLButtonElement>('[data-schedule-modal-action="confirm"]')?.click();
 
     await vi.waitFor(() => {
@@ -254,7 +268,7 @@ describe('schedule unit modal', () => {
         start_date: '2026-08-14',
         meeting_days: [1, 3, 5]
       });
-      expect(onSuccess).toHaveBeenCalled();
+      expect(onSuccess).toHaveBeenCalledWith(created);
     });
 
     expect(document.querySelector('.schedule-modal')).toBeNull();

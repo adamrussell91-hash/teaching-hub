@@ -239,13 +239,13 @@ describe('createBlock learning activities', () => {
     );
   });
 
-  it('creates flashcards with 2 empty cards and shuffle false', () => {
+  it('creates flashcards with two sample cards that already have front and back text', () => {
     const block = createBlock('flashcards', 'fc1');
     expect(block.block_type).toBe('flashcards');
     if (block.block_type !== 'flashcards') throw new Error('expected flashcards');
     expect(block.content.cards).toHaveLength(2);
     expect(block.content.cards.map((c) => c.id)).toEqual(['fc1_c1', 'fc1_c2']);
-    expect(block.content.cards.every((c) => c.front === '' && c.back === '')).toBe(true);
+    expect(block.content.cards.every((c) => c.front.trim() && c.back.trim())).toBe(true);
     expect(block.content.shuffle).toBe(false);
   });
 
@@ -876,7 +876,7 @@ describe('learning activity rendering', () => {
 
     const el = renderBlock(flashcards, 'teacher');
     expect(el.textContent).toContain('Visible front');
-    expect(el.textContent).not.toContain('Hidden back');
+    expect(el.textContent).toContain('Hidden back');
     expect(el.querySelector('button')).toBeNull();
     expect(setItem).not.toHaveBeenCalled();
   });
