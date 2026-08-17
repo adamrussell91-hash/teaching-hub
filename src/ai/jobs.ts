@@ -1,8 +1,10 @@
 import { z } from 'zod';
 import type { ArchivePull } from '@/ai/archiveKernel';
 import type { AiProposal } from '@/ai/proposals';
-import { ProposeReplaceLessonSchema } from '@/ai/proposals';
-import { countBlocksInTree } from '@/teacher/lesson-canvas/drop';
+import { parseToolProposal } from '@/ai/proposals';
+import { BLOCK_BUILD_RECIPES } from '@/ai/block-recipes';
+import type { SearchPack } from '@/ai/search-pack';
+import { validateProposalAgainstSearchPack } from '@/ai/search-pack-validation';
 
 export const AiJobAgentSchema = z.enum(['clementine', 'ann', 'hammond', 'clare']);
 export const AiJobStatusSchema = z.enum(['working', 'done', 'error']);
@@ -50,6 +52,8 @@ export type KernelJobPayload = {
   };
   findings: ArchivePull['findings'];
   archiveFailed: boolean;
+  searchPack: SearchPack;
+  blockRecipes: string;
 };
 
 export function buildKernelJobPayload(input: {
@@ -57,6 +61,7 @@ export function buildKernelJobPayload(input: {
   lesson: unknown;
   transcript: AiTranscriptTurn[];
   archive?: ArchivePull | null;
+  searchPack: SearchPack;
 }): KernelJobPayload {
   const findings = input.archive?.findings ?? [];
   const archiveFailed = Boolean(input.archive?.archiveFailed);
@@ -67,6 +72,8 @@ export function buildKernelJobPayload(input: {
     transcript: input.transcript,
     findings,
     archiveFailed,
+    searchPack: input.searchPack,
+    blockRecipes: BLOCK_BUILD_RECIPES,
     archive: {
       findings,
       archiveFailed,
@@ -120,6 +127,7 @@ export type ClassifyKernelInput = {
   payload?: unknown;
   networkError?: boolean;
   invalidJson?: boolean;
+  searchPack: SearchPack;
 };
 
 export function classifyKernelResponse(input: ClassifyKernelInput): KernelOutcome {
@@ -130,7 +138,7 @@ export function classifyKernelResponse(input: ClassifyKernelInput): KernelOutcom
     return { kind: 'failed', error: `Kernel returned HTTP ${input.status}` };
   }
   if (input.invalidJson) return { kind: 'failed', error: 'Kernel returned invalid JSON' };
-  const proposal = proposalFromKernelPayload(input.payload);
+  const proposal = proposalFromKernelPayload(input.payload, input.searchPack);
   if (!proposal) return { kind: 'failed', error: 'Kernel returned an invalid proposal' };
   return { kind: 'ok', proposal };
 }
@@ -159,22 +167,32 @@ export function staleWorkingJobError(job: AiJob, now = Date.now()): AiJob | null
   return { ...rest, status: 'error', error: 'Job timed out after 10 minutes' };
 }
 
-export function proposalFromKernelPayload(payload: unknown): AiProposal | null {
+const KERNEL_PROPOSAL_TO_TOOL = {
+  replace_block: 'propose_replace_block',
+  replace_section: 'propose_replace_section',
+  replace_lesson: 'propose_replace_lesson',
+  insert_blocks: 'propose_insert_blocks',
+  delete_blocks: 'propose_delete_blocks',
+  reorder_blocks: 'propose_reorder_blocks',
+  review_only: 'review_only'
+} as const;
+
+export function proposalFromKernelPayload(
+  payload: unknown,
+  searchPack: SearchPack
+): AiProposal | null {
   if (!payload || typeof payload !== 'object') return null;
   const raw = payload as Record<string, unknown>;
   const candidate = (raw.proposal ?? raw) as Record<string, unknown>;
   if (!candidate || typeof candidate !== 'object') return null;
-  const parsed = ProposeReplaceLessonSchema.safeParse({
-    title: candidate.title,
-    cover: candidate.cover,
-    blocks: candidate.blocks
-  });
-  if (!parsed.success) return null;
-  if (countBlocksInTree(parsed.data.blocks) > 48) return null;
-  return {
-    kind: 'replace_lesson',
-    title: parsed.data.title,
-    cover: parsed.data.cover,
-    blocks: parsed.data.blocks
-  };
+  const kind = candidate.kind ?? 'replace_lesson';
+  if (typeof kind !== 'string' || !(kind in KERNEL_PROPOSAL_TO_TOOL)) return null;
+  const { kind: _kind, ...toolInput } = candidate;
+  const parsed = parseToolProposal(
+    KERNEL_PROPOSAL_TO_TOOL[kind as keyof typeof KERNEL_PROPOSAL_TO_TOOL],
+    toolInput
+  );
+  if ('error' in parsed) return null;
+  if (!validateProposalAgainstSearchPack(parsed, searchPack).ok) return null;
+  return parsed;
 }

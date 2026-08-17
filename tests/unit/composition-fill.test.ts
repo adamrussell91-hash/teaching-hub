@@ -8,6 +8,7 @@ import {
 } from '@/ai/composition-fill';
 import { actionsForScope, isKnownAction } from '@/ai/capabilities';
 import { buildAiSystemPrompt } from '@/ai/context';
+import { emptySearchPack } from '@/ai/search-pack';
 import { createBlock } from '@/blocks/create-block';
 import type { Lesson } from '@/schemas/lesson';
 
@@ -108,7 +109,8 @@ describe('composition fill prompt + actions', () => {
       scope: 'block',
       selectedBlockId: 'rt1',
       action: 'turn_into_reading_comprehension',
-      compositionFill: fill ?? undefined
+      compositionFill: fill ?? undefined,
+      searchPack: emptySearchPack('reading comprehension', ISO)
     });
     expect(prompt).toContain('Composition fill');
     expect(prompt).toContain('Reading Comprehension');

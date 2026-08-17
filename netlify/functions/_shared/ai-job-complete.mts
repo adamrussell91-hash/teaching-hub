@@ -12,6 +12,7 @@ import {
 } from '../../../src/ai/jobs.ts';
 import type { Lesson } from '../../../src/schemas/lesson.ts';
 import { syncInboxForJob, type AiJobInbox } from '../../../src/ai/jobs-inbox.ts';
+import { buildLessonSearchQuery, searchPublicWeb } from './brave-search.mts';
 import {
   aiJobKey,
   aiJobsInboxKey,
@@ -47,7 +48,9 @@ async function persistJobResult(store: Store, job: AiJob): Promise<AiJob> {
   const assistant =
     job.status === 'error'
       ? `Job failed: ${job.error ?? 'unknown error'}`
-      : 'Proposed a replace_lesson draft.';
+      : job.proposal
+        ? `Proposed a ${job.proposal.kind} change.`
+        : 'Completed without a proposal.';
   await setJSON(
     store,
     aiTranscriptKey(job.lesson_id, job.agent),
@@ -65,7 +68,8 @@ async function tryKernelProposal(input: {
   body: KernelJobPayload;
 }): Promise<KernelOutcome> {
   const secret = input.secret;
-  if (!secret) return classifyKernelResponse({ secret });
+  const searchPack = input.body.searchPack;
+  if (!secret) return classifyKernelResponse({ secret, searchPack });
   const base = (input.url || DEFAULT_KERNEL_URL).replace(/\/+$/, '');
   try {
     const response = await fetch(`${base}/lesson_proposal`, {
@@ -88,10 +92,11 @@ async function tryKernelProposal(input: {
       secret,
       status: response.status,
       payload,
-      invalidJson
+      invalidJson,
+      searchPack
     });
   } catch {
-    return classifyKernelResponse({ secret, networkError: true });
+    return classifyKernelResponse({ secret, networkError: true, searchPack });
   }
 }
 
@@ -115,15 +120,20 @@ export async function completeWorkingAiJob(
 
   const transcript = await loadTranscript(store, job.lesson_id, job.agent);
   const kernelSecret = env.RESEARCH_KERNEL_SHARED_SECRET;
-  let archive: ArchivePull | undefined;
-  if (kernelSecret) {
-    archive = await pullArchive({
-      query: job.message,
-      documentContext: `${lesson.title}\n${job.message}`,
-      url: env.RESEARCH_KERNEL_URL,
-      secret: kernelSecret
-    });
-  }
+  const [archive, searchPack] = await Promise.all([
+    kernelSecret
+      ? pullArchive({
+          query: job.message,
+          documentContext: `${lesson.title}\n${job.message}`,
+          url: env.RESEARCH_KERNEL_URL,
+          secret: kernelSecret
+        })
+      : Promise.resolve<ArchivePull | undefined>(undefined),
+    searchPublicWeb({
+      query: buildLessonSearchQuery(job.message, lesson.title),
+      apiKey: env.BRAVE_SEARCH_API_KEY
+    })
+  ]);
   const nextJob = archive?.archiveFailed ? { ...job, archiveFailed: true } : job;
 
   const outcome = await tryKernelProposal({
@@ -133,7 +143,8 @@ export async function completeWorkingAiJob(
       query: job.message,
       lesson,
       transcript,
-      archive
+      archive,
+      searchPack
     })
   });
   return persistJobResult(store, applyKernelOutcome(nextJob, outcome));
