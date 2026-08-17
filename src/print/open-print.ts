@@ -95,20 +95,8 @@ async function waitForImages(docEl: HTMLElement, timeoutMs = 1500): Promise<void
   ]);
 }
 
-export function openPrintLesson(lesson: Lesson): void {
+function writePrintDocument(doc: Document, lesson: Lesson): HTMLElement {
   const docEl = renderPrintLesson(lesson);
-  const printWindow = window.open('', '_blank');
-  if (!printWindow) {
-    window.alert('Allow pop-ups to print this lesson.');
-    return;
-  }
-  try {
-    printWindow.opener = null;
-  } catch {
-    /* some environments expose opener as read-only */
-  }
-
-  const { document: doc } = printWindow;
 
   const title = doc.createElement('title');
   title.textContent = lesson.title.trim() || 'Print';
@@ -127,10 +115,87 @@ export function openPrintLesson(lesson: Lesson): void {
   doc.head.append(style);
 
   doc.body.replaceChildren(docEl);
+  return docEl;
+}
 
+function printLessonPopup(lesson: Lesson): void {
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    window.alert('Allow pop-ups to print this lesson.');
+    return;
+  }
+  try {
+    printWindow.opener = null;
+  } catch {
+    /* some environments expose opener as read-only */
+  }
+
+  const docEl = writePrintDocument(printWindow.document, lesson);
   void (async () => {
     await waitForImages(docEl);
     printWindow.focus();
     printWindow.print();
   })();
+}
+
+export function openPrintLesson(lesson: Lesson): void {
+  document.querySelector('[data-print-modal="backdrop"]')?.remove();
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'create-modal-backdrop';
+  backdrop.dataset.printModal = 'backdrop';
+
+  const dialog = document.createElement('div');
+  dialog.className = 'create-modal glass-panel glass-tile print-modal';
+  dialog.setAttribute('role', 'dialog');
+  dialog.setAttribute('aria-modal', 'true');
+  dialog.setAttribute('aria-labelledby', 'print-modal-title');
+
+  const heading = document.createElement('h2');
+  heading.id = 'print-modal-title';
+  heading.className = 'create-modal__title';
+  heading.textContent = 'Print';
+
+  const viewport = document.createElement('div');
+  viewport.className = 'print-modal__viewport';
+  viewport.append(renderPrintLesson(lesson));
+
+  const footer = document.createElement('div');
+  footer.className = 'create-modal__footer';
+
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.className = 'btn btn--ghost';
+  closeBtn.dataset.printModalAction = 'close';
+  closeBtn.textContent = 'Close';
+
+  const printBtn = document.createElement('button');
+  printBtn.type = 'button';
+  printBtn.className = 'btn btn--decisive';
+  printBtn.dataset.printModalAction = 'print';
+  printBtn.textContent = 'Print';
+
+  footer.append(closeBtn, printBtn);
+  dialog.append(heading, viewport, footer);
+  backdrop.append(dialog);
+  document.body.append(backdrop);
+
+  const close = (): void => {
+    document.removeEventListener('keydown', onKeyDown);
+    backdrop.remove();
+  };
+
+  const onKeyDown = (event: KeyboardEvent): void => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      close();
+    }
+  };
+
+  document.addEventListener('keydown', onKeyDown);
+  backdrop.addEventListener('click', (event) => {
+    if (event.target === backdrop) close();
+  });
+  closeBtn.addEventListener('click', () => close());
+  printBtn.addEventListener('click', () => printLessonPopup(lesson));
 }

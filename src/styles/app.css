@@ -6221,6 +6221,25 @@ input.scope-timeline__note-title:focus-visible {
   gap: var(--space-4);
 }
 
+.print-modal {
+  width: min(100%, 52rem);
+  max-height: calc(100vh - var(--space-8));
+}
+
+.print-modal__viewport {
+  overflow: auto;
+  max-height: min(70vh, 40rem);
+  background: var(--shallow);
+  padding: var(--space-3);
+  border-radius: var(--radius-xs);
+}
+
+.create-modal__message {
+  margin: 0;
+  font-size: var(--font-size-body);
+  color: var(--muted);
+}
+
 .home-dashboard__hero-time {
   font-family: var(--font-ui);
   font-size: var(--font-size-hero);

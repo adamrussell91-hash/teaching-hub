@@ -16,7 +16,6 @@ import {
 import type { CurriculumResponse } from '@/teacher/nav';
 import { fetchContentSearch } from '@/teacher/search/api';
 import { readRecent } from '@/teacher/search/recent';
-import { listLessonTemplates, useLessonTemplate } from '@/teacher/template-api';
 import { mountPublicLinkControl } from '@/teacher/public-link';
 import { duplicateLesson, patchLessonLibrary } from './api';
 import { duplicateIdSet, findNearDuplicates } from './duplicates';
@@ -957,34 +956,4 @@ export function renderLessonsLibrary(
       for (const dispose of disposers.splice(0).reverse()) dispose();
     }
   };
-}
-
-export async function promptLessonFromTemplate(curriculum: CurriculumResponse): Promise<string | null> {
-  const units = curriculum.units.filter((unit) => unit.status === 'active');
-  if (units.length === 0) {
-    window.alert('Create a unit before using a lesson template.');
-    return null;
-  }
-  try {
-    const { templates } = await listLessonTemplates();
-    if (templates.length === 0) {
-      window.alert('No lesson templates yet. Save one from a lesson editor.');
-      return null;
-    }
-    const names = templates.map((row, index) => `${index + 1}. ${row.title}`).join('\n');
-    const pick = window.prompt(`New lesson from template:\n${names}\n\nEnter a number`);
-    const index = Number(pick) - 1;
-    const template = templates[index];
-    if (!template) return null;
-    const unitPick = window.prompt(
-      `Unit for “${template.title}”:\n${units.map((unit, i) => `${i + 1}. ${unit.title}`).join('\n')}`
-    );
-    const unit = units[Number(unitPick) - 1];
-    if (!unit) return null;
-    const created = await useLessonTemplate({ templateId: template.id, unitId: unit.id });
-    return created.id;
-  } catch {
-    window.alert('Unable to create from template.');
-    return null;
-  }
 }

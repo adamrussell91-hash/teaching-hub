@@ -234,19 +234,48 @@ describe('mountA4Preview', () => {
 describe('openPrintLesson', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    document.body.replaceChildren();
   });
 
-  it('appends a print document to the new window and triggers print', async () => {
-    const printWindow = new Window();
-    const printSpy = vi.fn();
-    (printWindow as unknown as { print: typeof printSpy }).print = printSpy;
-
-    vi.spyOn(window, 'open').mockReturnValue(printWindow as unknown as WindowProxy);
+  it('shows an in-page print document even when pop-ups are unavailable', () => {
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(null);
 
     openPrintLesson(minimalLesson());
 
+    const dialog = document.querySelector('[role="dialog"]');
+    expect(dialog).toBeTruthy();
+    expect(dialog?.textContent).toContain('Print');
+    expect(dialog?.querySelector('.print-document')).not.toBeNull();
+    expect(dialog?.querySelector('.print-document__title')?.textContent).toBe(
+      'Forces worksheet'
+    );
+    expect(openSpy).not.toHaveBeenCalled();
+    expect(alertSpy).not.toHaveBeenCalled();
+  });
+
+  it('closes the print preview without leaving the editor', () => {
+    openPrintLesson(minimalLesson());
+    expect(document.querySelector('[role="dialog"]')).toBeTruthy();
+    document.querySelector<HTMLButtonElement>('[data-print-modal-action="close"]')?.click();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.querySelector('.print-document')).toBeNull();
+  });
+
+  it('prints from the preview without noopener so the document handle is usable', async () => {
+    const printWindow = new Window();
+    const printSpy = vi.fn();
+    (printWindow as unknown as { print: typeof printSpy }).print = printSpy;
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(printWindow as unknown as WindowProxy);
+
+    openPrintLesson(minimalLesson());
+    document.querySelector<HTMLButtonElement>('[data-print-modal-action="print"]')?.click();
+
     await vi.waitUntil(() => printSpy.mock.calls.length > 0);
 
+    expect(openSpy).toHaveBeenCalled();
+    const features = String(openSpy.mock.calls[0]?.[2] ?? '');
+    expect(features).not.toMatch(/noopener/);
     expect(printWindow.document.querySelector('.print-document')).not.toBeNull();
     expect(printWindow.document.title).toBe('Forces worksheet');
     const styleText = printWindow.document.querySelector('style')?.textContent ?? '';
@@ -254,26 +283,17 @@ describe('openPrintLesson', () => {
     expect(styleText).toContain('.block-flashcards__print');
     expect(styleText).toContain('.block-gallery__controls');
     expect(printSpy).toHaveBeenCalledOnce();
+    expect(document.querySelector('[role="dialog"]')).toBeTruthy();
   });
 
-  it('alerts when pop-ups are blocked', () => {
+  it('alerts when the preview Print action cannot open a print tab', () => {
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
     vi.spyOn(window, 'open').mockReturnValue(null);
 
     openPrintLesson(minimalLesson());
+    document.querySelector<HTMLButtonElement>('[data-print-modal-action="print"]')?.click();
 
     expect(alertSpy).toHaveBeenCalledWith('Allow pop-ups to print this lesson.');
-  });
-
-  it('opens the print tab without noopener so the document handle is usable', () => {
-    const printWindow = new Window();
-    (printWindow as unknown as { print: () => void }).print = vi.fn();
-    const openSpy = vi.spyOn(window, 'open').mockReturnValue(printWindow as unknown as WindowProxy);
-
-    openPrintLesson(minimalLesson());
-
-    expect(openSpy).toHaveBeenCalled();
-    const features = String(openSpy.mock.calls[0]?.[2] ?? '');
-    expect(features).not.toMatch(/noopener/);
+    expect(document.querySelector('.print-document')).not.toBeNull();
   });
 });

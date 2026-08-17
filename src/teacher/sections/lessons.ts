@@ -1,7 +1,8 @@
 import { mountCreateControl } from '@/teacher/create/control';
 import type { EntityCreatedHandler } from '@/teacher/create/types';
 import type { CurriculumResponse } from '@/teacher/nav';
-import { promptLessonFromTemplate, renderLessonsLibrary } from '@/teacher/lessons-library/render';
+import { promptLessonFromTemplate } from '@/teacher/lessons-library/from-template';
+import { renderLessonsLibrary } from '@/teacher/lessons-library/render';
 import { renderPageHeader } from '@/teacher/page-header';
 
 export interface LessonsIndexOptions {
