@@ -33,6 +33,8 @@ import {
   withCors
 } from './_shared/http.mts';
 
+export const AI_STREAM_HEARTBEAT_MS = 10_000;
+
 function sseEncode(payload: unknown): string {
   return `data: ${JSON.stringify(payload)}\n\n`;
 }
@@ -119,9 +121,22 @@ export default async function handler(request: Request): Promise<Response> {
 
   const stream = new ReadableStream({
     async start(controller) {
-      const send = (payload: unknown) => {
-        controller.enqueue(encoder.encode(sseEncode(payload)));
+      let streamOpen = true;
+      const enqueue = (text: string): void => {
+        if (!streamOpen) return;
+        try {
+          controller.enqueue(encoder.encode(text));
+        } catch {
+          streamOpen = false;
+        }
       };
+      const send = (payload: unknown) => {
+        enqueue(sseEncode(payload));
+      };
+      const heartbeat = setInterval(
+        () => enqueue(': keep-alive\n\n'),
+        AI_STREAM_HEARTBEAT_MS
+      );
 
       try {
         send({ type: 'status', text: 'Thinking…' });
@@ -258,7 +273,8 @@ export default async function handler(request: Request): Promise<Response> {
         } catch {
           /* usage log best-effort */
         }
-        controller.close();
+        clearInterval(heartbeat);
+        if (streamOpen) controller.close();
       }
     }
   });

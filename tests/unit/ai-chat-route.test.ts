@@ -262,6 +262,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.useRealTimers();
   delete process.env.TEACHING_HUB_PASSPHRASE_HASH;
   delete process.env.SESSION_SECRET;
   delete process.env.ANTHROPIC_API_KEY;
@@ -430,6 +431,48 @@ describe('POST /api/ai/chat mandatory web search', () => {
     } finally {
       releaseBrave();
       await reader?.cancel().catch(() => undefined);
+    }
+  });
+
+  it('keeps the SSE stream alive while generation has no browser-visible events', async () => {
+    vi.useFakeTimers();
+    let releaseBrave: () => void = () => undefined;
+    const braveHeld = new Promise<void>((resolve) => {
+      releaseBrave = resolve;
+    });
+
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(
+        typeof input === 'string' || input instanceof URL ? input : input.url
+      );
+      if (url.origin === 'https://api.search.brave.com') {
+        await braveHeld;
+        return Response.json(WEB_FIXTURE);
+      }
+      if (url.origin === 'https://api.anthropic.com') return anthropicDoneReply();
+      throw new Error(`Unexpected fetch destination: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await handler(chatRequest());
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+
+    try {
+      const first = await reader.read();
+      expect(decoder.decode(first.value)).toContain('Thinking');
+
+      let heartbeat: ReadableStreamReadResult<Uint8Array> | undefined;
+      void reader.read().then((result) => {
+        heartbeat = result;
+      });
+      await vi.advanceTimersByTimeAsync(10_000);
+
+      expect(heartbeat?.done).toBe(false);
+      expect(decoder.decode(heartbeat?.value)).toContain(': keep-alive');
+    } finally {
+      releaseBrave();
+      await reader.cancel().catch(() => undefined);
     }
   });
 });
