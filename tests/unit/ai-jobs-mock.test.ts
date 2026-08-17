@@ -107,6 +107,43 @@ describe('mock /api/ai/jobs', () => {
     expect(inboxBody.data.jobs).toEqual([]);
   });
 
+  it('preserves fast-agent context and returns a mock Hammond review', async () => {
+    const { api, cookie, lessonId } = await signIn();
+    const snapshot = '2026-08-17T10:00:00.000Z';
+    const created = await api.request('POST', '/api/ai/jobs', {
+      cookie,
+      body: {
+        lesson_id: lessonId,
+        agent: 'hammond',
+        scope: 'lesson',
+        lesson_snapshot_at: snapshot,
+        message: 'Review this lesson',
+        action: 'review',
+        history: [{ role: 'user', content: 'Keep the existing structure.' }]
+      }
+    });
+    const id = ((await created.json()) as { data: { id: string } }).data.id;
+
+    const beforeRun = await api.request('GET', `/api/ai/jobs/${id}`, { cookie });
+    const before = (await beforeRun.json()) as {
+      data: { snapshot_at: string; action?: string; history?: unknown[] };
+    };
+    expect(before.data).toMatchObject({
+      snapshot_at: snapshot,
+      action: 'review',
+      history: [{ role: 'user', content: 'Keep the existing structure.' }]
+    });
+
+    const run = await api.request('POST', `/api/ai/jobs/${id}/run`, { cookie });
+    const done = (await run.json()) as {
+      data: { proposal?: { kind: string; summary?: string } };
+    };
+    expect(done.data.proposal).toMatchObject({
+      kind: 'review_only',
+      summary: expect.stringContaining('Mock review')
+    });
+  });
+
   it('dismisses a failed job and refuses dismiss on a ready plan', async () => {
     const { api, cookie, lessonId } = await signIn();
     const created = await api.request('POST', '/api/ai/jobs', {

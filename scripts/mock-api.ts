@@ -109,6 +109,7 @@ import {
 import { parseStatusPatch } from '../netlify/functions/_shared/lifecycle-routes.mts';
 import {
   appendTranscriptTurns,
+  AiJobCreateSchema,
   fixtureReplaceLessonProposal,
   staleWorkingJobError,
   type AiJob,
@@ -3056,7 +3057,13 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
 
   function completeMockJob(job: AiJob): AiJob {
     if (job.status !== 'working') return job;
-    const proposal = fixtureReplaceLessonProposal();
+    const proposal =
+      job.agent === 'hammond'
+        ? {
+            kind: 'review_only' as const,
+            summary: 'Mock review: keep the focus tight and one teaching move at a time.'
+          }
+        : fixtureReplaceLessonProposal();
     const done: AiJob = { ...job, status: 'done', proposal };
     store.setJSON(aiJobKey(job.id), done);
     const existing = store.getJSON<AiTranscriptTurn[]>(aiTranscriptKey(job.lesson_id, job.agent));
@@ -3216,18 +3223,11 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       if (!body || typeof body !== 'object') {
         return errorResponse(400, 'invalid_json', 'Request body is not valid JSON');
       }
-      const req = body as {
-        lesson_id?: unknown;
-        agent?: unknown;
-        message?: unknown;
-      };
-      if (
-        typeof req.lesson_id !== 'string' ||
-        typeof req.agent !== 'string' ||
-        typeof req.message !== 'string'
-      ) {
+      const parsed = AiJobCreateSchema.safeParse(body);
+      if (!parsed.success) {
         return errorResponse(400, 'validation_error', 'Invalid AI job request');
       }
+      const req = parsed.data;
       const lesson = store.getJSON<Lesson>(draftLessonKey(req.lesson_id));
       if (!lesson) return notFoundResponse('Lesson not found');
       const existing = unresolvedJobForLesson(readJobInbox(), req.lesson_id);
@@ -3242,10 +3242,15 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       const job: AiJob = {
         id,
         lesson_id: req.lesson_id,
-        agent: req.agent as AiJob['agent'],
+        agent: req.agent,
         status: 'working',
-        snapshot_at: now,
+        snapshot_at: req.lesson_snapshot_at ?? now,
         message: req.message,
+        scope: req.scope,
+        selected_block_id: req.selected_block_id,
+        action: req.action,
+        history: req.history,
+        phase: 'queued',
         created_at: now
       };
       store.setJSON(aiJobKey(id), job);

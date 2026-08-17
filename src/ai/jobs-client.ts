@@ -1,14 +1,9 @@
 import { getApiBaseUrl } from '@/api/config';
 import { apiGet, apiPatch } from '@/api/client';
-import type { AgentSlug } from '@/ai/agents';
-import type { AiJob } from '@/ai/jobs';
+import type { AiJob, AiJobCreate } from '@/ai/jobs';
 import type { AiJobInbox, AiJobResolution } from '@/ai/jobs-inbox';
 
-export type StartAiJobPayload = {
-  lesson_id: string;
-  agent: AgentSlug;
-  message: string;
-};
+export type StartAiJobPayload = AiJobCreate;
 
 export type StartAiJobResult = {
   id: string;

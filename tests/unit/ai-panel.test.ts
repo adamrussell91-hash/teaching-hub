@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { writeLastAgentSlug } from '@/ai/agents';
-import { streamAiChat, type AiStreamEvent } from '@/ai/client';
+import { streamAiChat } from '@/ai/client';
 import { pollAiJob, startAiJob, listAiJobs, resolveAiJob, AiJobConflictError } from '@/ai/jobs-client';
 import type { AiJob } from '@/ai/jobs';
 import type { AiProposal } from '@/ai/proposals';
@@ -200,51 +200,56 @@ describe('mountAiPanel', () => {
     expect(composer(mounted.host).send.disabled).toBe(false);
   });
 
-  it('sends with Ann on empty selection and omits selected_block_id from the payload', async () => {
+  it('routes Ann through a durable job and omits selected_block_id on empty selection', async () => {
     const mounted = mountPanel();
     handle = mounted.handle;
 
     submitMessage(mounted.host, 'Build a heading');
 
     await vi.waitFor(() => {
-      expect(streamAiChatMock).toHaveBeenCalled();
+      expect(startAiJobMock).toHaveBeenCalled();
     });
-    expect(startAiJobMock).not.toHaveBeenCalled();
+    expect(streamAiChatMock).not.toHaveBeenCalled();
 
-    const payload = streamAiChatMock.mock.calls[0]?.[0];
+    const payload = startAiJobMock.mock.calls[0]?.[0];
     expect(payload?.agent).toBe('ann');
     expect(payload?.selected_block_id).toBeUndefined();
+    expect(payload?.lesson_snapshot_at).toBe(SNAPSHOT);
     expect(JSON.stringify(payload)).not.toContain('"selected_block_id":null');
   });
 
-  it('shows the latest progress phase and hands the bubble over to streamed text', async () => {
-    let emit: ((event: AiStreamEvent) => void) | undefined;
-    let finish: () => void = () => undefined;
-    streamAiChatMock.mockImplementation(async (_payload, onEvent) => {
-      emit = onEvent;
-      await new Promise<void>((resolve) => {
-        finish = resolve;
-      });
-    });
+  it('shows background progress and hands the bubble over to the finished response', async () => {
+    let finishPoll: (job: AiJob) => void = () => undefined;
+    pollAiJobMock.mockReset();
+    pollAiJobMock
+      .mockResolvedValueOnce(workingJob({ agent: 'ann', phase: 'searching' }))
+      .mockImplementationOnce(
+        () =>
+          new Promise<AiJob>((resolve) => {
+            finishPoll = resolve;
+          })
+      );
 
     const mounted = mountPanel();
     handle = mounted.handle;
     submitMessage(mounted.host, 'Build a dual coding lesson');
 
     await vi.waitFor(() => {
-      expect(emit).toBeDefined();
+      expect(mounted.host.textContent).toContain('Searching the web…');
+      expect(pollAiJobMock).toHaveBeenCalledTimes(2);
     });
-
-    emit!({ type: 'status', text: 'Thinking…' });
-    emit!({ type: 'status', text: 'Searching the web…' });
-    expect(mounted.host.textContent).toContain('Searching the web…');
-    expect(mounted.host.textContent).not.toContain('Thinking…');
-
-    emit!({ type: 'text', text: 'Here is the lesson.' });
-    expect(mounted.host.textContent).toContain('Here is the lesson.');
-    expect(mounted.host.textContent).not.toContain('Searching the web…');
-
-    finish();
+    finishPoll(
+      workingJob({
+        agent: 'ann',
+        status: 'done',
+        phase: undefined,
+        response: 'Here is the lesson.'
+      })
+    );
+    await vi.waitFor(() => {
+      expect(mounted.host.textContent).toContain('Here is the lesson.');
+      expect(mounted.host.textContent).not.toContain('Searching the web…');
+    });
   });
 
   it('routes Clementine through jobs and pulses working until poll completes', async () => {
@@ -308,8 +313,9 @@ describe('mountAiPanel', () => {
     const flushDraft = vi.fn(async () => {
       order.push('flush');
     });
-    streamAiChatMock.mockImplementation(async () => {
-      order.push('stream');
+    startAiJobMock.mockImplementation(async () => {
+      order.push('job');
+      return { id: 'job_1', status: 'working' };
     });
 
     const mounted = mountPanel({ flushDraft });
@@ -319,10 +325,10 @@ describe('mountAiPanel', () => {
     submitMessage(mounted.host, 'Put three facts about Shakespeare in this box');
 
     await vi.waitFor(() => {
-      expect(streamAiChatMock).toHaveBeenCalled();
+      expect(startAiJobMock).toHaveBeenCalled();
     });
     expect(flushDraft).toHaveBeenCalledTimes(1);
-    expect(order).toEqual(['flush', 'stream']);
+    expect(order).toEqual(['flush', 'job']);
   });
 
   it('still asks when saving first fails', async () => {
@@ -336,11 +342,11 @@ describe('mountAiPanel', () => {
     submitMessage(mounted.host, 'Build a heading');
 
     await vi.waitFor(() => {
-      expect(streamAiChatMock).toHaveBeenCalled();
+      expect(startAiJobMock).toHaveBeenCalled();
     });
   });
 
-  it('keeps Ann on streamAiChat after a block is selected', async () => {
+  it('keeps Ann selection and scope when starting a durable job', async () => {
     const mounted = mountPanel();
     handle = mounted.handle;
     handle.setSelection({ blockId: 'block_1', blockType: 'heading', scope: 'block' });
@@ -348,11 +354,15 @@ describe('mountAiPanel', () => {
     submitMessage(mounted.host, 'Rewrite this heading');
 
     await vi.waitFor(() => {
-      expect(streamAiChatMock).toHaveBeenCalled();
+      expect(startAiJobMock).toHaveBeenCalled();
     });
-    expect(startAiJobMock).not.toHaveBeenCalled();
-    expect(streamAiChatMock.mock.calls[0]?.[0]?.agent).toBe('ann');
-    expect(streamAiChatMock.mock.calls[0]?.[0]?.selected_block_id).toBe('block_1');
+    expect(streamAiChatMock).not.toHaveBeenCalled();
+    expect(startAiJobMock.mock.calls[0]?.[0]).toMatchObject({
+      agent: 'ann',
+      scope: 'block',
+      selected_block_id: 'block_1',
+      lesson_snapshot_at: SNAPSHOT
+    });
   });
 
   it('keeps suggestion buttons out of the way until asked for', () => {
@@ -405,9 +415,7 @@ describe('mountAiPanel', () => {
   });
 
   it('calls onAcceptProposal when Accept is clicked on a replace_lesson proposal', async () => {
-    streamAiChatMock.mockImplementation(async (_payload, onEvent) => {
-      onEvent({ type: 'proposal', proposal: replaceLesson });
-    });
+    pollAiJobMock.mockResolvedValue(workingJob({ status: 'done', proposal: replaceLesson }));
     const mounted = mountPanel();
     handle = mounted.handle;
 
@@ -426,9 +434,7 @@ describe('mountAiPanel', () => {
   it('asks onStaleAccept when the snapshot changed and leaves the proposal pending if apply is not called', async () => {
     let snapshot = 't1';
     const onStaleAccept = vi.fn();
-    streamAiChatMock.mockImplementation(async (_payload, onEvent) => {
-      onEvent({ type: 'proposal', proposal: replaceLesson });
-    });
+    pollAiJobMock.mockResolvedValue(workingJob({ status: 'done', proposal: replaceLesson }));
     const mounted = mountPanel({
       getSnapshotAt: () => snapshot,
       onStaleAccept
@@ -451,9 +457,7 @@ describe('mountAiPanel', () => {
   });
 
   it('keeps Accept without a checklist for title-only replace_lesson', async () => {
-    streamAiChatMock.mockImplementation(async (_payload, onEvent) => {
-      onEvent({ type: 'proposal', proposal: replaceLesson });
-    });
+    pollAiJobMock.mockResolvedValue(workingJob({ status: 'done', proposal: replaceLesson }));
     const mounted = mountPanel();
     handle = mounted.handle;
     submitMessage(mounted.host, 'Replace the lesson');
@@ -468,9 +472,9 @@ describe('mountAiPanel', () => {
   });
 
   it('shows Accept selected and checkboxes for a multi-block insert', async () => {
-    streamAiChatMock.mockImplementation(async (_payload, onEvent) => {
-      onEvent({ type: 'proposal', proposal: insertTwoHeadings });
-    });
+    pollAiJobMock.mockResolvedValue(
+      workingJob({ agent: 'ann', status: 'done', proposal: insertTwoHeadings })
+    );
     const mounted = mountPanel();
     handle = mounted.handle;
     submitMessage(mounted.host, 'Add two headings');
@@ -485,9 +489,9 @@ describe('mountAiPanel', () => {
   });
 
   it('Accept selected applies only checked insert blocks', async () => {
-    streamAiChatMock.mockImplementation(async (_payload, onEvent) => {
-      onEvent({ type: 'proposal', proposal: insertTwoHeadings });
-    });
+    pollAiJobMock.mockResolvedValue(
+      workingJob({ agent: 'ann', status: 'done', proposal: insertTwoHeadings })
+    );
     const mounted = mountPanel();
     handle = mounted.handle;
     submitMessage(mounted.host, 'Add two headings');
@@ -598,18 +602,20 @@ describe('mountAiPanel', () => {
       expect(acceptButton(mounted.host)).toBeTruthy();
     });
     expect(pollAiJobMock).toHaveBeenCalledWith('job_1', expect.anything());
+    expect(mounted.host.textContent).toContain('Build a lesson');
+    expect(mounted.host.textContent).not.toContain('Build again');
   });
 
   it('does not persist Aborted into the transcript when the request is cancelled', async () => {
-    streamAiChatMock.mockImplementation(
-      (_payload, _onEvent, signal) =>
+    startAiJobMock.mockImplementation(
+      (_payload, options) =>
         new Promise((_, reject) => {
           const fail = () => reject(new DOMException('Aborted', 'AbortError'));
-          if (signal?.aborted) {
+          if (options?.signal?.aborted) {
             fail();
             return;
           }
-          signal?.addEventListener('abort', fail, { once: true });
+          options?.signal?.addEventListener('abort', fail, { once: true });
         })
     );
 
@@ -618,7 +624,7 @@ describe('mountAiPanel', () => {
     submitMessage(mounted.host, 'hello');
 
     await vi.waitFor(() => {
-      expect(streamAiChatMock).toHaveBeenCalled();
+      expect(startAiJobMock).toHaveBeenCalled();
     });
 
     mounted.handle.dispose();

@@ -106,8 +106,13 @@ export default async function handler(request: Request): Promise<Response> {
     lesson_id: body.lesson_id,
     agent: body.agent,
     status: 'working',
-    snapshot_at: now,
+    snapshot_at: body.lesson_snapshot_at ?? now,
     message: body.message,
+    scope: body.scope,
+    selected_block_id: body.selected_block_id,
+    action: body.action,
+    history: body.history,
+    phase: 'queued',
     created_at: now
   };
   await setJSON(store, aiJobKey(id), job);

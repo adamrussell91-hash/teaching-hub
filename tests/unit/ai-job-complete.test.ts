@@ -83,6 +83,18 @@ class FakeStore {
   async setJSON(key: string, value: unknown): Promise<void> {
     this.data.set(key, value);
   }
+
+  async list({ prefix = '' }: { prefix?: string } = {}): Promise<{
+    blobs: Array<{ key: string; etag: string }>;
+    directories: string[];
+  }> {
+    return {
+      blobs: [...this.data.keys()]
+        .filter((key) => key.startsWith(prefix))
+        .map((key) => ({ key, etag: 'fake-etag' })),
+      directories: []
+    };
+  }
 }
 
 const fakeStore = new FakeStore();
@@ -184,6 +196,29 @@ function imageBlock(url: string) {
 
 function insertBlocksPayload(blocks: unknown[]) {
   return { proposal: { kind: 'insert_blocks', position: 'below', blocks } };
+}
+
+function anthropicToolReply(name: string, input: unknown): Response {
+  const events = [
+    { type: 'message_start', message: { usage: { input_tokens: 10 } } },
+    {
+      type: 'content_block_start',
+      index: 0,
+      content_block: { type: 'tool_use', id: 'tool_1', name }
+    },
+    {
+      type: 'content_block_delta',
+      index: 0,
+      delta: { type: 'input_json_delta', partial_json: JSON.stringify(input) }
+    },
+    { type: 'content_block_stop', index: 0 },
+    { type: 'message_stop' }
+  ];
+  return new Response(`${events.map((event) => `data: ${JSON.stringify(event)}`).join('\n')}\n`);
+}
+
+function anthropicDoneReply(): Response {
+  return new Response('data: {"type":"message_stop"}\n');
 }
 
 type FetchOptions = {
@@ -331,5 +366,115 @@ describe('completeWorkingAiJob web search grounding', () => {
 
     expect(result.status).toBe('done');
     expect(result.proposal?.kind).toBe('insert_blocks');
+  });
+});
+
+describe('completeWorkingAiJob fast agents', () => {
+  it('runs Ann through Anthropic in the durable job and persists her proposal', async () => {
+    let anthropicCalls = 0;
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
+      if (url.origin === BRAVE_ORIGIN) {
+        if (url.pathname === '/res/v1/web/search') return Response.json(WEB_FIXTURE);
+        if (url.pathname === '/res/v1/images/search') return Response.json(IMAGE_FIXTURE);
+        if (url.pathname === '/res/v1/videos/search') return Response.json(VIDEO_FIXTURE);
+      }
+      if (url.origin === 'https://api.anthropic.com') {
+        anthropicCalls += 1;
+        return anthropicCalls === 1
+          ? anthropicToolReply('propose_insert_blocks', {
+              position: 'below',
+              blocks: [mindMapBlock()]
+            })
+          : anthropicDoneReply();
+      }
+      throw new Error(`Unexpected fetch destination: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const job: AiJob = {
+      ...workingJob(),
+      agent: 'ann',
+      scope: 'lesson',
+      history: [{ role: 'user', content: 'Keep the starter.' }]
+    };
+
+    const result = await completeWorkingAiJob(store, job, {
+      ANTHROPIC_API_KEY: 'anthropic-test-key',
+      BRAVE_SEARCH_API_KEY: 'brave-test-key'
+    } as NodeJS.ProcessEnv);
+
+    expect(anthropicCalls).toBeGreaterThan(0);
+    expect(result.status).toBe('done');
+    expect(result.proposal?.kind).toBe('insert_blocks');
+    expect(fakeStore.read<AiJob>(aiJobKey(JOB_ID))?.proposal?.kind).toBe('insert_blocks');
+  });
+
+  it('persists Hammond review-only output from the durable job', async () => {
+    let anthropicCalls = 0;
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
+      if (url.origin === BRAVE_ORIGIN) return Response.json({});
+      if (url.origin === 'https://api.anthropic.com') {
+        anthropicCalls += 1;
+        return anthropicCalls === 1
+          ? anthropicToolReply('review_only', { summary: 'Add a clearer retrieval checkpoint.' })
+          : anthropicDoneReply();
+      }
+      throw new Error(`Unexpected fetch destination: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await completeWorkingAiJob(
+      store,
+      { ...workingJob(), agent: 'hammond', scope: 'lesson' },
+      {
+        ANTHROPIC_API_KEY: 'anthropic-test-key',
+        BRAVE_SEARCH_API_KEY: 'brave-test-key'
+      } as NodeJS.ProcessEnv
+    );
+
+    expect(result).toMatchObject({
+      status: 'done',
+      proposal: {
+        kind: 'review_only',
+        summary: 'Add a clearer retrieval checkpoint.'
+      }
+    });
+  });
+
+  it('does not persist fast-agent media invented outside the search pack', async () => {
+    let anthropicCalls = 0;
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
+      if (url.origin === BRAVE_ORIGIN) {
+        if (url.pathname === '/res/v1/web/search') return Response.json(WEB_FIXTURE);
+        if (url.pathname === '/res/v1/images/search') return Response.json(IMAGE_FIXTURE);
+        if (url.pathname === '/res/v1/videos/search') return Response.json(VIDEO_FIXTURE);
+      }
+      if (url.origin === 'https://api.anthropic.com') {
+        anthropicCalls += 1;
+        return anthropicCalls === 1
+          ? anthropicToolReply('propose_insert_blocks', {
+              position: 'below',
+              blocks: [imageBlock(INVENTED_IMAGE_URL)]
+            })
+          : anthropicDoneReply();
+      }
+      throw new Error(`Unexpected fetch destination: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await completeWorkingAiJob(
+      store,
+      { ...workingJob(), agent: 'ann', scope: 'lesson' },
+      {
+        ANTHROPIC_API_KEY: 'anthropic-test-key',
+        BRAVE_SEARCH_API_KEY: 'brave-test-key'
+      } as NodeJS.ProcessEnv
+    );
+
+    expect(result.status).toBe('error');
+    expect(result.proposal).toBeUndefined();
+    expect(fakeStore.read<AiJob>(aiJobKey(JOB_ID))?.proposal).toBeUndefined();
   });
 });

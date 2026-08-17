@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { ArchivePull } from '@/ai/archiveKernel';
-import type { AiProposal } from '@/ai/proposals';
-import { parseToolProposal } from '@/ai/proposals';
+import type { AiProposal, AiScope } from '@/ai/proposals';
+import { AiChatRequestSchema, parseToolProposal } from '@/ai/proposals';
 import { BLOCK_BUILD_RECIPES } from '@/ai/block-recipes';
 import type { SearchPack } from '@/ai/search-pack';
 import { validateProposalAgainstSearchPack } from '@/ai/search-pack-validation';
@@ -9,11 +9,7 @@ import { validateProposalAgainstSearchPack } from '@/ai/search-pack-validation';
 export const AiJobAgentSchema = z.enum(['clementine', 'ann', 'hammond', 'clare']);
 export const AiJobStatusSchema = z.enum(['working', 'done', 'error']);
 
-export const AiJobCreateSchema = z.object({
-  lesson_id: z.string().min(1),
-  agent: AiJobAgentSchema,
-  message: z.string().min(1).max(8000)
-});
+export const AiJobCreateSchema = AiChatRequestSchema;
 
 export const AiJobPatchSchema = z.object({
   resolution: z.enum(['accepted', 'rejected', 'dismissed'])
@@ -34,6 +30,12 @@ export type AiJob = {
   status: z.infer<typeof AiJobStatusSchema>;
   snapshot_at: string;
   message: string;
+  scope?: AiScope;
+  selected_block_id?: string;
+  action?: string;
+  history?: Array<{ role: 'user' | 'assistant'; content: string }>;
+  phase?: 'queued' | 'searching' | 'writing';
+  response?: string;
   proposal?: AiProposal;
   error?: string;
   archiveFailed?: boolean;

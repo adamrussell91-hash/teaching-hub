@@ -14,7 +14,23 @@ vi.mock('@/api/client', async () => {
   };
 });
 
-vi.mock('@/ai/client', () => ({ streamAiChat: vi.fn() }));
+vi.mock('@/ai/jobs-client', () => {
+  class MockConflict extends Error {
+    constructor(
+      readonly jobId: string,
+      readonly status: string
+    ) {
+      super('An unresolved job already exists for this lesson');
+    }
+  }
+  return {
+    startAiJob: vi.fn(),
+    pollAiJob: vi.fn(),
+    listAiJobs: vi.fn(),
+    resolveAiJob: vi.fn(),
+    AiJobConflictError: MockConflict
+  };
+});
 
 const historyHarness: { onRestored?: (live: unknown) => void } = {};
 
@@ -25,12 +41,15 @@ vi.mock('@/teacher/history-panel', () => ({
   }
 }));
 
-import { streamAiChat } from '@/ai/client';
+import { listAiJobs, pollAiJob, resolveAiJob, startAiJob } from '@/ai/jobs-client';
 import { apiGet, apiPut, apiPost, apiPatch, ApiClientError } from '@/api/client';
 import { mountLessonEditor, type LessonEditorHandle } from '@/teacher/lesson-editor';
 import { renderTeacherShell } from '@/teacher/shell';
 
-const streamAiChatMock = vi.mocked(streamAiChat);
+const startAiJobMock = vi.mocked(startAiJob);
+const pollAiJobMock = vi.mocked(pollAiJob);
+const listAiJobsMock = vi.mocked(listAiJobs);
+const resolveAiJobMock = vi.mocked(resolveAiJob);
 
 const apiGetMock = apiGet as unknown as ReturnType<typeof vi.fn>;
 const apiPutMock = apiPut as unknown as ReturnType<typeof vi.fn>;
@@ -207,8 +226,32 @@ describe('mountLessonEditor', () => {
     apiPutMock.mockReset();
     apiPostMock.mockReset();
     apiPatchMock.mockReset();
-    streamAiChatMock.mockReset();
-    streamAiChatMock.mockResolvedValue(undefined);
+    startAiJobMock.mockReset();
+    pollAiJobMock.mockReset();
+    listAiJobsMock.mockReset();
+    resolveAiJobMock.mockReset();
+    startAiJobMock.mockResolvedValue({ id: 'job_1', status: 'working' });
+    pollAiJobMock.mockResolvedValue({
+      id: 'job_1',
+      lesson_id: 'lesson_1',
+      agent: 'ann',
+      status: 'done',
+      snapshot_at: ISO,
+      message: 'Build lesson',
+      created_at: ISO,
+      proposal: { kind: 'replace_lesson', title: 'Built lesson', blocks: [] }
+    });
+    listAiJobsMock.mockResolvedValue({ jobs: [] });
+    resolveAiJobMock.mockResolvedValue({
+      id: 'job_1',
+      lesson_id: 'lesson_1',
+      agent: 'ann',
+      status: 'done',
+      snapshot_at: ISO,
+      message: 'Build lesson',
+      created_at: ISO,
+      resolution: 'accepted'
+    });
     historyHarness.onRestored = undefined;
     vi.stubGlobal('localStorage', new MemoryStorage());
     container = document.createElement('div');
@@ -880,12 +923,6 @@ describe('mountLessonEditor', () => {
 
   it('confirms stale Accept after a local edit and applies when confirmed', async () => {
     mockLessonLoad();
-    streamAiChatMock.mockImplementation(async (_payload, onEvent) => {
-      onEvent({
-        type: 'proposal',
-        proposal: { kind: 'replace_lesson', title: 'Built lesson', blocks: [] }
-      });
-    });
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     mount();
@@ -923,12 +960,6 @@ describe('mountLessonEditor', () => {
 
   it('confirms stale Accept after history restore', async () => {
     mockLessonLoad();
-    streamAiChatMock.mockImplementation(async (_payload, onEvent) => {
-      onEvent({
-        type: 'proposal',
-        proposal: { kind: 'replace_lesson', title: 'Built lesson', blocks: [] }
-      });
-    });
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     mount();

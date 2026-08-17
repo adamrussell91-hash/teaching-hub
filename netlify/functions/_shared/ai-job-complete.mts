@@ -1,4 +1,7 @@
 import { pullArchive, type ArchivePull } from '../../../src/ai/archiveKernel.ts';
+import { agentBySlug } from '../../../src/ai/agents.ts';
+import { matchCompositionFill } from '../../../src/ai/composition-fill.ts';
+import { buildAiSystemPrompt } from '../../../src/ai/context.ts';
 import {
   appendTranscriptTurns,
   applyKernelOutcome,
@@ -10,6 +13,14 @@ import {
   type KernelJobPayload,
   type KernelOutcome
 } from '../../../src/ai/jobs.ts';
+import { protocolForAgent } from '../../../src/ai/protocols.ts';
+import { AI_TOOLS, parseToolProposal, type AiProposal } from '../../../src/ai/proposals.ts';
+import { resolveSelection } from '../../../src/ai/selection.ts';
+import { validateProposalAgainstSearchPack } from '../../../src/ai/search-pack-validation.ts';
+import {
+  CompositionTemplateSchema,
+  type CompositionTemplate
+} from '../../../src/schemas/composition.ts';
 import type { Lesson } from '../../../src/schemas/lesson.ts';
 import { syncInboxForJob, type AiJobInbox } from '../../../src/ai/jobs-inbox.ts';
 import { buildLessonSearchQuery, searchPublicWeb } from './brave-search.mts';
@@ -21,6 +32,7 @@ import {
   getJSON,
   setJSON
 } from './blobs.mts';
+import { AnthropicStreamError, createAnthropicStreamer } from './anthropic-stream.mts';
 import type { Store } from '@netlify/blobs';
 
 const DEFAULT_KERNEL_URL = 'https://knowledge-hub-research.adamrussell91.workers.dev';
@@ -49,8 +61,8 @@ async function persistJobResult(store: Store, job: AiJob): Promise<AiJob> {
     job.status === 'error'
       ? `Job failed: ${job.error ?? 'unknown error'}`
       : job.proposal
-        ? `Proposed a ${job.proposal.kind} change.`
-        : 'Completed without a proposal.';
+        ? job.response || `Proposed a ${job.proposal.kind} change.`
+        : job.response || 'Completed without a proposal.';
   await setJSON(
     store,
     aiTranscriptKey(job.lesson_id, job.agent),
@@ -60,6 +72,134 @@ async function persistJobResult(store: Store, job: AiJob): Promise<AiJob> {
     ])
   );
   return job;
+}
+
+async function persistWorkingPhase(
+  store: Store,
+  job: AiJob,
+  phase: NonNullable<AiJob['phase']>
+): Promise<AiJob> {
+  const next = { ...job, phase };
+  await setJSON(store, aiJobKey(next.id), next);
+  await writeJobInbox(store, next);
+  return next;
+}
+
+async function loadCompositionLibrary(store: Store): Promise<CompositionTemplate[]> {
+  const { blobs } = await store.list({ prefix: 'templates/compositions/' });
+  return (
+    await Promise.all(blobs.map((blob) => getJSON<CompositionTemplate>(store, blob.key)))
+  ).flatMap((entry) => {
+    const parsed = CompositionTemplateSchema.safeParse(entry);
+    return parsed.success ? [parsed.data] : [];
+  });
+}
+
+async function completeFastAgentJob(
+  store: Store,
+  job: AiJob,
+  lesson: Lesson,
+  env: NodeJS.ProcessEnv
+): Promise<AiJob> {
+  const agent = agentBySlug(job.agent);
+  const apiKey = env.ANTHROPIC_API_KEY;
+  if (!agent || !apiKey) {
+    return persistJobResult(store, {
+      ...job,
+      status: 'error',
+      error: !agent ? 'Unknown agent' : 'AI provider is not configured'
+    });
+  }
+
+  let working = await persistWorkingPhase(store, job, 'searching');
+  const [searchPack, library] = await Promise.all([
+    searchPublicWeb({
+      query: buildLessonSearchQuery(job.message, lesson.title),
+      apiKey: env.BRAVE_SEARCH_API_KEY
+    }),
+    loadCompositionLibrary(store)
+  ]);
+  const selection = resolveSelection(lesson.blocks, job.selected_block_id, job.scope ?? 'lesson');
+  const compositionFill = matchCompositionFill({
+    action: job.action,
+    message: job.message,
+    library
+  });
+  const system = buildAiSystemPrompt({
+    agentName: agent.name,
+    protocol: protocolForAgent(job.agent),
+    lesson,
+    scope: selection.scope,
+    selectedBlockId: selection.selectedBlockId,
+    action: job.action,
+    fullLesson: false,
+    compositionFill: compositionFill ?? undefined,
+    searchPack
+  });
+
+  working = await persistWorkingPhase(store, working, 'writing');
+  const streamer = createAnthropicStreamer(apiKey);
+  let response = '';
+  let proposal: AiProposal | undefined;
+
+  try {
+    for await (const event of streamer.streamMessage({
+      system,
+      messages: [
+        ...(job.history ?? []).map((turn) => ({ role: turn.role, content: turn.content })),
+        { role: 'user' as const, content: job.message }
+      ],
+      tools: [...AI_TOOLS],
+      executeTools: async (toolEvent) => {
+        const parsed = parseToolProposal(toolEvent.name, toolEvent.input);
+        if ('error' in parsed) return JSON.stringify({ ok: false, error: parsed.error });
+        const validation = validateProposalAgainstSearchPack(parsed, searchPack);
+        if (!validation.ok) {
+          const references = validation.violations
+            .map(({ path, value }) => `${path}=${value}`)
+            .join(', ');
+          return JSON.stringify({ ok: false, error: `Media not in search pack: ${references}` });
+        }
+        proposal = parsed;
+        // A valid proposal is the terminal product for a background job. Returning
+        // null yields the tool call to this loop without starting another model round.
+        return null;
+      }
+    })) {
+      if (event.type === 'text') response += event.text;
+      if (event.type === 'tool_call' && proposal) break;
+    }
+  } catch (error) {
+    const message =
+      error instanceof AnthropicStreamError
+        ? error.message
+        : error instanceof Error
+          ? error.message
+          : 'AI request failed';
+    return persistJobResult(store, {
+      ...working,
+      status: 'error',
+      error: message,
+      response: response.trim() || undefined,
+      phase: undefined
+    });
+  }
+
+  if (!proposal && !response.trim()) {
+    return persistJobResult(store, {
+      ...working,
+      status: 'error',
+      error: 'AI completed without a reply or proposal',
+      phase: undefined
+    });
+  }
+  return persistJobResult(store, {
+    ...working,
+    status: 'done',
+    proposal,
+    response: response.trim() || undefined,
+    phase: undefined
+  });
 }
 
 async function tryKernelProposal(input: {
@@ -116,6 +256,10 @@ export async function completeWorkingAiJob(
       store,
       applyKernelOutcome(job, { kind: 'failed', error: 'Lesson not found' })
     );
+  }
+
+  if (job.agent !== 'clementine') {
+    return completeFastAgentJob(store, job, lesson, env);
   }
 
   const transcript = await loadTranscript(store, job.lesson_id, job.agent);

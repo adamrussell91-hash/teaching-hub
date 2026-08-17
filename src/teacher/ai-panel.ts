@@ -6,8 +6,8 @@ import {
   type AgentSlug
 } from '@/ai/agents';
 import { actionsForScope } from '@/ai/capabilities';
-import { streamAiChat, type ArchiveCitation } from '@/ai/client';
-import { aiErrorCopy, aiFailureCopy } from '@/app/failure';
+import type { ArchiveCitation } from '@/ai/client';
+import { aiFailureCopy } from '@/app/failure';
 import { pollAiJob, startAiJob, listAiJobs, resolveAiJob, AiJobConflictError } from '@/ai/jobs-client';
 import { AI_JOB_STALE_MS } from '@/ai/jobs';
 import { filterProposal, listPartialAcceptUnits } from '@/ai/partial-accept';
@@ -64,6 +64,11 @@ interface ChatMessage {
 
 const POLL_MS = import.meta.env.MODE === 'test' ? 50 : 1000;
 const MAX_POLLS = Math.ceil(AI_JOB_STALE_MS / 1000);
+const JOB_PHASE_COPY = {
+  queued: 'Thinking…',
+  searching: 'Searching the web…',
+  writing: 'Writing the reply…'
+} as const;
 
 function transcriptKey(lessonId: string): string {
   return `teaching_hub_ai_transcript_${lessonId}`;
@@ -505,13 +510,22 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
     const assistant = messages.find((m) => m.id === assistantId);
     if (assistant) assistant.jobId = jobId;
     let job = await pollAiJob(jobId, { signal });
+    if (assistant && job.phase) {
+      assistant.status = JOB_PHASE_COPY[job.phase];
+      renderThread();
+    }
     let polls = 1;
     while (job.status === 'working' && !signal.aborted && polls < MAX_POLLS) {
       polls += 1;
       await sleep(POLL_MS, signal);
       job = await pollAiJob(jobId, { signal });
+      if (assistant && job.phase) {
+        assistant.status = JOB_PHASE_COPY[job.phase];
+        renderThread();
+      }
     }
     if (!assistant) return;
+    assistant.status = undefined;
     if (job.status === 'error') {
       assistant.text = job.error ?? 'AI job failed';
       renderThread();
@@ -522,6 +536,7 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
       renderThread();
       return;
     }
+    if (job.response) assistant.text = job.response;
     if (job.proposal) {
       attachProposal(assistant, job.proposal, job.snapshot_at || snapshotAt);
       if (job.archiveFailed) assistant.archiveFailed = true;
@@ -531,21 +546,41 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
     renderThread();
   }
 
-  async function runClementineJob(
+  async function runAgentJob(
     message: string,
+    userId: string,
     assistantId: string,
     snapshotAt: string,
-    signal: AbortSignal
+    signal: AbortSignal,
+    action: string | undefined,
+    history: Array<{ role: 'user' | 'assistant'; content: string }>
   ): Promise<void> {
     let jobId: string;
     try {
       const started = await startAiJob(
-        { lesson_id: options.lessonId, agent: agentSlug, message },
+        {
+          lesson_id: options.lessonId,
+          agent: agentSlug,
+          scope,
+          selected_block_id: selectedBlockId ?? undefined,
+          lesson_snapshot_at: snapshotAt,
+          message,
+          action,
+          history
+        },
         { signal }
       );
       jobId = started.id;
     } catch (error) {
       if (error instanceof AiJobConflictError) {
+        const existing = await pollAiJob(error.jobId, { signal });
+        const user = messages.find((entry) => entry.id === userId);
+        const assistant = messages.find((entry) => entry.id === assistantId);
+        if (user) user.text = existing.message;
+        if (assistant) {
+          assistant.agent = existing.agent;
+          assistant.jobId = existing.id;
+        }
         jobId = error.jobId;
       } else {
         throw error;
@@ -582,9 +617,10 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
       } else if (job.status === 'error') {
         const assistant = messages.find((msg) => msg.id === assistantId);
         if (assistant) assistant.text = job.error ?? 'AI job failed';
-      } else if (job.proposal) {
+      } else {
         const assistant = messages.find((msg) => msg.id === assistantId);
-        if (assistant) attachProposal(assistant, job.proposal, job.snapshot_at);
+        if (assistant && job.response) assistant.text = job.response;
+        if (assistant && job.proposal) attachProposal(assistant, job.proposal, job.snapshot_at);
       }
       saveTranscript(options.lessonId, messages);
       renderShell();
@@ -610,7 +646,8 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
 
     const snapshotAt = currentSnapshot();
 
-    messages.push({ id: nextMsgId(), role: 'user', text: trimmed });
+    const userId = nextMsgId();
+    messages.push({ id: userId, role: 'user', text: trimmed });
     const assistantId = nextMsgId();
     messages.push({ id: assistantId, role: 'assistant', agent: agentSlug, text: '' });
     saveTranscript(options.lessonId, messages);
@@ -630,48 +667,7 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
       }));
 
     try {
-      if (agentSlug === 'clementine') {
-        await runClementineJob(trimmed, assistantId, snapshotAt, abort.signal);
-      } else {
-        const payload = {
-          lesson_id: options.lessonId,
-          agent: agentSlug,
-          scope,
-          selected_block_id: selectedBlockId ?? undefined,
-          lesson_snapshot_at: snapshotAt,
-          message: trimmed,
-          action,
-          history
-        };
-        await streamAiChat(
-          payload,
-          (event) => {
-            const assistant = messages.find((m) => m.id === assistantId);
-            if (!assistant) return;
-            if (event.type === 'text') {
-              assistant.text += event.text;
-              assistant.status = undefined;
-              renderThread();
-            } else if (event.type === 'research') {
-              assistant.citations = event.findings;
-              assistant.archiveFailed = event.archiveFailed;
-              renderThread();
-            } else if (event.type === 'proposal') {
-              assistant.status = undefined;
-              attachProposal(assistant, event.proposal, snapshotAt);
-              renderThread();
-            } else if (event.type === 'error') {
-              assistant.status = undefined;
-              assistant.text = aiErrorCopy(event);
-              renderThread();
-            } else if (event.type === 'status' && !assistant.text) {
-              assistant.status = event.text;
-              renderThread();
-            }
-          },
-          abort.signal
-        );
-      }
+      await runAgentJob(trimmed, userId, assistantId, snapshotAt, abort.signal, action, history);
     } catch (err) {
       if (isAbortError(err)) {
         messages = messages.filter((msg) => msg.id !== assistantId || Boolean(msg.text));
