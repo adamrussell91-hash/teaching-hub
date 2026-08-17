@@ -141,6 +141,7 @@ async function completeFastAgentJob(
   const streamer = createAnthropicStreamer(apiKey);
   let response = '';
   let proposal: AiProposal | undefined;
+  let retriedInvalidTool = false;
 
   try {
     for await (const event of streamer.streamMessage({
@@ -152,9 +153,13 @@ async function completeFastAgentJob(
       tools: [...AI_TOOLS],
       executeTools: async (toolEvent) => {
         const parsed = parseToolProposal(toolEvent.name, toolEvent.input);
-        if ('error' in parsed) return JSON.stringify({ ok: false, error: parsed.error });
+        if ('error' in parsed) {
+          retriedInvalidTool = true;
+          return JSON.stringify({ ok: false, error: parsed.error });
+        }
         const validation = validateProposalAgainstSearchPack(parsed, searchPack);
         if (!validation.ok) {
+          retriedInvalidTool = true;
           const references = validation.violations
             .map(({ path, value }) => `${path}=${value}`)
             .join(', ');
@@ -197,7 +202,9 @@ async function completeFastAgentJob(
     ...working,
     status: 'done',
     proposal,
-    response: response.trim() || undefined,
+    // Tool-schema retries cause Anthropic to narrate the fix ("Oops — response_space
+    // only accepts…"). That is not teacher-facing copy once a valid proposal exists.
+    response: retriedInvalidTool && proposal ? undefined : response.trim() || undefined,
     phase: undefined
   });
 }

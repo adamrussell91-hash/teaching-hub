@@ -194,17 +194,39 @@ function imageBlock(url: string) {
   });
 }
 
+function questionSetBlock(responseSpace: string) {
+  return baseBlock({
+    id: 'questions-dual-coding',
+    block_type: 'question_set',
+    variant: 'medium',
+    content: {
+      questions: [
+        {
+          id: 'questions-dual-coding_q1',
+          prompt: 'Name one dual-coding move.',
+          kind: 'short_answer',
+          response_space: responseSpace
+        }
+      ]
+    }
+  });
+}
+
+function anthropicSse(events: unknown[]): Response {
+  return new Response(`${events.map((event) => `data: ${JSON.stringify(event)}`).join('\n')}\n`);
+}
+
 function insertBlocksPayload(blocks: unknown[]) {
   return { proposal: { kind: 'insert_blocks', position: 'below', blocks } };
 }
 
-function anthropicToolReply(name: string, input: unknown): Response {
-  const events = [
+function anthropicToolReply(name: string, input: unknown, toolId = 'tool_1'): Response {
+  return anthropicSse([
     { type: 'message_start', message: { usage: { input_tokens: 10 } } },
     {
       type: 'content_block_start',
       index: 0,
-      content_block: { type: 'tool_use', id: 'tool_1', name }
+      content_block: { type: 'tool_use', id: toolId, name }
     },
     {
       type: 'content_block_delta',
@@ -213,8 +235,28 @@ function anthropicToolReply(name: string, input: unknown): Response {
     },
     { type: 'content_block_stop', index: 0 },
     { type: 'message_stop' }
-  ];
-  return new Response(`${events.map((event) => `data: ${JSON.stringify(event)}`).join('\n')}\n`);
+  ]);
+}
+
+function anthropicTextThenTool(text: string, name: string, input: unknown): Response {
+  return anthropicSse([
+    { type: 'message_start', message: { usage: { input_tokens: 10 } } },
+    { type: 'content_block_start', index: 0, content_block: { type: 'text' } },
+    { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text } },
+    { type: 'content_block_stop', index: 0 },
+    {
+      type: 'content_block_start',
+      index: 1,
+      content_block: { type: 'tool_use', id: 'tool_2', name }
+    },
+    {
+      type: 'content_block_delta',
+      index: 1,
+      delta: { type: 'input_json_delta', partial_json: JSON.stringify(input) }
+    },
+    { type: 'content_block_stop', index: 1 },
+    { type: 'message_stop' }
+  ]);
 }
 
 function anthropicDoneReply(): Response {
@@ -476,5 +518,46 @@ describe('completeWorkingAiJob fast agents', () => {
     expect(result.status).toBe('error');
     expect(result.proposal).toBeUndefined();
     expect(fakeStore.read<AiJob>(aiJobKey(JOB_ID))?.proposal).toBeUndefined();
+  });
+
+  it('does not persist Anthropic retry apologies after a valid proposal', async () => {
+    const apology =
+      'Oops — response_space only accepts none | short | medium | long | extended. Let me fix that and resubmit.';
+    let anthropicCalls = 0;
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
+      if (url.origin === BRAVE_ORIGIN) return Response.json({});
+      if (url.origin === 'https://api.anthropic.com') {
+        anthropicCalls += 1;
+        if (anthropicCalls === 1) {
+          return anthropicToolReply('propose_insert_blocks', {
+            position: 'below',
+            blocks: [questionSetBlock('paragraph')]
+          });
+        }
+        return anthropicTextThenTool(apology, 'propose_insert_blocks', {
+          position: 'below',
+          blocks: [questionSetBlock('medium')]
+        });
+      }
+      throw new Error(`Unexpected fetch destination: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await completeWorkingAiJob(
+      store,
+      { ...workingJob(), agent: 'ann', scope: 'lesson' },
+      {
+        ANTHROPIC_API_KEY: 'anthropic-test-key',
+        BRAVE_SEARCH_API_KEY: 'brave-test-key'
+      } as NodeJS.ProcessEnv
+    );
+
+    expect(result.status).toBe('done');
+    expect(result.proposal?.kind).toBe('insert_blocks');
+    expect(result.response ?? '').not.toMatch(/Oops|response_space only accepts/);
+    expect(fakeStore.read<AiJob>(aiJobKey(JOB_ID))?.response ?? '').not.toMatch(
+      /Oops|response_space only accepts/
+    );
   });
 });
