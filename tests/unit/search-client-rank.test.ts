@@ -159,7 +159,23 @@ describe('searchCurriculumTitles', () => {
 
   it('matches scope note titles', () => {
     const hits = searchCurriculumTitles(curriculumFixture(), 'trial', []);
-    expect(hits.some((h) => h.type === 'scope_note')).toBe(true);
+    const note = hits.find((h) => h.type === 'scope_note');
+    expect(note).toBeTruthy();
+    expect(note?.href).toBe('/scope-sequences/eng?selectNote=n1');
+  });
+
+  it('opens a subject at its scope sequence', () => {
+    const hits = searchCurriculumTitles(curriculumFixture(), 'english advanced', []);
+    const subject = hits.find((h) => h.type === 'subject' && h.id === 'eng');
+    expect(subject?.href).toBe('/scope-sequences/eng');
+  });
+
+  it('opens a composition from search', () => {
+    const hits = searchCurriculumTitles(curriculumFixture(), 'starter pack', [
+      { id: 'comp1', title: 'Starter pack' }
+    ]);
+    const composition = hits.find((h) => h.type === 'composition' && h.id === 'comp1');
+    expect(composition?.href).toBe('/templates');
   });
 
   it('emits hierarchy matches when year/subject/unit labels match but title does not', () => {

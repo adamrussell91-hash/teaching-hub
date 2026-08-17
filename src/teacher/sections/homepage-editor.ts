@@ -19,6 +19,7 @@ import {
   mountBlockCanvas,
   type BlockCanvasHandle
 } from '@/teacher/lesson-canvas/mount-page';
+import { nextBlockIdFactory } from '@/teacher/lesson-canvas/drop';
 import { mountLessonPalette } from '@/teacher/lesson-canvas/mount-palette';
 import { homepagePaletteFamilies } from '@/teacher/lesson-canvas/palette-catalog';
 import { readBuilderChromePrefs } from '@/teacher/lesson-canvas/prefs';
@@ -51,10 +52,6 @@ export function normalizeHomepage(homepage?: ClassHomepage): ClassHomepage {
 
 function cloneHomepage(homepage: ClassHomepage): ClassHomepage {
   return structuredClone(homepage);
-}
-
-function countBlocks(homepage: ClassHomepage): number {
-  return homepage.announcements.length + homepage.resources.length + homepage.custom.length;
 }
 
 function regionEmptyCopy(text: string): HTMLElement {
@@ -159,7 +156,6 @@ export function mountHomepageEditor(
   }
 ): HomepageEditorHandle {
   const homepage = cloneHomepage(normalizeHomepage(initial));
-  let blockCounter = countBlocks(homepage);
   let destroyed = false;
   let historyPanel: HistoryPanelHandle | null = null;
 
@@ -246,10 +242,7 @@ export function mountHomepageEditor(
         allowCollectionAtRoot: true,
         editorContext,
         renderPreview,
-        idFactory: () => {
-          blockCounter += 1;
-          return `block_homepage_${region.key}_${blockCounter}`;
-        },
+        idFactory: () => nextBlockIdFactory(`block_homepage_${region.key}`, homepage[region.key])(),
         onChange: (blocks) => {
           homepage[region.key] = blocks;
           setActiveRegion(region.key);
@@ -314,7 +307,6 @@ export function mountHomepageEditor(
       homepage.announcements = next.announcements;
       homepage.resources = next.resources;
       homepage.custom = next.custom;
-      blockCounter = countBlocks(homepage);
       canvases.get('announcements')?.update(homepage.announcements);
       canvases.get('resources')?.update(homepage.resources);
       canvases.get('custom')?.update(homepage.custom);

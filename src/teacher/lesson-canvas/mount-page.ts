@@ -23,7 +23,9 @@ import {
 import { renderEntityBanner, type EntityBannerHandle } from '@/teacher/entity-banner';
 import {
   deleteBlocksById,
+  findBlockLocation,
   insertAt,
+  insertTargetForSelection,
   moveBlockTo,
   type DropRootMode
 } from '@/teacher/lesson-canvas/drop';
@@ -432,9 +434,10 @@ export function mountBlockCanvas(
     duplicate.addEventListener('click', (event) => {
       event.stopPropagation();
       const clone = cloneBlockWithNewIds(block, options.idFactory);
-      const index = blocks.findIndex((row) => row.id === block.id);
-      const at = index >= 0 ? index + 1 : blocks.length;
-      const result = insertAt(blocks, { kind: 'root' }, at, clone, { rootMode });
+      const location = findBlockLocation(blocks, block.id);
+      const parent = location?.parent ?? { kind: 'root' };
+      const at = location ? location.index + 1 : blocks.length;
+      const result = insertAt(blocks, parent, at, clone, { rootMode });
       if (result.ok) emit(result.blocks);
     });
 
@@ -611,9 +614,8 @@ export function mountBlockCanvas(
     },
     insertType(type: InsertMenuValue) {
       const block = createFromInsertMenu(type, options.idFactory());
-      const selectedIndex = selectedId ? blocks.findIndex((row) => row.id === selectedId) : -1;
-      const at = selectedIndex >= 0 ? selectedIndex + 1 : blocks.length;
-      const result = insertAt(blocks, { kind: 'root' }, at, block, { rootMode });
+      const target = insertTargetForSelection(blocks, selectedId);
+      const result = insertAt(blocks, target.parent, target.index, block, { rootMode });
       if (!result.ok) {
         setHint(result.message);
         return;

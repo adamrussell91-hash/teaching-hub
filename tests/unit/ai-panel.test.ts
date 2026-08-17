@@ -250,6 +250,8 @@ describe('mountAiPanel', () => {
     expect(handle.isWorking()).toBe(false);
     expect(onWorkingChange).toHaveBeenCalledWith(false);
     expect(mounted.host.querySelector('.ai-panel__proposal')).not.toBeNull();
+    expect(mounted.host.querySelector('.confirm-card')).not.toBeNull();
+    expect(mounted.host.querySelector('.confirm-card__actions')).not.toBeNull();
   });
 
   it('does not claim Job finished when Clementine is still working after the poll cap', async () => {
@@ -566,5 +568,37 @@ describe('mountAiPanel', () => {
       expect(acceptButton(mounted.host)).toBeTruthy();
     });
     expect(pollAiJobMock).toHaveBeenCalledWith('job_1', expect.anything());
+  });
+
+  it('does not persist Aborted into the transcript when the request is cancelled', async () => {
+    streamAiChatMock.mockImplementation(
+      (_payload, _onEvent, signal) =>
+        new Promise((_, reject) => {
+          const fail = () => reject(new DOMException('Aborted', 'AbortError'));
+          if (signal?.aborted) {
+            fail();
+            return;
+          }
+          signal?.addEventListener('abort', fail, { once: true });
+        })
+    );
+
+    const mounted = mountPanel();
+    handle = mounted.handle;
+    submitMessage(mounted.host, 'hello');
+
+    await vi.waitFor(() => {
+      expect(streamAiChatMock).toHaveBeenCalled();
+    });
+
+    mounted.handle.dispose();
+    handle = undefined;
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const remounted = mountPanel();
+    handle = remounted.handle;
+    expect(remounted.host.textContent).not.toContain('Aborted');
+    expect(localStorage.getItem('teaching_hub_ai_transcript_lesson_1') ?? '').not.toContain('Aborted');
   });
 });

@@ -82,11 +82,16 @@ describe('router match', () => {
     });
   });
 
-  it('returns null for unknown paths', () => {
-    expect(match('/unknown')).toBeNull();
-    expect(match('/s/lessons')).toBeNull();
-    expect(match('/s/units')).toBeNull();
-    expect(match('/s/classes')).toBeNull();
+  it('matches a not-found page for unknown paths', () => {
+    expect(match('/unknown')).toEqual({
+      name: 'not-found',
+      params: {},
+      requiresAuth: false,
+      path: '/unknown'
+    });
+    expect(match('/s/lessons')?.name).toBe('not-found');
+    expect(match('/s/units')?.name).toBe('not-found');
+    expect(match('/s/classes')?.name).toBe('not-found');
   });
 
   it('matches teacher section list routes', () => {
@@ -215,6 +220,23 @@ describe('router navigation', () => {
 
     expect(replaceState).toHaveBeenCalledWith(null, '', '/sign-in');
     expect(pushState).not.toHaveBeenCalled();
+  });
+
+  it('navigate notifies listeners for unknown paths', () => {
+    const onRoute = vi.fn<(match: RouteMatch) => void>();
+    const stop = start(onRoute);
+    onRoute.mockClear();
+
+    navigate('/nope');
+
+    expect(onRoute).toHaveBeenCalledWith({
+      name: 'not-found',
+      params: {},
+      requiresAuth: false,
+      path: '/nope'
+    });
+
+    stop();
   });
 
   it('navigate preserves query strings in history', () => {

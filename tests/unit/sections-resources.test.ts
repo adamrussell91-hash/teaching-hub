@@ -177,7 +177,7 @@ describe('resources section', () => {
     renderResourcesIndex(canvas, curriculum);
     canvas.querySelector<HTMLButtonElement>('[data-drive-pick]')!.click();
     expect(canvas.querySelector('[role="alert"]')?.textContent).toContain(
-      'Google Drive picker coming soon'
+      'Google Drive is not configured'
     );
   });
 

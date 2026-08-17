@@ -531,4 +531,24 @@ describe('mountBlockCanvas', () => {
     handle.insertType('heading');
     expect((onChange.mock.calls.at(-1)?.[0] as Block[])[0]?.block_type).toBe('heading');
   });
+
+  it('insertType drops into a selected section instead of the lesson root', () => {
+    const onChange = vi.fn();
+    const section = createBlock('section', 'sec1');
+    if (section.block_type !== 'section') throw new Error('expected section');
+    const handle = mountBlockCanvas(host, {
+      blocks: [section],
+      onChange,
+      idFactory: () => ids.shift() ?? 'new_x'
+    });
+
+    host.querySelector<HTMLElement>('[data-block-id="sec1"]')!.click();
+    handle.insertType('heading');
+
+    const next = onChange.mock.calls.at(-1)?.[0] as Block[];
+    expect(next).toHaveLength(1);
+    expect(next[0]?.block_type).toBe('section');
+    if (next[0]?.block_type !== 'section') return;
+    expect(next[0].content.blocks.map((block) => block.block_type)).toEqual(['heading']);
+  });
 });

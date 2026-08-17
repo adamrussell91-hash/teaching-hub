@@ -150,6 +150,7 @@ export function renderResourcesIndex(
         await options?.refresh?.();
       } catch (error) {
         setStatus(errorMessage(error), true);
+      } finally {
         setBusy(false);
       }
     })();
@@ -185,6 +186,7 @@ export function renderResourcesIndex(
         await options?.refresh?.();
       } catch (error) {
         setStatus(errorMessage(error), true);
+      } finally {
         setBusy(false);
       }
     })();
@@ -200,11 +202,12 @@ export function renderResourcesIndex(
           await options.refresh?.();
         } catch (error) {
           setStatus(errorMessage(error), true);
+        } finally {
           setBusy(false);
         }
         return;
       }
-      setStatus('Google Drive picker coming soon', true);
+      setStatus('Google Drive is not configured.', true);
     })();
   });
 

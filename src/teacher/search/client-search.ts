@@ -110,7 +110,7 @@ export function searchCurriculumTitles(
         id: subject.id,
         title: subject.title,
         match: 'title',
-        href: '/units'
+        href: `/scope-sequences/${subject.id}`
       });
     }
   }
@@ -145,7 +145,7 @@ export function searchCurriculumTitles(
           id: item.id,
           title: item.title,
           match: 'title',
-          href: scopeSequenceHref(scope.subject_id)
+          href: `${scopeSequenceHref(scope.subject_id)}?selectNote=${encodeURIComponent(item.id)}`
         });
       }
     }
@@ -169,7 +169,8 @@ export function searchCurriculumTitles(
         type: 'composition',
         id: composition.id,
         title: composition.title,
-        match: 'title'
+        match: 'title',
+        href: '/templates'
       });
     }
   }

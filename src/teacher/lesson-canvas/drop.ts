@@ -76,7 +76,7 @@ function sameParent(a: DropParent, b: DropParent): boolean {
   return false;
 }
 
-function findBlockLocation(
+export function findBlockLocation(
   blocks: Block[],
   blockId: string
 ): { parent: DropParent; index: number } | null {
@@ -116,6 +116,38 @@ function findBlockLocation(
     return null;
   }
   return search(blocks, { kind: 'root' });
+}
+
+export function insertTargetForSelection(
+  blocks: Block[],
+  selectedId: string | null
+): { parent: DropParent; index: number } {
+  if (!selectedId) return { parent: { kind: 'root' }, index: blocks.length };
+  const selected = findBlockById(blocks, selectedId);
+  if (!selected) return { parent: { kind: 'root' }, index: blocks.length };
+  if (selected.block_type === 'section') {
+    return {
+      parent: { kind: 'section', id: selected.id },
+      index: selected.content.blocks.length
+    };
+  }
+  if (selected.block_type === 'columns') {
+    const column = selected.content.columns[0];
+    return {
+      parent: { kind: 'column', id: selected.id, columnIndex: 0 },
+      index: column?.blocks.length ?? 0
+    };
+  }
+  if (selected.block_type === 'tabs') {
+    const tab = selected.content.tabs[0];
+    return {
+      parent: { kind: 'tab', id: selected.id, tabIndex: 0 },
+      index: tab?.blocks.length ?? 0
+    };
+  }
+  const location = findBlockLocation(blocks, selectedId);
+  if (!location) return { parent: { kind: 'root' }, index: blocks.length };
+  return { parent: location.parent, index: location.index + 1 };
 }
 
 function updateListAtParent(
@@ -332,4 +364,28 @@ export function countBlocksInTree(blocks: Block[]): number {
   }
   walk(blocks);
   return count;
+}
+
+export function nextBlockIdFactory(prefix: string, blocks: Block[]): () => string {
+  const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`^${escaped}_(\\d+)$`);
+  let max = 0;
+  function walk(list: Block[]): void {
+    for (const block of list) {
+      const match = re.exec(block.id);
+      if (match) max = Math.max(max, Number(match[1]));
+      if (block.block_type === 'section') walk(block.content.blocks as Block[]);
+      else if (block.block_type === 'columns') {
+        for (const col of block.content.columns) walk(col.blocks as Block[]);
+      } else if (block.block_type === 'tabs') {
+        for (const tab of block.content.tabs) walk(tab.blocks as Block[]);
+      }
+    }
+  }
+  walk(blocks);
+  let counter = max;
+  return () => {
+    counter += 1;
+    return `${prefix}_${counter}`;
+  };
 }

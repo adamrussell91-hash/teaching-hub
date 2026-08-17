@@ -15,7 +15,8 @@ export type RouteName =
   | 'student-unit'
   | 'student-class'
   | 'student-class-lesson'
-  | 'sign-in';
+  | 'sign-in'
+  | 'not-found';
 
 export type RouteParams = {
   'teacher-home': Record<string, never>;
@@ -35,6 +36,7 @@ export type RouteParams = {
   'student-class': { classId: string };
   'student-class-lesson': { classId: string; lessonId: string };
   'sign-in': Record<string, never>;
+  'not-found': Record<string, never>;
 };
 
 export type RouteMatch<N extends RouteName = RouteName> = N extends RouteName
@@ -230,7 +232,12 @@ export function match(pathname: string): RouteMatch | null {
     };
   }
 
-  return null;
+  return {
+    name: 'not-found',
+    params: {},
+    requiresAuth: false,
+    path
+  };
 }
 
 function notify(pathname: string): void {

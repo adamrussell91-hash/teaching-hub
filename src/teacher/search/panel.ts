@@ -77,7 +77,8 @@ function enrichBodyHit(
     id: hit.id,
     title: composition?.title ?? hit.id,
     match: 'body',
-    snippet: hit.snippet
+    snippet: hit.snippet,
+    href: '/templates'
   };
 }
 

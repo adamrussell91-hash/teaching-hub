@@ -409,7 +409,7 @@ describe('openSearchPanel', () => {
     expect(document.querySelectorAll('.search-palette__row')).toHaveLength(0);
   });
 
-  it('does not navigate or close when Enter activates href-less hit', async () => {
+  it('navigates to templates when Enter activates a composition hit', async () => {
     vi.useFakeTimers();
     const onNavigate = vi.fn();
     const onAction = vi.fn();
@@ -432,8 +432,8 @@ describe('openSearchPanel', () => {
     expect(document.body.textContent ?? '').toContain('Template Pack');
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
 
-    expect(onNavigate).not.toHaveBeenCalled();
+    expect(onNavigate).toHaveBeenCalledWith('/templates');
     expect(onAction).not.toHaveBeenCalled();
-    expect(document.querySelector('.search-palette')).toBeTruthy();
+    expect(document.querySelector('.search-palette')).toBeNull();
   });
 });

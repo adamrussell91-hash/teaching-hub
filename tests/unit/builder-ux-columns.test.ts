@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { BlockSchema } from '@/schemas/block';
+import { BlockSchema, type Block } from '@/schemas/block';
 import { trySetColumnWidths } from '@/blocks/column-widths';
 import { moveBlockBetweenColumns } from '@/blocks/column-move';
 import { COLUMN_CHILD_TYPES, createBlock } from '@/blocks/create-block';
@@ -124,6 +124,37 @@ describe('nested columnMove', () => {
     select.value = '1';
     select.dispatchEvent(new Event('change'));
     expect(moves).toEqual([1]);
+  });
+
+  it('accepts a palette drop onto the nested list', () => {
+    const changes: Block[][] = [];
+    const el = createNestedBlocksEditor({
+      blocks: [],
+      allowedTypes: COLUMN_CHILD_TYPES,
+      idFactory: () => 'id',
+      onChange: (next) => {
+        changes.push(next);
+      }
+    });
+    document.body.append(el);
+
+    const dt = {
+      types: ['application/x-teaching-hub-block'],
+      getData: () => JSON.stringify({ kind: 'block', type: 'heading' }),
+      effectAllowed: 'copy',
+      dropEffect: 'copy'
+    };
+    const over = new Event('dragover', { bubbles: true, cancelable: true });
+    Object.defineProperty(over, 'dataTransfer', { value: dt });
+    el.dispatchEvent(over);
+    expect(over.defaultPrevented).toBe(true);
+
+    const drop = new Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(drop, 'dataTransfer', { value: dt });
+    el.dispatchEvent(drop);
+
+    expect(changes.at(-1)?.[0]?.block_type).toBe('heading');
+    el.remove();
   });
 });
 

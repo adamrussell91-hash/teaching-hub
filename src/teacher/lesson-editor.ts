@@ -42,7 +42,8 @@ import {
   readBuilderChromePrefs,
   writeBuilderChromePrefs
 } from '@/teacher/lesson-canvas/prefs';
-import { insertAt } from '@/teacher/lesson-canvas/drop';
+import { insertAt, nextBlockIdFactory } from '@/teacher/lesson-canvas/drop';
+import { replaceBlockInTree } from '@/ai/block-tree';
 import { createLessonTemplate } from '@/teacher/template-api';
 import { fetchCurriculum } from '@/teacher/nav';
 import { renderContextBar, type TeacherShellRefs } from '@/teacher/shell';
@@ -126,7 +127,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
 
   function renderEditor(initialLesson: Lesson): void {
     const lesson: Lesson = initialLesson;
-    let blockCounter = lesson.blocks.length;
+    let nextId = nextBlockIdFactory(`block_${lesson.id}`, lesson.blocks);
     let mediaList: Media[] = media;
     let selectedBlockId: string | null = null;
     let draftAt = lesson.updated_at;
@@ -175,11 +176,6 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       chatFab.dataset.agent = slug;
     }
     paintChatFab(readLastAgentSlug());
-
-    function nextId(): string {
-      blockCounter += 1;
-      return `block_${lesson.id}_${blockCounter}`;
-    }
 
     function assignLesson(next: Lesson): void {
       lesson.title = next.title;
@@ -370,8 +366,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     }
 
     async function detachLinkedSection(blockId: string): Promise<void> {
-      const index = lesson.blocks.findIndex((block) => block.id === blockId);
-      const block = index >= 0 ? lesson.blocks[index] : undefined;
+      const block = findBlockById(lesson.blocks, blockId);
       if (!block || !isLinkedSection(block)) return;
       try {
         const full = await apiGet<CompositionTemplate>(
@@ -382,9 +377,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
           return;
         }
         const independent = insertCompositionRoot(full.root, nextId);
-        const next = [...lesson.blocks];
-        next[index] = independent;
-        applyBlocks(next);
+        applyBlocks(replaceBlockInTree(lesson.blocks, blockId, independent));
         setCompositionStatus('Detached composition into this lesson.');
       } catch {
         setCompositionStatus('Unable to detach composition.');
@@ -491,7 +484,11 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         const result = applyProposalToLesson(lesson, proposal, nextId);
         if (!result.ok) return result;
         assignLesson(result.lesson);
+        nextId = nextBlockIdFactory(`block_${lesson.id}`, lesson.blocks);
+        bumpDraftClock();
         page?.update(lesson);
+        const titleEl = refs.contextBar.querySelector('.teacher-layout__context-bar-title');
+        if (titleEl) titleEl.textContent = lesson.title || 'Untitled lesson';
         void saveController?.saveNow({ checkpointReason: 'ai_accepted' });
         return { ok: true };
       },
@@ -636,7 +633,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
 
     function applyRestoredLesson(restored: Lesson): void {
       Object.assign(lesson, restored);
-      blockCounter = lesson.blocks.length;
+      nextId = nextBlockIdFactory(`block_${lesson.id}`, lesson.blocks);
       bumpDraftClock();
       page?.update(lesson);
       const titleEl = refs.contextBar.querySelector('.teacher-layout__context-bar-title');

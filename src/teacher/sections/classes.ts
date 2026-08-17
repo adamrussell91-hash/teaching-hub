@@ -195,10 +195,12 @@ export function renderClassPage(
   const viewAsStudent = document.createElement('a');
   viewAsStudent.className = 'btn btn--ghost class-page__view-as-student';
   viewAsStudent.href = `/s/classes/${cls.id}`;
+  viewAsStudent.target = '_blank';
+  viewAsStudent.rel = 'noopener noreferrer';
   viewAsStudent.textContent = 'View as student';
   viewAsStudent.addEventListener('click', (event) => {
     event.preventDefault();
-    navigate(`/s/classes/${cls.id}`);
+    window.open(viewAsStudent.href, '_blank', 'noopener,noreferrer');
   });
 
   const editButton = document.createElement('button');

@@ -17,6 +17,7 @@ import {
   mountBlockCanvas,
   type BlockCanvasHandle
 } from '@/teacher/lesson-canvas/mount-page';
+import { nextBlockIdFactory } from '@/teacher/lesson-canvas/drop';
 import { mountLessonPalette } from '@/teacher/lesson-canvas/mount-palette';
 import { homepagePaletteFamilies } from '@/teacher/lesson-canvas/palette-catalog';
 import { readBuilderChromePrefs } from '@/teacher/lesson-canvas/prefs';
@@ -485,7 +486,7 @@ function mountUnitPlanEditor(
   options: { onSave: (blocks: Block[]) => Promise<void> }
 ): { dispose: () => void } {
   let blocks = structuredClone(initialBlocks);
-  let blockCounter = blocks.length;
+  let nextId = nextBlockIdFactory('block_unit', blocks);
   let destroyed = false;
 
   const root = document.createElement('div');
@@ -522,12 +523,10 @@ function mountUnitPlanEditor(
   const canvas: BlockCanvasHandle = mountBlockCanvas(canvasHost, {
     blocks,
     allowCollectionAtRoot: true,
-    idFactory: () => {
-      blockCounter += 1;
-      return `block_unit_${blockCounter}`;
-    },
+    idFactory: () => nextId(),
     onChange: (next) => {
       blocks = next;
+      nextId = nextBlockIdFactory('block_unit', blocks);
     }
   });
 

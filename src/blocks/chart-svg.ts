@@ -13,7 +13,7 @@ export type ChartContent = {
 const VIEW_W = 400;
 const VIEW_H = 240;
 const PAD = { top: 36, right: 20, bottom: 36, left: 44 };
-const COLORS = ['#2563eb', '#dc2626', '#16a34a', '#ca8a04', '#7c3aed', '#0891b2'];
+const COLORS = ['#376fb7', '#9b2c2c', '#2f7a4f', '#f68620', '#5d4e70', '#244f7c'];
 
 export function escapeXml(text: string): string {
   return text

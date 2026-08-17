@@ -46,6 +46,7 @@ import {
 } from '@/student/class-view';
 import { createCurriculumCache } from './curriculum-cache';
 import { navigate, start, type RouteMatch } from './router';
+import { renderPageHeader } from '@/teacher/page-header';
 
 const root = document.querySelector('#app');
 if (!(root instanceof HTMLElement)) {
@@ -738,6 +739,39 @@ function renderStudentClassRoute(classId: string, token: number): void {
   });
 }
 
+function renderNotFoundRoute(token: number): void {
+  const home = document.createElement('a');
+  home.className = 'btn btn--primary';
+  home.href = session.authenticated ? '/' : '/sign-in';
+  home.textContent = session.authenticated ? 'Back to dashboard' : 'Sign in';
+  home.addEventListener('click', (event) => {
+    event.preventDefault();
+    navigate(session.authenticated ? '/' : '/sign-in');
+  });
+
+  if (session.authenticated) {
+    const refs = mountTeacherShell();
+    void loadNavAndHandleErrors(refs, token, 'home', undefined, () => {
+      refs.canvas.replaceChildren();
+      renderPageHeader(refs.canvas, {
+        eyebrow: 'Teaching Hub',
+        title: 'Page not found',
+        supporting: 'That address is not a Teaching Hub page.',
+        actions: [home]
+      });
+    });
+    return;
+  }
+
+  appRoot.replaceChildren();
+  renderPageHeader(appRoot, {
+    eyebrow: 'Teaching Hub',
+    title: 'Page not found',
+    supporting: 'That address is not a Teaching Hub page.',
+    actions: [home]
+  });
+}
+
 function renderRoute(match: RouteMatch, token: number): void {
   switch (match.name) {
     case 'teacher-home':
@@ -787,6 +821,9 @@ function renderRoute(match: RouteMatch, token: number): void {
       break;
     case 'student-class':
       renderStudentClassRoute(match.params.classId, token);
+      break;
+    case 'not-found':
+      renderNotFoundRoute(token);
       break;
     default:
       break;

@@ -108,6 +108,12 @@ function isMutatingProposal(proposal: AiProposal | undefined): boolean {
   return Boolean(proposal && proposal.kind !== 'review_only');
 }
 
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException
+    ? error.name === 'AbortError'
+    : error instanceof Error && error.name === 'AbortError';
+}
+
 export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): AiPanelHandle {
   host.classList.add('ai-panel');
 
@@ -385,9 +391,9 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
 
       if (msg.proposal && msg.proposal.kind !== 'review_only') {
         const card = document.createElement('div');
-        card.className = 'ai-panel__proposal';
+        card.className = 'confirm-card ai-panel__proposal';
         const title = document.createElement('p');
-        title.className = 'ai-panel__proposal-title';
+        title.className = 'page-header__eyebrow ai-panel__proposal-title';
         title.textContent =
           msg.proposalStatus === 'accepted'
             ? 'Proposal accepted'
@@ -400,7 +406,7 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
           const units = listPartialAcceptUnits(msg.proposal);
           const partial = units.length >= 2;
           const actions = document.createElement('div');
-          actions.className = 'ai-panel__proposal-actions';
+          actions.className = 'confirm-card__actions ai-panel__proposal-actions';
           const accept = document.createElement('button');
           accept.type = 'button';
           accept.className = 'btn btn--primary';
@@ -662,9 +668,13 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
         );
       }
     } catch (err) {
-      const assistant = messages.find((m) => m.id === assistantId);
-      if (assistant && !assistant.text) {
-        assistant.text = err instanceof Error ? err.message : aiFailureCopy(true);
+      if (isAbortError(err)) {
+        messages = messages.filter((msg) => msg.id !== assistantId || Boolean(msg.text));
+      } else {
+        const assistant = messages.find((m) => m.id === assistantId);
+        if (assistant && !assistant.text) {
+          assistant.text = err instanceof Error ? err.message : aiFailureCopy(true);
+        }
       }
     } finally {
       setWorkingState(false);

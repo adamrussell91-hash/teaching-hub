@@ -1720,13 +1720,13 @@ function buildMindMapSvg(content: MindMapContent): string {
     const parent = byId.get(node.parent_id);
     if (!child || !parent) continue;
     lines.push(
-      `<line x1="${parent.x}" y1="${parent.y}" x2="${child.x}" y2="${child.y}" stroke="#64748b" stroke-width="1.5" />`
+      `<line x1="${parent.x}" y1="${parent.y}" x2="${child.x}" y2="${child.y}" stroke="#424860" stroke-width="1.5" />`
     );
   }
   const nodesMarkup = positioned
     .map(
       (node) =>
-        `<circle cx="${node.x}" cy="${node.y}" r="${MAP_NODE_R}" fill="#e0f2fe" stroke="#0284c7" stroke-width="1.5" />` +
+        `<circle cx="${node.x}" cy="${node.y}" r="${MAP_NODE_R}" fill="#dceafa" stroke="#376fb7" stroke-width="1.5" />` +
         `<text x="${node.x}" y="${node.y}" text-anchor="middle" dominant-baseline="middle" font-size="12">${escapeXml(node.label)}</text>`
     )
     .join('');
@@ -1746,7 +1746,7 @@ function buildConceptMapSvg(content: ConceptMapContent): string {
         ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="11">${escapeXml(edge.label)}</text>`
         : '';
       return (
-        `<line x1="${edge.x1}" y1="${edge.y1}" x2="${edge.x2}" y2="${edge.y2}" stroke="#64748b" stroke-width="1.5" />` +
+        `<line x1="${edge.x1}" y1="${edge.y1}" x2="${edge.x2}" y2="${edge.y2}" stroke="#424860" stroke-width="1.5" />` +
         label
       );
     })
@@ -1754,7 +1754,7 @@ function buildConceptMapSvg(content: ConceptMapContent): string {
   const nodesMarkup = layout.nodes
     .map(
       (node) =>
-        `<circle cx="${node.x}" cy="${node.y}" r="${MAP_NODE_R}" fill="#fef3c7" stroke="#d97706" stroke-width="1.5" />` +
+        `<circle cx="${node.x}" cy="${node.y}" r="${MAP_NODE_R}" fill="#f1e2b6" stroke="#6c581f" stroke-width="1.5" />` +
         `<text x="${node.x}" y="${node.y}" text-anchor="middle" dominant-baseline="middle" font-size="12">${escapeXml(node.label)}</text>`
     )
     .join('');

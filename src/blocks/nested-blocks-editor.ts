@@ -181,5 +181,39 @@ export function createNestedBlocksEditor(options: NestedBlocksEditorOptions): HT
   }
 
   render();
+
+  const PALETTE_MIME = 'application/x-teaching-hub-block';
+
+  function carriesPalette(event: DragEvent): boolean {
+    return Array.from(event.dataTransfer?.types ?? []).includes(PALETTE_MIME);
+  }
+
+  function paletteType(event: DragEvent): NewBlockType | null {
+    const raw = event.dataTransfer?.getData(PALETTE_MIME) ?? '';
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw) as { kind?: unknown; type?: unknown };
+      if (parsed.kind !== 'block' || typeof parsed.type !== 'string') return null;
+      return options.allowedTypes.includes(parsed.type as NewBlockType)
+        ? (parsed.type as NewBlockType)
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  root.addEventListener('dragover', (event) => {
+    if (!carriesPalette(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+  });
+  root.addEventListener('drop', (event) => {
+    const type = paletteType(event);
+    if (!type) return;
+    event.preventDefault();
+    event.stopPropagation();
+    emit([...blocks, createFromInsertMenu(type, nextId())]);
+  });
+
   return root;
 }

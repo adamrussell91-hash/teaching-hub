@@ -462,6 +462,8 @@ describe('chart-svg', () => {
     const svg = buildChartSvg(content);
     expect(svg).toMatch(/<svg[\s\S]*<\/svg>/);
     expect(svg).toMatch(/A/);
+    expect(svg).toMatch(/#376fb7/);
+    expect(svg).not.toMatch(/#2563eb/);
     const rows = buildChartTableRows(content);
     expect(rows.length).toBeGreaterThanOrEqual(2);
   });

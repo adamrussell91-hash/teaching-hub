@@ -6,8 +6,10 @@ import {
   countBlocksInTree,
   deleteBlocksById,
   insertAt,
+  insertTargetForSelection,
   insertTypeForParent,
   moveBlockTo,
+  nextBlockIdFactory,
   reorderSiblings
 } from '@/teacher/lesson-canvas/drop';
 
@@ -196,6 +198,54 @@ describe('countBlocksInTree', () => {
       }
     ];
     expect(countBlocksInTree(tree)).toBe(3);
+  });
+});
+
+describe('nextBlockIdFactory', () => {
+  it('skips ids already used by nested blocks', () => {
+    const section = asSection(createBlock('section', 'sec1'));
+    const tree: Block[] = [
+      {
+        ...section,
+        content: {
+          ...section.content,
+          blocks: [createBlock('heading', 'block_lesson_1_1'), createBlock('rich_text', 'block_lesson_1_2')] as typeof section.content.blocks
+        }
+      }
+    ];
+    const nextId = nextBlockIdFactory('block_lesson_1', tree);
+    expect(nextId()).toBe('block_lesson_1_3');
+  });
+});
+
+describe('insertTargetForSelection', () => {
+  it('inserts inside a selected section', () => {
+    const section = withSectionChildren(createBlock('section', 'sec1'), [
+      createBlock('heading', 'h1')
+    ]);
+    expect(insertTargetForSelection([section], 'sec1')).toEqual({
+      parent: { kind: 'section', id: 'sec1' },
+      index: 1
+    });
+  });
+
+  it('inserts after a selected nested child in that parent', () => {
+    const section = withSectionChildren(createBlock('section', 'sec1'), [
+      createBlock('heading', 'h1'),
+      createBlock('rich_text', 'rt1')
+    ]);
+    expect(insertTargetForSelection([section], 'h1')).toEqual({
+      parent: { kind: 'section', id: 'sec1' },
+      index: 1
+    });
+  });
+
+  it('appends at root when nothing is selected', () => {
+    const heading = createBlock('heading', 'h1');
+    expect(insertTargetForSelection([heading], null)).toEqual({
+      parent: { kind: 'root' },
+      index: 1
+    });
   });
 });
 
