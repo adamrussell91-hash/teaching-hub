@@ -441,7 +441,9 @@ describe('mountLessonEditor', () => {
     refs.contextBar.querySelector<HTMLButtonElement>('.context-bar__publish')!.click();
     await tick();
 
-    expect(refs.canvas.querySelector('.lesson-editor__publish-panel')?.hidden).toBe(true);
+    expect(refs.canvas.querySelector<HTMLElement>('.lesson-editor__publish-panel')?.hidden).toBe(
+      true
+    );
     expect(refs.canvas.querySelector('.lesson-editor__publish-link')).toBeNull();
     expect(
       refs.contextBar.querySelector<HTMLButtonElement>('.public-link__trigger')?.disabled
