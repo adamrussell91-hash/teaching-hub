@@ -1,8 +1,8 @@
 import katex from 'katex';
 import { DEFAULT_ANTHROPIC_MODEL } from '@/ai/models';
 import type { CollectionLink } from '@/blocks/collection-resolve';
-import { buildChartSvg, escapeXml } from '@/blocks/chart-svg';
-import { layoutConceptMap, layoutMindMap } from '@/blocks/graph-layout';
+import { buildChartSvg, CHART_SERIES_COLOR_OPTIONS } from '@/blocks/chart-svg';
+import { buildConceptMapSvg, buildMindMapSvg } from '@/blocks/graph-svg';
 import {
   createColumnsEditor,
   createSectionEditor,
@@ -15,7 +15,7 @@ import { sanitizeSvgMarkup } from '@/blocks/sanitize-svg';
 import { isHttpUrl } from '@/blocks/url-safety';
 import { parseEmbedInput } from '@/blocks/embed-url';
 import { parseVideoInput } from '@/blocks/video-url';
-import type { Block, EmbedProvider } from '@/schemas/block';
+import { DIAGRAM_IMAGE_PUBLISH_URL_ISSUE, type Block, type ChartSeriesColor, type EmbedProvider } from '@/schemas/block';
 import type { Media } from '@/schemas/media';
 import {
   mountMediaLibraryPicker,
@@ -2159,10 +2159,6 @@ export function createSelfCheckEditor(
 }
 
 
-const VIZ_MAP_VIEW_W = 400;
-const VIZ_MAP_VIEW_H = 240;
-const VIZ_MAP_NODE_R = 28;
-
 function parseChartX(raw: string): string | number {
   const trimmed = raw.trim();
   if (trimmed !== '' && /^-?\d+(\.\d+)?$/.test(trimmed)) {
@@ -2176,69 +2172,33 @@ function parseChartY(raw: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-function buildMindMapPreviewSvg(content: {
-  title?: string;
-  nodes: Array<{ id: string; label: string; parent_id?: string | null }>;
-}): string {
-  const positioned = layoutMindMap(content.nodes);
-  const byId = new Map(positioned.map((node) => [node.id, node]));
-  const lines: string[] = [];
-  for (const node of content.nodes) {
-    if (node.parent_id == null) continue;
-    const child = byId.get(node.id);
-    const parent = byId.get(node.parent_id);
-    if (!child || !parent) continue;
-    lines.push(
-      `<line x1="${parent.x}" y1="${parent.y}" x2="${child.x}" y2="${child.y}" stroke="#424860" stroke-width="1.5" />`
-    );
-  }
-  const nodesMarkup = positioned
-    .map(
-      (node) =>
-        `<circle cx="${node.x}" cy="${node.y}" r="${VIZ_MAP_NODE_R}" fill="#dceafa" stroke="#376fb7" stroke-width="1.5" />` +
-        `<text x="${node.x}" y="${node.y}" text-anchor="middle" dominant-baseline="middle" font-size="12">${escapeXml(node.label)}</text>`
-    )
-    .join('');
-  const title = content.title?.trim()
-    ? `<text x="${VIZ_MAP_VIEW_W / 2}" y="18" text-anchor="middle" font-size="14">${escapeXml(content.title.trim())}</text>`
-    : '';
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VIZ_MAP_VIEW_W} ${VIZ_MAP_VIEW_H}" width="100%" role="img">${title}${lines.join('')}${nodesMarkup}</svg>`;
-}
-
-function buildConceptMapPreviewSvg(content: {
-  title?: string;
-  nodes: Array<{ id: string; label: string }>;
-  edges: Array<{ id: string; from: string; to: string; label?: string }>;
-}): string {
-  const layout = layoutConceptMap(content.nodes, content.edges);
-  const edgesMarkup = layout.edges
-    .map((edge) => {
-      const midX = (edge.x1 + edge.x2) / 2;
-      const midY = (edge.y1 + edge.y2) / 2;
-      const label = edge.label
-        ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="11">${escapeXml(edge.label)}</text>`
-        : '';
-      return (
-        `<line x1="${edge.x1}" y1="${edge.y1}" x2="${edge.x2}" y2="${edge.y2}" stroke="#424860" stroke-width="1.5" />` +
-        label
-      );
-    })
-    .join('');
-  const nodesMarkup = layout.nodes
-    .map(
-      (node) =>
-        `<circle cx="${node.x}" cy="${node.y}" r="${VIZ_MAP_NODE_R}" fill="#f1e2b6" stroke="#6c581f" stroke-width="1.5" />` +
-        `<text x="${node.x}" y="${node.y}" text-anchor="middle" dominant-baseline="middle" font-size="12">${escapeXml(node.label)}</text>`
-    )
-    .join('');
-  const title = content.title?.trim()
-    ? `<text x="${VIZ_MAP_VIEW_W / 2}" y="18" text-anchor="middle" font-size="14">${escapeXml(content.title.trim())}</text>`
-    : '';
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VIZ_MAP_VIEW_W} ${VIZ_MAP_VIEW_H}" width="100%" role="img">${title}${edgesMarkup}${nodesMarkup}</svg>`;
-}
-
 type ChartPointDraft = { x: string | number; y: number };
-type ChartSeriesDraft = { id: string; name: string; points: ChartPointDraft[] };
+type ChartSeriesDraft = {
+  id: string;
+  name: string;
+  color?: ChartSeriesColor;
+  points: ChartPointDraft[];
+};
+
+function seriesDraftFromBlock(
+  series: Extract<Block, { block_type: 'chart' }>['content']['series']
+): ChartSeriesDraft[] {
+  return series.map((entry) => ({
+    id: entry.id,
+    name: entry.name,
+    color: entry.color,
+    points: entry.points.map((point) => ({ ...point }))
+  }));
+}
+
+function seriesContentFromDraft(series: ChartSeriesDraft[]) {
+  return series.map((entry) => ({
+    id: entry.id,
+    name: entry.name,
+    ...(entry.color ? { color: entry.color } : {}),
+    points: entry.points.map((point) => ({ x: point.x, y: point.y }))
+  }));
+}
 
 export function createChartEditor(
   block: Extract<Block, { block_type: 'chart' }>,
@@ -2249,11 +2209,7 @@ export function createChartEditor(
   fields.className = 'block-editor__fields';
 
   let chartType = block.content.chart_type;
-  let series: ChartSeriesDraft[] = block.content.series.map((entry) => ({
-    id: entry.id,
-    name: entry.name,
-    points: entry.points.map((point) => ({ ...point }))
-  }));
+  let series: ChartSeriesDraft[] = seriesDraftFromBlock(block.content.series);
   let seriesCounter = series.length;
 
   const chartTypeSelect = document.createElement('select');
@@ -2306,11 +2262,7 @@ export function createChartEditor(
       title: title.value.trim() || undefined,
       x_label: xLabel.value.trim() || undefined,
       y_label: yLabel.value.trim() || undefined,
-      series: series.map((entry) => ({
-        id: entry.id,
-        name: entry.name,
-        points: entry.points.map((point) => ({ x: point.x, y: point.y }))
-      }))
+      series: seriesContentFromDraft(series)
     };
     preview.innerHTML = buildChartSvg(content);
     onChange({
@@ -2335,6 +2287,29 @@ export function createChartEditor(
       name.placeholder = 'Series name';
       name.setAttribute('aria-label', `Series ${seriesIndex + 1} name`);
 
+      const colour = document.createElement('select');
+      colour.className = 'block-editor__chart-series-color';
+      colour.setAttribute('aria-label', `Series ${seriesIndex + 1} colour`);
+      const auto = document.createElement('option');
+      auto.value = '';
+      auto.textContent = 'Auto';
+      auto.selected = entry.color == null;
+      colour.append(auto);
+      for (const option of CHART_SERIES_COLOR_OPTIONS) {
+        const opt = document.createElement('option');
+        opt.value = option.id;
+        opt.textContent = option.label;
+        opt.selected = entry.color === option.id;
+        colour.append(opt);
+      }
+      colour.addEventListener('change', () => {
+        const next = colour.value as ChartSeriesColor | '';
+        series[seriesIndex] = {
+          ...series[seriesIndex]!,
+          color: next === '' ? undefined : next
+        };
+        emitChange();
+      });
       const pointsContainer = document.createElement('div');
       pointsContainer.className = 'block-editor__chart-points';
 
@@ -2425,7 +2400,7 @@ export function createChartEditor(
         emitChange();
       });
 
-      row.append(name, pointsContainer, addPoint, removeSeries);
+      row.append(name, colour, pointsContainer, addPoint, removeSeries);
       seriesContainer.append(row);
     });
 
@@ -2465,11 +2440,7 @@ export function createChartEditor(
     title: title.value.trim() || undefined,
     x_label: xLabel.value.trim() || undefined,
     y_label: yLabel.value.trim() || undefined,
-    series: series.map((entry) => ({
-      id: entry.id,
-      name: entry.name,
-      points: entry.points.map((point) => ({ x: point.x, y: point.y }))
-    }))
+    series: seriesContentFromDraft(series)
   });
   fields.append(chartTypeSelect, title, xLabel, yLabel, seriesContainer, addSeriesButton, preview);
   return editorShell(block, onChange, fields, getLatest);
@@ -2605,7 +2576,7 @@ export function createDiagramEditor(
         preview.append(img);
       } else {
         const unavailable = document.createElement('p');
-        unavailable.textContent = imageAlt.value.trim() || 'Image unavailable.';
+        unavailable.textContent = DIAGRAM_IMAGE_PUBLISH_URL_ISSUE;
         preview.append(unavailable);
       }
     } else {
@@ -2690,7 +2661,7 @@ export function createMindMapEditor(
       })),
       edges: latest.content.edges ?? []
     };
-    preview.innerHTML = buildMindMapPreviewSvg(content);
+    preview.innerHTML = buildMindMapSvg(content);
     onChange({
       ...latest,
       content
@@ -2800,13 +2771,14 @@ export function createMindMapEditor(
   title.addEventListener('input', emitChange);
 
   renderNodes();
-  preview.innerHTML = buildMindMapPreviewSvg({
+  preview.innerHTML = buildMindMapSvg({
     title: title.value.trim() || undefined,
     nodes: nodes.map((node) => ({
       id: node.id,
       label: node.label,
       parent_id: node.parent_id ?? null
-    }))
+    })),
+    edges: []
   });
   fields.append(title, nodesContainer, addButton, preview);
   return editorShell(block, onChange, fields, getLatest);
@@ -2859,7 +2831,7 @@ export function createConceptMapEditor(
         label: edge.label?.trim() ? edge.label : undefined
       }))
     };
-    preview.innerHTML = buildConceptMapPreviewSvg(content);
+    preview.innerHTML = buildConceptMapSvg(content);
     onChange({
       ...getLatest(),
       content
@@ -3016,7 +2988,7 @@ export function createConceptMapEditor(
 
   renderNodes();
   renderEdges();
-  preview.innerHTML = buildConceptMapPreviewSvg({
+  preview.innerHTML = buildConceptMapSvg({
     title: title.value.trim() || undefined,
     nodes: nodes.map((node) => ({ id: node.id, label: node.label })),
     edges: edges.map((edge) => ({

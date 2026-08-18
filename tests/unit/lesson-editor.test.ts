@@ -43,6 +43,7 @@ vi.mock('@/teacher/history-panel', () => ({
 
 import { listAiJobs, pollAiJob, resolveAiJob, startAiJob } from '@/ai/jobs-client';
 import { apiGet, apiPut, apiPost, apiPatch, ApiClientError } from '@/api/client';
+import { createBlock } from '@/blocks/create-block';
 import { mountLessonEditor, type LessonEditorHandle } from '@/teacher/lesson-editor';
 import { renderTeacherShell } from '@/teacher/shell';
 
@@ -464,6 +465,39 @@ describe('mountLessonEditor', () => {
       (el) => el.textContent
     );
     expect(issues).toEqual(['title: Title is required to publish']);
+  });
+
+  it('names the failing block and jumps to it from the publish checklist', async () => {
+    const diagram = createBlock('diagram', 'd1');
+    if (diagram.block_type !== 'diagram') throw new Error('expected diagram');
+    diagram.content = {
+      source: 'image',
+      image_url: '',
+      image_alt: '',
+      caption: 'Spacing vs massed practice'
+    };
+    mockLessonLoad(makeLesson({ blocks: [diagram] }));
+    apiPostMock.mockRejectedValue(
+      new ApiClientError({
+        code: 'validation_error',
+        message: 'Lesson is not publishable',
+        details: [{ path: ['blocks'], message: 'Diagram image needs a valid http(s) URL to publish' }]
+      })
+    );
+    mount();
+    await tick();
+
+    refs.contextBar.querySelector<HTMLButtonElement>('.context-bar__publish')!.click();
+    await tick();
+
+    const jump = refs.canvas.querySelector<HTMLButtonElement>('.lesson-editor__publish-jump');
+    expect(jump?.textContent).toContain('Diagram “Spacing vs massed practice”');
+    expect(jump?.textContent).toContain('valid http(s) URL');
+    jump!.click();
+
+    const row = refs.canvas.querySelector('[data-block-id="d1"]');
+    expect(row?.classList.contains('lesson-page__block--publish-error')).toBe(true);
+    expect(row?.classList.contains('lesson-page__block--selected')).toBe(true);
   });
 
   it('flush() saves immediately, and awaiting it confirms the save completed, without waiting for the autosave debounce', async () => {

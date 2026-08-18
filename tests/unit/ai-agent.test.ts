@@ -380,6 +380,7 @@ describe('AI context builder', () => {
     expect(prompt).toContain('nodes: 1–24');
     expect(prompt).toContain('question_set');
     expect(prompt).toContain('image/video/embed URLs must come from the search pack');
+    expect(prompt).toContain('caption alone is not enough to publish');
     expect(prompt).toContain('"block_type":"mind_map"');
     expect(prompt).toContain('"block_type":"question_set"');
   });

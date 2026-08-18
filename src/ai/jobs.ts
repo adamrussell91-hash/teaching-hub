@@ -4,7 +4,7 @@ import type { AiProposal, AiScope } from '@/ai/proposals';
 import { AiChatRequestSchema, parseToolProposal } from '@/ai/proposals';
 import { BLOCK_BUILD_RECIPES } from '@/ai/block-recipes';
 import type { SearchPack } from '@/ai/search-pack';
-import { validateProposalAgainstSearchPack } from '@/ai/search-pack-validation';
+import { validateMutatingProposal } from '@/ai/validate-proposal';
 
 export const AiJobAgentSchema = z.enum(['clementine', 'ann', 'hammond', 'clare']);
 export const AiJobStatusSchema = z.enum(['working', 'done', 'error']);
@@ -195,6 +195,6 @@ export function proposalFromKernelPayload(
     toolInput
   );
   if ('error' in parsed) return null;
-  if (!validateProposalAgainstSearchPack(parsed, searchPack).ok) return null;
+  if (!validateMutatingProposal(parsed, searchPack).ok) return null;
   return parsed;
 }

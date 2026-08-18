@@ -5,7 +5,7 @@ import { matchCompositionFill } from '../../src/ai/composition-fill.ts';
 import { buildAiSystemPrompt } from '../../src/ai/context.ts';
 import { protocolForAgent } from '../../src/ai/protocols.ts';
 import { AI_TOOLS, AiChatRequestSchema, parseToolProposal } from '../../src/ai/proposals.ts';
-import { validateProposalAgainstSearchPack } from '../../src/ai/search-pack-validation.ts';
+import { validateMutatingProposal } from '../../src/ai/validate-proposal.ts';
 import type { Lesson } from '../../src/schemas/lesson.ts';
 import { CompositionTemplateSchema, type CompositionTemplate } from '../../src/schemas/composition.ts';
 import { searchPublicWeb, buildLessonSearchQuery } from './_shared/brave-search.mts';
@@ -222,14 +222,10 @@ export default async function handler(request: Request): Promise<Response> {
               send({ type: 'tool_error', name: toolEvent.name, error: proposal.error });
               return JSON.stringify({ ok: false, error: proposal.error });
             }
-            const validation = validateProposalAgainstSearchPack(proposal, searchPack);
+            const validation = validateMutatingProposal(proposal, searchPack);
             if (!validation.ok) {
-              const references = validation.violations
-                .map(({ path, value }) => `${path}=${value}`)
-                .join(', ');
-              const error = `Media not in search pack: ${references}`;
-              send({ type: 'tool_error', name: toolEvent.name, error });
-              return JSON.stringify({ ok: false, error });
+              send({ type: 'tool_error', name: toolEvent.name, error: validation.error });
+              return JSON.stringify({ ok: false, error: validation.error });
             }
             send({ type: 'proposal', proposal });
             return JSON.stringify({ ok: true, status: 'awaiting_teacher_accept' });

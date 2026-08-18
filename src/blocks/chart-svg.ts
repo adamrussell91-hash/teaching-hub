@@ -1,3 +1,14 @@
+import type { ChartSeriesColor } from '@/schemas/block';
+
+export const CHART_SERIES_COLOR_OPTIONS: Array<{ id: ChartSeriesColor; label: string }> = [
+  { id: 'wave', label: 'Wave' },
+  { id: 'danger', label: 'High contrast red' },
+  { id: 'success', label: 'Sage' },
+  { id: 'high-sea', label: 'High sea' },
+  { id: 'pastel-lilac-ink', label: 'Lilac' },
+  { id: 'navy-2', label: 'Navy' }
+];
+
 export type ChartContent = {
   chart_type: 'bar' | 'line' | 'pie' | 'scatter';
   title?: string;
@@ -6,14 +17,23 @@ export type ChartContent = {
   series: Array<{
     id: string;
     name: string;
+    color?: ChartSeriesColor;
     points: Array<{ x: string | number; y: number }>;
   }>;
 };
 
 const VIEW_W = 400;
 const VIEW_H = 240;
-const PAD = { top: 36, right: 20, bottom: 36, left: 44 };
-const COLORS = ['#376fb7', '#9b2c2c', '#2f7a4f', '#f68620', '#5d4e70', '#244f7c'];
+const PAD = { top: 16, right: 20, bottom: 44, left: 44 };
+
+function seriesFill(
+  series: { color?: ChartSeriesColor },
+  index: number
+): string {
+  const token =
+    series.color ?? CHART_SERIES_COLOR_OPTIONS[index % CHART_SERIES_COLOR_OPTIONS.length]!.id;
+  return `var(--${token})`;
+}
 
 export function escapeXml(text: string): string {
   return text
@@ -33,11 +53,6 @@ export function buildChartTableRows(
     }
   }
   return rows;
-}
-
-function titleMarkup(title?: string): string {
-  if (!title) return '';
-  return `<text x="${VIEW_W / 2}" y="20" text-anchor="middle" font-size="14">${escapeXml(title)}</text>`;
 }
 
 function plotBounds() {
@@ -91,7 +106,7 @@ function buildBarSvg(content: ChartContent): string {
   const range = max - min || 1;
   const groupWidth = bounds.width / Math.max(cats.length, 1);
   const barWidth = groupWidth / Math.max(content.series.length, 1) * 0.7;
-  const parts: string[] = [titleMarkup(content.title)];
+  const parts: string[] = [];
 
   cats.forEach((cat, catIndex) => {
     content.series.forEach((series, seriesIndex) => {
@@ -105,12 +120,12 @@ function buildBarSvg(content: ChartContent): string {
         (groupWidth / content.series.length - barWidth) / 2;
       const yPos = bounds.y1 - h;
       parts.push(
-        `<rect x="${x.toFixed(2)}" y="${yPos.toFixed(2)}" width="${barWidth.toFixed(2)}" height="${Math.max(h, 0).toFixed(2)}" fill="${COLORS[seriesIndex % COLORS.length]}" />`
+        `<rect x="${x.toFixed(2)}" y="${yPos.toFixed(2)}" width="${barWidth.toFixed(2)}" height="${Math.max(h, 0).toFixed(2)}" fill="${seriesFill(series, seriesIndex)}" />`
       );
     });
     const labelX = bounds.x0 + catIndex * groupWidth + groupWidth / 2;
     parts.push(
-      `<text x="${labelX.toFixed(2)}" y="${VIEW_H - 12}" text-anchor="middle" font-size="11">${escapeXml(cat)}</text>`
+      `<text x="${labelX.toFixed(2)}" y="${VIEW_H - 12}" text-anchor="middle" font-size="11" fill="currentColor">${escapeXml(cat)}</text>`
     );
   });
 
@@ -122,7 +137,7 @@ function buildLineSvg(content: ChartContent): string {
   const cats = categoryLabels(content);
   const { min, max } = yExtent(content);
   const range = max - min || 1;
-  const parts: string[] = [titleMarkup(content.title)];
+  const parts: string[] = [];
 
   content.series.forEach((series, seriesIndex) => {
     const points = cats
@@ -136,7 +151,7 @@ function buildLineSvg(content: ChartContent): string {
       .filter((p): p is string => p != null);
     if (points.length) {
       parts.push(
-        `<polyline fill="none" stroke="${COLORS[seriesIndex % COLORS.length]}" stroke-width="2" points="${points.join(' ')}" />`
+        `<polyline fill="none" stroke="${seriesFill(series, seriesIndex)}" stroke-width="2" points="${points.join(' ')}" />`
       );
     }
   });
@@ -144,7 +159,7 @@ function buildLineSvg(content: ChartContent): string {
   cats.forEach((cat, index) => {
     const x = bounds.x0 + (index / Math.max(cats.length - 1, 1)) * bounds.width;
     parts.push(
-      `<text x="${x.toFixed(2)}" y="${VIEW_H - 12}" text-anchor="middle" font-size="11">${escapeXml(cat)}</text>`
+      `<text x="${x.toFixed(2)}" y="${VIEW_H - 12}" text-anchor="middle" font-size="11" fill="currentColor">${escapeXml(cat)}</text>`
     );
   });
 
@@ -159,7 +174,7 @@ function buildScatterSvg(content: ChartContent): string {
   const xMin = xs.length ? Math.min(...xs) : 0;
   const xMax = xs.length ? Math.max(...xs) : 1;
   const xRange = xMax - xMin || 1;
-  const parts: string[] = [titleMarkup(content.title)];
+  const parts: string[] = [];
 
   content.series.forEach((series, seriesIndex) => {
     for (const point of series.points) {
@@ -169,11 +184,11 @@ function buildScatterSvg(content: ChartContent): string {
         : bounds.x0;
       const y = bounds.y1 - ((point.y - min) / range) * bounds.height;
       parts.push(
-        `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="4" fill="${COLORS[seriesIndex % COLORS.length]}" />`
+        `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="4" fill="${seriesFill(series, seriesIndex)}" />`
       );
       if (typeof point.x === 'string') {
         parts.push(
-          `<text x="${x.toFixed(2)}" y="${(y - 8).toFixed(2)}" text-anchor="middle" font-size="10">${escapeXml(point.x)}</text>`
+          `<text x="${x.toFixed(2)}" y="${(y - 8).toFixed(2)}" text-anchor="middle" font-size="10" fill="currentColor">${escapeXml(point.x)}</text>`
         );
       }
     }
@@ -189,9 +204,14 @@ function polar(cx: number, cy: number, r: number, angle: number): { x: number; y
   };
 }
 
+function sliceFill(index: number): string {
+  const token = CHART_SERIES_COLOR_OPTIONS[index % CHART_SERIES_COLOR_OPTIONS.length]!.id;
+  return `var(--${token})`;
+}
+
 function buildPieSvg(content: ChartContent): string {
   const series = content.series[0];
-  const parts: string[] = [titleMarkup(content.title)];
+  const parts: string[] = [];
   if (!series) return parts.join('');
 
   const total = series.points.reduce((sum, p) => sum + (Number.isFinite(p.y) ? Math.abs(p.y) : 0), 0);
@@ -200,7 +220,7 @@ function buildPieSvg(content: ChartContent): string {
   const r = 70;
 
   if (total <= 0) {
-    parts.push(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="#e5e7eb" />`);
+    parts.push(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="var(--line)" />`);
     return parts.join('');
   }
 
@@ -217,12 +237,12 @@ function buildPieSvg(content: ChartContent): string {
       `A ${r} ${r} 0 ${large} 1 ${end.x.toFixed(2)} ${end.y.toFixed(2)}`,
       'Z'
     ].join(' ');
-    parts.push(`<path d="${d}" fill="${COLORS[index % COLORS.length]}" />`);
+    parts.push(`<path d="${d}" fill="${sliceFill(index)}" />`);
 
     const mid = angle + sweep / 2;
     const labelPos = polar(cx, cy, r + 18, mid);
     parts.push(
-      `<text x="${labelPos.x.toFixed(2)}" y="${labelPos.y.toFixed(2)}" text-anchor="middle" font-size="11">${escapeXml(String(point.x))}</text>`
+      `<text x="${labelPos.x.toFixed(2)}" y="${labelPos.y.toFixed(2)}" text-anchor="middle" font-size="11" fill="currentColor">${escapeXml(String(point.x))}</text>`
     );
     angle += sweep;
   });
@@ -247,5 +267,5 @@ export function buildChartSvg(content: ChartContent): string {
       break;
   }
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VIEW_W} ${VIEW_H}" role="img">${body}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VIEW_W} ${VIEW_H}" overflow="visible" role="img">${body}</svg>`;
 }

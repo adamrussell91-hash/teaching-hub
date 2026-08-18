@@ -1,13 +1,8 @@
 import { FAILURE } from '@/app/failure';
 import katex from 'katex';
 import { getApiBaseUrl } from '@/api/config';
-import { buildChartSvg, buildChartTableRows, escapeXml } from '@/blocks/chart-svg';
-import {
-  layoutConceptMap,
-  layoutMindMap,
-  type ConceptMapContent,
-  type MindMapContent
-} from '@/blocks/graph-layout';
+import { buildChartSvg, buildChartTableRows } from '@/blocks/chart-svg';
+import { buildConceptMapSvg, buildMindMapSvg } from '@/blocks/graph-svg';
 import type { CollectionLink } from '@/blocks/collection-resolve';
 import { buildHtmlAppSrcdoc } from '@/blocks/html-app-srcdoc';
 import { sanitizeRichTextHtml } from '@/blocks/sanitize';
@@ -22,7 +17,7 @@ import {
   shuffleArray,
   storageKey
 } from '@/blocks/learning-activity';
-import type { Block, EmbedProvider } from '@/schemas/block';
+import { DIAGRAM_IMAGE_PUBLISH_URL_ISSUE, type Block, type EmbedProvider } from '@/schemas/block';
 
 export type RenderMode = 'teacher' | 'student' | 'print';
 export type RenderContext = { lessonId?: string };
@@ -1717,64 +1712,6 @@ export function renderSelfCheckBlock(
   return wrapBlock(root, block, mode);
 }
 
-const MAP_VIEW_W = 400;
-const MAP_VIEW_H = 240;
-const MAP_NODE_R = 28;
-
-function buildMindMapSvg(content: MindMapContent): string {
-  const positioned = layoutMindMap(content.nodes);
-  const byId = new Map(positioned.map((node) => [node.id, node]));
-  const lines: string[] = [];
-  for (const node of content.nodes) {
-    if (node.parent_id == null) continue;
-    const child = byId.get(node.id);
-    const parent = byId.get(node.parent_id);
-    if (!child || !parent) continue;
-    lines.push(
-      `<line x1="${parent.x}" y1="${parent.y}" x2="${child.x}" y2="${child.y}" stroke="#424860" stroke-width="1.5" />`
-    );
-  }
-  const nodesMarkup = positioned
-    .map(
-      (node) =>
-        `<circle cx="${node.x}" cy="${node.y}" r="${MAP_NODE_R}" fill="#dceafa" stroke="#376fb7" stroke-width="1.5" />` +
-        `<text x="${node.x}" y="${node.y}" text-anchor="middle" dominant-baseline="middle" font-size="12">${escapeXml(node.label)}</text>`
-    )
-    .join('');
-  const title = content.title?.trim()
-    ? `<text x="${MAP_VIEW_W / 2}" y="18" text-anchor="middle" font-size="14">${escapeXml(content.title.trim())}</text>`
-    : '';
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${MAP_VIEW_W} ${MAP_VIEW_H}" width="100%" role="img">${title}${lines.join('')}${nodesMarkup}</svg>`;
-}
-
-function buildConceptMapSvg(content: ConceptMapContent): string {
-  const layout = layoutConceptMap(content.nodes, content.edges);
-  const edgesMarkup = layout.edges
-    .map((edge) => {
-      const midX = (edge.x1 + edge.x2) / 2;
-      const midY = (edge.y1 + edge.y2) / 2;
-      const label = edge.label
-        ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="11">${escapeXml(edge.label)}</text>`
-        : '';
-      return (
-        `<line x1="${edge.x1}" y1="${edge.y1}" x2="${edge.x2}" y2="${edge.y2}" stroke="#424860" stroke-width="1.5" />` +
-        label
-      );
-    })
-    .join('');
-  const nodesMarkup = layout.nodes
-    .map(
-      (node) =>
-        `<circle cx="${node.x}" cy="${node.y}" r="${MAP_NODE_R}" fill="#f1e2b6" stroke="#6c581f" stroke-width="1.5" />` +
-        `<text x="${node.x}" y="${node.y}" text-anchor="middle" dominant-baseline="middle" font-size="12">${escapeXml(node.label)}</text>`
-    )
-    .join('');
-  const title = content.title?.trim()
-    ? `<text x="${MAP_VIEW_W / 2}" y="18" text-anchor="middle" font-size="14">${escapeXml(content.title.trim())}</text>`
-    : '';
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${MAP_VIEW_W} ${MAP_VIEW_H}" width="100%" role="img">${title}${edgesMarkup}${nodesMarkup}</svg>`;
-}
-
 export function renderChartBlock(
   block: Extract<Block, { block_type: 'chart' }>,
   mode: RenderMode
@@ -1878,7 +1815,10 @@ export function renderDiagramBlock(
     } else {
       const unavailable = document.createElement('p');
       unavailable.className = 'block-diagram__unavailable';
-      unavailable.textContent = (block.content.image_alt ?? '').trim() || 'Image unavailable.';
+      unavailable.textContent =
+        mode === 'teacher'
+          ? DIAGRAM_IMAGE_PUBLISH_URL_ISSUE
+          : (block.content.image_alt ?? '').trim() || FAILURE.imageUnavailable;
       root.append(unavailable);
     }
   } else {

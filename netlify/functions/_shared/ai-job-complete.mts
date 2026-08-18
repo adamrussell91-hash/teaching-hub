@@ -16,7 +16,7 @@ import {
 import { protocolForAgent } from '../../../src/ai/protocols.ts';
 import { AI_TOOLS, parseToolProposal, type AiProposal } from '../../../src/ai/proposals.ts';
 import { resolveSelection } from '../../../src/ai/selection.ts';
-import { validateProposalAgainstSearchPack } from '../../../src/ai/search-pack-validation.ts';
+import { validateMutatingProposal } from '../../../src/ai/validate-proposal.ts';
 import {
   CompositionTemplateSchema,
   type CompositionTemplate
@@ -157,13 +157,10 @@ async function completeFastAgentJob(
           retriedInvalidTool = true;
           return JSON.stringify({ ok: false, error: parsed.error });
         }
-        const validation = validateProposalAgainstSearchPack(parsed, searchPack);
+        const validation = validateMutatingProposal(parsed, searchPack);
         if (!validation.ok) {
           retriedInvalidTool = true;
-          const references = validation.violations
-            .map(({ path, value }) => `${path}=${value}`)
-            .join(', ');
-          return JSON.stringify({ ok: false, error: `Media not in search pack: ${references}` });
+          return JSON.stringify({ ok: false, error: validation.error });
         }
         proposal = parsed;
         // A valid proposal is the terminal product for a background job. Returning

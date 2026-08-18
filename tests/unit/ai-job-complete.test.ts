@@ -156,7 +156,7 @@ function workingJob(): AiJob {
 
 function mindMapBlock() {
   const nodes = [
-    { id: 'roman-roads', label: 'Roman roads' },
+    { id: 'roman-roads', label: 'Roman roads', parent_id: null },
     ...[
       'Purpose',
       'Layers',
@@ -167,7 +167,11 @@ function mindMapBlock() {
       'Surveying',
       'Bridges',
       'Legacy'
-    ].map((label, index) => ({ id: `node-${index + 1}`, label }))
+    ].map((label, index) => ({
+      id: `node-${index + 1}`,
+      label,
+      parent_id: 'roman-roads'
+    }))
   ];
   return baseBlock({
     id: 'mind-map-roads',
@@ -191,6 +195,20 @@ function imageBlock(url: string) {
     block_type: 'image',
     variant: 'large',
     content: { url, alt_text: 'Roman road' }
+  });
+}
+
+function captionOnlyDiagramBlock() {
+  return baseBlock({
+    id: 'diagram-spacing',
+    block_type: 'diagram',
+    variant: 'medium',
+    content: {
+      source: 'image',
+      image_url: '',
+      image_alt: '',
+      caption: 'Spacing vs massed practice'
+    }
   });
 }
 
@@ -499,6 +517,42 @@ describe('completeWorkingAiJob fast agents', () => {
           ? anthropicToolReply('propose_insert_blocks', {
               position: 'below',
               blocks: [imageBlock(INVENTED_IMAGE_URL)]
+            })
+          : anthropicDoneReply();
+      }
+      throw new Error(`Unexpected fetch destination: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await completeWorkingAiJob(
+      store,
+      { ...workingJob(), agent: 'ann', scope: 'lesson' },
+      {
+        ANTHROPIC_API_KEY: 'anthropic-test-key',
+        BRAVE_SEARCH_API_KEY: 'brave-test-key'
+      } as NodeJS.ProcessEnv
+    );
+
+    expect(result.status).toBe('error');
+    expect(result.proposal).toBeUndefined();
+    expect(fakeStore.read<AiJob>(aiJobKey(JOB_ID))?.proposal).toBeUndefined();
+  });
+
+  it('does not persist a caption-only diagram that cannot publish', async () => {
+    let anthropicCalls = 0;
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
+      if (url.origin === BRAVE_ORIGIN) {
+        if (url.pathname === '/res/v1/web/search') return Response.json(WEB_FIXTURE);
+        if (url.pathname === '/res/v1/images/search') return Response.json(IMAGE_FIXTURE);
+        if (url.pathname === '/res/v1/videos/search') return Response.json(VIDEO_FIXTURE);
+      }
+      if (url.origin === 'https://api.anthropic.com') {
+        anthropicCalls += 1;
+        return anthropicCalls === 1
+          ? anthropicToolReply('propose_insert_blocks', {
+              position: 'below',
+              blocks: [captionOnlyDiagramBlock()]
             })
           : anthropicDoneReply();
       }

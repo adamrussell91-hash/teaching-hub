@@ -1,3 +1,4 @@
+import { navigate } from '@/app/router';
 import { apiGet, apiPost, ApiClientError } from '@/api/client';
 import { applyProposalToLesson } from '@/ai/apply-proposal';
 import { agentColour, readLastAgentSlug, type AgentSlug } from '@/ai/agents';
@@ -14,7 +15,7 @@ import { findBlockById } from '@/blocks/find-block';
 import { openPrintLesson } from '@/print/open-print';
 import { downloadPortableExport } from '@/teacher/export-api';
 import type { CompositionSummary, CompositionTemplate } from '@/schemas/composition';
-import type { Lesson } from '@/schemas/lesson';
+import { formatPublishBlockIssue, listPublishBlockIssues, type Lesson } from '@/schemas/lesson';
 import type { Media } from '@/schemas/media';
 import {
   mountHistoryPanel,
@@ -49,6 +50,7 @@ import { createLessonTemplate } from '@/teacher/template-api';
 import { fetchCurriculum } from '@/teacher/nav';
 import { renderContextBar, type TeacherShellRefs } from '@/teacher/shell';
 import { mountSavePublishControls, SaveController, type SavePublishHandle } from '@/teacher/save-publish';
+import { confirmAndTrash } from '@/teacher/lifecycle-api';
 
 export interface LessonEditorHandle {
   /**
@@ -464,6 +466,16 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
           window.alert('Unable to export this lesson.');
         });
       },
+      onTrash: () => {
+        void (async () => {
+          try {
+            const ok = await confirmAndTrash('lesson', lesson.id, lesson.title);
+            if (ok) navigate('/lessons');
+          } catch {
+            window.alert('Unable to move lesson to trash.');
+          }
+        })();
+      },
       onSaveComposition: (blockId) => {
         void saveBlockAsComposition(blockId);
       },
@@ -571,6 +583,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
 
       publishPanel.append(message, link);
       refreshPublicLink();
+      page?.revealPublishBlock('', []);
     }
 
     const publicLinkHost = document.createElement('div');
@@ -586,24 +599,57 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       }).dispose;
     }
 
-    function showPublishIssues(issues: string[]): void {
+    function showPublishIssues(apiIssues: string[]): void {
+      const local = listPublishBlockIssues(lesson.blocks);
+      const errorIds = local.map((issue) => issue.blockId);
+
       publishPanel.replaceChildren();
       publishPanel.hidden = false;
       publishPanel.classList.remove('lesson-editor__publish-panel--success');
       publishPanel.classList.add('lesson-editor__publish-panel--error');
 
-      const message = document.createElement('p');
-      message.textContent = "This lesson can't be published yet:";
+      const heading = document.createElement('p');
+      heading.textContent = "This lesson can't be published yet:";
 
       const list = document.createElement('ul');
       list.className = 'lesson-editor__publish-issues';
-      for (const issue of issues) {
+
+      const titleIssues = apiIssues.filter((issue) => {
+        const lower = issue.toLowerCase();
+        return lower.includes('title is required') || issue.startsWith('title:');
+      });
+      const lines: Array<{ text: string; blockId?: string }> = [
+        ...titleIssues.map((text) => ({ text })),
+        ...local.map((issue) => ({
+          text: formatPublishBlockIssue(issue),
+          blockId: issue.blockId
+        }))
+      ];
+      if (lines.length === 0) {
+        for (const issue of apiIssues) lines.push({ text: issue });
+      }
+
+      for (const line of lines) {
         const item = document.createElement('li');
-        item.textContent = issue;
+        if (line.blockId) {
+          const jump = document.createElement('button');
+          jump.type = 'button';
+          jump.className = 'btn btn--ghost lesson-editor__publish-jump';
+          jump.textContent = line.text;
+          jump.addEventListener('click', () => {
+            page?.revealPublishBlock(line.blockId!, errorIds);
+          });
+          item.append(jump);
+        } else {
+          item.textContent = line.text;
+        }
         list.append(item);
       }
 
-      publishPanel.append(message, list);
+      publishPanel.append(heading, list);
+      publishPanel.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      const first = local[0];
+      if (first) page?.revealPublishBlock(first.blockId, errorIds);
     }
 
     saveController = new SaveController({

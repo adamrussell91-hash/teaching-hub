@@ -60,6 +60,7 @@ export function formatPublishIssues(error: ApiClientError): string[] {
       const candidate = issue as ZodLikeIssue;
       const path = Array.isArray(candidate.path) ? candidate.path.join('.') : '';
       const message = typeof candidate.message === 'string' ? candidate.message : error.message;
+      if (path === 'blocks' || path.startsWith('blocks.')) return message;
       return path.length > 0 ? `${path}: ${message}` : message;
     });
   }

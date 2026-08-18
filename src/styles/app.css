@@ -650,9 +650,30 @@ a:hover {
 }
 
 .lesson-editor__publish-panel--error {
+  position: sticky;
+  top: 0;
+  z-index: 3;
   color: var(--ink);
   background: var(--danger-surface);
   border: 1px solid var(--danger-line);
+  box-shadow: var(--elev-2);
+}
+
+.lesson-editor__publish-jump {
+  display: inline;
+  width: auto;
+  height: auto;
+  padding: 0;
+  white-space: normal;
+  text-align: left;
+  font-weight: var(--weight-semibold);
+}
+
+.lesson-page__block--publish-error,
+.block-editor__nested-row.lesson-page__block--publish-error {
+  outline: 2px solid var(--danger);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
 
 .lesson-editor__publish-link {
@@ -1197,7 +1218,7 @@ a:hover {
   justify-content: space-between;
   gap: var(--space-4);
   min-height: 3.5rem;
-  padding: var(--space-3) var(--space-5);
+  padding: var(--space-3) clamp(var(--space-5), 3vw, var(--space-10));
   font-size: var(--text-sm);
   color: var(--navy);
   background: color-mix(in srgb, var(--paper) 82%, transparent);
@@ -1253,13 +1274,10 @@ a:hover {
 }
 
 .student-surface__content {
-  max-width: 52rem;
-  margin: 0 auto;
-  padding: var(--space-8) var(--space-5) var(--space-16);
-}
-
-.student-surface__content--class {
-  max-width: 72rem;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: var(--space-8) clamp(var(--space-5), 3vw, var(--space-10)) var(--space-16);
 }
 
 .student-status {
@@ -4469,9 +4487,10 @@ a.home-class-tile:hover {
 @media (min-width: 48rem) {
   .block-timeline {
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: stretch;
     gap: var(--space-4);
-    overflow-x: auto;
+    overflow-x: visible;
     padding-top: var(--space-5);
   }
 
@@ -4485,7 +4504,8 @@ a.home-class-tile:hover {
   }
 
   .block-timeline__event {
-    flex: 0 0 min(16rem, 70vw);
+    flex: 1 1 12rem;
+    min-width: 10rem;
     padding-left: 0;
     padding-top: var(--space-4);
   }
@@ -6404,6 +6424,14 @@ input.scope-timeline__note-title:focus-visible {
   max-width: 100%;
   height: auto;
   display: block;
+  overflow: visible;
+  color: var(--ink);
+}
+
+.block-chart__svg,
+.block-mind-map__svg,
+.block-concept-map__svg {
+  overflow: visible;
 }
 
 .block-chart__data {
@@ -7343,7 +7371,12 @@ input.scope-timeline__note-title:focus-visible {
 
 /* The builder gutter is too narrow to hold the grip, so the block list keeps
    a left lane for it. */
-.lesson-page__grip {
+.lesson-page__block:not(.lesson-page__block--selected) iframe {
+  pointer-events: none;
+}
+
+.lesson-page__grip,
+.lesson-page__block-delete {
   position: absolute;
   top: var(--space-1);
   left: -1.6rem;
@@ -7363,14 +7396,23 @@ input.scope-timeline__note-title:focus-visible {
   transition: opacity 160ms ease;
 }
 
-.lesson-page__grip svg {
+.lesson-page__block-delete {
+  top: 2.15rem;
+  cursor: pointer;
+}
+
+.lesson-page__grip svg,
+.lesson-page__block-delete svg {
   width: 1rem;
   height: 1rem;
 }
 
 .lesson-page__block:hover .lesson-page__grip,
 .lesson-page__block--selected .lesson-page__grip,
-.lesson-page__grip:focus-visible {
+.lesson-page__grip:focus-visible,
+.lesson-page__block:hover .lesson-page__block-delete,
+.lesson-page__block--selected .lesson-page__block-delete,
+.lesson-page__block-delete:focus-visible {
   opacity: 1;
 }
 

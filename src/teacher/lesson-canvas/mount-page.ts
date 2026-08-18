@@ -53,6 +53,7 @@ export type MountBlockCanvasOptions = {
 export type BlockCanvasHandle = {
   update(blocks: Block[], nextMedia?: Media[]): void;
   insertType(type: InsertMenuValue): void;
+  revealPublishBlock(blockId: string, errorIds?: string[]): void;
   dispose(): void;
 };
 
@@ -65,6 +66,7 @@ export type MountLessonPageOptions = {
   idFactory: () => string;
   onSaveTemplate?: () => void;
   onExport?: () => void;
+  onTrash?: () => void;
   onSaveComposition?: (blockId: string) => void;
   onEditSource?: (compositionId: string) => void;
   onDetachComposition?: (blockId: string) => void;
@@ -75,6 +77,7 @@ export type MountLessonPageOptions = {
 export type LessonPageHandle = {
   update(lesson: Lesson, nextMedia?: Media[]): void;
   insertType(type: InsertMenuValue): void;
+  revealPublishBlock(blockId: string, errorIds?: string[]): void;
   dispose(): void;
 };
 
@@ -168,6 +171,15 @@ function gripIcon(): SVGSVGElement {
   return svg;
 }
 
+function trashIcon(): SVGSVGElement {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.innerHTML =
+    '<path fill="currentColor" d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 6h2v9h-2V9zm4 0h2v9h-2V9zM8 9h2v9H8V9z"/>';
+  return svg;
+}
+
 function printIcon(): SVGSVGElement {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 24 24');
@@ -186,6 +198,7 @@ export function mountBlockCanvas(
   let media = options.media ?? [];
   let activeDropIndex: number | null = null;
   let pendingReveal: string | null = null;
+  let publishErrorIds = new Set<string>();
   const rootMode: DropRootMode = options.allowCollectionAtRoot ? 'page' : 'lesson';
 
   const root = document.createElement('div');
@@ -378,6 +391,22 @@ export function mountBlockCanvas(
     return grip;
   }
 
+  function createBlockDelete(block: Block): HTMLElement {
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'lesson-page__block-delete';
+    remove.setAttribute('aria-label', 'Delete block');
+    remove.title = 'Delete block';
+    remove.append(trashIcon());
+    remove.addEventListener('click', (event) => {
+      event.stopPropagation();
+      selectedId = null;
+      options.onSelect?.(null);
+      emit(deleteBlocksById(blocks, [block.id]));
+    });
+    return remove;
+  }
+
   function moveBy(blockId: string, delta: number): void {
     const from = blocks.findIndex((row) => row.id === blockId);
     if (from < 0) return;
@@ -538,8 +567,11 @@ export function mountBlockCanvas(
       row.dataset.blockId = block.id;
       row.dataset.blockType = block.block_type;
       if (selectedId === block.id) row.classList.add('lesson-page__block--selected');
+      if (blockOrDescendantHasError(block, publishErrorIds)) {
+        row.classList.add('lesson-page__block--publish-error');
+      }
       bindRowDropTarget(row, index);
-      row.append(createGrip(block, row));
+      row.append(createGrip(block, row), createBlockDelete(block));
 
       if (isLinkedSection(block)) {
         row.append(createLinkedChrome(block));
@@ -624,6 +656,20 @@ export function mountBlockCanvas(
       emit(result.blocks);
       selectAndReveal(block.id);
     },
+    revealPublishBlock(blockId: string, errorIds: string[] = [blockId]) {
+      publishErrorIds = new Set(errorIds);
+      if (!blockId) {
+        render();
+        return;
+      }
+      const targetId = rootAncestorId(blocks, blockId) ?? blockId;
+      selectAndReveal(targetId);
+      const target = root.querySelector(`[data-block-id="${blockId}"]`);
+      if (target) {
+        target.classList.add('lesson-page__block--publish-error');
+        scrollElementIntoView(target);
+      }
+    },
     dispose() {
       root.remove();
     }
@@ -634,6 +680,21 @@ export function mountBlockCanvas(
 function lessonWithoutCover(lesson: Lesson): Lesson {
   const { cover: _removed, ...rest } = lesson;
   return rest as Lesson;
+}
+
+function rootAncestorId(blocks: Block[], blockId: string): string | null {
+  for (const block of blocks) {
+    if (findBlockById([block], blockId)) return block.id;
+  }
+  return null;
+}
+
+function blockOrDescendantHasError(block: Block, errorIds: Set<string>): boolean {
+  if (errorIds.has(block.id)) return true;
+  for (const id of errorIds) {
+    if (findBlockById([block], id)) return true;
+  }
+  return false;
 }
 
 export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptions): LessonPageHandle {
@@ -678,6 +739,18 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     options.onExport?.();
   });
   menu.append(exportBtn, save);
+
+  if (options.onTrash) {
+    const trash = document.createElement('button');
+    trash.type = 'button';
+    trash.className = 'btn btn--ghost lesson-page__trash';
+    trash.textContent = 'Move to trash';
+    trash.addEventListener('click', () => {
+      menu.hidden = true;
+      options.onTrash?.();
+    });
+    menu.append(trash);
+  }
 
   more.addEventListener('click', () => {
     menu.hidden = !menu.hidden;
@@ -776,6 +849,9 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     },
     insertType(type: InsertMenuValue) {
       canvas.insertType(type);
+    },
+    revealPublishBlock(blockId: string, errorIds?: string[]) {
+      canvas.revealPublishBlock(blockId, errorIds);
     },
     dispose() {
       canvas.dispose();

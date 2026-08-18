@@ -130,9 +130,9 @@ function lesson() {
 
 function mindMapBlock() {
   const nodes = [
-    { id: 'cheese-types', label: 'Cheese types' },
+    { id: 'cheese-types', label: 'Cheese types', parent_id: null },
     ...['Fresh', 'Soft', 'Semi-soft', 'Hard', 'Blue', 'Washed-rind', 'Goat', 'Sheep', 'Processed'].map(
-      (label, index) => ({ id: `type-${index + 1}`, label })
+      (label, index) => ({ id: `type-${index + 1}`, label, parent_id: 'cheese-types' })
     )
   ];
   return baseBlock({

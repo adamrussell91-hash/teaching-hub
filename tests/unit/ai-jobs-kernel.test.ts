@@ -151,6 +151,26 @@ describe('classifyKernelResponse', () => {
       })
     ).toEqual({ kind: 'failed', error: 'Kernel returned an invalid proposal' });
   });
+
+  it('rejects a caption-only diagram that cannot publish', () => {
+    const diagram = createBlock('diagram', 'diagram_1');
+    if (diagram.block_type !== 'diagram') throw new Error('expected diagram');
+    diagram.content = {
+      source: 'image',
+      image_url: '',
+      image_alt: '',
+      caption: 'Spacing vs massed practice'
+    };
+
+    expect(
+      classifyKernelResponse({
+        secret: 's',
+        status: 200,
+        searchPack: AVAILABLE_SEARCH_PACK,
+        payload: { kind: 'insert_blocks', position: 'below', blocks: [diagram] }
+      })
+    ).toEqual({ kind: 'failed', error: 'Kernel returned an invalid proposal' });
+  });
 });
 
 describe('applyKernelOutcome', () => {
