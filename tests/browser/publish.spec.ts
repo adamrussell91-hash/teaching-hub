@@ -19,9 +19,8 @@ test('teacher publishes lesson visible on student URL', async ({ page, context }
 
   await page.getByRole('button', { name: /^publish$/i }).click();
 
-  await expect(
-    page.getByText('Published. Students can now view this lesson at:')
-  ).toBeVisible();
+  await expect(page.locator('[data-save-slot]')).toHaveText('Published');
+  await expect(page.getByText('Published. Students can now view this lesson at:')).toHaveCount(0);
 
   const student = await context.newPage();
   await student.goto('/s/lessons/lesson_aotfw_008');
