@@ -432,7 +432,7 @@ describe('mountLessonEditor', () => {
     expect(builder.classList.contains('lesson-builder--rail-shelved')).toBe(true);
   });
 
-  it('wires Publish success into a visible student link', async () => {
+  it('enables the student link after Publish without a canvas banner', async () => {
     mockLessonLoad();
     apiPostMock.mockResolvedValue({ student_path: '/s/lessons/lesson_001' });
     mount();
@@ -441,8 +441,12 @@ describe('mountLessonEditor', () => {
     refs.contextBar.querySelector<HTMLButtonElement>('.context-bar__publish')!.click();
     await tick();
 
-    const link = refs.canvas.querySelector<HTMLAnchorElement>('.lesson-editor__publish-link');
-    expect(link?.getAttribute('href')).toBe('/s/lessons/lesson_001');
+    expect(refs.canvas.querySelector('.lesson-editor__publish-panel')?.hidden).toBe(true);
+    expect(refs.canvas.querySelector('.lesson-editor__publish-link')).toBeNull();
+    expect(
+      refs.contextBar.querySelector<HTMLButtonElement>('.public-link__trigger')?.disabled
+    ).toBe(false);
+    expect(refs.contextBar.querySelector('[data-save-slot]')?.textContent).toBe('Published');
   });
 
   it('wires Publish failure into a checklist of issues', async () => {
