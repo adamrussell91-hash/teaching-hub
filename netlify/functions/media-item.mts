@@ -24,6 +24,7 @@ import {
   LifecycleError,
   parseStatusPatch
 } from './_shared/lifecycle-routes.mts';
+import handleMediaUpload from './media-upload.mts';
 
 interface FunctionContext {
   params: Record<string, string | undefined>;
@@ -136,6 +137,12 @@ export default async function handler(request: Request, context: FunctionContext
   const id = context.params.id;
   if (!id) {
     return withCors(errorResponse(404, 'not_found', 'Media not found'), request, env);
+  }
+
+  // Netlify matches `/api/media/:id` ahead of `/api/media/upload`, so the
+  // dedicated upload function never sees production POSTs. Forward here.
+  if (id === 'upload') {
+    return handleMediaUpload(request);
   }
 
   if (request.method === 'DELETE') {

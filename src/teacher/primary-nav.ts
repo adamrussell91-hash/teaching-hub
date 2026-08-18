@@ -100,6 +100,8 @@ export function renderPrimaryNav(container: HTMLElement, options: PrimaryNavOpti
     label.className = 'primary-nav__label';
     label.textContent = section.label;
 
+    link.setAttribute('aria-label', section.label);
+    link.title = section.label;
     link.append(createGlyph(section.glyph), label);
     link.addEventListener('click', (event) => {
       event.preventDefault();

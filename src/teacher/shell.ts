@@ -1,4 +1,5 @@
 import { createSkipLink } from '@/app/failure';
+import { readTeacherRailPrefs, writeTeacherRailPrefs } from '@/teacher/rail-prefs';
 
 export interface TeacherShellRefs {
   root: HTMLElement;
@@ -7,7 +8,6 @@ export interface TeacherShellRefs {
   main: HTMLElement;
   contextBar: HTMLElement;
   canvas: HTMLElement;
-  jobsHost: HTMLElement;
   logoutButton: HTMLButtonElement | null;
 }
 
@@ -22,6 +22,31 @@ const SIGN_OUT_ICON = `
     <path d="m7 8-4 4 4 4" />
   </svg>
 `.trim();
+
+const CHEVRON_LEFT_ICON = `
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="m15 18-6-6 6-6" />
+  </svg>
+`.trim();
+
+const CHEVRON_RIGHT_ICON = `
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="m9 18 6-6-6-6" />
+  </svg>
+`.trim();
+
+function applyRailCollapsed(
+  layout: HTMLElement,
+  toggle: HTMLButtonElement,
+  collapsed: boolean
+): void {
+  layout.classList.toggle('teacher-layout--rail-collapsed', collapsed);
+  toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  const label = collapsed ? 'Show navigation' : 'Hide navigation';
+  toggle.setAttribute('aria-label', label);
+  toggle.title = label;
+  toggle.innerHTML = collapsed ? CHEVRON_RIGHT_ICON : CHEVRON_LEFT_ICON;
+}
 
 /**
  * Builds the teacher chrome (rail / main / context bar / canvas) and returns
@@ -48,14 +73,22 @@ export function renderTeacherShell(
   brand.className = 'teacher-layout__rail-brand';
   brand.textContent = 'Teaching Hub';
 
-  const jobsHost = document.createElement('div');
-  jobsHost.className = 'teacher-layout__jobs';
-  jobsHost.dataset.jobsHost = '';
-
-  brandRow.append(brand, jobsHost);
-
   const railNav = document.createElement('div');
   railNav.className = 'teacher-layout__rail-nav';
+  railNav.id = 'teacher-rail-nav';
+
+  const railToggle = document.createElement('button');
+  railToggle.type = 'button';
+  railToggle.className = 'hub-icon-btn teacher-layout__rail-toggle';
+  railToggle.setAttribute('aria-controls', 'teacher-rail-nav');
+  applyRailCollapsed(layout, railToggle, readTeacherRailPrefs().collapsed);
+  railToggle.addEventListener('click', () => {
+    const next = !layout.classList.contains('teacher-layout--rail-collapsed');
+    applyRailCollapsed(layout, railToggle, next);
+    writeTeacherRailPrefs({ collapsed: next });
+  });
+
+  brandRow.append(brand, railToggle);
 
   rail.append(brandRow, railNav);
 
@@ -99,7 +132,7 @@ export function renderTeacherShell(
   layout.append(rail, main);
   root.append(createSkipLink('teacher-main'), layout);
 
-  return { root, rail, railNav, main, contextBar, canvas, jobsHost, logoutButton };
+  return { root, rail, railNav, main, contextBar, canvas, logoutButton };
 }
 
 export interface ContextBarConfig {

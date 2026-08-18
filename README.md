@@ -101,11 +101,40 @@ GITHUB_BACKUP_BRANCH=main
    - Netlify Domain management → add `teaching-api.adam-russell.com` → wait for HTTPS
 5. Trigger a Netlify deploy after env vars / domain changes.
 
-### 3. Point the Pages app at the API
+### 3. Google Drive picker (teacher Resources)
+
+The picker is client-only. Vite inlines these at **Pages build** time (`VITE_*`), so they belong in the local `.env` and as **GitHub Actions secrets** — not Netlify.
+
+In [Google Cloud Console](https://console.cloud.google.com/):
+
+1. Create (or pick) a project. Enable **Google Picker API** and **Google Drive API**.
+2. OAuth consent screen (External is fine for a private teacher app). Add yourself as a test user. Scope: `https://www.googleapis.com/auth/drive.file`.
+3. Credentials → **OAuth 2.0 Client ID** (Web application). Authorized JavaScript origins:
+   - `https://teaching-hub.adam-russell.com`
+   - `http://localhost:5173`
+4. Credentials → **API key**. Restrict to **Google Picker API** and HTTP referrers:
+   - `https://teaching-hub.adam-russell.com/*`
+   - `http://localhost:5173/*`
+5. Copy the Cloud **project number** (IAM & Admin → Settings). Picker needs it as App ID for `drive.file`.
+
+Then:
+
+```text
+VITE_GOOGLE_CLIENT_ID=<oauth web client id>
+VITE_GOOGLE_PICKER_API_KEY=<browser api key>
+VITE_GOOGLE_APP_ID=<project number>
+```
+
+- Local: put them in `.env` (see `.env.example`) and restart `npm run dev`.
+- Production: `gh secret set` those three names on this repo, then push `main` (or **Actions → Deploy to GitHub Pages → Run workflow**) so the SPA rebuilds with them.
+
+These values appear in the teacher JS bundle by design. Restrict the API key and OAuth origins as above.
+
+### 4. Point the Pages app at the API
 
 `src/api/config.ts` should use `https://teaching-api.adam-russell.com` (sibling of the Pages site under `adam-russell.com`). That URL is not a secret. Push `main` so Pages rebuilds.
 
-### 4. Seed curriculum into Blobs
+### 5. Seed curriculum into Blobs
 
 Curriculum GET never auto-seeds. Once, with Netlify Blobs credentials / a linked site:
 
@@ -113,7 +142,7 @@ Curriculum GET never auto-seeds. Once, with Netlify Blobs credentials / a linked
 npm run seed:blobs
 ```
 
-### 5. Smoke-check production
+### 6. Smoke-check production
 
 1. Open the Pages URL → sign in with the passphrase you hashed for Netlify.
 2. Open a seed lesson → edit → save → publish.
@@ -122,4 +151,4 @@ npm run seed:blobs
 
 ## Out of scope (later)
 
-AI chat, Google Drive media, class scheduling, Scope and Sequence, A4 print, full block library, version browser.
+Multi-teacher roles, stored Drive refresh tokens, Drive folder sync.

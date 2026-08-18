@@ -28,15 +28,74 @@ describe('mountPublicLinkControl', () => {
     host.remove();
   });
 
-  it('explains drafts and does not offer copy', () => {
+  it('does not paint a publish nag for unpublished lessons', () => {
     const handle = mountPublicLinkControl(host, {
       kind: 'lesson',
       id: 'lesson_1',
       published: false
     });
-    host.querySelector('button')!.click();
-    expect(host.textContent).toMatch(/Publish this lesson/i);
+    const popover = host.querySelector<HTMLElement>('.public-link__popover');
+    expect(popover?.hidden).toBe(true);
+    expect(host.textContent).not.toMatch(/Publish this lesson/i);
+    host.querySelector('button')?.click();
+    expect(popover?.hidden).toBe(true);
+    expect(host.textContent).not.toMatch(/Publish this lesson/i);
     expect(host.querySelector('.public-link__actions')).toBeNull();
+    handle.dispose();
+  });
+
+  it('keeps the popover hidden until the trigger is clicked', () => {
+    const handle = mountPublicLinkControl(host, {
+      kind: 'lesson',
+      id: 'lesson_1',
+      published: true
+    });
+    const popover = host.querySelector<HTMLElement>('.public-link__popover');
+    expect(popover?.hidden).toBe(true);
+    expect(host.querySelector('.public-link__url')).toBeNull();
+    host.querySelector('button')!.click();
+    expect(popover?.hidden).toBe(false);
+    expect(host.classList.contains('public-link--open')).toBe(true);
+    handle.dispose();
+  });
+
+  it('closes the open popover when another public-link opens', () => {
+    const other = document.createElement('div');
+    document.body.append(other);
+    const first = mountPublicLinkControl(host, {
+      kind: 'lesson',
+      id: 'lesson_1',
+      published: true
+    });
+    const second = mountPublicLinkControl(other, {
+      kind: 'lesson',
+      id: 'lesson_2',
+      published: true
+    });
+
+    host.querySelector('button')!.click();
+    expect(host.querySelector<HTMLElement>('.public-link__popover')?.hidden).toBe(false);
+
+    other.querySelector('button')!.click();
+    expect(host.querySelector<HTMLElement>('.public-link__popover')?.hidden).toBe(true);
+    expect(host.classList.contains('public-link--open')).toBe(false);
+    expect(other.querySelector<HTMLElement>('.public-link__popover')?.hidden).toBe(false);
+    expect(other.querySelector('.public-link__url')?.textContent).toContain('/s/lessons/lesson_2');
+
+    first.dispose();
+    second.dispose();
+    other.remove();
+  });
+
+  it('closes on Escape', () => {
+    const handle = mountPublicLinkControl(host, {
+      kind: 'lesson',
+      id: 'lesson_1',
+      published: true
+    });
+    host.querySelector('button')!.click();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(host.querySelector<HTMLElement>('.public-link__popover')?.hidden).toBe(true);
     handle.dispose();
   });
 

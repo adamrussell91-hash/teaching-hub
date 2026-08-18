@@ -562,26 +562,16 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         /* library picker stays empty */
       });
 
-    function showPublishSuccess(studentPath: string): void {
+    function showPublishSuccess(_studentPath: string): void {
       const publishedAt = new Date().toISOString();
       lesson.published_at = publishedAt;
 
       publishPanel.replaceChildren();
-      publishPanel.hidden = false;
-      publishPanel.classList.remove('lesson-editor__publish-panel--error');
-      publishPanel.classList.add('lesson-editor__publish-panel--success');
-
-      const message = document.createElement('p');
-      message.textContent = 'Published. Students can now view this lesson at:';
-
-      const link = document.createElement('a');
-      link.className = 'lesson-editor__publish-link';
-      link.href = studentPath;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      link.textContent = studentPath;
-
-      publishPanel.append(message, link);
+      publishPanel.hidden = true;
+      publishPanel.classList.remove(
+        'lesson-editor__publish-panel--error',
+        'lesson-editor__publish-panel--success'
+      );
       refreshPublicLink();
       page?.revealPublishBlock('', []);
     }
