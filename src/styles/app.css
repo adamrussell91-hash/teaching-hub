@@ -6641,8 +6641,12 @@ input.scope-timeline__note-title:focus-visible {
   border-radius: var(--radius-md);
   background: var(--glass);
   box-shadow: var(--elevation-2, 0 8px 24px color-mix(in srgb, var(--ink) 12%, transparent));
-  display: grid;
+  display: none;
   gap: var(--space-2);
+}
+
+.public-link__popover:not([hidden]) {
+  display: grid;
 }
 
 .public-link__message,
@@ -6651,7 +6655,7 @@ input.scope-timeline__note-title:focus-visible {
   font-family: var(--font-ui);
   font-size: var(--text-sm);
   color: var(--ink);
-  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 
 .public-link__actions {
