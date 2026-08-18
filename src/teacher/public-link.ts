@@ -23,7 +23,7 @@ export function absolutePublicUrl(kind: PublicEntityKind, id: string, origin = l
 export interface PublicLinkControlOptions {
   kind: PublicEntityKind;
   id: string;
-  /** When false, show draft guidance instead of Copy/Open. */
+  /** When false, the control stays inert until Publish creates a snapshot. */
   published: boolean;
   /** Optional label override for the trigger button. */
   label?: string;
@@ -55,6 +55,8 @@ async function copyText(text: string): Promise<boolean> {
   }
 }
 
+let activeClose: (() => void) | null = null;
+
 /**
  * Compact ghost control. Nested inside cards — callers must stopPropagation
  * on the host so whole-card open does not fire.
@@ -74,6 +76,7 @@ export function mountPublicLinkControl(
   trigger.setAttribute('aria-haspopup', 'dialog');
   trigger.setAttribute('aria-expanded', 'false');
   trigger.title = options.label ?? 'Public link';
+  trigger.disabled = !options.published;
   trigger.innerHTML =
     '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11 4"/><path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07L13 20"/></svg>';
 
@@ -85,16 +88,7 @@ export function mountPublicLinkControl(
 
   function paintPopover(): void {
     popover.replaceChildren();
-    if (!options.published) {
-      const message = document.createElement('p');
-      message.className = 'public-link__message';
-      message.textContent =
-        options.kind === 'lesson'
-          ? 'Publish this lesson to create a student link.'
-          : 'This item is not publicly available yet.';
-      popover.append(message);
-      return;
-    }
+    if (!options.published) return;
 
     const path = publicStudentPath(options.kind, options.id);
     const absolute = absolutePublicUrl(options.kind, options.id);
@@ -134,14 +128,26 @@ export function mountPublicLinkControl(
   }
 
   function setOpen(open: boolean): void {
+    if (open) {
+      if (activeClose && activeClose !== closeSelf) activeClose();
+      activeClose = closeSelf;
+      paintPopover();
+    } else if (activeClose === closeSelf) {
+      activeClose = null;
+    }
     popover.hidden = !open;
+    host.classList.toggle('public-link--open', open);
     trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
-    if (open) paintPopover();
+  }
+
+  function closeSelf(): void {
+    setOpen(false);
   }
 
   const onTrigger = (event: MouseEvent): void => {
     event.preventDefault();
     event.stopPropagation();
+    if (!options.published) return;
     setOpen(popover.hidden);
   };
 
@@ -149,6 +155,11 @@ export function mountPublicLinkControl(
     if (popover.hidden) return;
     const target = event.target as Node | null;
     if (target && host.contains(target)) return;
+    setOpen(false);
+  };
+
+  const onKey = (event: KeyboardEvent): void => {
+    if (event.key !== 'Escape' || popover.hidden) return;
     setOpen(false);
   };
 
@@ -160,13 +171,15 @@ export function mountPublicLinkControl(
   host.addEventListener('click', stop);
   host.addEventListener('keydown', stop);
   document.addEventListener('click', onDoc);
+  document.addEventListener('keydown', onKey);
 
   host.append(trigger, popover);
-  paintPopover();
 
   return {
     dispose: () => {
+      if (activeClose === closeSelf) activeClose = null;
       document.removeEventListener('click', onDoc);
+      document.removeEventListener('keydown', onKey);
       host.replaceChildren();
     }
   };
