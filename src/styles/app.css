@@ -1181,6 +1181,7 @@ a:hover {
 
 .student-surface {
   position: relative;
+  width: 100%;
   min-height: 100dvh;
   background: transparent;
   color: var(--ink);
@@ -1197,7 +1198,7 @@ a:hover {
   justify-content: space-between;
   gap: var(--space-4);
   min-height: 3.5rem;
-  padding: var(--space-3) var(--space-5);
+  padding: var(--space-3) clamp(var(--space-5), 3vw, var(--space-10));
   font-size: var(--text-sm);
   color: var(--navy);
   background: color-mix(in srgb, var(--paper) 82%, transparent);
@@ -1253,13 +1254,10 @@ a:hover {
 }
 
 .student-surface__content {
-  max-width: 52rem;
-  margin: 0 auto;
-  padding: var(--space-8) var(--space-5) var(--space-16);
-}
-
-.student-surface__content--class {
-  max-width: 72rem;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: var(--space-8) clamp(var(--space-5), 3vw, var(--space-10)) var(--space-16);
 }
 
 .student-status {
