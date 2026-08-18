@@ -40,6 +40,17 @@ export type PositionedEdge = {
   y2: number;
 };
 
+export const GRAPH_NODE_R = 18;
+
+function radialRadius(count: number): number {
+  const packed = Math.ceil(((GRAPH_NODE_R * 2 + 52) * Math.max(count, 1)) / (2 * Math.PI));
+  return Math.max(120, packed);
+}
+
+function canvasCentre(radius: number): { cx: number; cy: number } {
+  return { cx: radius + 96, cy: radius + 72 };
+}
+
 function isRoot(node: GraphNode): boolean {
   return node.parent_id == null;
 }
@@ -117,10 +128,9 @@ export function layoutMindMap(nodes: GraphNode[]): PositionedNode[] {
   const root = roots[0] ?? sorted[0];
   if (!root) return [];
 
-  const cx = 200;
-  const cy = 120;
-  const radius = 90;
   const children = sorted.filter((node) => node.id !== root.id);
+  const radius = radialRadius(children.length);
+  const { cx, cy } = canvasCentre(radius);
   const positioned: PositionedNode[] = [{ id: root.id, label: root.label, x: cx, y: cy }];
 
   children.forEach((node, index) => {
@@ -142,9 +152,8 @@ export function layoutConceptMap(
 ): { nodes: PositionedNode[]; edges: PositionedEdge[] } {
   const sortedNodes = [...nodes].sort((a, b) => a.id.localeCompare(b.id));
   const sortedEdges = [...edges].sort((a, b) => a.id.localeCompare(b.id));
-  const cx = 200;
-  const cy = 120;
-  const radius = 90;
+  const radius = radialRadius(sortedNodes.length);
+  const { cx, cy } = canvasCentre(radius);
 
   const positionedNodes: PositionedNode[] = sortedNodes.map((node, index) => {
     const angle = (Math.PI * 2 * index) / Math.max(sortedNodes.length, 1) - Math.PI / 2;

@@ -57,6 +57,23 @@ describe('formatPublishIssues', () => {
     ]);
   });
 
+  it('does not prefix block issues with a blocks. path', () => {
+    const error = new ApiClientError({
+      code: 'validation_error',
+      message: 'Lesson is not publishable',
+      details: [
+        {
+          path: ['blocks'],
+          message:
+            'Diagram “Spacing vs massed practice”: Diagram image needs a valid http(s) URL to publish'
+        }
+      ]
+    });
+    expect(formatPublishIssues(error)).toEqual([
+      'Diagram “Spacing vs massed practice”: Diagram image needs a valid http(s) URL to publish'
+    ]);
+  });
+
   it('falls back to the error message when there are no structured details', () => {
     const error = new ApiClientError({ code: 'validation_error', message: 'Nope' });
     expect(formatPublishIssues(error)).toEqual(['Nope']);

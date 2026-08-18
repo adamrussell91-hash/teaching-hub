@@ -7,7 +7,6 @@ import {
   renderTeacherShell,
   type TeacherShellRefs
 } from '@/teacher/shell';
-import { mountAiJobsInbox, type AiJobsInboxHandle } from '@/teacher/ai-jobs-inbox';
 import { fetchCurriculum, type CurriculumResponse } from '@/teacher/nav';
 import { renderTeacherRail } from '@/teacher/rail';
 import { renderTeacherHome as renderHomeCanvas } from '@/teacher/home';
@@ -71,7 +70,6 @@ let lessonEditorHandle: LessonEditorHandle | null = null;
 
 // Latest teacher shell refs (for search create-modal callbacks).
 let teacherShellRefs: TeacherShellRefs | null = null;
-let jobsInboxHandle: AiJobsInboxHandle | null = null;
 
 // The student lesson view mounted for the current public route, if any.
 let studentLessonViewHandle: StudentLessonViewHandle | null = null;
@@ -380,10 +378,6 @@ async function handleLogout(): Promise<void> {
 function mountTeacherShell(): TeacherShellRefs {
   const refs = renderTeacherShell(appRoot, { onLogout: () => handleLogout() });
   teacherShellRefs = refs;
-  jobsInboxHandle?.dispose();
-  jobsInboxHandle = mountAiJobsInbox(refs.jobsHost, {
-    onOpenLesson: (lessonId) => navigate(`/lessons/${lessonId}`)
-  });
   return refs;
 }
 

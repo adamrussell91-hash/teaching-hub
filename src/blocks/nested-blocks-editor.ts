@@ -45,6 +45,7 @@ export function createNestedBlocksEditor(options: NestedBlocksEditorOptions): HT
     blocks.forEach((block, index) => {
       const row = document.createElement('div');
       row.className = 'block-editor__nested-row';
+      row.dataset.blockId = block.id;
 
       const controls = document.createElement('div');
       controls.className = 'block-editor__nested-controls';

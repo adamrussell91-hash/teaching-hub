@@ -462,10 +462,21 @@ describe('chart-svg', () => {
     const svg = buildChartSvg(content);
     expect(svg).toMatch(/<svg[\s\S]*<\/svg>/);
     expect(svg).toMatch(/A/);
-    expect(svg).toMatch(/#376fb7/);
+    expect(svg).toMatch(/var\(--wave\)/);
     expect(svg).not.toMatch(/#2563eb/);
+    expect(svg).not.toMatch(/>Demo</);
     const rows = buildChartTableRows(content);
     expect(rows.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('uses a series colour token when set', () => {
+    const svg = buildChartSvg({
+      chart_type: 'bar',
+      series: [
+        { id: 's1', name: 'Spaced', color: 'danger', points: [{ x: 'Day 1', y: 80 }] }
+      ]
+    });
+    expect(svg).toMatch(/var\(--danger\)/);
   });
 });
 
@@ -516,11 +527,71 @@ describe('visualisation renderers', () => {
     }
   });
 
+  it('tells the teacher a caption-only diagram cannot publish', () => {
+    const block = {
+      ...createBlock('diagram', 'd1'),
+      content: {
+        source: 'image' as const,
+        image_url: '',
+        image_alt: '',
+        caption: 'Spacing vs massed practice'
+      }
+    };
+    const el = renderBlock(block as ReturnType<typeof createBlock>, 'teacher');
+    expect(el.querySelector('img')).toBeNull();
+    expect(el.querySelector('.block-diagram__unavailable')?.textContent).toBe(
+      'Diagram image needs a valid http(s) URL to publish'
+    );
+    expect(el.querySelector('.block-diagram__caption')?.textContent).toBe(
+      'Spacing vs massed practice'
+    );
+  });
+
   it('renders mind_map and concept_map svg', () => {
     expect(renderBlock(createBlock('mind_map', 'm1'), 'student').querySelector('svg')).toBeTruthy();
     expect(
       renderBlock(createBlock('concept_map', 'cm1'), 'student').querySelector('svg')
     ).toBeTruthy();
+  });
+
+  it('keeps the mind map title in HTML and spreads labels outside the nodes', () => {
+    const block = createBlock('mind_map', 'm1');
+    if (block.block_type !== 'mind_map') throw new Error('expected mind_map');
+    block.content = {
+      title: 'The Spacing Effect',
+      nodes: [
+        { id: 'centre', label: 'Spacing Effect', parent_id: null },
+        ...[
+          'Why it works',
+          'Evidence base',
+          'How to apply it',
+          'Retrieval practice',
+          'Cepeda et al. (2006)',
+          'Ebbinghaus (1885)',
+          'Flashcard review sessions',
+          'repetition schedule'
+        ].map((label, index) => ({
+          id: `n${index + 1}`,
+          label,
+          parent_id: 'centre'
+        }))
+      ],
+      edges: []
+    };
+    const el = renderBlock(block, 'teacher');
+    expect(el.querySelector('.block-mind-map__title')?.textContent).toBe('The Spacing Effect');
+    const svg = el.querySelector('svg');
+    expect(svg?.innerHTML).not.toContain('The Spacing Effect');
+    const viewBox = (svg?.getAttribute('viewBox') ?? '').split(' ').map(Number);
+    expect(viewBox[2]).toBeGreaterThan(400);
+    expect(viewBox[3]).toBeGreaterThan(240);
+    const circle = el.querySelector('circle');
+    const label = [...el.querySelectorAll('text')].find((node) =>
+      (node.textContent ?? '').includes('Why it works')
+    );
+    expect(circle).not.toBeNull();
+    expect(label).not.toBeNull();
+    expect(label?.getAttribute('y')).not.toBe(circle?.getAttribute('cy'));
   });
 });
 
@@ -551,6 +622,20 @@ describe('visualisation editors', () => {
       seriesName.value = 'Class A';
       seriesName.dispatchEvent(new Event('input'));
       expect(latest.content.series[0]!.name).toBe('Class A');
+    });
+
+    it('lets the teacher pick a series colour from the kit tokens', () => {
+      const block = createBlock('chart', 'c1');
+      if (block.block_type !== 'chart') throw new Error('expected chart');
+      let latest = block;
+      const el = createChartEditor(block, (next) => {
+        latest = next;
+      });
+      const colour = el.querySelector('.block-editor__chart-series-color') as HTMLSelectElement;
+      expect(colour).not.toBeNull();
+      colour.value = 'danger';
+      colour.dispatchEvent(new Event('change'));
+      expect(latest.content.series[0]?.color).toBe('danger');
     });
   });
 
@@ -601,6 +686,15 @@ describe('visualisation editors', () => {
       svg.value = '<svg xmlns="http://www.w3.org/2000/svg"><circle r="2"/></svg>';
       svg.dispatchEvent(new Event('input'));
       expect(latest.content.svg_markup).toContain('circle');
+    });
+
+    it('previews the publish URL requirement when the image URL is empty', () => {
+      const block = createBlock('diagram', 'd1');
+      if (block.block_type !== 'diagram') throw new Error('expected diagram');
+      const el = createDiagramEditor(block, () => {});
+      expect(el.querySelector('.block-editor__diagram-preview')?.textContent).toContain(
+        'Diagram image needs a valid http(s) URL to publish'
+      );
     });
   });
 

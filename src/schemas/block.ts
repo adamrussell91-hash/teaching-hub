@@ -444,9 +444,20 @@ export const ChartPointSchema = z.object({
   y: z.number()
 });
 
+export const ChartSeriesColorSchema = z.enum([
+  'wave',
+  'danger',
+  'success',
+  'high-sea',
+  'pastel-lilac-ink',
+  'navy-2'
+]);
+export type ChartSeriesColor = z.infer<typeof ChartSeriesColorSchema>;
+
 export const ChartSeriesSchema = z.object({
   id: z.string().min(1),
   name: z.string(),
+  color: ChartSeriesColorSchema.optional(),
   points: z.array(ChartPointSchema).min(1).max(24)
 });
 
@@ -482,6 +493,9 @@ export const EquationBlockSchema = z.object({
 });
 
 export const DiagramSourceSchema = z.enum(['image', 'svg']);
+
+export const DIAGRAM_IMAGE_PUBLISH_URL_ISSUE =
+  'Diagram image needs a valid http(s) URL to publish';
 
 export const DiagramBlockSchema = z.object({
   id: z.string().min(1),

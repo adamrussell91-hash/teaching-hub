@@ -102,7 +102,7 @@ describe('mountLessonPage', () => {
     document.body.replaceChildren();
   });
 
-  function mount(lesson: Lesson = makeLesson(), extras: { onSaveTemplate?: () => void; onExport?: () => void } = {}) {
+  function mount(lesson: Lesson = makeLesson(), extras: { onSaveTemplate?: () => void; onExport?: () => void; onTrash?: () => void } = {}) {
     const onChange = vi.fn();
     const onPrint = vi.fn();
     const onSelect = vi.fn();
@@ -368,6 +368,46 @@ describe('mountLessonPage', () => {
       host.querySelector('.block-editor__visibility, [aria-label="Visibility"], select')
     ).not.toBeNull();
     expect(host.querySelector('.block-editor__move-up')).toBeNull();
+  });
+
+  it('deletes a video block from the gutter without selecting it first', () => {
+    const video = createBlock('video', 'v1');
+    if (video.block_type !== 'video') throw new Error('expected video');
+    video.content = { provider: 'youtube', external_id: 'dQw4w9WgXcQ' };
+    const { onChange } = mount(makeLesson({ blocks: [createBlock('heading', 'h1'), video] }));
+
+    const frame = host.querySelector<HTMLIFrameElement>('[data-block-id="v1"] iframe');
+    expect(frame).not.toBeNull();
+    expect(host.querySelector('.lesson-page__inspector')).toBeNull();
+
+    host.querySelector<HTMLButtonElement>('[data-block-id="v1"] [aria-label="Delete block"]')!.click();
+
+    const next = onChange.mock.calls.at(-1)?.[0] as Lesson;
+    expect(next.blocks.map((block) => block.id)).toEqual(['h1']);
+  });
+
+  it('reveals a publish error on the named block', () => {
+    const diagram = createBlock('diagram', 'd1');
+    if (diagram.block_type !== 'diagram') throw new Error('expected diagram');
+    diagram.content = {
+      source: 'image',
+      image_url: '',
+      image_alt: '',
+      caption: 'Spacing vs massed practice'
+    };
+    const { handle } = mount(makeLesson({ blocks: [createBlock('heading', 'h1'), diagram] }));
+    handle.revealPublishBlock('d1', ['d1']);
+    const row = host.querySelector('[data-block-id="d1"]');
+    expect(row?.classList.contains('lesson-page__block--publish-error')).toBe(true);
+    expect(row?.classList.contains('lesson-page__block--selected')).toBe(true);
+  });
+
+  it('offers Move to trash in the page menu', () => {
+    const onTrash = vi.fn();
+    mount(makeLesson(), { onTrash });
+    host.querySelector<HTMLButtonElement>('.lesson-page__more-btn')!.click();
+    host.querySelector<HTMLButtonElement>('.lesson-page__trash')!.click();
+    expect(onTrash).toHaveBeenCalledTimes(1);
   });
 
   it('inserting flashcards reveals front and back fields on the canvas', () => {

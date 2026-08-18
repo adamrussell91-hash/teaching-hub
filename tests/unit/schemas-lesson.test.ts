@@ -1140,6 +1140,27 @@ describe('PublishableLessonSchema visualisation rules', () => {
     }
   });
 
+  it('rejects caption-only diagram image on publish', () => {
+    const result = PublishableLessonSchema.safeParse({
+      ...baseLesson,
+      blocks: [
+        {
+          ...okDiagramImage,
+          content: {
+            source: 'image',
+            image_url: '',
+            image_alt: '',
+            caption: 'Spacing vs massed practice'
+          }
+        }
+      ]
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.message.includes('http(s) URL'))).toBe(true);
+    }
+  });
+
   it('rejects diagram image with bad url on publish', () => {
     const result = PublishableLessonSchema.safeParse({
       ...baseLesson,
