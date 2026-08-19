@@ -7368,6 +7368,85 @@ input.scope-timeline__note-title:focus-visible {
   display: none;
 }
 
+.alchemy-lab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+}
+
+.alchemy-lab__header {
+  margin: 0;
+}
+
+.alchemy-lab__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+}
+
+.alchemy-lab__form textarea {
+  width: 100%;
+  min-height: 8rem;
+  resize: vertical;
+  font: inherit;
+  color: var(--depth);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+}
+
+.alchemy-lab__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.alchemy-lab__mode,
+.alchemy-lab__error {
+  margin: 0;
+  font-size: var(--text-xs);
+}
+
+.alchemy-lab__error {
+  color: var(--high-sea);
+}
+
+.alchemy-lab__results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.alchemy-lab-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+}
+
+.alchemy-lab-card__icon {
+  margin: 0;
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--shallow);
+}
+
+.alchemy-lab-card h2 {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.alchemy-lab-card__why,
+.alchemy-lab-card__excerpt {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--mid);
+}
+
 .lesson-palette__flyout-footer {
   margin-top: var(--space-2);
 }
