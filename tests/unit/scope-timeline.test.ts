@@ -281,8 +281,8 @@ describe('scope timeline editor', () => {
 
     const [id, body] = patchScopeSequenceMock.mock.calls[0]!;
     expect(id).toBe('scope_y12_engadv_2026');
-    expect(body.timeline_items).toHaveLength(3);
-    const added = body.timeline_items.find(
+    expect(body.timeline_items!).toHaveLength(3);
+    const added = body.timeline_items!.find(
       (item) => item.kind === 'unit' && item.unit_id === 'unit_hamlet'
     );
     expect(added).toMatchObject({ kind: 'unit', unit_id: 'unit_hamlet', start_week: 1, end_week: 4 });
@@ -351,7 +351,7 @@ describe('scope timeline editor', () => {
     });
 
     const [, body] = patchScopeSequenceMock.mock.calls[0]!;
-    const note = body.timeline_items.find(
+    const note = body.timeline_items!.find(
       (item) => item.kind === 'note' && item.id !== 'ti_note_1'
     );
     expect(note).toMatchObject({
@@ -383,7 +383,7 @@ describe('scope timeline editor', () => {
       expect(patchScopeSequenceMock).toHaveBeenCalledTimes(1);
     });
     const [, body] = patchScopeSequenceMock.mock.calls[0]!;
-    expect(body.timeline_items.find((item) => item.id === 'ti_note_1')).toMatchObject({
+    expect(body.timeline_items!.find((item) => item.id === 'ti_note_1')).toMatchObject({
       kind: 'note',
       title: 'Exam week'
     });
@@ -452,7 +452,7 @@ describe('scope timeline editor', () => {
       expect(patchScopeSequenceMock).toHaveBeenCalledTimes(1);
     });
     const [, body] = patchScopeSequenceMock.mock.calls[0]!;
-    expect(body.timeline_items.some((item) => item.id === 'ti_note_1')).toBe(false);
+    expect(body.timeline_items!.some((item) => item.id === 'ti_note_1')).toBe(false);
 
     await vi.waitFor(() => {
       expect(canvas.querySelector('.scope-timeline__item--note')).toBeNull();
@@ -475,7 +475,7 @@ describe('scope timeline editor', () => {
       expect(patchScopeSequenceMock).toHaveBeenCalledTimes(1);
     });
     const [, body] = patchScopeSequenceMock.mock.calls[0]!;
-    expect(body.timeline_items.some((item) => item.id === 'ti_unit_aotfw')).toBe(false);
+    expect(body.timeline_items!.some((item) => item.id === 'ti_unit_aotfw')).toBe(false);
     expect(local.units.some((entry) => entry.id === 'unit_aotfw')).toBe(true);
 
     await vi.waitFor(() => {
@@ -546,7 +546,7 @@ describe('scope timeline editor', () => {
     });
 
     const [, body] = patchScopeSequenceMock.mock.calls[0]!;
-    expect(body.timeline_items.find((entry) => entry.id === 'ti_unit_aotfw')).toMatchObject({
+    expect(body.timeline_items!.find((entry) => entry.id === 'ti_unit_aotfw')).toMatchObject({
       start_week: 14,
       end_week: 20,
       start_date: '2026-05-18',
@@ -579,7 +579,7 @@ describe('scope timeline editor', () => {
     });
 
     const [, body] = patchScopeSequenceMock.mock.calls[0]!;
-    expect(body.timeline_items.find((entry) => entry.id === 'ti_unit_aotfw')).toMatchObject({
+    expect(body.timeline_items!.find((entry) => entry.id === 'ti_unit_aotfw')).toMatchObject({
       start_week: 12,
       end_week: 20
     });

@@ -80,6 +80,7 @@ function extractBlock(block: Block, parts: string[]): void {
     case 'concept_map':
     case 'gallery':
     case 'collection':
+    case 'outcomes':
       walkStrings(c, parts);
       break;
     case 'columns': {

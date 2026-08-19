@@ -3,6 +3,8 @@ import { apiGet, ApiClientError } from '@/api/client';
 import { renderBlock } from '@/blocks/render';
 import type { PublishedUnit } from '@/schemas/published-unit';
 import { renderStudentHero } from '@/student/hero';
+import { mountPublicOutcomeChips } from '@/outcomes/strip';
+import type { PublicOutcome } from '@/curriculum/outcome-catalog';
 import {
   createStudentShell,
   renderStudentChrome,
@@ -33,13 +35,18 @@ function renderPublishedUnit(content: HTMLElement, unit: PublishedUnit): void {
     })
   );
 
+  const publishedOutcomes = (unit as PublishedUnit & { outcomes?: PublicOutcome[] }).outcomes;
+  if (publishedOutcomes && publishedOutcomes.length > 0) {
+    mountPublicOutcomeChips(content, publishedOutcomes);
+  }
+
   const planBlocks = unit.blocks ?? [];
   if (planBlocks.length > 0) {
     const plan = document.createElement('section');
     plan.className = 'student-panel student-unit__plan';
     plan.dataset.unitSection = 'plan';
     for (const block of planBlocks) {
-      plan.append(renderBlock(block, 'student'));
+      plan.append(renderBlock(block, 'student', { attachedOutcomes: publishedOutcomes }));
     }
     content.append(plan);
   }

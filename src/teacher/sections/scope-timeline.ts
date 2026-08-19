@@ -18,6 +18,7 @@ import { resolveScheduleToday } from '@/schedule/today';
 import type { CurriculumResponse } from '@/teacher/nav';
 import { patchScopeSequence } from '@/teacher/scope-api';
 import { renderPageHeader } from '@/teacher/page-header';
+import { mountOutcomeStrip } from '@/outcomes/strip';
 
 export const SCOPE_TIMELINE_ZOOM_KEY = 'teaching-hub.scope-timeline-zoom';
 
@@ -239,7 +240,23 @@ export function renderScopeTimelineEditor(
   const todayYmd = resolveScheduleToday(curriculum.schedule_anchor_date);
 
   canvas.replaceChildren();
-  renderPageHeader(canvas, { eyebrow: 'Scope & Sequence', title: subject.title });
+  const pageHeader = renderPageHeader(canvas, { eyebrow: 'Scope & Sequence', title: subject.title });
+  const stripHost = document.createElement('div');
+  pageHeader.insertAdjacentElement('afterend', stripHost);
+  mountOutcomeStrip(stripHost, {
+    catalog: curriculum.outcomes ?? [],
+    subject,
+    attached: scope,
+    editable: true,
+    onChange: async (ids) => {
+      scope = await patchScopeSequence(scope.id, { outcome_ids: ids });
+      options?.onPatched?.(scope);
+    },
+    onCatalogChange: (created) => {
+      curriculum.outcomes = [...(curriculum.outcomes ?? []), created];
+      subject.outcome_ids = [...subject.outcome_ids, created.id];
+    }
+  });
 
   const root = document.createElement('div');
   root.className = 'scope-timeline';

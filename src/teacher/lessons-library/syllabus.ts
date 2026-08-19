@@ -33,7 +33,7 @@ export function coverageGaps(
   const counts = new Map<string, number>();
   for (const lesson of lessons) {
     if (lesson.status === 'trashed') continue;
-    for (const outcome of lesson.syllabus_outcomes ?? []) {
+    for (const outcome of lesson.outcome_ids ?? lesson.syllabus_outcomes ?? []) {
       counts.set(outcome, (counts.get(outcome) ?? 0) + 1);
     }
   }

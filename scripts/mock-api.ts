@@ -13,6 +13,7 @@ import {
   scheduleAnchorKey,
   scopeSequenceKey,
   mediaKey,
+  outcomeKey,
   mediaFileKey,
   compositionKey,
   lessonTemplateKey,
@@ -34,6 +35,7 @@ import {
   ClassSchema,
   CompositionTemplateSchema,
   CoverPatchSchema,
+  CurriculumOutcomeSchema,
   DEFAULT_PEDAGOGICAL_MODE,
   isPedagogicalMode,
   LessonSchema,
@@ -59,6 +61,7 @@ import {
   type CompositionSummary,
   type CompositionTemplate,
   type Cover,
+  type CurriculumOutcome,
   type Lesson,
   type LessonTemplate,
   type LessonTemplateSummary,
@@ -72,6 +75,8 @@ import {
   type UnitTemplateSummary
 } from '../src/schemas';
 import { orderLessonsByUnitIds } from '../src/schemas/published-unit';
+import { toPublicOutcome } from '../src/curriculum/outcome-catalog';
+import { attachedOutcomeIds } from '../src/curriculum/outcome-ids';
 import { filterBlocksForStudent } from '../src/blocks/visibility';
 import { sanitizeBlocksDeep } from '../src/blocks/sanitize-blocks';
 import { isLinkedSection } from '../src/blocks/composition-link';
@@ -585,6 +590,14 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
 
     const anchor = store.getJSON<{ date: string }>(scheduleAnchorKey());
 
+    const outcomes = store
+      .listKeys('outcomes/')
+      .map((key) => {
+        const parsed = CurriculumOutcomeSchema.safeParse(store.getJSON(key));
+        return parsed.success ? parsed.data : null;
+      })
+      .filter((row): row is CurriculumOutcome => row !== null);
+
     return {
       years,
       subjects,
@@ -594,6 +607,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       scheduled_lessons,
       scope_sequences,
       media,
+      outcomes,
       schedule_anchor_date: anchor?.date ?? DEFAULT_SCHEDULE_ANCHOR_DATE
     };
   }
@@ -686,6 +700,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
               const parsed = MediaSchema.safeParse(entry);
               return parsed.success;
             }),
+            outcomes: listStored('outcomes/'),
             compositions: listStored('templates/compositions/'),
             lesson_templates: listStored('templates/lessons/'),
             unit_templates: listStored('templates/units/'),
@@ -1029,9 +1044,18 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
   }
 
   function handleGetPublishedLesson(id: string): MockResponse {
-    const snapshot = store.getJSON(publishedLessonKey(id));
+    const snapshot = store.getJSON<Record<string, unknown>>(publishedLessonKey(id));
     if (!snapshot) return notFoundResponse('Lesson is not published');
-    return okResponse(200, snapshot);
+    const ids = attachedOutcomeIds({
+      outcome_ids: Array.isArray(snapshot.outcome_ids)
+        ? snapshot.outcome_ids.filter((row): row is string => typeof row === 'string')
+        : undefined
+    });
+    const outcomes = ids
+      .map((outcomeId) => CurriculumOutcomeSchema.safeParse(store.getJSON(outcomeKey(outcomeId))))
+      .filter((parsed) => parsed.success)
+      .map((parsed) => toPublicOutcome(parsed.data));
+    return okResponse(200, { ...snapshot, outcome_ids: ids, outcomes });
   }
 
   function handleGetPublishedClass(classId: string): MockResponse {
@@ -1103,6 +1127,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       lesson_ids?: string[];
       cover?: unknown;
       blocks?: unknown;
+      outcome_ids?: string[];
     }>(unitKey(id));
     if (!unit || typeof unit.title !== 'string' || !unit.title) {
       return notFoundResponse('Unit not found');
@@ -1155,6 +1180,12 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       filterBlocksForStudent(unitParsed.success ? (unitParsed.data.blocks ?? []) : [])
     );
 
+    const ids = attachedOutcomeIds({ outcome_ids: unit.outcome_ids });
+    const outcomes = ids
+      .map((outcomeId) => CurriculumOutcomeSchema.safeParse(store.getJSON(outcomeKey(outcomeId))))
+      .filter((parsed) => parsed.success)
+      .map((parsed) => toPublicOutcome(parsed.data));
+
     return okResponse(200, {
       unit_id: id,
       title: unit.title,
@@ -1162,7 +1193,9 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       ...(unitParsed.success && unitParsed.data.cover
         ? { cover: unitParsed.data.cover }
         : {}),
-      blocks: studentBlocks
+      blocks: studentBlocks,
+      outcome_ids: ids,
+      outcomes
     });
   }
 
@@ -1553,17 +1586,18 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const hasBlocks = record.blocks !== undefined;
     const hasLessonIds = record.lesson_ids !== undefined;
     const hasCover = record.cover !== undefined;
+    const hasOutcomeIds = record.outcome_ids !== undefined;
     const statusFields = parseStatusPatch(body);
     if (!statusFields.ok) {
       return errorResponse(400, statusFields.code, statusFields.message);
     }
     const hasStatus = statusFields.hasStatus;
 
-    if (!hasTitle && !hasDescription && !hasBlocks && !hasLessonIds && !hasCover && !hasStatus) {
+    if (!hasTitle && !hasDescription && !hasBlocks && !hasLessonIds && !hasCover && !hasStatus && !hasOutcomeIds) {
       return errorResponse(
         400,
         'validation_error',
-        'Provide title, description, blocks, lesson_ids, cover, and/or status'
+        'Provide title, description, blocks, lesson_ids, cover, outcome_ids, and/or status'
       );
     }
 
@@ -1616,6 +1650,18 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       cover = coverParsed.data;
     }
 
+    let outcome_ids: string[] | undefined;
+    if (hasOutcomeIds) {
+      if (
+        !Array.isArray(record.outcome_ids) ||
+        record.outcome_ids.some((id) => typeof id !== 'string' || !id) ||
+        record.outcome_ids.length > 24
+      ) {
+        return errorResponse(400, 'validation_error', 'outcome_ids are invalid');
+      }
+      outcome_ids = record.outcome_ids as string[];
+    }
+
     const rawUnit = store.getJSON(unitKey(unitId));
     if (!rawUnit) return notFoundResponse('Unit not found');
     const unitParsed = UnitSchema.safeParse(rawUnit);
@@ -1639,6 +1685,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
         merged.cover = cover;
       }
     }
+    if (outcome_ids !== undefined) merged.outcome_ids = outcome_ids;
 
     if (hasStatus) {
       try {
@@ -1785,11 +1832,10 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     }
 
     const record = body as Record<string, unknown>;
-    if (record.timeline_items === undefined) {
-      return errorResponse(400, 'validation_error', 'Provide timeline_items');
-    }
-    if (!Array.isArray(record.timeline_items)) {
-      return errorResponse(400, 'validation_error', 'timeline_items must be an array');
+    const hasTimeline = record.timeline_items !== undefined;
+    const hasOutcomes = record.outcome_ids !== undefined;
+    if (!hasTimeline && !hasOutcomes) {
+      return errorResponse(400, 'validation_error', 'Provide timeline_items and/or outcome_ids');
     }
 
     const rawScope = store.getJSON(scopeSequenceKey(scopeId));
@@ -1799,8 +1845,14 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       return errorResponse(400, 'validation_error', 'Scope sequence data is invalid');
     }
 
+    let timeline_items = scopeParsed.data.timeline_items;
+    if (hasTimeline) {
+    if (!Array.isArray(record.timeline_items)) {
+      return errorResponse(400, 'validation_error', 'timeline_items must be an array');
+    }
+
     const weekCount = scopeParsed.data.week_count;
-    const timeline_items: TimelineItem[] = [];
+    timeline_items = [];
     const seenUnitIds = new Set<string>();
 
     for (const raw of record.timeline_items) {
@@ -1847,11 +1899,25 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
 
       timeline_items.push(item);
     }
+    }
+
+    let outcome_ids = scopeParsed.data.outcome_ids;
+    if (hasOutcomes) {
+      if (
+        !Array.isArray(record.outcome_ids) ||
+        record.outcome_ids.some((id) => typeof id !== 'string' || !id) ||
+        record.outcome_ids.length > 24
+      ) {
+        return errorResponse(400, 'validation_error', 'outcome_ids are invalid');
+      }
+      outcome_ids = record.outcome_ids as string[];
+    }
 
     const nowIso = new Date().toISOString();
     const merged = {
       ...scopeParsed.data,
       timeline_items,
+      ...(outcome_ids !== undefined ? { outcome_ids } : {}),
       updated_at: nowIso
     };
 
@@ -1862,6 +1928,74 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
 
     store.setJSON(scopeSequenceKey(scopeId), validated.data);
     return okResponse(200, validated.data);
+  }
+
+  function handlePostOutcome(cookie: string | null | undefined, body: unknown): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+    if (typeof body !== 'object' || body === null) {
+      return errorResponse(400, 'validation_error', 'Request body must be a JSON object');
+    }
+    const record = body as Record<string, unknown>;
+    const subjectId = typeof record.subject_id === 'string' ? record.subject_id.trim() : '';
+    const code = typeof record.code === 'string' ? record.code.trim() : '';
+    const title = typeof record.title === 'string' ? record.title.trim() : '';
+    const description = typeof record.description === 'string' ? record.description.trim() : '';
+    const group =
+      typeof record.group === 'string' && record.group.trim() ? record.group.trim() : 'Custom';
+    if (!subjectId || !code || !title || !description) {
+      return errorResponse(
+        400,
+        'validation_error',
+        'subject_id, code, title, and description are required'
+      );
+    }
+    const rawSubject = store.getJSON(subjectKey(subjectId));
+    const subjectParsed = SubjectSchema.safeParse(rawSubject);
+    if (!subjectParsed.success) return notFoundResponse('Subject not found');
+    const duplicate = store.listKeys('outcomes/').some((key) => {
+      const parsed = CurriculumOutcomeSchema.safeParse(store.getJSON(key));
+      return (
+        parsed.success &&
+        parsed.data.subject_id === subjectId &&
+        parsed.data.code.toLowerCase() === code.toLowerCase()
+      );
+    });
+    if (duplicate) {
+      return errorResponse(409, 'conflict', 'An outcome with this code already exists for the subject');
+    }
+    const now = new Date().toISOString();
+    const candidate = {
+      id: newId('outcome'),
+      type: 'curriculum_outcome' as const,
+      source: 'custom' as const,
+      title,
+      slug: slugify(code),
+      status: 'active' as const,
+      created_at: now,
+      updated_at: now,
+      schema_version: 1 as const,
+      code,
+      description,
+      group,
+      subject_id: subjectId
+    };
+    const validated = CurriculumOutcomeSchema.safeParse(candidate);
+    if (!validated.success) {
+      return errorResponse(400, 'validation_error', 'Outcome data is invalid');
+    }
+    const subject = {
+      ...subjectParsed.data,
+      outcome_ids: [...subjectParsed.data.outcome_ids, validated.data.id],
+      updated_at: now
+    };
+    const subjectOut = SubjectSchema.safeParse(subject);
+    if (!subjectOut.success) {
+      return errorResponse(400, 'validation_error', 'Subject data is invalid');
+    }
+    store.setJSON(outcomeKey(validated.data.id), validated.data);
+    store.setJSON(subjectKey(subjectId), subjectOut.data);
+    return okResponse(201, validated.data);
   }
 
   function handlePostClass(cookie: string | null | undefined, body: unknown): MockResponse {
@@ -3349,6 +3483,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
 
     if (method === 'POST' && path === '/api/classes') return handlePostClass(cookie, body);
     if (method === 'POST' && path === '/api/subjects') return handlePostSubject(cookie, body);
+    if (method === 'POST' && path === '/api/outcomes') return handlePostOutcome(cookie, body);
     if (method === 'POST' && path === '/api/units') return handlePostUnit(cookie, body);
     if (method === 'POST' && path === '/api/lessons') return handlePostLesson(cookie, body);
     if (method === 'POST' && path === '/api/scope-sequences') {

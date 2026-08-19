@@ -14,6 +14,8 @@ import { renderBlock } from '@/blocks/render';
 import type { Block } from '@/schemas/block';
 import type { Lesson } from '@/schemas/lesson';
 import type { Media } from '@/schemas/media';
+import type { CurriculumOutcome } from '@/schemas/outcome';
+import { mountOutcomeStrip, publicOutcomesForPage } from '@/outcomes/strip';
 import {
   PEDAGOGICAL_MODES,
   PEDAGOGICAL_MODE_LABELS,
@@ -72,6 +74,8 @@ export type MountLessonPageOptions = {
   onDetachComposition?: (blockId: string) => void;
   onCompositionDrop?: (id: string) => void;
   renderLinkedPreview?: (compositionId: string) => HTMLElement;
+  outcomesCatalog?: CurriculumOutcome[];
+  subject?: { id: string; outcome_ids: string[] };
 };
 
 export type LessonPageHandle = {
@@ -837,8 +841,36 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     onEditSource: options.onEditSource,
     onDetachComposition: options.onDetachComposition,
     onCompositionDrop: options.onCompositionDrop,
-    renderLinkedPreview: options.renderLinkedPreview
+    renderLinkedPreview: options.renderLinkedPreview,
+    renderPreview: (block) =>
+      renderBlock(block, 'teacher', {
+        attachedOutcomes: publicOutcomesForPage(lesson, options.outcomesCatalog ?? [])
+      })
   });
+
+  const stripHost = document.createElement('div');
+  root.insertBefore(stripHost, canvasHost);
+  const strip =
+    options.subject && options.outcomesCatalog
+      ? mountOutcomeStrip(stripHost, {
+          catalog: options.outcomesCatalog,
+          subject: options.subject,
+          attached: lesson,
+          editable: true,
+          onChange: (ids) => {
+            emitLesson({ ...lesson, outcome_ids: ids, syllabus_outcomes: ids });
+          },
+          onCatalogChange: (created) => {
+            options.outcomesCatalog = [...(options.outcomesCatalog ?? []), created];
+            if (options.subject) {
+              options.subject = {
+                ...options.subject,
+                outcome_ids: [...options.subject.outcome_ids, created.id]
+              };
+            }
+          }
+        })
+      : null;
 
   return {
     update(next: Lesson, nextMedia?: Media[]) {
@@ -852,6 +884,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
         ...(nextMedia ? { media } : {})
       });
       canvas.update(lesson.blocks, media);
+      strip?.update({ attached: lesson, catalog: options.outcomesCatalog ?? [] });
     },
     insertType(type: InsertMenuValue) {
       canvas.insertType(type);
@@ -861,6 +894,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     },
     dispose() {
       canvas.dispose();
+      strip?.dispose();
       banner.dispose();
       root.remove();
     }

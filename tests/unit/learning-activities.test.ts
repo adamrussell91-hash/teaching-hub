@@ -235,7 +235,7 @@ describe('createBlock learning activities', () => {
   it('excludes the Learning group from homepage block choices', () => {
     expect(HOMEPAGE_BLOCK_GROUPS.map((group) => group.label)).not.toContain('Learning');
     expect(HOMEPAGE_BLOCK_GROUPS.flatMap((group) => group.types)).not.toEqual(
-      expect.arrayContaining(['flashcards', 'cloze', 'self_check'])
+      expect.arrayContaining(['flashcards', 'cloze', 'self_check', 'outcomes'])
     );
   });
 

@@ -373,6 +373,7 @@ describe('blockRegistry', () => {
       'html_app',
       'image',
       'mind_map',
+      'outcomes',
       'question_set',
       'quote',
       'rich_text',

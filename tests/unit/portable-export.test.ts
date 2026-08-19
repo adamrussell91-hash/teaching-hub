@@ -75,6 +75,7 @@ describe('portable export', () => {
         scheduled_lessons: [{ id: 'sched_1' }],
         scope_sequences: [],
         media: [{ id: 'media_1', preview_url: 'https://example.com/a.png' }],
+        outcomes: [{ id: 'EA12-1' }],
         compositions: [],
         lesson_templates: [],
         unit_templates: [],
@@ -85,6 +86,7 @@ describe('portable export', () => {
     expect(pack.kind).toBe('archive');
     expect(pack.objects.lessons).toBe(1);
     expect(pack.objects.media).toBe(1);
+    expect(pack.objects.outcomes).toBe(1);
     expect(pack.media_files).toBeUndefined();
     expect(pack.ai_jobs).toBeUndefined();
     expect(JSON.stringify(pack)).not.toMatch(/media_files/);

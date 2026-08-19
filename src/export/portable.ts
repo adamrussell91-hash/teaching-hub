@@ -23,6 +23,7 @@ export interface PortableExport {
   scheduled_lessons?: unknown[];
   scope_sequences?: unknown[];
   media?: unknown[];
+  outcomes?: unknown[];
   compositions?: unknown[];
   lesson_templates?: unknown[];
   unit_templates?: unknown[];
@@ -40,6 +41,7 @@ export interface ArchiveBundle {
   scheduled_lessons: unknown[];
   scope_sequences: unknown[];
   media: unknown[];
+  outcomes: unknown[];
   compositions: unknown[];
   lesson_templates: unknown[];
   unit_templates: unknown[];
@@ -87,6 +89,7 @@ export function buildArchiveExport(bundle: ArchiveBundle, createdAt: string): Po
       scheduled_lessons: bundle.scheduled_lessons.length,
       scope_sequences: bundle.scope_sequences.length,
       media: bundle.media.length,
+      outcomes: bundle.outcomes.length,
       compositions: bundle.compositions.length,
       lesson_templates: bundle.lesson_templates.length,
       unit_templates: bundle.unit_templates.length
@@ -100,6 +103,7 @@ export function buildArchiveExport(bundle: ArchiveBundle, createdAt: string): Po
       scheduled_lessons: bundle.scheduled_lessons,
       scope_sequences: bundle.scope_sequences,
       media: bundle.media,
+      outcomes: bundle.outcomes,
       compositions: bundle.compositions,
       lesson_templates: bundle.lesson_templates,
       unit_templates: bundle.unit_templates,

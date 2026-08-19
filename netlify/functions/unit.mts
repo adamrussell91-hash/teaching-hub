@@ -53,6 +53,7 @@ function parseBody(
       cover?: Cover | null;
       status?: Unit['status'];
       trash_reason?: string;
+      outcome_ids?: string[];
     }
   | { ok: false; code: string; message: string } {
   if (typeof body !== 'object' || body === null) {
@@ -65,17 +66,18 @@ function parseBody(
   const hasBlocks = record.blocks !== undefined;
   const hasLessonIds = record.lesson_ids !== undefined;
   const hasCover = record.cover !== undefined;
+  const hasOutcomeIds = record.outcome_ids !== undefined;
   const statusPatch = parseStatusPatch(body);
   if (!statusPatch.ok) {
     return { ok: false, code: statusPatch.code, message: statusPatch.message };
   }
   const hasStatus = statusPatch.hasStatus;
 
-  if (!hasTitle && !hasDescription && !hasBlocks && !hasLessonIds && !hasCover && !hasStatus) {
+  if (!hasTitle && !hasDescription && !hasBlocks && !hasLessonIds && !hasCover && !hasStatus && !hasOutcomeIds) {
     return {
       ok: false,
       code: 'validation_error',
-      message: 'Provide title, description, blocks, lesson_ids, cover, and/or status'
+      message: 'Provide title, description, blocks, lesson_ids, cover, outcome_ids, and/or status'
     };
   }
 
@@ -122,6 +124,15 @@ function parseBody(
     cover = parsed.data;
   }
 
+  let outcome_ids: string[] | undefined;
+  if (hasOutcomeIds) {
+    const parsed = z.array(z.string().min(1)).max(24).safeParse(record.outcome_ids);
+    if (!parsed.success) {
+      return { ok: false, code: 'validation_error', message: 'outcome_ids are invalid' };
+    }
+    outcome_ids = parsed.data;
+  }
+
   return {
     ok: true,
     title,
@@ -129,6 +140,7 @@ function parseBody(
     blocks,
     lesson_ids,
     cover,
+    outcome_ids,
     status: statusPatch.status,
     trash_reason: statusPatch.trash_reason
   };
@@ -208,6 +220,9 @@ export default async function handler(request: Request, context: FunctionContext
     } else {
       merged.cover = parsed.cover;
     }
+  }
+  if (parsed.outcome_ids !== undefined) {
+    merged.outcome_ids = parsed.outcome_ids;
   }
 
   if (parsed.status !== undefined) {

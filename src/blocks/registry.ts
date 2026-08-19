@@ -21,6 +21,7 @@ import {
   createHtmlEditor,
   createImageEditor,
   createMindMapEditor,
+  createOutcomesEditor,
   createQuestionSetEditor,
   createQuoteEditor,
   createRichTextEditor,
@@ -61,6 +62,7 @@ import {
   renderHtmlBlock,
   renderImageBlock,
   renderMindMapBlock,
+  renderOutcomesBlock,
   renderQuestionSetBlock,
   renderQuoteBlock,
   renderRichTextBlock,
@@ -182,6 +184,10 @@ export const blockRegistry: {
   collection: {
     render: renderCollectionBlock,
     createEditor: createCollectionEditor
+  },
+  outcomes: {
+    render: renderOutcomesBlock,
+    createEditor: createOutcomesEditor
   },
   section: {
     render: renderSectionBlock,

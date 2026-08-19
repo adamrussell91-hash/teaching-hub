@@ -117,10 +117,10 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
 
   renderStatus(refs.canvas, 'Loading lesson…');
 
-  void apiGet<Lesson>(`/api/lessons/${lessonId}`)
-    .then((lesson) => {
+  void Promise.all([apiGet<Lesson>(`/api/lessons/${lessonId}`), fetchCurriculum()])
+    .then(([lesson, curriculum]) => {
       if (disposed || isStale()) return;
-      renderEditor(lesson);
+      renderEditor(lesson, curriculum);
     })
     .catch((error: unknown) => {
       if (disposed || isStale()) return;
@@ -131,7 +131,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       renderStatus(refs.canvas, message);
     });
 
-  function renderEditor(initialLesson: Lesson): void {
+  function renderEditor(initialLesson: Lesson, curriculum: Awaited<ReturnType<typeof fetchCurriculum>>): void {
     const lesson: Lesson = initialLesson;
     let nextId = nextBlockIdFactory(`block_${lesson.id}`, lesson.blocks);
     let mediaList: Media[] = media;
@@ -200,6 +200,12 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         lesson.cover = next.cover;
       } else {
         delete lesson.cover;
+      }
+      if (next.outcome_ids) {
+        lesson.outcome_ids = next.outcome_ids;
+        lesson.syllabus_outcomes = next.outcome_ids;
+      } else {
+        delete lesson.outcome_ids;
       }
     }
 
@@ -488,6 +494,13 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     page = mountLessonPage(pageHost, {
       lesson,
       media: mediaList,
+      outcomesCatalog: curriculum.outcomes ?? [],
+      subject: (() => {
+        const unit = curriculum.units.find((entry) => entry.id === lesson.unit_id);
+        return unit
+          ? curriculum.subjects.find((entry) => entry.id === unit.subject_id)
+          : undefined;
+      })(),
       onChange: (next) => {
         assignLesson(next);
         markDirty();
