@@ -303,6 +303,12 @@ describe('mountLessonEditor', () => {
       (el) => el.textContent === 'A4'
     );
     expect(a4Tab).toBeUndefined();
+    expect(refs.contextBar.querySelector('.context-bar__alchemy-lab')?.textContent).toBe(
+      'Alchemy Lab'
+    );
+    refs.contextBar.querySelector<HTMLButtonElement>('.context-bar__alchemy-lab')!.click();
+    expect(builder.classList.contains('lesson-builder--chat-shelved')).toBe(false);
+    expect(refs.canvas.querySelector('.alchemy-lab')).not.toBeNull();
   });
 
   it('renders one block editor per text-like block and includes a visibility control', async () => {

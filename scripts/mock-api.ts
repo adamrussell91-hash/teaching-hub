@@ -3119,6 +3119,47 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       return okResponse(200, { text: 'mock-ai-reply' });
     }
 
+    if (method === 'POST' && path === '/api/alchemy-lab') {
+      const session = getSession(cookie);
+      if (!session.authenticated) return unauthorizedResponse();
+      if (!body || typeof body !== 'object') {
+        return errorResponse(400, 'invalid_json', 'Request body is not valid JSON');
+      }
+      const lessonText = (body as { lessonText?: unknown }).lessonText;
+      if (typeof lessonText !== 'string' || !lessonText.trim()) {
+        return errorResponse(400, 'bad_request', 'Lesson text is required.');
+      }
+      return okResponse(200, {
+        mode: 'local',
+        connections: [
+          {
+            icon: 'Irony',
+            summary: 'Inherited duty in a Roman exemplum',
+            sourcePageId: 'note_caesar',
+            sourcePageTitle: 'Caesar and pietas',
+            sourceExcerpt: 'Duty arrives as an inheritance, not a choice.',
+            whyNonObvious: 'The lesson is a poem; the archive note is military history.'
+          },
+          {
+            icon: 'Multiple Perspectives',
+            summary: 'A later self looking back',
+            sourcePageId: 'note_heaney',
+            sourcePageTitle: 'Heaney and the given past',
+            sourceExcerpt: 'The speaker inherits a role he did not ask for.',
+            whyNonObvious: 'Same thread as the Roman note, different century and genre.'
+          },
+          {
+            icon: 'Ethics',
+            summary: 'Who gets to refuse the inheritance',
+            sourcePageId: 'note_ethics',
+            sourcePageTitle: 'Agency vs givenness',
+            sourceExcerpt: 'Some duties are assigned before the student can consent.',
+            whyNonObvious: 'Turns a literature starter into an ethics question.'
+          }
+        ]
+      });
+    }
+
     if (method === 'GET' && path === '/api/ai/chat') {
       const session = getSession(cookie);
       if (!session.authenticated) return unauthorizedResponse();
