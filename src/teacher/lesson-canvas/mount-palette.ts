@@ -2,6 +2,35 @@ import type { InsertMenuValue } from '@/blocks/create-block';
 import type { PaletteCard, PaletteFamily } from '@/teacher/lesson-canvas/palette-catalog';
 import { readBuilderChromePrefs, writeBuilderChromePrefs } from '@/teacher/lesson-canvas/prefs';
 
+function familyIcon(familyId: string): SVGSVGElement {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 20 20');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '1.6');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  const paths: Record<string, string> = {
+    Basic:
+      '<path d="M4 5h12M4 10h12M4 15h7"/>',
+    Media:
+      '<rect x="3" y="4" width="14" height="12" rx="1.3"/><circle cx="7.2" cy="8.3" r="1.4"/><path d="M4 14l4-3.6 3 2.2 3.5-4.1 2.5 3"/>',
+    Teaching:
+      '<rect x="3" y="4" width="14" height="10" rx="1.3"/><path d="M7.5 17h5M10 14v3"/>',
+    Learning:
+      '<path d="M10 3a5 5 0 0 0-3 9v2h6v-2a5 5 0 0 0-3-9Z"/><path d="M8 16.5h4"/>',
+    Visualisation:
+      '<path d="M4 16V9M9 16V4M14 16v-6"/>',
+    Layout:
+      '<rect x="3" y="3" width="14" height="14" rx="1.3"/><path d="M8.3 3v14"/>',
+    Compositions:
+      '<rect x="3.5" y="4" width="9" height="6" rx="1"/><rect x="7.5" y="10" width="9" height="6" rx="1"/>'
+  };
+  svg.innerHTML = paths[familyId] ?? '<circle cx="10" cy="10" r="3"/>';
+  return svg;
+}
+
 export const PALETTE_DND_MIME = 'application/x-teaching-hub-block';
 
 export type PaletteInsertPayload =
@@ -159,6 +188,13 @@ export function mountLessonPalette(
     flyout?.remove();
     flyout = null;
     openId = null;
+    syncOpenFamily();
+  }
+
+  function syncOpenFamily(): void {
+    rail.querySelectorAll<HTMLButtonElement>('.lesson-palette__family').forEach((btn) => {
+      btn.classList.toggle('lesson-palette__family--open', btn.dataset.family === openId);
+    });
   }
 
   function bindCard(el: HTMLButtonElement, card: PaletteCard): void {
@@ -198,6 +234,7 @@ export function mountLessonPalette(
     }
 
     host.append(flyout);
+    syncOpenFamily();
   }
 
   function setShelved(shelved: boolean): void {
@@ -217,7 +254,7 @@ export function mountLessonPalette(
 
       const glyph = document.createElement('span');
       glyph.className = 'lesson-palette__family-icon';
-      glyph.textContent = family.id.slice(0, 1);
+      glyph.append(familyIcon(family.id));
 
       const label = document.createElement('span');
       label.className = 'lesson-palette__family-label';

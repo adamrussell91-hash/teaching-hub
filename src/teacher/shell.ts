@@ -139,6 +139,10 @@ export interface ContextBarConfig {
   title: string;
   /** Placeholder text for the save-state indicator; wired up fully in Task 15. */
   saveState?: string;
+  /** Optional breadcrumb above the title (class · unit). */
+  crumb?: string;
+  /** Editor chrome: stacked title + save status, actions on the right. */
+  variant?: 'default' | 'editor';
 }
 
 /**
@@ -148,6 +152,18 @@ export interface ContextBarConfig {
 export function renderContextBar(refs: TeacherShellRefs, config: ContextBarConfig): void {
   refs.contextBar.hidden = false;
   refs.contextBar.replaceChildren();
+  refs.contextBar.classList.toggle(
+    'teacher-layout__context-bar--editor',
+    config.variant === 'editor'
+  );
+
+  const left = document.createElement('div');
+  left.className = 'teacher-layout__context-bar-left';
+
+  const crumb = document.createElement('p');
+  crumb.className = 'teacher-layout__context-bar-crumb';
+  crumb.hidden = !config.crumb;
+  crumb.textContent = config.crumb ?? '';
 
   const title = document.createElement('h1');
   title.className = 'teacher-layout__context-bar-title';
@@ -158,7 +174,8 @@ export function renderContextBar(refs: TeacherShellRefs, config: ContextBarConfi
   saveSlot.dataset.saveSlot = 'true';
   saveSlot.textContent = config.saveState ?? '';
 
-  refs.contextBar.append(title, saveSlot);
+  left.append(crumb, title, saveSlot);
+  refs.contextBar.append(left);
 }
 
 /** Renders a lightweight status line into the rail nav mount point. */
