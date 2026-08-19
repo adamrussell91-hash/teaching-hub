@@ -21,6 +21,8 @@ import { nextBlockIdFactory } from '@/teacher/lesson-canvas/drop';
 import { mountLessonPalette } from '@/teacher/lesson-canvas/mount-palette';
 import { homepagePaletteFamilies } from '@/teacher/lesson-canvas/palette-catalog';
 import { readBuilderChromePrefs } from '@/teacher/lesson-canvas/prefs';
+import { mountOutcomeStrip, publicOutcomesForPage } from '@/outcomes/strip';
+import { renderBlock } from '@/blocks/render';
 
 export const UNITS_INDEX_GROUP_STORAGE_KEY = 'teaching-hub.units-index-group';
 export type UnitsIndexGroupBy = 'subject' | 'year';
@@ -357,8 +359,30 @@ export function renderUnitPage(
     onSave: async (blocks) => {
       await patchUnit(unit.id, { blocks });
       await options.onMutated?.();
-    }
+    },
+    attachedOutcomes: publicOutcomesForPage(unit, curriculum.outcomes ?? [])
   });
+
+  const subject = curriculum.subjects.find((entry) => entry.id === unit.subject_id);
+  const stripHost = document.createElement('div');
+  pageHeader.insertAdjacentElement('afterend', stripHost);
+  const outcomeStrip = subject
+    ? mountOutcomeStrip(stripHost, {
+        catalog: curriculum.outcomes ?? [],
+        subject,
+        attached: unit,
+        editable: true,
+        onChange: async (ids) => {
+          const saved = await patchUnit(unit.id, { outcome_ids: ids });
+          unit.outcome_ids = saved.outcome_ids;
+          planEditor.updateOutcomes(publicOutcomesForPage(unit, curriculum.outcomes ?? []));
+        },
+        onCatalogChange: (created) => {
+          curriculum.outcomes = [...(curriculum.outcomes ?? []), created];
+          subject.outcome_ids = [...subject.outcome_ids, created.id];
+        }
+      })
+    : null;
 
   planSection.append(planHeading, planHost);
 
@@ -476,6 +500,7 @@ export function renderUnitPage(
       historyPanel.dispose();
       banner.dispose();
       planEditor.dispose();
+      outcomeStrip?.dispose();
     }
   };
 }
@@ -483,11 +508,15 @@ export function renderUnitPage(
 function mountUnitPlanEditor(
   host: HTMLElement,
   initialBlocks: Block[],
-  options: { onSave: (blocks: Block[]) => Promise<void> }
-): { dispose: () => void } {
+  options: {
+    onSave: (blocks: Block[]) => Promise<void>;
+    attachedOutcomes?: ReturnType<typeof publicOutcomesForPage>;
+  }
+): { dispose: () => void; updateOutcomes: (next: ReturnType<typeof publicOutcomesForPage>) => void } {
   let blocks = structuredClone(initialBlocks);
   let nextId = nextBlockIdFactory('block_unit', blocks);
   let destroyed = false;
+  let attachedOutcomes = options.attachedOutcomes ?? [];
 
   const root = document.createElement('div');
   root.className = 'unit-plan-editor lesson-builder lesson-builder--no-chat';
@@ -524,6 +553,7 @@ function mountUnitPlanEditor(
     blocks,
     allowCollectionAtRoot: true,
     idFactory: () => nextId(),
+    renderPreview: (block) => renderBlock(block, 'teacher', { attachedOutcomes }),
     onChange: (next) => {
       blocks = next;
       nextId = nextBlockIdFactory('block_unit', blocks);
@@ -567,6 +597,10 @@ function mountUnitPlanEditor(
   });
 
   return {
+    updateOutcomes(next) {
+      attachedOutcomes = next;
+      canvas.update(blocks);
+    },
     dispose: () => {
       destroyed = true;
       palette.dispose();

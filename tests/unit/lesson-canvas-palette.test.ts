@@ -59,6 +59,6 @@ describe('homepage palette catalog', () => {
     const types = families.flatMap((f) =>
       f.cards.filter((c) => c.kind === 'block').map((c) => c.type)
     );
-    expect(types).not.toEqual(expect.arrayContaining(['flashcards', 'cloze', 'self_check']));
+    expect(types).not.toEqual(expect.arrayContaining(['flashcards', 'cloze', 'self_check', 'outcomes']));
   });
 });

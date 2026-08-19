@@ -15,7 +15,8 @@ export const UnitSchema = z.object({
   end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   description: z.string().optional(),
   cover: CoverSchema.optional(),
-  blocks: z.array(BlockSchema).optional()
+  blocks: z.array(BlockSchema).optional(),
+  outcome_ids: z.array(z.string().min(1)).max(24).optional()
 });
 
 export type Unit = z.infer<typeof UnitSchema>;

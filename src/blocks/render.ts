@@ -18,9 +18,14 @@ import {
   storageKey
 } from '@/blocks/learning-activity';
 import { DIAGRAM_IMAGE_PUBLISH_URL_ISSUE, type Block, type EmbedProvider } from '@/schemas/block';
+import { renderOutcomeList } from '@/outcomes/display';
+import type { PublicOutcome } from '@/curriculum/outcome-catalog';
 
 export type RenderMode = 'teacher' | 'student' | 'print';
-export type RenderContext = { lessonId?: string };
+export type RenderContext = {
+  lessonId?: string;
+  attachedOutcomes?: PublicOutcome[];
+};
 
 const HEADING_TAG = {
   page: 'h1',
@@ -822,6 +827,26 @@ export function renderTimelineBlock(
   }
 
   return wrapBlock(list, block, mode);
+}
+
+export function renderOutcomesBlock(
+  block: Extract<Block, { block_type: 'outcomes' }>,
+  mode: RenderMode,
+  ctx: RenderContext = {}
+): HTMLElement {
+  const root = document.createElement('div');
+  root.className = 'block-outcomes';
+  const heading = document.createElement('h2');
+  heading.className = 'block-outcomes__title';
+  heading.textContent = 'Outcomes';
+  root.append(heading);
+  root.append(
+    renderOutcomeList(
+      ctx.attachedOutcomes ?? [],
+      'No outcomes tagged on this page yet.'
+    )
+  );
+  return wrapBlock(root, block, mode);
 }
 
 export function renderCollectionBlock(
@@ -1976,6 +2001,8 @@ export function renderBlock(
       return renderTimelineBlock(block, mode);
     case 'collection':
       return renderCollectionBlock(block, mode);
+    case 'outcomes':
+      return renderOutcomesBlock(block, mode, ctx);
     case 'spacer':
       return renderSpacerBlock(block, mode);
     case 'section':

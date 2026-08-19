@@ -24,6 +24,7 @@ export async function duplicateLesson(id: string): Promise<Lesson> {
     tags: source.tags,
     review_status: source.review_status === 'needs_review' ? 'none' : source.review_status,
     syllabus_outcomes: source.syllabus_outcomes,
+    outcome_ids: source.outcome_ids,
     pedagogical_mode: source.pedagogical_mode,
     updated_at: new Date().toISOString()
   };

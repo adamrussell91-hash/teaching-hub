@@ -58,7 +58,8 @@ export const ScopeSequenceSchema = z.object({
   academic_year: z.number().int(),
   week_count: z.number().int().positive(),
   terms: z.array(ScopeTermSchema),
-  timeline_items: z.array(TimelineItemSchema)
+  timeline_items: z.array(TimelineItemSchema),
+  outcome_ids: z.array(z.string().min(1)).max(24).optional()
 });
 
 export type ScopeSequence = z.infer<typeof ScopeSequenceSchema>;

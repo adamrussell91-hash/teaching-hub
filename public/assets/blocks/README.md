@@ -40,3 +40,4 @@ PNG exports from Documents/`teaching hub page content icons`, renamed to palette
 | `timeline.png` | `timeline.png` |
 | `tabs.png` | `tabs.png` |
 | `collection.png` | `collection.png` |
+| `outcomes.png` | `outcomes.png` |

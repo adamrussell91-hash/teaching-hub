@@ -34,7 +34,8 @@ export const BlockTypeSchema = z.enum([
   'spacer',
   'timeline',
   'tabs',
-  'collection'
+  'collection',
+  'outcomes'
 ]);
 
 export const ColumnPresetSchema = z.enum(['50-50', '33-67', '67-33', '33-33-33', 'custom']);
@@ -597,6 +598,17 @@ export const CollectionBlockSchema = z.object({
   ...blockTimestamps
 });
 
+export const OutcomesBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('outcomes'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({}).default({}),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
 const leafBlockSchemas = [
   RichTextBlockSchema,
   HeadingBlockSchema,
@@ -623,7 +635,8 @@ const leafBlockSchemas = [
   EquationBlockSchema,
   DiagramBlockSchema,
   MindMapBlockSchema,
-  ConceptMapBlockSchema
+  ConceptMapBlockSchema,
+  OutcomesBlockSchema
 ] as const;
 
 export const SpacerBlockSchema = z.object({

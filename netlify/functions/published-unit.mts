@@ -1,4 +1,4 @@
-import { getContentStore, getJSON, unitKey } from './_shared/blobs.mts';
+import { getContentStore, getJSON, outcomeKey, unitKey } from './_shared/blobs.mts';
 import { errorResponse, methodNotAllowed, okResponse, preflightResponse, withCors } from './_shared/http.mts';
 import { filterBlocksForStudent } from '../../src/blocks/visibility';
 import { sanitizeBlocksDeep } from '../../src/blocks/sanitize-blocks';
@@ -7,6 +7,9 @@ import {
   UnitSchema,
   type PublishedUnitLessonSummary
 } from '../../src/schemas';
+import { CurriculumOutcomeSchema } from '../../src/schemas/outcome';
+import { toPublicOutcome } from '../../src/curriculum/outcome-catalog';
+import { attachedOutcomeIds } from '../../src/curriculum/outcome-ids';
 
 interface FunctionContext {
   params: Record<string, string | undefined>;
@@ -26,6 +29,7 @@ interface UnitBlob {
   created_at?: string;
   updated_at?: string;
   schema_version?: number;
+  outcome_ids?: string[];
 }
 
 interface PublishedLessonBlob {
@@ -90,6 +94,14 @@ export default async function handler(request: Request, context: FunctionContext
     filterBlocksForStudent(unitParsed.success ? (unitParsed.data.blocks ?? []) : [])
   );
 
+  const ids = attachedOutcomeIds({ outcome_ids: unit.outcome_ids });
+  const outcomes = [];
+  for (const outcomeId of ids) {
+    const raw = await getJSON(store, outcomeKey(outcomeId));
+    const parsed = CurriculumOutcomeSchema.safeParse(raw);
+    if (parsed.success) outcomes.push(toPublicOutcome(parsed.data));
+  }
+
   return withCors(
     okResponse(200, {
       unit_id: id,
@@ -98,7 +110,9 @@ export default async function handler(request: Request, context: FunctionContext
       ...(unitParsed.success && unitParsed.data.cover
         ? { cover: unitParsed.data.cover }
         : {}),
-      blocks: studentBlocks
+      blocks: studentBlocks,
+      outcome_ids: ids,
+      outcomes
     }),
     request,
     env

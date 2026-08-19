@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import {
   getContentStore,
   getJSON,
@@ -152,23 +153,55 @@ export default async function handler(request: Request, context: FunctionContext
     return withCors(errorResponse(400, 'validation_error', 'Scope sequence data is invalid'), request, env);
   }
 
-  const parsed = parseTimelineItems(body, scopeParsed.data.week_count);
-  if (!parsed.ok) {
-    return withCors(errorResponse(400, parsed.code, parsed.message), request, env);
+  const record = typeof body === 'object' && body !== null ? (body as Record<string, unknown>) : null;
+  if (!record) {
+    return withCors(
+      errorResponse(400, 'validation_error', 'Request body must be a JSON object'),
+      request,
+      env
+    );
   }
 
-  const unitsCheck = await assertTimelineUnitsExist(
-    parsed.timeline_items,
-    scopeParsed.data.subject_id
-  );
-  if (!unitsCheck.ok) {
-    return withCors(errorResponse(400, 'validation_error', unitsCheck.message), request, env);
+  const hasTimeline = record.timeline_items !== undefined;
+  const hasOutcomes = record.outcome_ids !== undefined;
+  if (!hasTimeline && !hasOutcomes) {
+    return withCors(
+      errorResponse(400, 'validation_error', 'Provide timeline_items and/or outcome_ids'),
+      request,
+      env
+    );
+  }
+
+  let timeline_items = scopeParsed.data.timeline_items;
+  if (hasTimeline) {
+    const parsed = parseTimelineItems(body, scopeParsed.data.week_count);
+    if (!parsed.ok) {
+      return withCors(errorResponse(400, parsed.code, parsed.message), request, env);
+    }
+    const unitsCheck = await assertTimelineUnitsExist(
+      parsed.timeline_items,
+      scopeParsed.data.subject_id
+    );
+    if (!unitsCheck.ok) {
+      return withCors(errorResponse(400, 'validation_error', unitsCheck.message), request, env);
+    }
+    timeline_items = parsed.timeline_items;
+  }
+
+  let outcome_ids = scopeParsed.data.outcome_ids;
+  if (hasOutcomes) {
+    const parsed = z.array(z.string().min(1)).max(24).safeParse(record.outcome_ids);
+    if (!parsed.success) {
+      return withCors(errorResponse(400, 'validation_error', 'outcome_ids are invalid'), request, env);
+    }
+    outcome_ids = parsed.data;
   }
 
   const nowIso = new Date().toISOString();
   const merged = {
     ...scopeParsed.data,
-    timeline_items: parsed.timeline_items,
+    timeline_items,
+    ...(outcome_ids !== undefined ? { outcome_ids } : {}),
     updated_at: nowIso
   };
 

@@ -6,6 +6,7 @@ export const LessonLibraryPatchSchema = z.object({
   tags: z.array(z.string().min(1).max(40)).max(24).optional(),
   review_status: z.enum(['needs_review', 'none']).optional(),
   syllabus_outcomes: z.array(z.string().min(1).max(32)).max(24).optional(),
+  outcome_ids: z.array(z.string().min(1).max(64)).max(24).optional(),
   unit_id: z.string().min(1).optional(),
   author_id: z.string().min(1).nullable().optional(),
   pedagogical_mode: PedagogicalModeSchema.optional()
@@ -28,6 +29,7 @@ export function parseLessonLibraryPatch(
     ...(record.syllabus_outcomes !== undefined
       ? { syllabus_outcomes: record.syllabus_outcomes }
       : {}),
+    ...(record.outcome_ids !== undefined ? { outcome_ids: record.outcome_ids } : {}),
     ...(record.unit_id !== undefined ? { unit_id: record.unit_id } : {}),
     ...(record.author_id !== undefined ? { author_id: record.author_id } : {}),
     ...(record.pedagogical_mode !== undefined
@@ -46,6 +48,10 @@ export function applyLessonLibraryPatch(lesson: Lesson, patch: LessonLibraryPatc
   if (patch.tags !== undefined) next.tags = patch.tags;
   if (patch.review_status !== undefined) next.review_status = patch.review_status;
   if (patch.syllabus_outcomes !== undefined) next.syllabus_outcomes = patch.syllabus_outcomes;
+  if (patch.outcome_ids !== undefined) {
+    next.outcome_ids = patch.outcome_ids;
+    next.syllabus_outcomes = patch.outcome_ids;
+  }
   if (patch.unit_id !== undefined) next.unit_id = patch.unit_id;
   if (patch.author_id !== undefined) {
     if (patch.author_id === null) delete next.author_id;

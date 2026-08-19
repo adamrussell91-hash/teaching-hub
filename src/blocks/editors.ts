@@ -3064,6 +3064,17 @@ export function createCollectionEditor(
   return editorShell(block, onChange, fields, getLatest);
 }
 
+export function createOutcomesEditor(
+  block: Extract<Block, { block_type: 'outcomes' }>,
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'outcomes' }>>,
+  getLatest: () => Extract<Block, { block_type: 'outcomes' }> = () => block
+): HTMLElement {
+  const hint = document.createElement('p');
+  hint.className = 'block-editor__hint';
+  hint.textContent = 'Shows the outcomes tagged on this page.';
+  return editorShell(block, onChange, hint, getLatest);
+}
+
 export function createBlockEditor(
   block: Block,
   onChange: BlockChangeHandler,
@@ -3130,6 +3141,12 @@ export function createBlockEditor(
         onChange,
         latest as () => Extract<Block, { block_type: 'collection' }>,
         context
+      );
+    case 'outcomes':
+      return createOutcomesEditor(
+        block,
+        onChange,
+        latest as () => Extract<Block, { block_type: 'outcomes' }>
       );
     case 'flashcards':
       return createFlashcardsEditor(block, onChange, latest as () => Extract<Block, { block_type: 'flashcards' }>);

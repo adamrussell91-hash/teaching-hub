@@ -28,6 +28,7 @@ export const LessonSchema = z.object({
   author_id: z.string().min(1).optional(),
   review_status: z.enum(['needs_review', 'none']).optional(),
   syllabus_outcomes: z.array(z.string().min(1).max(32)).max(24).optional(),
+  outcome_ids: z.array(z.string().min(1).max(64)).max(24).optional(),
   /** Teacher planning metadata; optional for blob/version compatibility. */
   pedagogical_mode: PedagogicalModeSchema.optional()
 });

@@ -12,7 +12,8 @@ export const PublishedUnitSchema = z.object({
   title: z.string().min(1),
   lessons: z.array(PublishedUnitLessonSummarySchema),
   cover: CoverSchema.optional(),
-  blocks: z.array(BlockSchema).optional()
+  blocks: z.array(BlockSchema).optional(),
+  outcome_ids: z.array(z.string().min(1)).max(24).optional()
 });
 
 export type PublishedUnitLessonSummary = z.infer<

@@ -36,6 +36,7 @@ export function searchHaystack(lesson: LessonLibraryRow, unitTitle?: string): st
     unitTitle ?? '',
     ...(lesson.tags ?? []),
     ...(lesson.syllabus_outcomes ?? []),
+    ...(lesson.outcome_ids ?? []),
     lesson.excerpt ?? '',
     lesson.author_name ?? '',
     lesson.author_id ?? ''
@@ -173,7 +174,10 @@ export function applyLessonsQuery(
 
   if (state.outcomes.length > 0) {
     rows = rows.filter((lesson) => {
-      const outcomes = new Set(lesson.syllabus_outcomes ?? []);
+      const outcomes = new Set([
+        ...(lesson.syllabus_outcomes ?? []),
+        ...(lesson.outcome_ids ?? [])
+      ]);
       return state.outcomes.every((outcome) => outcomes.has(outcome));
     });
   }

@@ -10,7 +10,8 @@ import {
   LessonSchema,
   ClassSchema,
   ScheduledLessonSchema,
-  MediaSchema
+  MediaSchema,
+  CurriculumOutcomeSchema
 } from '@/schemas';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -25,6 +26,7 @@ const seed = JSON.parse(
   classes: unknown[];
   scheduled_lessons: unknown[];
   media: unknown[];
+  outcomes?: unknown[];
   schedule_anchor_date: string;
 };
 
@@ -88,6 +90,14 @@ describe('seed fixtures', () => {
       (m) => (m as { media_type: string }).media_type
     );
     expect(types).toEqual(['pdf', 'link', 'image']);
+  });
+
+  it('parses English Advanced NESA outcomes', () => {
+    const outcomes = seed.outcomes ?? [];
+    expect(outcomes.length).toBe(9);
+    for (const item of outcomes) {
+      CurriculumOutcomeSchema.parse(item);
+    }
   });
 
   it('keeps English Advanced and Standard as separate subjects', () => {

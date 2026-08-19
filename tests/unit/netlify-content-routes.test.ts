@@ -182,6 +182,7 @@ describe('GET /api/curriculum', () => {
         scheduled_lessons: [],
         scope_sequences: [],
         media: [],
+        outcomes: [],
         schedule_anchor_date: '2026-08-12'
       }
     });

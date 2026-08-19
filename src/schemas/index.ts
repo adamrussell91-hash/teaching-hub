@@ -5,6 +5,13 @@ export {
   TrashFieldsSchema,
   TrashFields
 } from './common';
+export {
+  CurriculumOutcomeSchema,
+  OutcomeIdsSchema,
+  OutcomeSourceSchema,
+  type CurriculumOutcome,
+  type OutcomeSource
+} from './outcome';
 export { YearSchema, type Year } from './year';
 export { SubjectSchema, type Subject } from './subject';
 export {

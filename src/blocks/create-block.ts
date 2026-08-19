@@ -37,7 +37,8 @@ export const NEW_BLOCK_TYPES = [
   'spacer',
   'timeline',
   'tabs',
-  'collection'
+  'collection',
+  'outcomes'
 ] as const;
 
 export type NewBlockType = (typeof NEW_BLOCK_TYPES)[number];
@@ -74,7 +75,8 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   spacer: 'Spacer',
   timeline: 'Timeline',
   tabs: 'Tabs',
-  collection: 'Collection'
+  collection: 'Collection',
+  outcomes: 'Outcomes'
 };
 
 export const EMBED_INSERT_PRESETS = [
@@ -129,7 +131,7 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
   },
   {
     label: 'Teaching',
-    types: ['accordion', 'table', 'question_set', 'timeline']
+    types: ['accordion', 'table', 'question_set', 'timeline', 'outcomes']
   },
   {
     label: 'Learning',
@@ -145,7 +147,12 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
   }
 ];
 
-export const HOMEPAGE_BLOCK_GROUPS = BLOCK_GROUPS.filter((group) => group.label !== 'Learning');
+export const HOMEPAGE_BLOCK_GROUPS = BLOCK_GROUPS.filter((group) => group.label !== 'Learning').map(
+  (group) =>
+    group.label === 'Teaching'
+      ? { ...group, types: group.types.filter((type) => type !== 'outcomes') }
+      : group
+);
 
 export const LESSON_BLOCK_GROUPS = BLOCK_GROUPS.map((group) =>
   group.label === 'Layout'
@@ -492,6 +499,13 @@ export function createBlock(type: NewBlockType, id: string): Block {
         block_type: 'collection',
         variant: 'medium',
         content: { source: 'unit_lessons', title: '' }
+      };
+    case 'outcomes':
+      return {
+        ...shared,
+        block_type: 'outcomes',
+        variant: 'medium',
+        content: {}
       };
   }
 }

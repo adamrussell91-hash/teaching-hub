@@ -6,6 +6,8 @@ import type { PublishedLesson } from '@/schemas/published-lesson';
 import { scheduleNeighbors } from '@/schedule/schedule-neighbors';
 import { formatStudentDate } from '@/student/format';
 import { renderStudentHero } from '@/student/hero';
+import { mountPublicOutcomeChips } from '@/outcomes/strip';
+import type { PublicOutcome } from '@/curriculum/outcome-catalog';
 import { firstLeadFromBlocks } from '@/student/lesson-lead';
 import {
   fetchPublishedClass,
@@ -76,10 +78,20 @@ function renderPublishedLesson(
     })
   );
 
+  const publishedOutcomes = (lesson as PublishedLesson & { outcomes?: PublicOutcome[] }).outcomes;
+  if (publishedOutcomes && publishedOutcomes.length > 0) {
+    mountPublicOutcomeChips(content, publishedOutcomes);
+  }
+
   const blocks = document.createElement('div');
   blocks.className = 'lesson-blocks';
   for (const block of lesson.blocks) {
-    blocks.append(renderBlock(block, 'student', { lessonId: lesson.lesson_id }));
+    blocks.append(
+      renderBlock(block, 'student', {
+        lessonId: lesson.lesson_id,
+        attachedOutcomes: publishedOutcomes
+      })
+    );
   }
   content.append(blocks);
 }

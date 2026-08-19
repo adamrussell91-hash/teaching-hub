@@ -1,7 +1,7 @@
 import { apiGet } from '@/api/client';
 import { navigate } from '@/app/router';
 import type { PedagogicalMode } from '@/curriculum/pedagogical-mode';
-import type { Year, Subject, Unit, Class, ScheduledLesson, ScopeSequence, Media } from '@/schemas';
+import type { Year, Subject, Unit, Class, ScheduledLesson, ScopeSequence, Media, CurriculumOutcome } from '@/schemas';
 
 export interface CurriculumLessonSummary {
   id: string;
@@ -19,6 +19,7 @@ export interface CurriculumLessonSummary {
   author_name?: string;
   review_status?: 'needs_review' | 'none';
   syllabus_outcomes?: string[];
+  outcome_ids?: string[];
   excerpt?: string;
   attachment_count?: number;
   pedagogical_mode?: PedagogicalMode;
@@ -33,6 +34,7 @@ export interface CurriculumResponse {
   scheduled_lessons: ScheduledLesson[];
   scope_sequences: ScopeSequence[];
   media: Media[];
+  outcomes?: CurriculumOutcome[];
   schedule_anchor_date: string; // YYYY-MM-DD — demo override (tests / VITE_SCHEDULE_ANCHOR_DATE)
 }
 
