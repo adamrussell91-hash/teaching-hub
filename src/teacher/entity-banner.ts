@@ -10,7 +10,15 @@ export interface EntityBannerOptions {
   entityId: string;
   editable?: boolean;
   onSave?: (cover: Cover | null) => void | Promise<void>;
+  /** Compact cinematic cover used on the lesson editor. */
+  size?: 'banner' | 'hero';
+  /** No-cover fill: per-entity hue, or the locked marine/depth wash. */
+  fallback?: 'hue' | 'marine';
+  editButtonClass?: string;
 }
+
+export const MARINE_COVER_GRADIENT =
+  'radial-gradient(520px 320px at 88% -10%, rgba(55,111,183,0.35), transparent 60%), linear-gradient(155deg, var(--marine), var(--depth) 70%)';
 
 export interface EntityBannerUpdate {
   cover?: Cover | null;
@@ -55,9 +63,11 @@ export function renderEntityBanner(
   let dialogClosed = true;
 
   const root = document.createElement('div');
-  root.className = 'entity-banner';
-  root.style.aspectRatio = '16 / 5';
-  root.style.borderRadius = 'var(--radius-xl)';
+  root.className = options.size === 'hero' ? 'entity-banner entity-banner--hero' : 'entity-banner';
+  if (options.size !== 'hero') {
+    root.style.aspectRatio = '16 / 5';
+  }
+  root.style.borderRadius = options.size === 'hero' ? 'var(--radius-lg)' : 'var(--radius-xl)';
   root.style.overflow = 'hidden';
   root.style.position = 'relative';
 
@@ -83,7 +93,9 @@ export function renderEntityBanner(
       fallback.className = 'entity-banner__fallback';
       fallback.setAttribute(
         'style',
-        `position:absolute;inset:0;background:${gradientForEntityId(options.entityId)}`
+        `position:absolute;inset:0;background:${
+          options.fallback === 'marine' ? MARINE_COVER_GRADIENT : gradientForEntityId(options.entityId)
+        }`
       );
       root.append(fallback);
     }
@@ -114,6 +126,7 @@ export function renderEntityBanner(
     const title = document.createElement('p');
     title.className = 'entity-banner__title';
     title.textContent = titleText;
+    if (options.size === 'hero') title.setAttribute('aria-hidden', 'true');
     scrim.append(title);
 
     root.append(scrim);
@@ -121,7 +134,8 @@ export function renderEntityBanner(
     if (options.editable) {
       const editBtn = document.createElement('button');
       editBtn.type = 'button';
-      editBtn.className = 'entity-banner__edit btn btn--secondary';
+      editBtn.className =
+        options.editButtonClass ?? 'entity-banner__edit btn btn--secondary';
       editBtn.textContent = 'Change cover';
       editBtn.addEventListener('click', () => {
         openCoverDialog();

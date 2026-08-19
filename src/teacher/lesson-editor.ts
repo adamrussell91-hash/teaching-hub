@@ -21,7 +21,7 @@ import {
   mountHistoryPanel,
   type HistoryPanelHandle
 } from '@/teacher/history-panel';
-import { mountPublicLinkControl } from '@/teacher/public-link';
+import { mountPublicLinkControl, publicStudentPath } from '@/teacher/public-link';
 import {
   buildLinkedPreview,
   ensureCompositionCached,
@@ -135,7 +135,10 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     let selectedBlockId: string | null = null;
     let draftAt = lesson.updated_at;
 
-    renderContextBar(refs, { title: lesson.title || 'Untitled lesson' });
+    renderContextBar(refs, {
+      title: lesson.title || 'Untitled lesson',
+      variant: 'editor'
+    });
     refs.canvas.replaceChildren();
 
     const builder = document.createElement('div');
@@ -451,6 +454,8 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       onChange: (next) => {
         assignLesson(next);
         markDirty();
+        const titleEl = refs.contextBar.querySelector('.teacher-layout__context-bar-title');
+        if (titleEl) titleEl.textContent = next.title || 'Untitled lesson';
       },
       onPrint: () => openPrintLesson(lesson),
       onSelect: (blockId) => {
@@ -557,6 +562,19 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         if (disposed || isStale()) return;
         mediaList = curriculum.media;
         page?.update(lesson, mediaList);
+        const unit = curriculum.units.find((row) => row.id === lesson.unit_id);
+        const klass = curriculum.classes.find(
+          (row) =>
+            row.current_unit_id === lesson.unit_id || row.active_unit_ids.includes(lesson.unit_id)
+        );
+        const crumb = [klass?.code, unit?.title].filter(Boolean).join(' · ');
+        const crumbEl = refs.contextBar.querySelector<HTMLElement>(
+          '.teacher-layout__context-bar-crumb'
+        );
+        if (crumbEl && crumb) {
+          crumbEl.textContent = crumb;
+          crumbEl.hidden = false;
+        }
       })
       .catch(() => {
         /* library picker stays empty */
@@ -573,6 +591,13 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         'lesson-editor__publish-panel--success'
       );
       refreshPublicLink();
+      const preview = refs.contextBar.querySelector<HTMLAnchorElement>('.context-bar__preview');
+      if (preview) {
+        preview.href = publicStudentPath('lesson', lesson.id);
+        preview.setAttribute('aria-disabled', 'false');
+        preview.tabIndex = 0;
+        preview.classList.remove('is-disabled');
+      }
       page?.revealPublishBlock('', []);
     }
 
@@ -585,7 +610,11 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         kind: 'lesson',
         id: lesson.id,
         published: Boolean(lesson.published_at),
-        label: 'Student link'
+        label: 'Share',
+        trigger: 'labelled',
+        lead: 'Currently live at (last published version):',
+        copyLabel: 'Copy link',
+        openLabel: 'Open student view'
       }).dispose;
     }
 
@@ -663,12 +692,32 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     const historyHost = document.createElement('div');
     historyHost.className = 'history-panel-host context-bar__history';
     const actions = refs.contextBar.querySelector('.context-bar__actions');
+    const previewLink = document.createElement('a');
+    previewLink.className = 'btn btn--ghost context-bar__preview';
+    previewLink.textContent = 'Student preview';
+    previewLink.target = '_blank';
+    previewLink.rel = 'noopener noreferrer';
+
+    function syncPreviewLink(): void {
+      previewLink.href = publicStudentPath('lesson', lesson.id);
+      const published = Boolean(lesson.published_at);
+      previewLink.setAttribute('aria-disabled', published ? 'false' : 'true');
+      previewLink.tabIndex = published ? 0 : -1;
+      previewLink.classList.toggle('is-disabled', !published);
+    }
+    previewLink.addEventListener('click', (event) => {
+      if (!lesson.published_at) event.preventDefault();
+    });
+    syncPreviewLink();
+
     if (actions) {
+      actions.prepend(previewLink);
       actions.append(publicLinkHost, historyHost);
     } else {
-      refs.contextBar.append(publicLinkHost, historyHost);
+      refs.contextBar.append(previewLink, publicLinkHost, historyHost);
     }
     refreshPublicLink();
+    syncPreviewLink();
 
     function applyRestoredLesson(restored: Lesson): void {
       Object.assign(lesson, restored);

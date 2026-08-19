@@ -307,7 +307,7 @@ export function mountSavePublishControls(options: SavePublishMountOptions): Save
 
   const publishButton = document.createElement('button');
   publishButton.type = 'button';
-  publishButton.className = 'btn btn--decisive context-bar__publish';
+  publishButton.className = 'btn btn--high-sea context-bar__publish';
   publishButton.textContent = 'Publish';
   publishButton.addEventListener('click', () => {
     publishButton.disabled = true;
@@ -340,8 +340,22 @@ export function mountSavePublishControls(options: SavePublishMountOptions): Save
   contextBar.append(actions);
 
   const unsubscribe = controller.subscribe((state) => {
-    saveSlot.textContent = SAVE_STATE_LABEL[state];
     saveSlot.dataset.saveState = state;
+    saveSlot.replaceChildren();
+    const dot = document.createElement('span');
+    dot.className = 'teacher-layout__save-dot';
+    dot.setAttribute('aria-hidden', 'true');
+    const text = document.createElement('span');
+    text.className = 'teacher-layout__save-text';
+    if (state === 'unpublished_changes') {
+      text.append('Saved · ');
+      const unpublished = document.createElement('b');
+      unpublished.textContent = 'Unpublished changes';
+      text.append(unpublished);
+    } else {
+      text.textContent = SAVE_STATE_LABEL[state];
+    }
+    saveSlot.append(dot, text);
     saveButton.disabled = state === 'saving';
   });
 

@@ -249,6 +249,20 @@ function embedProviderLabel(provider: EmbedProvider): string {
   }
 }
 
+function hostnameFromUrl(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return '';
+  }
+}
+
+function sourceInitials(source: string): string {
+  const parts = source.replace(/\.[a-z]+$/i, '').split(/[.\-]/).filter(Boolean);
+  const letters = (parts[0]?.slice(0, 1) ?? '') + (parts[1]?.slice(0, 1) ?? '');
+  return letters.toUpperCase() || 'EX';
+}
+
 function embedDefaultTitle(provider: EmbedProvider): string {
   switch (provider) {
     case 'google_maps':
@@ -313,8 +327,23 @@ export function renderEmbedBlock(
     link.textContent = block.content.title?.trim() || 'Open in new tab';
     wrap.append(link);
   } else {
+    const host = hostnameFromUrl(safeUrl);
+    const source = host || embedProviderLabel(provider);
     const card = document.createElement('div');
     card.className = 'block-embed__card';
+
+    const bar = document.createElement('div');
+    bar.className = 'block-embed__card-bar';
+    const icon = document.createElement('span');
+    icon.className = 'block-embed__card-icon';
+    icon.textContent = sourceInitials(source);
+    const src = document.createElement('span');
+    src.className = 'block-embed__card-src';
+    src.textContent = source;
+    bar.append(icon, src);
+
+    const body = document.createElement('div');
+    body.className = 'block-embed__card-body';
 
     const title = document.createElement('p');
     title.className = 'block-embed__card-title';
@@ -322,16 +351,20 @@ export function renderEmbedBlock(
 
     const meta = document.createElement('p');
     meta.className = 'block-embed__card-meta';
-    meta.textContent = embedProviderLabel(provider);
+    meta.textContent =
+      host && provider !== 'generic'
+        ? embedProviderLabel(provider)
+        : 'This provider blocks in-page embedding, so it opens in a new tab.';
 
     const link = document.createElement('a');
-    link.className = 'block-embed__open';
+    link.className = 'btn btn--secondary block-embed__open';
     link.href = safeUrl;
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
     link.textContent = 'Open in new tab';
 
-    card.append(title, meta, link);
+    body.append(title, meta, link);
+    card.append(bar, body);
     wrap.append(card);
   }
 
@@ -664,6 +697,14 @@ export function renderQuestionSetBlock(
         }
         li.append(lines);
       }
+    } else if (question.kind === 'short_answer') {
+      const label = document.createElement('p');
+      label.className = 'block-question-set__answer-label';
+      label.textContent = 'Your response';
+      const box = document.createElement('div');
+      box.className = 'block-question-set__answer';
+      box.textContent = 'Type your response here…';
+      li.append(label, box);
     }
 
     list.append(li);

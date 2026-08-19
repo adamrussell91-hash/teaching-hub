@@ -775,8 +775,12 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     cover: lesson.cover ?? null,
     media,
     title: lesson.title,
+    eyebrow: 'Lesson',
     entityId: lesson.id,
     editable: true,
+    size: 'hero',
+    fallback: 'marine',
+    editButtonClass: 'entity-banner__edit entity-banner__edit--hero btn btn--ghost',
     onSave: (cover) => {
       emitLesson(cover ? { ...lesson, cover } : lessonWithoutCover(lesson));
     }
@@ -786,12 +790,14 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   title.type = 'text';
   title.className = 'lesson-page__title';
   title.value = lesson.title;
+  title.placeholder = 'Untitled lesson';
   title.setAttribute('aria-label', 'Lesson title');
   title.addEventListener('input', () => {
     // Retitling repaints the banner scrim only; remounting would drop the field.
     banner.update({ title: title.value });
     emitLesson({ ...lesson, title: title.value });
   });
+  coverHost.append(title);
 
   const modeRow = document.createElement('label');
   modeRow.className = 'lesson-page__mode';
@@ -817,7 +823,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   const canvasHost = document.createElement('div');
   canvasHost.className = 'lesson-page__canvas';
 
-  root.append(chrome, coverHost, title, modeRow, canvasHost);
+  root.append(chrome, coverHost, modeRow, canvasHost);
 
   const canvas = mountBlockCanvas(canvasHost, {
     blocks: lesson.blocks,

@@ -28,6 +28,11 @@ export interface PublicLinkControlOptions {
   /** Optional label override for the trigger button. */
   label?: string;
   className?: string;
+  /** Labelled secondary button instead of the compact icon trigger. */
+  trigger?: 'icon' | 'labelled';
+  lead?: string;
+  copyLabel?: string;
+  openLabel?: string;
 }
 
 async function copyText(text: string): Promise<boolean> {
@@ -71,14 +76,19 @@ export function mountPublicLinkControl(
 
   const trigger = document.createElement('button');
   trigger.type = 'button';
-  trigger.className = 'btn btn--ghost public-link__trigger';
-  trigger.setAttribute('aria-label', options.label ?? 'Public link');
   trigger.setAttribute('aria-haspopup', 'dialog');
   trigger.setAttribute('aria-expanded', 'false');
-  trigger.title = options.label ?? 'Public link';
   trigger.disabled = !options.published;
-  trigger.innerHTML =
-    '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11 4"/><path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07L13 20"/></svg>';
+  if (options.trigger === 'labelled') {
+    trigger.className = 'btn btn--secondary public-link__trigger public-link__trigger--labelled';
+    trigger.textContent = options.label ?? 'Share';
+  } else {
+    trigger.className = 'btn btn--ghost public-link__trigger';
+    trigger.setAttribute('aria-label', options.label ?? 'Public link');
+    trigger.title = options.label ?? 'Public link';
+    trigger.innerHTML =
+      '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11 4"/><path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07L13 20"/></svg>';
+  }
 
   const popover = document.createElement('div');
   popover.className = 'public-link__popover';
@@ -92,6 +102,12 @@ export function mountPublicLinkControl(
 
     const path = publicStudentPath(options.kind, options.id);
     const absolute = absolutePublicUrl(options.kind, options.id);
+    if (options.lead) {
+      const lead = document.createElement('p');
+      lead.className = 'public-link__lead';
+      lead.textContent = options.lead;
+      popover.append(lead);
+    }
     const urlEl = document.createElement('p');
     urlEl.className = 'public-link__url';
     urlEl.textContent = absolute;
@@ -102,23 +118,23 @@ export function mountPublicLinkControl(
     const copyBtn = document.createElement('button');
     copyBtn.type = 'button';
     copyBtn.className = 'btn btn--secondary';
-    copyBtn.textContent = 'Copy';
+    copyBtn.textContent = options.copyLabel ?? 'Copy';
     copyBtn.addEventListener('click', (event) => {
       event.stopPropagation();
       void copyText(absolute).then((ok) => {
         copyBtn.textContent = ok ? 'Copied' : 'Copy failed';
         window.setTimeout(() => {
-          copyBtn.textContent = 'Copy';
+          copyBtn.textContent = options.copyLabel ?? 'Copy';
         }, 1500);
       });
     });
 
     const openBtn = document.createElement('a');
-    openBtn.className = 'btn btn--ghost';
+    openBtn.className = 'btn btn--secondary';
     openBtn.href = path;
     openBtn.target = '_blank';
     openBtn.rel = 'noopener noreferrer';
-    openBtn.textContent = 'Open';
+    openBtn.textContent = options.openLabel ?? 'Open';
     openBtn.addEventListener('click', (event) => {
       event.stopPropagation();
     });
