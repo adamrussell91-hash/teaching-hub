@@ -29,6 +29,8 @@ import {
   type CompositionCache
 } from '@/teacher/lesson-editor-compositions';
 import { mountAiPanel, type AiPanelHandle } from '@/teacher/ai-panel';
+import { mountAlchemyLabPanel, type AlchemyLabHandle } from '@/teacher/alchemy-lab-panel';
+import { blockQueryText } from '@/alchemy/blockQueryText';
 import {
   mountLessonPage,
   type LessonPageHandle
@@ -107,6 +109,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
   let closeEditSourceModal: (() => void) | null = null;
   let editSourceOpenSeq = 0;
   let aiPanel: AiPanelHandle | null = null;
+  let alchemyLab: AlchemyLabHandle | null = null;
   let page: LessonPageHandle | null = null;
   let palette: LessonPaletteHandle | null = null;
   let removeChromeKeys: (() => void) | null = null;
@@ -158,6 +161,8 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4 3.2V16H7.5A2.5 2.5 0 0 1 5 13.5v-7Z"/></svg>';
 
     const aiHost = document.createElement('div');
+    const labHost = document.createElement('div');
+    labHost.hidden = true;
 
     const publishPanel = document.createElement('div');
     publishPanel.className = 'lesson-editor__publish-panel';
@@ -170,7 +175,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     compositionStatus.hidden = true;
 
     pageCol.append(publishPanel, pageHost, compositionStatus);
-    chatCol.append(aiHost);
+    chatCol.append(aiHost, labHost);
     builder.append(railHost, pageCol, chatCol, chatFab);
     refs.canvas.append(builder);
 
@@ -219,6 +224,13 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       persistChrome();
     }
 
+    let columnMode: 'chat' | 'lab' = 'chat';
+
+    function selectedQuery(): { text: string; hasSelection: boolean } {
+      const selected = selectedBlockId ? findBlockById(lesson.blocks, selectedBlockId) : null;
+      return { text: blockQueryText(selected), hasSelection: Boolean(selected) };
+    }
+
     function setChatShelved(shelved: boolean): void {
       builder.classList.toggle('lesson-builder--chat-shelved', shelved);
       aiPanel?.setShelved(shelved);
@@ -226,7 +238,32 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       persistChrome();
     }
 
+    function showColumn(mode: 'chat' | 'lab'): void {
+      columnMode = mode;
+      aiHost.hidden = mode !== 'chat';
+      labHost.hidden = mode !== 'lab';
+      setChatShelved(false);
+      if (mode === 'lab') {
+        const query = selectedQuery();
+        alchemyLab?.open(query.text);
+        alchemyLab?.setSelectionText(query.text, query.hasSelection);
+      }
+    }
+
+    function openAlchemyLab(): void {
+      if (
+        columnMode === 'lab' &&
+        !builder.classList.contains('lesson-builder--chat-shelved')
+      ) {
+        labHost.querySelector('textarea')?.focus();
+        return;
+      }
+      showColumn('lab');
+    }
+
     function syncAiSelection(): void {
+      const query = selectedQuery();
+      alchemyLab?.setSelectionText(query.text, query.hasSelection);
       if (!selectedBlockId) {
         aiPanel?.setSelection({ blockId: null, blockType: null, scope: 'lesson' });
         return;
@@ -526,13 +563,17 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       flushDraft: () => saveController?.flush() ?? Promise.resolve()
     });
 
+    alchemyLab = mountAlchemyLabPanel(labHost, {
+      onHide: () => setChatShelved(true)
+    });
+
     syncAiSelection();
 
     const prefs = readBuilderChromePrefs();
     if (prefs.rail === 'shelved') setRailShelved(true);
     setChatShelved(prefs.chat === 'shelved');
 
-    chatFab.addEventListener('click', () => setChatShelved(false));
+    chatFab.addEventListener('click', () => showColumn('chat'));
 
     function onWindowKeydown(event: KeyboardEvent): void {
       if (disposed || isTypingTarget(event.target)) return;
@@ -663,10 +704,16 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     const historyHost = document.createElement('div');
     historyHost.className = 'history-panel-host context-bar__history';
     const actions = refs.contextBar.querySelector('.context-bar__actions');
+    const labBtn = document.createElement('button');
+    labBtn.type = 'button';
+    labBtn.className = 'btn btn--ghost context-bar__alchemy-lab';
+    labBtn.textContent = 'Alchemy Lab';
+    labBtn.addEventListener('click', () => openAlchemyLab());
     if (actions) {
+      actions.prepend(labBtn);
       actions.append(publicLinkHost, historyHost);
     } else {
-      refs.contextBar.append(publicLinkHost, historyHost);
+      refs.contextBar.append(labBtn, publicLinkHost, historyHost);
     }
     refreshPublicLink();
 
@@ -709,6 +756,8 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       publicLinkDispose = null;
       aiPanel?.dispose();
       aiPanel = null;
+      alchemyLab?.dispose();
+      alchemyLab = null;
       savePublishHandle?.dispose();
       saveController?.dispose();
       printLesson = null;
