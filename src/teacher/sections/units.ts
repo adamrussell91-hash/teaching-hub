@@ -70,7 +70,7 @@ export function renderUnitsIndex(
   createHost.dataset.createHost = '';
 
   const groupByHost = document.createElement('div');
-  groupByHost.className = 'units-index__group-by';
+  groupByHost.className = 'hub-pills units-index__group-by';
   groupByHost.setAttribute('role', 'group');
   groupByHost.setAttribute('aria-label', 'Group units by');
 
@@ -113,13 +113,13 @@ export function renderUnitsIndex(
 
   const subjectBtn = document.createElement('button');
   subjectBtn.type = 'button';
-  subjectBtn.className = 'units-index__group-by-btn';
+  subjectBtn.className = 'hub-pills__btn units-index__group-by-btn';
   subjectBtn.dataset.unitsGroup = 'subject';
   subjectBtn.textContent = 'Subject';
 
   const yearBtn = document.createElement('button');
   yearBtn.type = 'button';
-  yearBtn.className = 'units-index__group-by-btn';
+  yearBtn.className = 'hub-pills__btn units-index__group-by-btn';
   yearBtn.dataset.unitsGroup = 'year';
   yearBtn.textContent = 'Year level';
 

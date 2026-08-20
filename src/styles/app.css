@@ -781,6 +781,10 @@ a:hover {
   box-shadow: var(--elev-2);
 }
 
+.ai-panel[hidden] {
+  display: none;
+}
+
 .ai-panel__toolbar {
   display: flex;
   align-items: flex-start;
@@ -7375,6 +7379,10 @@ input.scope-timeline__note-title:focus-visible {
   min-height: 0;
 }
 
+.alchemy-lab[hidden] {
+  display: none;
+}
+
 .alchemy-lab__header {
   margin: 0;
 }
@@ -7955,13 +7963,6 @@ input.scope-timeline__note-title:focus-visible {
 
 .lessons-lib__search {
   width: 100%;
-  min-height: 2.6rem;
-  padding: 0.55rem 0.85rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--glass);
-  font-family: var(--font-ui);
-  font-size: var(--font-size-body);
 }
 
 .lessons-lib__filters,
@@ -7984,21 +7985,6 @@ input.scope-timeline__note-title:focus-visible {
   background: var(--paper);
   font-family: var(--font-ui);
   font-size: var(--text-sm);
-}
-
-.lessons-lib__view-btn {
-  border: 1px solid var(--line);
-  background: var(--glass);
-  border-radius: 999px;
-  padding: 0.35rem 0.75rem;
-  font-family: var(--font-ui);
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
-
-.lessons-lib__view-btn[aria-selected='true'] {
-  border-color: rgba(55, 111, 183, 0.45);
-  background: color-mix(in srgb, var(--pastel-blue) 55%, #fff);
 }
 
 .lessons-lib__rail-label,

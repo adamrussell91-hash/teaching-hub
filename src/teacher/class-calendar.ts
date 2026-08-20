@@ -100,14 +100,14 @@ export function renderClassCalendar(
     paging.append(prev, label, next, todayBtn);
 
     const tabs = document.createElement('div');
-    tabs.className = 'calendar-view-tabs';
+    tabs.className = 'hub-pills calendar-view-tabs';
     tabs.setAttribute('role', 'tablist');
     tabs.setAttribute('aria-label', 'Calendar view');
 
     for (const item of VIEWS) {
       const tab = document.createElement('button');
       tab.type = 'button';
-      tab.className = 'calendar-view-tabs__tab';
+      tab.className = 'hub-pills__btn calendar-view-tabs__tab';
       tab.setAttribute('role', 'tab');
       tab.dataset.calendarView = item.id;
       tab.textContent = item.label;

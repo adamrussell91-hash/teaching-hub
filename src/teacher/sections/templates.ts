@@ -70,16 +70,16 @@ export function renderTemplatesPage(
   renderPageHeader(canvas, { eyebrow: 'Workspace', title: 'Templates' });
 
   const tabs = document.createElement('div');
-  tabs.className = 'templates-page__tabs';
+  tabs.className = 'hub-pills templates-page__tabs';
   tabs.setAttribute('role', 'tablist');
 
   const lessonTab = document.createElement('button');
   lessonTab.type = 'button';
-  lessonTab.className = 'templates-page__tab';
+  lessonTab.className = 'hub-pills__btn templates-page__tab';
   lessonTab.textContent = 'Lessons';
   const unitTab = document.createElement('button');
   unitTab.type = 'button';
-  unitTab.className = 'templates-page__tab';
+  unitTab.className = 'hub-pills__btn templates-page__tab';
   unitTab.textContent = 'Units';
 
   const status = document.createElement('p');
@@ -104,6 +104,8 @@ export function renderTemplatesPage(
     unitTab.setAttribute('aria-selected', tab === 'units' ? 'true' : 'false');
     lessonTab.classList.toggle('templates-page__tab--active', tab === 'lessons');
     unitTab.classList.toggle('templates-page__tab--active', tab === 'units');
+    lessonTab.classList.toggle('is-active', tab === 'lessons');
+    unitTab.classList.toggle('is-active', tab === 'units');
   }
 
   function renderList(): void {

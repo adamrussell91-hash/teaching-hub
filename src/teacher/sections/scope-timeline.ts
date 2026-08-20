@@ -262,18 +262,18 @@ export function renderScopeTimelineEditor(
   root.className = 'scope-timeline';
 
   const tabs = document.createElement('div');
-  tabs.className = 'scope-timeline__tabs';
+  tabs.className = 'hub-pills scope-timeline__tabs';
   tabs.setAttribute('role', 'tablist');
 
   const timelineTab = document.createElement('button');
   timelineTab.type = 'button';
-  timelineTab.className = 'scope-timeline__tab';
+  timelineTab.className = 'hub-pills__btn scope-timeline__tab';
   timelineTab.dataset.scopeTab = 'timeline';
   timelineTab.textContent = 'Timeline';
 
   const mapTab = document.createElement('button');
   mapTab.type = 'button';
-  mapTab.className = 'scope-timeline__tab';
+  mapTab.className = 'hub-pills__btn scope-timeline__tab';
   mapTab.dataset.scopeTab = 'map';
   mapTab.textContent = 'Curriculum Map';
 
@@ -1040,6 +1040,8 @@ export function renderScopeTimelineEditor(
     meta.textContent = `${unitCount} ${unitCount === 1 ? 'unit' : 'units'} · ${scope.academic_year}`;
     timelineTab.classList.toggle('scope-timeline__tab--active', tab === 'timeline');
     mapTab.classList.toggle('scope-timeline__tab--active', tab === 'map');
+    timelineTab.classList.toggle('is-active', tab === 'timeline');
+    mapTab.classList.toggle('is-active', tab === 'map');
     controls.hidden = tab !== 'timeline';
     zoomMonth.classList.toggle('scope-timeline__zoom-btn--active', zoom === 'month');
     zoomYear.classList.toggle('scope-timeline__zoom-btn--active', zoom === 'year');
