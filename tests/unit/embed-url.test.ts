@@ -12,15 +12,49 @@ describe('parseEmbedInput', () => {
     });
   });
 
-  it('detects Google Docs (no embed_url)', () => {
-    expect(parseEmbedInput('https://docs.google.com/document/d/doc99/edit')).toEqual({
-      provider: 'google_docs'
+  it('detects published Google Slides and keeps the public embed id', () => {
+    const parsed = parseEmbedInput(
+      'https://docs.google.com/presentation/d/e/2PACX-1vABC/pub?start=false'
+    );
+    expect(parsed).toEqual({
+      provider: 'google_slides',
+      embed_url: 'https://docs.google.com/presentation/d/e/2PACX-1vABC/embed'
     });
   });
 
-  it('detects Drive file as pdf', () => {
+  it('passes through an existing Slides embed url', () => {
+    const url = 'https://docs.google.com/presentation/d/e/2PACX-1vABC/embed?start=false';
+    expect(parseEmbedInput(url)).toEqual({
+      provider: 'google_slides',
+      embed_url: url
+    });
+  });
+
+  it('detects Google Docs and derives a preview embed url', () => {
+    expect(parseEmbedInput('https://docs.google.com/document/d/doc99/edit')).toEqual({
+      provider: 'google_docs',
+      embed_url: 'https://docs.google.com/document/d/doc99/preview'
+    });
+  });
+
+  it('detects Drive file and derives a preview embed url', () => {
     expect(parseEmbedInput('https://drive.google.com/file/d/fileABC/view')).toEqual({
-      provider: 'pdf'
+      provider: 'pdf',
+      embed_url: 'https://drive.google.com/file/d/fileABC/preview'
+    });
+  });
+
+  it('detects Drive open?id= links', () => {
+    expect(parseEmbedInput('https://drive.google.com/open?id=fileABC')).toEqual({
+      provider: 'pdf',
+      embed_url: 'https://drive.google.com/file/d/fileABC/preview'
+    });
+  });
+
+  it('detects Google Sheets as a previewable generic embed', () => {
+    expect(parseEmbedInput('https://docs.google.com/spreadsheets/d/sheet99/edit')).toEqual({
+      provider: 'generic',
+      embed_url: 'https://docs.google.com/spreadsheets/d/sheet99/preview'
     });
   });
 
@@ -71,10 +105,16 @@ describe('embedFrameSrc', () => {
     ).toBe('https://docs.google.com/presentation/d/abc/embed');
   });
 
-  it('returns null for card-first providers', () => {
+  it('derives preview frames for Docs and Drive files', () => {
     expect(
       embedFrameSrc({ url: 'https://docs.google.com/document/d/x/edit', provider: 'google_docs' })
-    ).toBeNull();
+    ).toBe('https://docs.google.com/document/d/x/preview');
+    expect(
+      embedFrameSrc({ url: 'https://drive.google.com/file/d/fileABC/view', provider: 'pdf' })
+    ).toBe('https://drive.google.com/file/d/fileABC/preview');
+  });
+
+  it('returns null for a pdf that has no in-page viewer', () => {
     expect(embedFrameSrc({ url: 'https://x.com/a.pdf', provider: 'pdf' })).toBeNull();
   });
 

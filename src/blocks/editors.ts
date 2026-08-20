@@ -17,6 +17,8 @@ import { parseEmbedInput } from '@/blocks/embed-url';
 import { parseVideoInput } from '@/blocks/video-url';
 import { DIAGRAM_IMAGE_PUBLISH_URL_ISSUE, type Block, type ChartSeriesColor, type EmbedProvider } from '@/schemas/block';
 import type { Media } from '@/schemas/media';
+import { openDrivePicker } from '@/teacher/drive-picker';
+import { uploadMediaFile } from '@/teacher/media-api';
 import {
   mountMediaLibraryPicker,
   resolveMediaLibraryUrl
@@ -67,6 +69,47 @@ export function createVisibilitySelect<T extends Block>(
   });
 
   return select;
+}
+
+function driveErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'Google Drive is not configured.';
+}
+
+function createDrivePickButton(options: {
+  onPicked: (url: string, title: string) => void;
+  onError?: (message: string) => void;
+}): HTMLButtonElement {
+  const driveBtn = document.createElement('button');
+  driveBtn.type = 'button';
+  driveBtn.className = 'btn btn--ghost block-editor__drive-btn';
+  driveBtn.textContent = 'Add from Drive';
+  driveBtn.addEventListener('click', () => {
+    void (async () => {
+      driveBtn.disabled = true;
+      try {
+        const pick = await openDrivePicker();
+        if (!pick) return;
+        if (pick.kind === 'link') {
+          options.onPicked(pick.preview_url, pick.title);
+          return;
+        }
+        const media = await uploadMediaFile(pick.file, {
+          title: pick.title,
+          provider_file_id: pick.provider_file_id
+        });
+        const resolved = resolveMediaLibraryUrl(media);
+        if (!resolved) {
+          throw new Error('Uploaded file has no usable URL.');
+        }
+        options.onPicked(resolved, pick.title);
+      } catch (error) {
+        options.onError?.(driveErrorMessage(error));
+      } finally {
+        driveBtn.disabled = false;
+      }
+    })();
+  });
+  return driveBtn;
 }
 
 function createMediaSizeSelect(
@@ -401,6 +444,10 @@ export function createImageEditor(
   libraryHost.className = 'block-editor__library';
   libraryHost.hidden = true;
 
+  const driveHint = document.createElement('p');
+  driveHint.className = 'block-editor__hint';
+  driveHint.hidden = true;
+
   const emitChange = () => {
     onChange({
       ...getLatest(),
@@ -436,11 +483,24 @@ export function createImageEditor(
     }
   });
 
+  const driveBtn = createDrivePickButton({
+    onPicked: (pickedUrl, pickedTitle) => {
+      url.value = pickedUrl;
+      if (!alt.value.trim()) alt.value = pickedTitle;
+      driveHint.hidden = true;
+      emitChange();
+    },
+    onError: (message) => {
+      driveHint.hidden = false;
+      driveHint.textContent = message;
+    }
+  });
+
   url.addEventListener('input', emitChange);
   alt.addEventListener('input', emitChange);
   caption.addEventListener('input', emitChange);
 
-  fields.append(url, alt, caption, sizeSelect, libraryBtn, libraryHost);
+  fields.append(url, alt, caption, sizeSelect, libraryBtn, driveBtn, driveHint, libraryHost);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -550,8 +610,7 @@ export function createEmbedEditor(
 
   const hint = document.createElement('p');
   hint.className = 'block-editor__hint';
-  hint.textContent =
-    'Share settings must allow viewers. Docs and PDFs open as a link card.';
+  hint.textContent = 'Share settings must allow viewers. Docs and Drive files preview in place.';
 
   const emitChange = (embedUrl?: string) => {
     const selected = provider.value as EmbedProvider;
@@ -590,7 +649,18 @@ export function createEmbedEditor(
     emitChange(undefined);
   });
 
-  fields.append(url, title, provider, hint);
+  const driveBtn = createDrivePickButton({
+    onPicked: (pickedUrl, pickedTitle) => {
+      url.value = pickedUrl;
+      if (!title.value.trim()) title.value = pickedTitle;
+      applyUrlDetection();
+    },
+    onError: (message) => {
+      hint.textContent = message;
+    }
+  });
+
+  fields.append(url, title, provider, driveBtn, hint);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -992,11 +1062,29 @@ export function createAttachmentEditor(
     }
   });
 
+  const driveHint = document.createElement('p');
+  driveHint.className = 'block-editor__hint';
+  driveHint.hidden = true;
+
+  const driveBtn = createDrivePickButton({
+    onPicked: (pickedUrl, pickedTitle) => {
+      url.value = pickedUrl;
+      if (!title.value.trim()) title.value = pickedTitle;
+      if (!filename.value.trim()) filename.value = pickedTitle;
+      driveHint.hidden = true;
+      emitChange();
+    },
+    onError: (message) => {
+      driveHint.hidden = false;
+      driveHint.textContent = message;
+    }
+  });
+
   url.addEventListener('input', emitChange);
   title.addEventListener('input', emitChange);
   filename.addEventListener('input', emitChange);
 
-  fields.append(url, title, filename, libraryBtn, libraryHost);
+  fields.append(url, title, filename, libraryBtn, driveBtn, driveHint, libraryHost);
   return editorShell(block, onChange, fields, getLatest);
 }
 

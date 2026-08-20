@@ -4,7 +4,17 @@
  * Env (Vite): `VITE_GOOGLE_CLIENT_ID`, `VITE_GOOGLE_PICKER_API_KEY`,
  * optional `VITE_GOOGLE_APP_ID` (Cloud project number for PickerBuilder.setAppId).
  * Tokens stay in-memory for the pick flow and are never persisted.
+ * Production Pages can also load the same public picker values from
+ * GET /api/drive-picker-config (Netlify: GOOGLE_CLIENT_ID / GOOGLE_PICKER_API_KEY).
  */
+
+import {
+  resolveGooglePickerConfig,
+  type GooglePickerConfig
+} from '@/teacher/google-picker-config';
+
+export { pickerConfigFromValues, resolveGooglePickerConfig } from '@/teacher/google-picker-config';
+export type { GooglePickerConfig } from '@/teacher/google-picker-config';
 
 export function isGoogleNativeMime(mime: string): boolean {
   return mime.startsWith('application/vnd.google-apps.');
@@ -151,16 +161,21 @@ declare global {
   };
 }
 
-function readGoogleEnv(): { clientId: string; apiKey: string; appId?: string } {
-  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim();
-  const apiKey = import.meta.env.VITE_GOOGLE_PICKER_API_KEY?.trim();
-  const appId = import.meta.env.VITE_GOOGLE_APP_ID?.trim();
-  if (!clientId || !apiKey) {
-    throw new Error(
-      'Google Drive is not configured (missing VITE_GOOGLE_CLIENT_ID / VITE_GOOGLE_PICKER_API_KEY)'
-    );
+async function loadRemotePickerConfig(): Promise<GooglePickerConfig | null> {
+  try {
+    const { apiGet } = await import('@/api/client');
+    return await apiGet<GooglePickerConfig>('/api/drive-picker-config');
+  } catch {
+    return null;
   }
-  return { clientId, apiKey, appId: appId || undefined };
+}
+
+function viteGoogleEnv(): { clientId?: string; apiKey?: string; appId?: string } {
+  return {
+    clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+    apiKey: import.meta.env.VITE_GOOGLE_PICKER_API_KEY,
+    appId: import.meta.env.VITE_GOOGLE_APP_ID
+  };
 }
 
 async function loadGoogleApis(): Promise<void> {
@@ -267,7 +282,10 @@ async function downloadDriveFile(
 }
 
 export async function openDrivePicker(): Promise<DrivePickResult | null> {
-  const { clientId, apiKey, appId } = readGoogleEnv();
+  const { clientId, apiKey, appId } = await resolveGooglePickerConfig({
+    vite: viteGoogleEnv(),
+    loadRemote: loadRemotePickerConfig
+  });
   await loadGoogleApis();
   const accessToken = await requestAccessToken(clientId);
   const picked = await showPicker({ accessToken, apiKey, appId });
