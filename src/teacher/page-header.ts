@@ -33,6 +33,13 @@ export function renderPageHeader(host: HTMLElement, config: PageHeaderConfig): H
     const actions = document.createElement('div');
     actions.className = 'page-header__actions';
     actions.append(...config.actions);
+    const mark = document.createElement('img');
+    mark.className = 'hub-mark';
+    mark.src = 'design-kit/icons/teaching.svg';
+    mark.alt = '';
+    mark.width = 32;
+    mark.height = 32;
+    actions.append(mark);
     header.append(actions);
   }
 
