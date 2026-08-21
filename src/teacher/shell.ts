@@ -63,14 +63,15 @@ export function renderTeacherShell(
   layout.className = 'teacher-layout';
 
   const rail = document.createElement('nav');
-  rail.className = 'teacher-layout__rail';
+  rail.className = 'teacher-layout__rail hub-rail';
   rail.setAttribute('aria-label', 'Curriculum navigation');
 
   const brandRow = document.createElement('div');
   brandRow.className = 'teacher-layout__rail-brand-row';
 
-  const brand = document.createElement('p');
-  brand.className = 'teacher-layout__rail-brand';
+  const brand = document.createElement('a');
+  brand.className = 'teacher-layout__rail-brand hub-rail__brand';
+  brand.href = '/';
   brand.textContent = 'Teaching Hub';
 
   const railNav = document.createElement('div');
@@ -124,7 +125,13 @@ export function renderTeacherShell(
     });
 
     utilities.append(logoutButton);
-    main.append(utilities, contextBar, canvas);
+    const mark = document.createElement('img');
+    mark.className = 'hub-mark';
+    mark.src = new URL('icons/teaching.svg', document.baseURI).href;
+    mark.alt = '';
+    mark.width = 32;
+    mark.height = 32;
+    main.append(utilities, mark, contextBar, canvas);
   } else {
     main.append(contextBar, canvas);
   }
