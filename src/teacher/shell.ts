@@ -127,7 +127,7 @@ export function renderTeacherShell(
     utilities.append(logoutButton);
     const mark = document.createElement('img');
     mark.className = 'hub-mark';
-    mark.src = 'design-kit/icons/teaching.svg';
+    mark.src = new URL('icons/teaching.svg', document.baseURI).href;
     mark.alt = '';
     mark.width = 32;
     mark.height = 32;
