@@ -93,4 +93,32 @@ describe('lessons index', () => {
       /Artist of the Floating World/
     );
   });
+
+  it('lays library cards out as checkbox, info, and row actions', () => {
+    renderLessonsIndex(canvas, curriculum);
+    const card = canvas.querySelector<HTMLElement>('.lesson-list__item--openable')!;
+    const lead = card.querySelector('.lessons-lib__lead');
+    const info = card.querySelector('.lesson-list__info');
+    const actions = card.querySelector('.list-row-actions');
+    expect(lead?.querySelector('.lessons-lib__check')).toBeTruthy();
+    expect(info?.querySelector('.lesson-list__title')?.textContent).toBe('Introduction');
+    expect(info?.querySelector('.lesson-list__meta')?.textContent).toMatch(/Artist of the Floating World/);
+    expect(info?.querySelector('.lesson-list__meta')?.textContent).toMatch(/Draft/);
+    expect(actions?.querySelector('.lessons-lib__icon-btn[aria-label="Duplicate"]')).toBeTruthy();
+    expect([...card.children].map((node) => node.className.split(' ')[0])).toEqual([
+      'lessons-lib__lead',
+      'lesson-list__info',
+      'list-row-actions'
+    ]);
+  });
+
+  it('wraps the table view in a fixed-column scroll shell', () => {
+    renderLessonsIndex(canvas, curriculum);
+    canvas.querySelector<HTMLButtonElement>('[data-view="table"]')!.click();
+    const wrap = canvas.querySelector('.lessons-table-wrap');
+    expect(wrap?.querySelector('.lessons-table__scroll')).toBeTruthy();
+    expect(wrap?.querySelector('.lessons-table colgroup col.c-title')).toBeTruthy();
+    expect(wrap?.querySelector('.lessons-table__title')?.textContent).toBe('Introduction');
+    expect(wrap?.querySelector('.status-badge')?.textContent).toBe('Draft');
+  });
 });

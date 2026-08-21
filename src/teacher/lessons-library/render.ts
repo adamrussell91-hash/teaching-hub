@@ -489,7 +489,7 @@ export function renderLessonsLibrary(
   }
 
   function iconButton(label: string, glyph: string): HTMLButtonElement {
-    const btn = el('button', 'btn btn--ghost lessons-lib__icon-btn', glyph);
+    const btn = el('button', 'lessons-lib__icon-btn', glyph);
     btn.type = 'button';
     btn.setAttribute('aria-label', label);
     btn.title = label;
@@ -543,9 +543,6 @@ export function renderLessonsLibrary(
     const info = el('div', 'lesson-list__info');
     info.append(el('p', 'lesson-list__title', row.title));
     const unit = curriculum.units.find((entry) => entry.id === row.unit_id);
-    const subject = unit
-      ? curriculum.subjects.find((entry) => entry.id === unit.subject_id)
-      : undefined;
     const badge = lessonBadge(row);
     const meta = el('p', 'lesson-list__meta');
     const pill = el('span', `status-badge status-badge--${badge}`, badgeLabel(badge));
@@ -562,9 +559,6 @@ export function renderLessonsLibrary(
       pill,
       document.createTextNode(` · ${formatRelativeTime(row.updated_at, now)}`)
     );
-    if (subject) {
-      meta.append(document.createTextNode(` · ${subject.display_title || subject.title}`));
-    }
     info.append(meta);
     if (row.tags && row.tags.length > 0) {
       const tagRow = el('p', 'lessons-lib__tags');
@@ -612,7 +606,9 @@ export function renderLessonsLibrary(
       })();
     });
     actions.append(linkHost, dup, archive, trash);
-    item.append(check, pin, info, actions);
+    const lead = el('div', 'lessons-lib__lead');
+    lead.append(check, pin);
+    item.append(lead, info, actions);
     return item;
   }
 
@@ -685,8 +681,28 @@ export function renderLessonsLibrary(
   }
 
   function paintTable(rows: LessonLibraryRow[]): void {
+    const wrap = el('div', 'lessons-table-wrap');
+    const virtualHost = el('div', 'lessons-table__scroll');
     const table = document.createElement('table');
     table.className = 'lessons-table';
+    const colgroup = document.createElement('colgroup');
+    for (const name of [
+      'c-check',
+      'c-title',
+      'c-subject',
+      'c-unit',
+      'c-mode',
+      'c-status',
+      'c-edited',
+      'c-created',
+      'c-tags',
+      'c-link'
+    ]) {
+      const col = document.createElement('col');
+      col.className = name;
+      colgroup.append(col);
+    }
+    table.append(colgroup);
     const head = document.createElement('thead');
     const hr = document.createElement('tr');
     for (const label of [
@@ -708,8 +724,8 @@ export function renderLessonsLibrary(
     const body = document.createElement('tbody');
     const unitsById = new Map(curriculum.units.map((unit) => [unit.id, unit]));
     const subjectsById = new Map(curriculum.subjects.map((subject) => [subject.id, subject]));
-    const virtualHost = el('div', 'lessons-table__scroll');
-    listHost.append(virtualHost);
+    wrap.append(virtualHost);
+    listHost.append(wrap);
 
     const renderRow = (index: number): HTMLElement => {
       const row = rows[index]!;
