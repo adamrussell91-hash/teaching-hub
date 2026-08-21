@@ -23,6 +23,11 @@ export interface CurriculumLessonSummary {
   excerpt?: string;
   attachment_count?: number;
   pedagogical_mode?: PedagogicalMode;
+  origin?: {
+    source: 'notion_export';
+    page_id: string;
+    export_path: string;
+  };
 }
 
 export interface CurriculumResponse {

@@ -15,6 +15,12 @@ export {
   type PublishBlockIssue
 } from './publish-block-issues';
 
+export const LessonOriginSchema = z.object({
+  source: z.literal('notion_export'),
+  page_id: z.string().min(1),
+  export_path: z.string().min(1)
+});
+
 export const LessonSchema = z.object({
   ...CommonFields,
   ...TrashFields,
@@ -30,7 +36,9 @@ export const LessonSchema = z.object({
   syllabus_outcomes: z.array(z.string().min(1).max(32)).max(24).optional(),
   outcome_ids: z.array(z.string().min(1).max(64)).max(24).optional(),
   /** Teacher planning metadata; optional for blob/version compatibility. */
-  pedagogical_mode: PedagogicalModeSchema.optional()
+  pedagogical_mode: PedagogicalModeSchema.optional(),
+  /** Set when the lesson was transferred from a Notion Markdown export. */
+  origin: LessonOriginSchema.optional()
 });
 
 export const PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {

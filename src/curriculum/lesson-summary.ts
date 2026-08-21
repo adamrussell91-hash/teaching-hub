@@ -49,6 +49,7 @@ export function toCurriculumLessonSummary(
     ...(lesson.outcome_ids && lesson.outcome_ids.length > 0
       ? { outcome_ids: lesson.outcome_ids }
       : {}),
-    ...(lesson.pedagogical_mode ? { pedagogical_mode: lesson.pedagogical_mode } : {})
+    ...(lesson.pedagogical_mode ? { pedagogical_mode: lesson.pedagogical_mode } : {}),
+    ...(lesson.origin ? { origin: lesson.origin } : {})
   };
 }

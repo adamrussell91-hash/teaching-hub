@@ -12,6 +12,7 @@ import { patchUnit } from '@/teacher/unit-api';
 import { ApiClientError } from '@/api/client';
 import { renderPageHeader } from '@/teacher/page-header';
 import { downloadPortableExport } from '@/teacher/export-api';
+import { mountNotionImport } from '@/teacher/import-notion';
 import { gradientForEntityId, renderEntityBanner } from '@/teacher/entity-banner';
 import {
   mountBlockCanvas,
@@ -315,12 +316,29 @@ export function renderUnitPage(
     });
   });
 
+  const importBtn = document.createElement('button');
+  importBtn.type = 'button';
+  importBtn.className = 'btn btn--secondary';
+  importBtn.dataset.import = 'notion';
+  importBtn.textContent = 'Import';
+
   const pageHeader = renderPageHeader(canvas, {
     eyebrow: 'Units',
     title: unit.title,
-    actions: [exportBtn]
+    actions: [importBtn, exportBtn]
   });
   const heading = pageHeader.querySelector('.page-header__title');
+  const importStatus = document.createElement('p');
+  importStatus.className = 'page-header__supporting';
+  importStatus.dataset.importStatus = '';
+  importStatus.hidden = true;
+  pageHeader.querySelector('.page-header__copy')?.append(importStatus);
+  const importer = mountNotionImport(importBtn, {
+    unitId: unit.id,
+    getExisting: () => curriculum.lessons,
+    status: importStatus,
+    onMutated: options.onMutated
+  });
 
   const root = document.createElement('div');
   root.className = 'unit-page';
@@ -497,6 +515,7 @@ export function renderUnitPage(
 
   return {
     dispose: () => {
+      importer.dispose();
       historyPanel.dispose();
       banner.dispose();
       planEditor.dispose();

@@ -222,6 +222,19 @@ describe('LessonSchema', () => {
     expect(lesson.published_at).toBe('2026-02-01T12:00:00.000Z');
   });
 
+  it('accepts optional Notion origin and still parses lessons without it', () => {
+    const withOrigin = LessonSchema.parse({
+      ...draftLesson,
+      origin: {
+        source: 'notion_export',
+        page_id: '1a2b3c4d5e6f7890abcd1234ef567890',
+        export_path: 'Unit/Memory 1a2b3c4d5e6f7890abcd1234ef567890.md'
+      }
+    });
+    expect(withOrigin.origin?.page_id).toBe('1a2b3c4d5e6f7890abcd1234ef567890');
+    expect(LessonSchema.parse(draftLesson).origin).toBeUndefined();
+  });
+
   it('accepts optional tags, review_status, and syllabus outcomes', () => {
     const lesson = LessonSchema.parse({
       ...draftLesson,

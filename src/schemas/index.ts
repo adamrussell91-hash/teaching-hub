@@ -48,6 +48,7 @@ export {
 } from './block';
 export {
   LessonSchema,
+  LessonOriginSchema,
   PublishableLessonSchema,
   type Lesson
 } from './lesson';

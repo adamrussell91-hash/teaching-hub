@@ -267,6 +267,8 @@ describe('units', () => {
       'Artist of the Floating World'
     );
     expect(canvas.querySelector('[data-export="unit"]')?.textContent).toMatch(/Export JSON/);
+    expect(canvas.querySelector('[data-import="notion"]')?.textContent).toBe('Import');
+    expect(canvas.querySelector('[data-confirm], .confirm-card')).toBeNull();
     expect(canvas.querySelector('[data-unit-section="plan"]')).toBeTruthy();
     const titles = [...canvas.querySelectorAll('.lesson-list__title')].map((el) => el.textContent);
     expect(titles).toEqual(['Introduction', 'Themes']);
