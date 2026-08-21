@@ -17,6 +17,7 @@ import type { CurriculumResponse } from '@/teacher/nav';
 import { fetchContentSearch } from '@/teacher/search/api';
 import { readRecent } from '@/teacher/search/recent';
 import { mountPublicLinkControl } from '@/teacher/public-link';
+import { createHubFilter } from '../../../design-kit/js/hub-filter-menu.js';
 import { duplicateLesson, patchLessonLibrary } from './api';
 import { duplicateIdSet, findNearDuplicates } from './duplicates';
 import { exportUnitPack } from './export-unit';
@@ -69,6 +70,31 @@ function uniqueAuthors(lessons: LessonLibraryRow[]): Array<{ id: string; name: s
   return [...map.entries()].map(([id, name]) => ({ id, name }));
 }
 
+type FilterOption = { value: string; label: string };
+
+type FilterControl = {
+  el: HTMLButtonElement;
+  getValue: () => string;
+  setOptions: (options: FilterOption[], selected: string) => void;
+  dispose: () => void;
+};
+
+function filterControl(
+  key: string,
+  label: string,
+  defaultValue: string,
+  onChange: (value: string) => void
+): FilterControl {
+  return createHubFilter({
+    key,
+    label,
+    defaultValue,
+    options: [{ value: defaultValue, label: key }],
+    value: defaultValue,
+    onChange
+  });
+}
+
 function selectControl(label: string, onChange: (value: string) => void): HTMLSelectElement {
   const select = el('select', 'lessons-lib__select');
   select.setAttribute('aria-label', label);
@@ -117,7 +143,7 @@ export function renderLessonsLibrary(
 
   const search = document.createElement('input');
   search.type = 'search';
-  search.className = 'lessons-lib__search';
+  search.className = 'hub-search lessons-lib__search';
   search.dataset.lessonsSearch = '';
   search.placeholder = 'Search titles, units, tags, notes…';
   search.setAttribute('aria-label', 'Search lessons');
@@ -125,7 +151,7 @@ export function renderLessonsLibrary(
 
   const toolbar = el('div', 'lessons-lib__toolbar');
   const filters = el('div', 'lessons-lib__filters');
-  const views = el('div', 'lessons-lib__views');
+  const views = el('div', 'hub-pills lessons-lib__views');
   views.setAttribute('role', 'tablist');
   views.setAttribute('aria-label', 'Lesson views');
 
@@ -139,11 +165,11 @@ export function renderLessonsLibrary(
 
   root.append(countEl, rail, toolbar, bulk, listHost, side);
 
-  const unitSelect = selectControl('Filter by unit', (value) => {
+  const unitSelect = filterControl('Unit', 'Filter by unit', '', (value) => {
     selected = new Set();
     patchState({ units: value ? [value] : [] });
   });
-  const subjectSelect = selectControl('Filter by subject', (value) => {
+  const subjectSelect = filterControl('Subject', 'Filter by subject', '', (value) => {
     selected = new Set();
     const subjects = value ? [value] : [];
     let units = state.units;
@@ -155,43 +181,53 @@ export function renderLessonsLibrary(
     }
     patchState({ subjects, units });
   });
-  const modeSelect = selectControl('Filter by pedagogical mode', (value) => {
+  const modeSelect = filterControl('Mode', 'Filter by pedagogical mode', '', (value) => {
     selected = new Set();
     patchState({ modes: value ? [value as PedagogicalMode] : [] });
   });
-  const statusSelect = selectControl('Filter by status', (value) => {
+  const statusSelect = filterControl('Status', 'Filter by status', '', (value) => {
     selected = new Set();
     patchState({ statuses: value ? [value as LessonStatusFilter] : [] });
   });
-  const tagSelect = selectControl('Filter by tag', (value) => {
+  const tagSelect = filterControl('Tags', 'Filter by tag', '', (value) => {
     selected = new Set();
     patchState({ tags: value ? [value] : [] });
   });
-  const sortSelect = selectControl('Sort lessons', (value) => {
+  const sortSelect = filterControl('Sort', 'Sort lessons', 'edited_desc', (value) => {
     patchState({ sort: value as LessonsListState['sort'] });
   });
-  const smartSelect = selectControl('Smart filter', (value) => {
+  const smartSelect = filterControl('Lesson', 'Smart filter', '', (value) => {
     selected = new Set();
     patchState({
       smart: value === '' ? null : (value as NonNullable<LessonsListState['smart']>)
     });
   });
 
-  const densitySelect = selectControl('Card density', (value) => {
+  const densitySelect = filterControl('Density', 'Card density', 'cards', (value) => {
     const density = value === 'compact' ? 'compact' : 'cards';
     writePreferredDensity(density);
     patchState({ density });
   });
 
   filters.append(
-    subjectSelect,
-    unitSelect,
-    modeSelect,
-    statusSelect,
-    tagSelect,
-    sortSelect,
-    smartSelect,
-    densitySelect
+    subjectSelect.el,
+    unitSelect.el,
+    modeSelect.el,
+    statusSelect.el,
+    tagSelect.el,
+    sortSelect.el,
+    smartSelect.el,
+    densitySelect.el
+  );
+  disposers.push(
+    () => subjectSelect.dispose(),
+    () => unitSelect.dispose(),
+    () => modeSelect.dispose(),
+    () => statusSelect.dispose(),
+    () => tagSelect.dispose(),
+    () => sortSelect.dispose(),
+    () => smartSelect.dispose(),
+    () => densitySelect.dispose()
   );
   toolbar.append(search, filters, views);
 
@@ -202,7 +238,7 @@ export function renderLessonsLibrary(
     { id: 'mine', label: 'My views' }
   ];
   for (const mode of viewModes) {
-    const btn = el('button', 'lessons-lib__view-btn', mode.label);
+    const btn = el('button', 'hub-pills__btn lessons-lib__view-btn', mode.label);
     btn.type = 'button';
     btn.dataset.view = mode.id;
     btn.addEventListener('click', () => {
@@ -273,65 +309,76 @@ export function renderLessonsLibrary(
   }
 
   function fillSelects(): void {
-    subjectSelect.replaceChildren();
-    option(subjectSelect, '', 'All subjects', state.subjects.length === 0);
-    for (const subject of [...curriculum.subjects].sort((a, b) =>
-      (a.display_title || a.title).localeCompare(b.display_title || b.title)
-    )) {
-      option(
-        subjectSelect,
-        subject.id,
-        subject.display_title || subject.title,
-        state.subjects.includes(subject.id)
-      );
-    }
+    const subjects: FilterOption[] = [
+      { value: '', label: 'All subjects' },
+      ...[...curriculum.subjects]
+        .sort((a, b) => (a.display_title || a.title).localeCompare(b.display_title || b.title))
+        .map((subject) => ({ value: subject.id, label: subject.display_title || subject.title }))
+    ];
+    subjectSelect.setOptions(subjects, state.subjects[0] ?? '');
 
     const subjectFilter = state.subjects[0];
-    const unitsForSelect = [...curriculum.units]
-      .filter((unit) => !subjectFilter || unit.subject_id === subjectFilter)
-      .sort((a, b) => a.title.localeCompare(b.title));
-    unitSelect.replaceChildren();
-    option(unitSelect, '', 'All units', state.units.length === 0);
-    for (const unit of unitsForSelect) {
-      option(unitSelect, unit.id, unit.title, state.units.includes(unit.id));
-    }
-
-    modeSelect.replaceChildren();
-    option(modeSelect, '', 'All modes', state.modes.length === 0);
-    for (const mode of PEDAGOGICAL_MODES) {
-      option(modeSelect, mode, PEDAGOGICAL_MODE_LABELS[mode], state.modes.includes(mode));
-    }
-
-    statusSelect.replaceChildren();
-    option(statusSelect, '', 'Active (draft + published)', state.statuses.length === 0);
-    option(statusSelect, 'draft', 'Draft', state.statuses.includes('draft'));
-    option(statusSelect, 'published', 'Published', state.statuses.includes('published'));
-    option(statusSelect, 'needs_review', 'Needs review', state.statuses.includes('needs_review'));
-    option(statusSelect, 'archived', 'Archived', state.statuses.includes('archived'));
-    tagSelect.replaceChildren();
-    option(tagSelect, '', 'All tags', state.tags.length === 0);
-    for (const tag of uniqueTags(curriculum.lessons)) {
-      option(tagSelect, tag, tag, state.tags.includes(tag));
-    }
-    sortSelect.replaceChildren();
-    const sorts: Array<[LessonsListState['sort'], string]> = [
-      ['edited_desc', 'Last edited · newest'],
-      ['edited_asc', 'Last edited · oldest'],
-      ['title_asc', 'Title A–Z'],
-      ['title_desc', 'Title Z–A'],
-      ['created_desc', 'Date created · newest'],
-      ['created_asc', 'Date created · oldest'],
-      ['status', 'Status']
+    const units: FilterOption[] = [
+      { value: '', label: 'All units' },
+      ...[...curriculum.units]
+        .filter((unit) => !subjectFilter || unit.subject_id === subjectFilter)
+        .sort((a, b) => a.title.localeCompare(b.title))
+        .map((unit) => ({ value: unit.id, label: unit.title }))
     ];
-    for (const [value, label] of sorts) option(sortSelect, value, label, state.sort === value);
-    smartSelect.replaceChildren();
-    option(smartSelect, '', 'All lessons', !state.smart);
-    option(smartSelect, 'health', 'Needs attention', state.smart === 'health');
-    option(smartSelect, 'duplicates', 'Possible duplicates', state.smart === 'duplicates');
-    option(smartSelect, 'today', 'On today\'s timetable', state.smart === 'today');
-    densitySelect.replaceChildren();
-    option(densitySelect, 'cards', 'Cards', state.density === 'cards');
-    option(densitySelect, 'compact', 'Compact', state.density === 'compact');
+    unitSelect.setOptions(units, state.units[0] ?? '');
+
+    modeSelect.setOptions(
+      [
+        { value: '', label: 'All modes' },
+        ...PEDAGOGICAL_MODES.map((mode) => ({ value: mode, label: PEDAGOGICAL_MODE_LABELS[mode] }))
+      ],
+      state.modes[0] ?? ''
+    );
+
+    statusSelect.setOptions(
+      [
+        { value: '', label: 'Active (draft + published)' },
+        { value: 'draft', label: 'Draft' },
+        { value: 'published', label: 'Published' },
+        { value: 'needs_review', label: 'Needs review' },
+        { value: 'archived', label: 'Archived' }
+      ],
+      state.statuses[0] ?? ''
+    );
+
+    tagSelect.setOptions(
+      [{ value: '', label: 'All tags' }, ...uniqueTags(curriculum.lessons).map((tag) => ({ value: tag, label: tag }))],
+      state.tags[0] ?? ''
+    );
+
+    const sorts: FilterOption[] = [
+      { value: 'edited_desc', label: 'Last edited · newest' },
+      { value: 'edited_asc', label: 'Last edited · oldest' },
+      { value: 'title_asc', label: 'Title A–Z' },
+      { value: 'title_desc', label: 'Title Z–A' },
+      { value: 'created_desc', label: 'Date created · newest' },
+      { value: 'created_asc', label: 'Date created · oldest' },
+      { value: 'status', label: 'Status' }
+    ];
+    sortSelect.setOptions(sorts, state.sort);
+
+    smartSelect.setOptions(
+      [
+        { value: '', label: 'All lessons' },
+        { value: 'health', label: 'Needs attention' },
+        { value: 'duplicates', label: 'Possible duplicates' },
+        { value: 'today', label: "On today's timetable" }
+      ],
+      state.smart ?? ''
+    );
+
+    densitySelect.setOptions(
+      [
+        { value: 'cards', label: 'Cards' },
+        { value: 'compact', label: 'Compact' }
+      ],
+      state.density
+    );
   }
 
   function paintRail(): void {
@@ -343,7 +390,7 @@ export function renderLessonsLibrary(
     const heading = el('p', 'lessons-lib__rail-label', 'Recently opened');
     const strip = el('div', 'lessons-lib__recent');
     for (const item of recent) {
-      const link = el('a', 'lessons-lib__recent-chip', item.title);
+      const link = el('a', 'hub-chip lessons-lib__recent-chip', item.title);
       link.href = `/lessons/${item.id}`;
       link.addEventListener('click', (event) => {
         event.preventDefault();
@@ -442,7 +489,7 @@ export function renderLessonsLibrary(
   }
 
   function iconButton(label: string, glyph: string): HTMLButtonElement {
-    const btn = el('button', 'btn btn--ghost lessons-lib__icon-btn', glyph);
+    const btn = el('button', 'lessons-lib__icon-btn', glyph);
     btn.type = 'button';
     btn.setAttribute('aria-label', label);
     btn.title = label;
@@ -496,9 +543,6 @@ export function renderLessonsLibrary(
     const info = el('div', 'lesson-list__info');
     info.append(el('p', 'lesson-list__title', row.title));
     const unit = curriculum.units.find((entry) => entry.id === row.unit_id);
-    const subject = unit
-      ? curriculum.subjects.find((entry) => entry.id === unit.subject_id)
-      : undefined;
     const badge = lessonBadge(row);
     const meta = el('p', 'lesson-list__meta');
     const pill = el('span', `status-badge status-badge--${badge}`, badgeLabel(badge));
@@ -515,9 +559,6 @@ export function renderLessonsLibrary(
       pill,
       document.createTextNode(` · ${formatRelativeTime(row.updated_at, now)}`)
     );
-    if (subject) {
-      meta.append(document.createTextNode(` · ${subject.display_title || subject.title}`));
-    }
     info.append(meta);
     if (row.tags && row.tags.length > 0) {
       const tagRow = el('p', 'lessons-lib__tags');
@@ -565,7 +606,9 @@ export function renderLessonsLibrary(
       })();
     });
     actions.append(linkHost, dup, archive, trash);
-    item.append(check, pin, info, actions);
+    const lead = el('div', 'lessons-lib__lead');
+    lead.append(check, pin);
+    item.append(lead, info, actions);
     return item;
   }
 
@@ -638,8 +681,28 @@ export function renderLessonsLibrary(
   }
 
   function paintTable(rows: LessonLibraryRow[]): void {
+    const wrap = el('div', 'lessons-table-wrap');
+    const virtualHost = el('div', 'lessons-table__scroll');
     const table = document.createElement('table');
     table.className = 'lessons-table';
+    const colgroup = document.createElement('colgroup');
+    for (const name of [
+      'c-check',
+      'c-title',
+      'c-subject',
+      'c-unit',
+      'c-mode',
+      'c-status',
+      'c-edited',
+      'c-created',
+      'c-tags',
+      'c-link'
+    ]) {
+      const col = document.createElement('col');
+      col.className = name;
+      colgroup.append(col);
+    }
+    table.append(colgroup);
     const head = document.createElement('thead');
     const hr = document.createElement('tr');
     for (const label of [
@@ -661,8 +724,8 @@ export function renderLessonsLibrary(
     const body = document.createElement('tbody');
     const unitsById = new Map(curriculum.units.map((unit) => [unit.id, unit]));
     const subjectsById = new Map(curriculum.subjects.map((subject) => [subject.id, subject]));
-    const virtualHost = el('div', 'lessons-table__scroll');
-    listHost.append(virtualHost);
+    wrap.append(virtualHost);
+    listHost.append(wrap);
 
     const renderRow = (index: number): HTMLElement => {
       const row = rows[index]!;

@@ -103,7 +103,7 @@ GITHUB_BACKUP_BRANCH=main
 
 ### 3. Google Drive picker (teacher Resources)
 
-The picker is client-only. Vite inlines these at **Pages build** time (`VITE_*`), so they belong in the local `.env` and as **GitHub Actions secrets** — not Netlify.
+The picker is client-only. Vite can inline these at **Pages build** time (`VITE_*`), or a signed-in teacher can load the same public values from Netlify (`GOOGLE_CLIENT_ID` / `GOOGLE_PICKER_API_KEY` / `GOOGLE_APP_ID` via `/api/drive-picker-config`).
 
 In [Google Cloud Console](https://console.cloud.google.com/):
 
@@ -125,8 +125,9 @@ VITE_GOOGLE_PICKER_API_KEY=<browser api key>
 VITE_GOOGLE_APP_ID=<project number>
 ```
 
-- Local: put them in `.env` (see `.env.example`) and restart `npm run dev`.
-- Production: `gh secret set` those three names on this repo, then push `main` (or **Actions → Deploy to GitHub Pages → Run workflow**) so the SPA rebuilds with them.
+- Local: put the `VITE_*` names in `.env` (see `.env.example`) and restart `npm run dev`.
+- Production Pages build: `gh secret set` the three `VITE_*` names, then push `main` (or **Actions → Deploy to GitHub Pages → Run workflow**).
+- Or set `GOOGLE_CLIENT_ID`, `GOOGLE_PICKER_API_KEY`, and `GOOGLE_APP_ID` on the Netlify Functions site so the live SPA can fetch them without a Pages rebuild.
 
 These values appear in the teacher JS bundle by design. Restrict the API key and OAuth origins as above.
 

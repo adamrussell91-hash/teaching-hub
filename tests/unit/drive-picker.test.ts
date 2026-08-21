@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { isGoogleNativeMime, sharingFromDriveFile } from '@/teacher/drive-picker';
+import {
+  isGoogleNativeMime,
+  pickerConfigFromValues,
+  resolveGooglePickerConfig,
+  sharingFromDriveFile
+} from '@/teacher/drive-picker';
 
 describe('isGoogleNativeMime', () => {
   it('maps Google Doc mime to native', () => {
@@ -48,5 +53,57 @@ describe('sharingFromDriveFile', () => {
 
   it('returns unknown when shared is absent', () => {
     expect(sharingFromDriveFile({}, false)).toBe('unknown');
+  });
+});
+
+describe('resolveGooglePickerConfig', () => {
+  it('uses Vite values when both client id and api key are present', async () => {
+    await expect(
+      resolveGooglePickerConfig({
+        vite: {
+          clientId: ' client.apps.googleusercontent.com ',
+          apiKey: ' key ',
+          appId: ' 123 '
+        },
+        loadRemote: async () => {
+          throw new Error('should not fetch');
+        }
+      })
+    ).resolves.toEqual({
+      clientId: 'client.apps.googleusercontent.com',
+      apiKey: 'key',
+      appId: '123'
+    });
+  });
+
+  it('falls back to the teacher API when Vite values are missing', async () => {
+    await expect(
+      resolveGooglePickerConfig({
+        vite: { clientId: '', apiKey: '' },
+        loadRemote: async () => ({
+          clientId: 'remote-client',
+          apiKey: 'remote-key'
+        })
+      })
+    ).resolves.toEqual({
+      clientId: 'remote-client',
+      apiKey: 'remote-key'
+    });
+  });
+
+  it('throws a configured error when neither source has keys', async () => {
+    await expect(
+      resolveGooglePickerConfig({
+        vite: {},
+        loadRemote: async () => null
+      })
+    ).rejects.toThrow('Google Drive is not configured');
+  });
+});
+
+describe('pickerConfigFromValues', () => {
+  it('returns null when either required value is missing', () => {
+    expect(pickerConfigFromValues({ clientId: 'x' })).toBeNull();
+    expect(pickerConfigFromValues({ apiKey: 'y' })).toBeNull();
   });
 });

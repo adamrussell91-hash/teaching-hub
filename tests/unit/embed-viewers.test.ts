@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { EmbedBlockSchema, EmbedProviderSchema } from '@/schemas/block';
 import type { Block } from '@/schemas/block';
 import {
@@ -10,6 +10,13 @@ import {
 } from '@/blocks/create-block';
 import { createEmbedEditor } from '@/blocks/editors';
 import { renderBlock } from '@/blocks/render';
+import { openDrivePicker } from '@/teacher/drive-picker';
+
+vi.mock('@/teacher/drive-picker', () => ({
+  openDrivePicker: vi.fn()
+}));
+
+const openDrivePickerMock = vi.mocked(openDrivePicker);
 
 const timestamps = {
   created_at: '2026-01-01T00:00:00.000Z',
@@ -116,6 +123,40 @@ describe('embed editor detect', () => {
       'https://docs.google.com/presentation/d/abc123XYZ/embed'
     );
   });
+
+  it('inserts a Drive file from Add from Drive', async () => {
+    openDrivePickerMock.mockResolvedValue({
+      kind: 'link',
+      title: 'Week 1 slides',
+      provider_file_id: 'fileABC',
+      preview_url: 'https://docs.google.com/presentation/d/abc123XYZ/edit',
+      sharing: 'unknown',
+      media_type: 'link'
+    });
+
+    const block = createBlock('embed', 'e1') as Extract<Block, { block_type: 'embed' }>;
+    let latest = block;
+    const root = createEmbedEditor(
+      block,
+      (next) => {
+        latest = next;
+      },
+      () => latest
+    );
+
+    const driveBtn = Array.from(root.querySelectorAll('button')).find(
+      (btn) => btn.textContent === 'Add from Drive'
+    );
+    expect(driveBtn).toBeDefined();
+    driveBtn!.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(openDrivePickerMock).toHaveBeenCalled();
+    expect(latest.content.url).toBe('https://docs.google.com/presentation/d/abc123XYZ/edit');
+    expect(latest.content.provider).toBe('google_slides');
+    expect(latest.content.title).toBe('Week 1 slides');
+  });
 });
 
 describe('embed hybrid render', () => {
@@ -152,7 +193,7 @@ describe('embed hybrid render', () => {
     expect(el.querySelector('a')?.getAttribute('href')).toContain('presentation');
   });
 
-  it('renders docs as resource card without iframe', () => {
+  it('renders docs in a preview iframe', () => {
     const el = renderBlock(
       {
         ...base,
@@ -165,8 +206,9 @@ describe('embed hybrid render', () => {
       },
       'student'
     );
-    expect(el.querySelector('iframe')).toBeNull();
-    expect(el.querySelector('.block-embed__card')).toBeTruthy();
-    expect(el.querySelector('a')?.textContent).toMatch(/Open/i);
+    expect(el.querySelector('iframe')?.getAttribute('src')).toBe(
+      'https://docs.google.com/document/d/doc1/preview'
+    );
+    expect(el.querySelector('a')?.getAttribute('href')).toContain('document');
   });
 });

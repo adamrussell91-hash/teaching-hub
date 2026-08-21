@@ -781,6 +781,10 @@ a:hover {
   box-shadow: var(--elev-2);
 }
 
+.ai-panel[hidden] {
+  display: none;
+}
+
 .ai-panel__toolbar {
   display: flex;
   align-items: flex-start;
@@ -1951,9 +1955,9 @@ a:hover {
 }
 
 .lesson-list__item:hover {
-  border-color: rgba(55, 111, 183, 0.22);
+  border-color: color-mix(in srgb, var(--wave) 22%, transparent);
   box-shadow: var(--elev-3);
-  background: rgba(255, 255, 255, 0.82);
+  background: color-mix(in srgb, #fff 82%, transparent);
 }
 
 .lesson-list__info {
@@ -1964,15 +1968,22 @@ a:hover {
 
 .lesson-list__title {
   font-family: var(--font-ui);
-  font-size: var(--font-size-body);
+  font-size: var(--text-md);
   font-weight: var(--weight-semibold);
   color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .lesson-list__meta {
   font-family: var(--font-ui);
   font-size: var(--text-xs);
   color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
 }
 
 .lesson-list__open {
@@ -6912,11 +6923,40 @@ input.scope-timeline__note-title:focus-visible {
   flex-shrink: 0;
 }
 
-.lessons-lib__icon-btn {
-  min-width: 2rem;
-  padding: var(--space-1) var(--space-2);
-  font-size: var(--text-sm);
+.lessons-lib .list-row-actions {
+  flex-wrap: nowrap;
+}
+
+.lessons-lib__icon-btn,
+.lessons-lib .list-row-actions .public-link__trigger {
+  min-width: 2.1rem;
+  min-height: 2.1rem;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: color-mix(in srgb, #fff 60%, transparent);
+  color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
   line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease;
+}
+
+.lessons-lib__icon-btn:hover,
+.lessons-lib .list-row-actions .public-link__trigger:hover {
+  background: #fff;
+  color: var(--navy);
+}
+
+.lessons-lib__icon-btn:focus-visible,
+.lessons-lib .list-row-actions .public-link__trigger:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--wave) 45%, transparent);
+  outline-offset: 2px;
 }
 
 .lessons-lib__mode {
@@ -7373,6 +7413,10 @@ input.scope-timeline__note-title:focus-visible {
   flex-direction: column;
   gap: var(--space-3);
   min-height: 0;
+}
+
+.alchemy-lab[hidden] {
+  display: none;
 }
 
 .alchemy-lab__header {
@@ -7955,13 +7999,6 @@ input.scope-timeline__note-title:focus-visible {
 
 .lessons-lib__search {
   width: 100%;
-  min-height: 2.6rem;
-  padding: 0.55rem 0.85rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--glass);
-  font-family: var(--font-ui);
-  font-size: var(--font-size-body);
 }
 
 .lessons-lib__filters,
@@ -7984,21 +8021,6 @@ input.scope-timeline__note-title:focus-visible {
   background: var(--paper);
   font-family: var(--font-ui);
   font-size: var(--text-sm);
-}
-
-.lessons-lib__view-btn {
-  border: 1px solid var(--line);
-  background: var(--glass);
-  border-radius: 999px;
-  padding: 0.35rem 0.75rem;
-  font-family: var(--font-ui);
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
-
-.lessons-lib__view-btn[aria-selected='true'] {
-  border-color: rgba(55, 111, 183, 0.45);
-  background: color-mix(in srgb, var(--pastel-blue) 55%, #fff);
 }
 
 .lessons-lib__rail-label,
@@ -8082,12 +8104,25 @@ input.scope-timeline__note-title:focus-visible {
   color: var(--wave);
 }
 
-.lessons-lib__check {
-  margin-right: var(--space-2);
+.lessons-lib .lesson-list__item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
 }
 
-.lesson-list__item {
-  align-items: flex-start;
+.lessons-lib__lead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.lessons-lib__check {
+  width: 1.15rem;
+  height: 1.15rem;
+  margin: 0;
+  accent-color: var(--wave);
+  cursor: pointer;
+  flex-shrink: 0;
 }
 
 .lesson-list__item--compact {
@@ -8105,23 +8140,86 @@ input.scope-timeline__note-title:focus-visible {
   gap: var(--space-3);
 }
 
+.lessons-table-wrap {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--glass);
+  box-shadow: var(--elev-1);
+}
+
+.lessons-table__scroll {
+  max-height: 60vh;
+  overflow: auto;
+}
+
 .lessons-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
   font-family: var(--font-ui);
   font-size: var(--text-sm);
 }
 
-.lessons-table th,
-.lessons-table td {
+.lessons-table col.c-check { width: 4%; }
+.lessons-table col.c-title { width: 25%; }
+.lessons-table col.c-subject { width: 12%; }
+.lessons-table col.c-unit { width: 16%; }
+.lessons-table col.c-mode { width: 9%; }
+.lessons-table col.c-status { width: 9%; }
+.lessons-table col.c-edited { width: 8%; }
+.lessons-table col.c-created { width: 8%; }
+.lessons-table col.c-tags { width: 6%; }
+.lessons-table col.c-link { width: 3%; }
+
+.lessons-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   text-align: left;
-  padding: 0.55rem 0.4rem;
+  padding: 0.7rem 0.75rem;
+  background: var(--paper);
   border-bottom: 1px solid var(--line);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
-.lessons-table__scroll {
-  max-height: 70vh;
-  overflow: auto;
+.lessons-table td {
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.lessons-table tbody tr {
+  transition: background-color 140ms ease;
+}
+
+.lessons-table tbody tr:hover {
+  background: color-mix(in srgb, #fff 65%, transparent);
+}
+
+.lessons-table__title {
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.lessons-table__title:hover {
+  color: var(--wave);
+}
+
+.lessons-table input[type='checkbox'] {
+  width: 1.05rem;
+  height: 1.05rem;
+  margin: 0;
+  accent-color: var(--wave);
+  cursor: pointer;
 }
 
 .virtual-list {

@@ -12,12 +12,14 @@ Hub marks: also read `ICONS.md`. The website tile is favicon + login + canvas to
 
 1. `css/tokens.css` — closed palette, type, space, radius, elevation
 2. `css/overlays.css` — the only per-hub differences (glass / tile density)
-3. `css/actions.css` — `.btn`, Wave `:focus-visible`, `.confirm-card` (import in existing hubs)
+3. `css/actions.css` — `.btn`, Wave `:focus-visible`, `.confirm-card` (import in existing hubs). Pulls in `filters.css`.
 4. `css/sign-in.css` — **locked** passphrase gate (same on every hub)
 5. `css/rail.css` — **locked** left rail (also imported by `chrome.css`)
-6. `css/chrome.css` — rail, page header, buttons, confirm cards (new hubs)
-7. `icons/` — locked hub tiles + glyphs (`ICONS.md`)
-8. `snippets/` — copy the HTML, then wire behaviour (`shell.html`, `rail.html`, `hub-utilities.html`, `sign-in.html`, `sign-in.js`, `confirm-card.html`)
+6. `css/chrome.css` — rail, page header, buttons, confirm cards (new hubs). Pulls in `filters.css` and `rail.css`.
+7. `css/filters.css` — `.hub-search`, `.hub-filter`, `.hub-menu`, `.hub-pills`, `.hub-chips` (list/search chrome only — not form fields)
+8. `js/hub-filter-menu.js` — `createHubFilter` for custom filter menus
+9. `icons/` — locked hub tiles + glyphs (`ICONS.md`)
+10. `snippets/` — copy the HTML, then wire behaviour (`shell.html`, `rail.html`, `hub-utilities.html`, `sign-in.html`, `sign-in.js`, `confirm-card.html`, `hub-search.html`, `hub-filter.html`, `hub-pills.html`, `hub-chips.html`)
 
 ### Passphrase gate (mandatory)
 
@@ -61,6 +63,7 @@ Each hub also has a copy at `design-kit/` so this workspace can see it.
 - Hub mark: the **tile** from `icons/` is the website icon. Favicon, `.sign-in__mark` on the gate, and `.hub-mark` at the canvas **top-right** (after `.hub-utilities`). Not on the rail. See `ICONS.md`.
 - Chrome utilities: refresh and sign out are `.hub-icon-btn` icons in `.hub-utilities` at the **canvas top-right**. Faded `--shallow` icons — never labelled pill `.btn`s on the rail or header. Snippet: `snippets/hub-utilities.html`.
 - Buttons: `.btn` + `--primary` / `--secondary` / `--ghost` / `--decisive`
+- Filter chrome: `.hub-search` (pill), `.hub-filter` (bordered dropdown + `.hub-menu`), `.hub-pills` (view / range), `.hub-chips` (active filters). Restyle existing list/search/range controls only. Do not add a new toolbar. Do not use these classes on labelled form fields.
 - Agent UX: propose → **confirm card** → apply. Never silent writes that look like a new UI kit
 - Inter 400/500/600/700 only
 

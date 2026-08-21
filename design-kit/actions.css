@@ -1,6 +1,7 @@
 /* Shared action chrome. Existing hubs import this instead of full chrome.css.
  * Left rail is css/rail.css (RAIL.md) — load it alongside this sheet when adopting.
  */
+@import "./filters.css";
 
 /* Discrete chrome utilities (refresh / sign out). Top-right of the page header —
    faded icon only, never a labelled .btn. Snippet: snippets/hub-utilities.html */

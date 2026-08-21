@@ -4,6 +4,7 @@
    under local class names — copy structure from snippets/, map to tokens,
    do not invent a parallel button or header system. Rail: css/rail.css (RAIL.md).
  */
+@import "./filters.css";
 
 *,
 *::before,
