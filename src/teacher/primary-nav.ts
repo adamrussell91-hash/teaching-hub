@@ -68,11 +68,11 @@ function createGlyph(paths: string[]): SVGSVGElement {
   svg.setAttribute('viewBox', '0 0 24 24');
   svg.setAttribute('fill', 'none');
   svg.setAttribute('stroke', 'currentColor');
-  svg.setAttribute('stroke-width', '1.8');
+  svg.setAttribute('stroke-width', '1.75');
   svg.setAttribute('stroke-linecap', 'round');
   svg.setAttribute('stroke-linejoin', 'round');
   svg.setAttribute('aria-hidden', 'true');
-  svg.classList.add('primary-nav__glyph');
+  svg.classList.add('primary-nav__glyph', 'hub-rail__icon');
   for (const d of paths) {
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.setAttribute('d', d);
@@ -90,7 +90,7 @@ export function renderPrimaryNav(container: HTMLElement, options: PrimaryNavOpti
 
   for (const section of SECTIONS) {
     const link = document.createElement('a');
-    link.className = 'primary-nav__link';
+    link.className = 'primary-nav__link hub-rail__link';
     link.href = section.path;
     if (section.id === options.activeSection) {
       link.setAttribute('aria-current', 'page');
