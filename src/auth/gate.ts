@@ -34,7 +34,7 @@ export function renderSignIn(container: HTMLElement, options?: SignInOptions): v
 
   const mark = document.createElement('img');
   mark.className = 'sign-in__mark';
-  mark.src = 'design-kit/icons/teaching.svg';
+  mark.src = new URL('icons/teaching.svg', document.baseURI).href;
   mark.alt = '';
   mark.width = 56;
   mark.height = 56;
