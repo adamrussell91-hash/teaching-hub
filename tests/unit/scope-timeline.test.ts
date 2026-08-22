@@ -190,7 +190,7 @@ describe('scope timeline editor', () => {
       'Artist of the Floating World'
     );
     expect(canvas.querySelector('.scope-timeline__inspector-weeks')?.textContent).toBe(
-      '4 May – 15 Jun'
+      '04/05/26 – 15/06/26'
     );
     expect(canvas.querySelector('.scope-timeline__inspector')?.hasAttribute('hidden')).toBe(false);
   });
