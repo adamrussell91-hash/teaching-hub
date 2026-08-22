@@ -1,3 +1,4 @@
+import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { ApiClientError } from '@/api/client';
 import type { VersionIndexEntry, VersionKind, VersionReason } from '@/schemas/version';
 import {
@@ -53,12 +54,7 @@ export function formatVersionTime(iso: string, now = new Date()): string {
 
   if (sameDay) return time;
 
-  const day = date.toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: date.getFullYear() === now.getFullYear() ? undefined : 'numeric'
-  });
-  return `${day} · ${time}`;
+  return `${formatDisplayDate(date)} · ${time}`;
 }
 
 export function summarizeVersionSnapshot(

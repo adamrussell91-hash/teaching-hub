@@ -337,7 +337,7 @@ describe('mountStudentLessonView', () => {
     const meta = root.querySelector('.lesson-hero__meta');
     expect(meta).toBeTruthy();
     expect(meta?.textContent).toContain('Year 12 English Advanced');
-    expect(meta?.textContent).toContain('12 Aug 2026');
+    expect(meta?.textContent).toContain('12/08/26');
   });
 
   it('bare mount uses Lesson eyebrow and omits meta', async () => {

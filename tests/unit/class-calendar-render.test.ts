@@ -296,7 +296,7 @@ describe('renderClassCalendar', () => {
 
     const detail = host.querySelector('.class-calendar__detail')!;
     expect(detail.querySelector('.class-calendar__detail-heading')?.textContent).toBe(
-      'Wednesday 12 August'
+      'Wednesday 12/08/26'
     );
     const row = detail.querySelector<HTMLAnchorElement>('a.class-calendar__detail-lesson')!;
     expect(row.getAttribute('href')).toBe('/lessons/l1');
@@ -330,7 +330,7 @@ describe('renderClassCalendar', () => {
 
     const cell = host.querySelector('.class-calendar__day[data-date="2026-08-12"]')!;
     expect(cell.getAttribute('aria-label')).toBe(
-      '12 August, Narrative Structure and Unreliable Memory'
+      '12/08/26, Narrative Structure and Unreliable Memory'
     );
   });
 

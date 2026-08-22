@@ -76,9 +76,9 @@ describe('timeline dates', () => {
     ).toEqual({ start: '2026-01-28', end: '2026-04-10' });
   });
 
-  it('formats a date range in en-AU', () => {
-    expect(formatDateRange('2026-01-28', '2026-04-10')).toBe('28 Jan – 10 Apr');
-    expect(formatDateRange('2026-05-18', '2026-05-18')).toBe('18 May');
+  it('formats a date range as dd/mm/yy', () => {
+    expect(formatDateRange('2026-01-28', '2026-04-10')).toBe('28/01/26 – 10/04/26');
+    expect(formatDateRange('2026-05-18', '2026-05-18')).toBe('18/05/26');
   });
 
   it('uses a wider day width at month zoom than year zoom', () => {

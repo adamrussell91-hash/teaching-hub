@@ -1,3 +1,4 @@
+import { formatDisplayDate } from '../../../design-kit/js/format-display-date.js';
 import type { LessonPublishBadge } from './types';
 
 export function formatLessonCount(total: number, shown: number, filtered: boolean): string {
@@ -17,7 +18,7 @@ export function formatRelativeTime(iso: string, now = new Date()): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.round(hours / 24);
   if (days < 14) return `${days}d ago`;
-  return then.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  return formatDisplayDate(then);
 }
 
 export function badgeLabel(badge: LessonPublishBadge): string {

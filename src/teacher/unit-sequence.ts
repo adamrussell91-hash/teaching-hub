@@ -1,5 +1,6 @@
 import type { ScheduledLesson, Unit } from '@/schemas';
 import { unitDateProgress, unitDateSpan } from '@/schedule/unit-progress';
+import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 
 export type SequenceUnit = Pick<Unit, 'id' | 'title'> &
   Partial<Pick<Unit, 'start_date' | 'end_date'>>;
@@ -57,17 +58,8 @@ function writeOpenUnits(classId: string, ids: string[]): void {
   }
 }
 
-function parseDateKey(date: string): Date {
-  const [year, month, day] = date.split('-').map(Number);
-  return new Date(Date.UTC(year, month - 1, day));
-}
-
 function formatShortDate(date: string): string {
-  return new Intl.DateTimeFormat('en-AU', {
-    day: 'numeric',
-    month: 'short',
-    timeZone: 'UTC'
-  }).format(parseDateKey(date));
+  return formatDisplayDate(date);
 }
 
 function formatDateRange(start: string, end: string): string {
