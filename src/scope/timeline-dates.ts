@@ -1,3 +1,5 @@
+import { formatDisplayDateRange } from '../../design-kit/js/format-display-date.js';
+
 export const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export type CalendarYmd = string;
@@ -153,27 +155,8 @@ export function resolveItemSpan(
   };
 }
 
-const SHORT_MONTHS = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec'
-] as const;
-
 export function formatDateRange(start: string, end: string): string {
-  const fmt = (ymd: string): string => {
-    const date = parseYmd(ymd);
-    return `${date.getUTCDate()} ${SHORT_MONTHS[date.getUTCMonth()]}`;
-  };
-  return start === end ? fmt(start) : `${fmt(start)} – ${fmt(end)}`;
+  return formatDisplayDateRange(start, end);
 }
 
 export type TimelineZoom = 'month' | 'year';

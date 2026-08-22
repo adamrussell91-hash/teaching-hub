@@ -1,3 +1,5 @@
+import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
+
 /** Live hero clock for the Clinical Glass Home dashboard. */
 export function mountHomeClock(el: HTMLElement): () => void {
   const timeEl = document.createElement('div');
@@ -13,12 +15,7 @@ export function mountHomeClock(el: HTMLElement): () => void {
       hour: 'numeric',
       minute: '2-digit'
     });
-    dateEl.textContent = now.toLocaleDateString('en-AU', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    });
+    dateEl.textContent = `${now.toLocaleDateString('en-AU', { weekday: 'long' })} ${formatDisplayDate(now)}`;
   };
 
   tick();

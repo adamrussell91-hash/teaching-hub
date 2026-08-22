@@ -1,3 +1,4 @@
+import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { pastelFromId } from '@/design/pastel';
 import { addCalendarDays, enumerateDateKeys, weekStartMonday } from '@/schedule/calendar-dates';
 import type { CalendarDayLesson, ClassCalendarModel } from '@/schedule/class-calendar-model';
@@ -539,22 +540,17 @@ function parseDateKey(date: string): Date {
 }
 
 function accessibleDayLabel(date: string, lessons: CalendarDayLesson[]): string {
-  const monthDay = new Intl.DateTimeFormat('en-AU', {
-    day: 'numeric',
-    month: 'long',
-    timeZone: 'UTC'
-  }).format(parseDateKey(date));
+  const monthDay = formatDisplayDate(date);
   if (lessons.length === 0) return monthDay;
   return `${monthDay}, ${lessons.map((lesson) => lesson.title).join(', ')}`;
 }
 
 function formatDetailHeading(date: string): string {
-  return new Intl.DateTimeFormat('en-AU', {
+  const weekday = parseDateKey(date).toLocaleDateString('en-AU', {
     weekday: 'long',
-    day: 'numeric',
-    month: 'long',
     timeZone: 'UTC'
-  }).format(parseDateKey(date));
+  });
+  return `${weekday} ${formatDisplayDate(date)}`;
 }
 
 function formatWeekdayShort(date: string): string {

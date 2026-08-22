@@ -181,7 +181,7 @@ describe('renderUnitSequence', () => {
     const summary = host.querySelector('details[data-unit-id="unit_aotfw"] summary')!;
     expect(summary.textContent).toContain('Artist of the Floating World');
     expect(summary.textContent).toContain('2 lessons');
-    expect(summary.textContent).toMatch(/10 Aug\s*[–-]\s*4 Sep/);
+    expect(summary.textContent).toMatch(/10\/08\/26\s*[–-]\s*04\/09\/26/);
 
     const titleLink = summary.querySelector<HTMLAnchorElement>('a[href="/units/unit_aotfw"]')!;
     expect(titleLink).not.toBeNull();
@@ -242,7 +242,7 @@ describe('renderUnitSequence', () => {
     ]);
     expect(rows[0].textContent).toContain('✓');
     expect(rows[0].textContent).toContain('Opening Moves');
-    expect(rows[0].textContent).toMatch(/10 Aug/);
+    expect(rows[0].textContent).toMatch(/10\/08\/26/);
     expect(rows[0].textContent).toContain('delivered');
     expect(rows[1].textContent).toContain('2');
     expect(rows[1].textContent).toContain('Narrative Structure');
