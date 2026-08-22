@@ -18,12 +18,13 @@ describe('sign-in haze on the card', () => {
 
     const card = host.querySelector('.sign-in__card');
     const haze = host.querySelector('.sign-in__haze');
-    const mark = host.querySelector('.sign-in__mark');
+    const brand = host.querySelector('.sign-in__brand');
 
     expect(haze).toBeTruthy();
     expect(haze?.getAttribute('aria-hidden')).toBe('true');
     expect(card?.firstElementChild).toBe(haze);
-    expect(haze?.nextElementSibling).toBe(mark);
+    expect(host.querySelector('.sign-in__mark')).toBeNull();
+    expect(haze?.nextElementSibling).toBe(brand);
     expect(haze?.querySelectorAll('.sign-in__bubble')).toHaveLength(5);
     expect(haze?.querySelectorAll('.sign-in__sparkle')).toHaveLength(6);
     expect(host.querySelector('#sign-in-passphrase')).toBeTruthy();
