@@ -125,13 +125,7 @@ export function renderTeacherShell(
     });
 
     utilities.append(logoutButton);
-    const mark = document.createElement('img');
-    mark.className = 'hub-mark';
-    mark.src = new URL('icons/teaching.svg', document.baseURI).href;
-    mark.alt = '';
-    mark.width = 32;
-    mark.height = 32;
-    main.append(utilities, mark, contextBar, canvas);
+    main.append(utilities, contextBar, canvas);
   } else {
     main.append(contextBar, canvas);
   }
