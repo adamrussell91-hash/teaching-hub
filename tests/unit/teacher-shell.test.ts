@@ -67,6 +67,7 @@ describe('teacher shell', () => {
     expect(root.querySelector('.teacher-layout__utilities .hub-icon-btn')).toBe(refs.logoutButton);
     expect(refs.main.contains(refs.logoutButton)).toBe(true);
     expect(refs.rail.contains(refs.logoutButton!)).toBe(false);
+    expect(root.querySelector('.hub-mark')).toBeNull();
 
     refs.logoutButton?.click();
     await vi.waitFor(() => {
