@@ -19,6 +19,7 @@ import {
   writeDashboardCover
 } from '@/teacher/dashboard-cover';
 import { renderEntityBanner } from '@/teacher/entity-banner';
+import { wireEntityCardExpand } from '@/teacher/entity-card-expand';
 import { mountHomeClock } from '@/teacher/home-clock';
 import type { CurriculumResponse } from './nav';
 
@@ -146,6 +147,7 @@ export function renderTeacherHome(
       curriculum.classes.filter((cls) => cls.status === 'active'),
       yearsById,
       subjectsById,
+      curriculum.media,
       openCreateClass
     )
   );
@@ -164,6 +166,7 @@ function buildClassesPanel(
   classes: Class[],
   yearsById: Map<string, Year>,
   subjectsById: Map<string, Subject>,
+  media: CurriculumResponse['media'],
   onCreate: () => void
 ): HTMLElement {
   const panel = document.createElement('section');
@@ -200,13 +203,21 @@ function buildClassesPanel(
   } else {
     for (const cls of sorted) {
       const path = `/classes/${cls.id}`;
+      const classTitle = classDisplayTitle(cls, yearsById, subjectsById);
       const tile = document.createElement('a');
       tile.className = 'glass-panel glass-tile home-class-tile';
       tile.href = path;
       tile.dataset.homeClassId = cls.id;
-      tile.addEventListener('click', (event) => {
-        event.preventDefault();
-        navigate(path);
+      wireEntityCardExpand(tile, {
+        kind: 'class',
+        id: cls.id,
+        title: classTitle,
+        eyebrow: classEyebrow(cls),
+        cover: cls.cover ?? null,
+        media,
+        fullPagePath: path,
+        metaText: classTitle,
+        editableTitle: false
       });
 
       const eyebrow = document.createElement('p');
@@ -215,7 +226,7 @@ function buildClassesPanel(
 
       const name = document.createElement('p');
       name.className = 'home-class-tile__title';
-      name.textContent = classDisplayTitle(cls, yearsById, subjectsById);
+      name.textContent = classTitle;
 
       tile.append(eyebrow, name);
       grid.append(tile);

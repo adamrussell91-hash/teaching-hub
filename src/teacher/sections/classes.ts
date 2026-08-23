@@ -14,6 +14,7 @@ import { renderClassCalendar, type ScheduleCalendarView } from '@/teacher/class-
 import { mountCreateControl } from '@/teacher/create/control';
 import type { EntityCreatedHandler } from '@/teacher/create/types';
 import { renderEntityBanner } from '@/teacher/entity-banner';
+import { wireEntityCardExpand } from '@/teacher/entity-card-expand';
 import type { CurriculumResponse } from '@/teacher/nav';
 import {
   mountHomepageEditor,
@@ -90,10 +91,25 @@ export function renderClassesIndex(
       tile.className = 'glass-tile home-class-tile entity-cover-tile';
       tile.href = path;
       tile.dataset.classId = cls.id;
-      tile.addEventListener('click', (event) => {
-        event.preventDefault();
-        navigate(path);
-      });
+
+      const classTitle = classDisplayTitle(cls, yearsById, subjectsById);
+      disposers.push(
+        wireEntityCardExpand(
+          tile,
+          {
+            kind: 'class',
+            id: cls.id,
+            title: classTitle,
+            eyebrow: classEyebrow(cls),
+            cover: cls.cover ?? null,
+            media: curriculum.media,
+            fullPagePath: path,
+            metaText: classTitle,
+            editableTitle: false
+          },
+          { onMutated: options.onMutated }
+        ).dispose
+      );
 
       const coverUrl = resolveCoverUrl(cls.cover, curriculum.media);
       if (coverUrl) {
@@ -115,7 +131,7 @@ export function renderClassesIndex(
 
       const title = document.createElement('p');
       title.className = 'home-class-tile__title';
-      title.textContent = classDisplayTitle(cls, yearsById, subjectsById);
+      title.textContent = classTitle;
 
       body.append(eyebrow, title);
       tile.append(body);

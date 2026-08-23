@@ -169,7 +169,7 @@ describe('classes section', () => {
     document.querySelectorAll('.entity-banner__dialog').forEach((el) => el.remove());
   });
 
-  it('renders glass class tiles that open the class page', () => {
+  it('renders glass class tiles that expand before opening the class page', async () => {
     renderClassesIndex(canvas, curriculum);
     expect(canvas.querySelector('.page-header__title')?.textContent).toBe('Classes');
     expect(canvas.querySelector('[data-create-trigger]')?.getAttribute('aria-label')).toMatch(
@@ -185,7 +185,11 @@ describe('classes section', () => {
     expect(canvas.textContent).toMatch(/Archive/);
     expect(canvas.textContent).toMatch(/Trash/);
     tile?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-    expect(navigate).toHaveBeenCalledWith('/classes/class_2026_12engadv1');
+    expect(document.querySelector('.entity-card-expand')).toBeTruthy();
+    document.querySelector<HTMLButtonElement>('.entity-card-expand__full-page')?.click();
+    await vi.waitFor(() => {
+      expect(navigate).toHaveBeenCalledWith('/classes/class_2026_12engadv1');
+    });
   });
 
   it('shows empty copy when there are no classes', () => {

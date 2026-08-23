@@ -13,6 +13,7 @@ import { ApiClientError } from '@/api/client';
 import { renderPageHeader } from '@/teacher/page-header';
 import { downloadPortableExport } from '@/teacher/export-api';
 import { gradientForEntityId, renderEntityBanner } from '@/teacher/entity-banner';
+import { wireEntityCardExpand } from '@/teacher/entity-card-expand';
 import {
   mountBlockCanvas,
   type BlockCanvasHandle
@@ -151,7 +152,7 @@ export function renderUnitsIndex(
       grid.className = 'home-classes units-index__grid';
 
       for (const unit of group.units) {
-        grid.append(renderUnitTile(unit, yearsById, subjectsById, curriculum.media));
+        grid.append(renderUnitTile(unit, yearsById, subjectsById, curriculum.media, options.onMutated));
       }
 
       section.append(heading, grid);
@@ -235,19 +236,32 @@ function renderUnitTile(
   unit: Unit,
   yearsById: Map<string, Year>,
   subjectsById: Map<string, Subject>,
-  media: CurriculumResponse['media']
+  media: CurriculumResponse['media'],
+  onMutated?: () => void | Promise<void>
 ): HTMLAnchorElement {
   const subject = subjectsById.get(unit.subject_id);
   const year = yearsById.get(unit.year_id);
   const path = `/units/${unit.id}`;
+  const metaText = [year?.title, subject?.title].filter(Boolean).join(' · ');
 
   const tile = document.createElement('a');
   tile.className = 'glass-tile home-class-tile entity-cover-tile units-index__tile';
   tile.href = path;
-  tile.addEventListener('click', (event) => {
-    event.preventDefault();
-    navigate(path);
-  });
+  wireEntityCardExpand(
+    tile,
+    {
+      kind: 'unit',
+      id: unit.id,
+      title: unit.title,
+      eyebrow: subject?.title,
+      cover: unit.cover ?? null,
+      media,
+      fullPagePath: path,
+      metaText,
+      editableTitle: true
+    },
+    { onMutated }
+  );
 
   const mediaEl = document.createElement('div');
   mediaEl.className = 'entity-cover-tile__media';
@@ -460,7 +474,27 @@ export function renderUnitPage(
 
     for (const lesson of lessons) {
       const item = document.createElement('li');
-      item.className = 'lesson-list__item';
+      item.className = 'lesson-list__item lesson-list__item--openable';
+      item.tabIndex = 0;
+      item.setAttribute('role', 'button');
+      item.setAttribute('aria-label', `Expand ${lesson.title}`);
+
+      const path = `/lessons/${lesson.id}`;
+      wireEntityCardExpand(
+        item,
+        {
+          kind: 'lesson',
+          id: lesson.id,
+          title: lesson.title,
+          eyebrow: unit.title,
+          media: curriculum.media,
+          fullPagePath: path,
+          metaText: lesson.published ? 'Published' : 'Draft',
+          previewText: lesson.excerpt,
+          editableTitle: true
+        },
+        { onMutated: options.onMutated }
+      );
 
       const info = document.createElement('div');
       info.className = 'lesson-list__info';
@@ -475,13 +509,13 @@ export function renderUnitPage(
 
       info.append(title, meta);
 
-      const path = `/lessons/${lesson.id}`;
       const open = document.createElement('a');
       open.className = 'btn btn--secondary lesson-list__open';
       open.href = path;
       open.textContent = 'Open';
       open.addEventListener('click', (event) => {
         event.preventDefault();
+        event.stopPropagation();
         navigate(path);
       });
 
