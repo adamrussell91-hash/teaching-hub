@@ -6,6 +6,7 @@ import {
   type AgentSlug
 } from '@/ai/agents';
 import { actionsForScope } from '@/ai/capabilities';
+import { pickAgentWaitLine, protocolsForAgent } from '@/ai/agent-protocols';
 import type { ArchiveCitation } from '@/ai/client';
 import { aiFailureCopy } from '@/app/failure';
 import { pollAiJob, startAiJob, listAiJobs, resolveAiJob, AiJobConflictError } from '@/ai/jobs-client';
@@ -43,6 +44,7 @@ export interface MountAiPanelOptions {
   onStaleAccept?: (apply: () => void) => void;
   onAgentChange?: (slug: AgentSlug) => void;
   onRequestShelve?: () => void;
+  random?: () => number;
 }
 
 interface ChatMessage {
@@ -64,12 +66,6 @@ interface ChatMessage {
 
 const POLL_MS = import.meta.env.MODE === 'test' ? 50 : 1000;
 const MAX_POLLS = Math.ceil(AI_JOB_STALE_MS / 1000);
-const JOB_PHASE_COPY = {
-  queued: 'Thinking…',
-  searching: 'Searching the web…',
-  writing: 'Writing the reply…'
-} as const;
-
 function transcriptKey(lessonId: string): string {
   return `teaching_hub_ai_transcript_${lessonId}`;
 }
@@ -132,6 +128,7 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
   let busy = false;
   let abort: AbortController | null = null;
   let msgCounter = 0;
+  const random = options.random ?? Math.random;
 
   const toolbar = document.createElement('div');
   toolbar.className = 'ai-panel__toolbar';
@@ -148,6 +145,9 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
   hideBtn.setAttribute('aria-label', 'Hide chat');
   hideBtn.addEventListener('click', () => options.onRequestShelve?.());
   toolbar.append(picker, hideBtn);
+
+  const protocolTray = document.createElement('div');
+  protocolTray.className = 'agent-protocol-pills';
 
   const scopeChip = document.createElement('p');
   scopeChip.className = 'ai-panel__scope';
@@ -206,6 +206,7 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
   composer.append(input, sendBtn);
   host.replaceChildren(
     toolbar,
+    protocolTray,
     scopeChip,
     suggestionsToggle,
     actionsBar,
@@ -253,9 +254,49 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
         writeLastAgentSlug(agent.slug);
         options.onAgentChange?.(agent.slug);
         renderPicker();
+        renderProtocols();
       });
       picker.append(btn);
     }
+  }
+
+  function renderProtocols(): void {
+    const pack = protocolsForAgent(agentSlug);
+    const eyebrow = document.createElement('p');
+    eyebrow.className = 'agent-protocol-pills__eyebrow page-header__eyebrow';
+    eyebrow.textContent = `${pack.firstName} can`;
+
+    const row = document.createElement('div');
+    row.className = 'hub-pills';
+    row.setAttribute('role', 'group');
+    row.setAttribute('aria-label', `${pack.firstName} protocols`);
+
+    for (const pill of pack.pills) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'hub-pills__btn';
+      button.dataset.protocolId = pill.id;
+      button.disabled = busy;
+
+      const label = document.createElement('span');
+      label.className = 'agent-protocol-pills__label';
+      label.textContent = pill.label;
+
+      const tip = document.createElement('span');
+      tip.className = 'agent-protocol-pills__tip';
+      tip.id = `teaching-protocol-tip-${agentSlug}-${pill.id}`;
+      tip.setAttribute('role', 'tooltip');
+      tip.textContent = pill.explain;
+      button.setAttribute('aria-describedby', tip.id);
+
+      button.append(label, tip);
+      button.addEventListener('click', () => {
+        void sendMessage(pill.label, undefined, pill.id);
+      });
+      row.append(button);
+    }
+
+    protocolTray.replaceChildren(eyebrow, row);
   }
 
   function renderScope(): void {
@@ -496,6 +537,7 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
     thread.hidden = false;
     input.disabled = busy;
     sendBtn.disabled = busy;
+    renderProtocols();
     renderScope();
     renderActions();
     renderThread();
@@ -510,8 +552,8 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
     const assistant = messages.find((m) => m.id === assistantId);
     if (assistant) assistant.jobId = jobId;
     let job = await pollAiJob(jobId, { signal });
-    if (assistant && job.phase) {
-      assistant.status = JOB_PHASE_COPY[job.phase];
+    if (assistant && job.status === 'working' && assistant.agent) {
+      assistant.status = pickAgentWaitLine(assistant.agent, { exclude: assistant.status, random });
       renderThread();
     }
     let polls = 1;
@@ -519,8 +561,8 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
       polls += 1;
       await sleep(POLL_MS, signal);
       job = await pollAiJob(jobId, { signal });
-      if (assistant && job.phase) {
-        assistant.status = JOB_PHASE_COPY[job.phase];
+      if (assistant && job.status === 'working' && assistant.agent) {
+        assistant.status = pickAgentWaitLine(assistant.agent, { exclude: assistant.status, random });
         renderThread();
       }
     }
@@ -552,6 +594,8 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
     assistantId: string,
     snapshotAt: string,
     signal: AbortSignal,
+    turnAgent: AgentSlug,
+    protocolId: string | undefined,
     action: string | undefined,
     history: Array<{ role: 'user' | 'assistant'; content: string }>
   ): Promise<void> {
@@ -560,11 +604,12 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
       const started = await startAiJob(
         {
           lesson_id: options.lessonId,
-          agent: agentSlug,
+          agent: turnAgent,
           scope,
           selected_block_id: selectedBlockId ?? undefined,
           lesson_snapshot_at: snapshotAt,
           message,
+          ...(protocolId ? { protocol_id: protocolId } : {}),
           action,
           history
         },
@@ -603,6 +648,7 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
         role: 'assistant',
         agent: job.agent,
         text: '',
+        status: pickAgentWaitLine(job.agent, { random }),
         jobId: job.id
       });
       if (job.status === 'working') {
@@ -629,10 +675,11 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
     }
   }
 
-  async function sendMessage(text: string, action?: string): Promise<void> {
+  async function sendMessage(text: string, action?: string, protocolId?: string): Promise<void> {
     if (busy) return;
     const trimmed = text.trim();
     if (!trimmed) return;
+    const turnAgent = agentSlug;
 
     setWorkingState(true);
 
@@ -649,7 +696,13 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
     const userId = nextMsgId();
     messages.push({ id: userId, role: 'user', text: trimmed });
     const assistantId = nextMsgId();
-    messages.push({ id: assistantId, role: 'assistant', agent: agentSlug, text: '' });
+    messages.push({
+      id: assistantId,
+      role: 'assistant',
+      agent: turnAgent,
+      text: '',
+      status: pickAgentWaitLine(turnAgent, { random })
+    });
     saveTranscript(options.lessonId, messages);
     renderThread();
 
@@ -667,7 +720,17 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
       }));
 
     try {
-      await runAgentJob(trimmed, userId, assistantId, snapshotAt, abort.signal, action, history);
+      await runAgentJob(
+        trimmed,
+        userId,
+        assistantId,
+        snapshotAt,
+        abort.signal,
+        turnAgent,
+        protocolId,
+        action,
+        history
+      );
     } catch (err) {
       if (isAbortError(err)) {
         messages = messages.filter((msg) => msg.id !== assistantId || Boolean(msg.text));
@@ -695,6 +758,7 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
   });
 
   renderPicker();
+  renderProtocols();
   options.onAgentChange?.(agentSlug);
   renderShell();
   void resumeOpenJob();

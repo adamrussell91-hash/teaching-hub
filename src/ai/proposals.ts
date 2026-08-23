@@ -14,6 +14,7 @@ export const AiChatRequestSchema = z.object({
   selected_block_id: z.string().min(1).optional(),
   lesson_snapshot_at: IsoDateSchema.optional(),
   message: z.string().min(1).max(8000),
+  protocol_id: z.string().min(1).max(64).regex(/^[a-z0-9-]+$/).optional(),
   action: z.string().min(1).max(80).optional(),
   history: z
     .array(

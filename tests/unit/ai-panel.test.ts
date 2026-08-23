@@ -230,12 +230,13 @@ describe('mountAiPanel', () => {
           })
       );
 
-    const mounted = mountPanel();
+    const mounted = mountPanel({ random: () => 0 });
     handle = mounted.handle;
     submitMessage(mounted.host, 'Build a dual coding lesson');
 
     await vi.waitFor(() => {
-      expect(mounted.host.textContent).toContain('Searching the web…');
+      expect(mounted.host.textContent).toContain('Checking the teaching move…');
+      expect(mounted.host.textContent).not.toContain('Searching the web…');
       expect(pollAiJobMock).toHaveBeenCalledTimes(2);
     });
     finishPoll(
@@ -248,7 +249,7 @@ describe('mountAiPanel', () => {
     );
     await vi.waitFor(() => {
       expect(mounted.host.textContent).toContain('Here is the lesson.');
-      expect(mounted.host.textContent).not.toContain('Searching the web…');
+      expect(mounted.host.textContent).not.toContain('Checking the teaching move…');
     });
   });
 
@@ -546,6 +547,73 @@ describe('mountAiPanel', () => {
 
     mounted.host.querySelector<HTMLButtonElement>('.ai-panel__hide')!.click();
     expect(onRequestShelve).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders four to six one-sentence protocol pills for every personality', () => {
+    const mounted = mountPanel();
+    handle = mounted.handle;
+
+    for (const slug of ['ann', 'clementine', 'hammond', 'clare']) {
+      mounted.host.querySelector<HTMLButtonElement>(`.ai-panel__agent[data-agent="${slug}"]`)!.click();
+      const tray = mounted.host.querySelector<HTMLElement>('.agent-protocol-pills');
+      const pills = [...mounted.host.querySelectorAll<HTMLButtonElement>('.agent-protocol-pills .hub-pills__btn')];
+      expect(tray?.textContent?.toLowerCase()).toContain(`${slug === 'clementine' ? 'clementine' : slug} can`);
+      expect(pills.length).toBeGreaterThanOrEqual(4);
+      expect(pills.length).toBeLessThanOrEqual(6);
+      for (const pill of pills) {
+        const tip = pill.querySelector<HTMLElement>('.agent-protocol-pills__tip');
+        expect(tip?.getAttribute('role')).toBe('tooltip');
+        expect(tip?.textContent).toMatch(/^[A-Z][^.?!]*[.?!]$/);
+        expect(pill.getAttribute('aria-describedby')).toBe(tip?.id);
+        expect(pill.getAttribute('title')).toBeNull();
+      }
+    }
+  });
+
+  it('tapping a pill starts a real agent job with protocol_id and no canned assistant explainer', async () => {
+    let finishPoll: (job: AiJob) => void = () => undefined;
+    pollAiJobMock.mockReset();
+    pollAiJobMock.mockImplementation(
+      () => new Promise<AiJob>((resolve) => { finishPoll = resolve; })
+    );
+    const mounted = mountPanel();
+    handle = mounted.handle;
+
+    mounted.host.querySelector<HTMLButtonElement>('[data-protocol-id="lesson-diagnosis"]')!.click();
+
+    await vi.waitFor(() => expect(startAiJobMock).toHaveBeenCalledTimes(1));
+    expect(startAiJobMock.mock.calls[0]?.[0]).toMatchObject({
+      agent: 'ann',
+      protocol_id: 'lesson-diagnosis'
+    });
+    const assistantRows = [...mounted.host.querySelectorAll('.ai-panel__msg--assistant')];
+    expect(assistantRows).toHaveLength(1);
+    expect(assistantRows.map((row) => row.textContent).join(' ')).not.toContain(
+      'Diagnose the lesson before prescribing changes'
+    );
+
+    finishPoll(workingJob({ agent: 'ann', status: 'done', response: 'The opening task needs a clearer model.' }));
+    await vi.waitFor(() => expect(mounted.host.textContent).toContain('The opening task needs a clearer model.'));
+  });
+
+  it('rotates Ann wait lines instead of rendering generic job phases', async () => {
+    let finishPoll: (job: AiJob) => void = () => undefined;
+    pollAiJobMock.mockReset();
+    pollAiJobMock
+      .mockResolvedValueOnce(workingJob({ agent: 'ann', phase: 'searching' }))
+      .mockImplementationOnce(() => new Promise<AiJob>((resolve) => { finishPoll = resolve; }));
+    const mounted = mountPanel({ random: () => 0 });
+    handle = mounted.handle;
+
+    submitMessage(mounted.host, 'Review this lesson');
+
+    await vi.waitFor(() => expect(pollAiJobMock).toHaveBeenCalledTimes(2));
+    const copy = mounted.host.textContent ?? '';
+    expect(copy).toMatch(/Reading the lesson closely…|Checking the teaching move…/);
+    expect(copy).not.toMatch(/Thinking…|Searching the web…|Writing the reply…|Still working…/);
+
+    finishPoll(workingJob({ agent: 'ann', status: 'done', response: 'Ready.' }));
+    await vi.waitFor(() => expect(mounted.host.textContent).toContain('Ready.'));
   });
 
   it('restores a finished job as a pending Accept card', async () => {

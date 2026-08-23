@@ -32,6 +32,7 @@ export type AiJob = {
   message: string;
   scope?: AiScope;
   selected_block_id?: string;
+  protocol_id?: string;
   action?: string;
   history?: Array<{ role: 'user' | 'assistant'; content: string }>;
   phase?: 'queued' | 'searching' | 'writing';

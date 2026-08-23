@@ -382,6 +382,24 @@ describe('completeWorkingAiJob web search grounding', () => {
     expect(result.status).toBe('done');
   });
 
+  it('steers Clementine through the kernel query without changing the web-search query', async () => {
+    const { fetchMock } = createFetchMock({
+      kernelPayload: insertBlocksPayload([mindMapBlock()])
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await completeWorkingAiJob(
+      store,
+      { ...workingJob(), protocol_id: 'find-the-claim' },
+      env()
+    );
+    const body = kernelJobBody(fetchMock);
+
+    expect(body.query).toContain('Run the Find the claim protocol');
+    expect(body.query).toContain(`Teacher request: ${MESSAGE}`);
+    expect(braveQueries(fetchMock)).toEqual(Array(3).fill(`${MESSAGE}\nLesson: ${LESSON_TITLE}`));
+  });
+
   it('persists a done job with the kernel insert_blocks proposal', async () => {
     const { fetchMock } = createFetchMock({
       kernelPayload: insertBlocksPayload([mindMapBlock()])
@@ -432,7 +450,7 @@ describe('completeWorkingAiJob web search grounding', () => {
 describe('completeWorkingAiJob fast agents', () => {
   it('runs Ann through Anthropic in the durable job and persists her proposal', async () => {
     let anthropicCalls = 0;
-    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+    const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
       if (url.origin === BRAVE_ORIGIN) {
         if (url.pathname === '/res/v1/web/search') return Response.json(WEB_FIXTURE);
@@ -454,6 +472,7 @@ describe('completeWorkingAiJob fast agents', () => {
     const job: AiJob = {
       ...workingJob(),
       agent: 'ann',
+      protocol_id: 'lesson-diagnosis',
       scope: 'lesson',
       history: [{ role: 'user', content: 'Keep the starter.' }]
     };
@@ -464,6 +483,12 @@ describe('completeWorkingAiJob fast agents', () => {
     } as NodeJS.ProcessEnv);
 
     expect(anthropicCalls).toBeGreaterThan(0);
+    const anthropicCall = fetchMock.mock.calls.find(([input]) => {
+      const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
+      return url.origin === 'https://api.anthropic.com';
+    });
+    const anthropicBody = JSON.parse(String(anthropicCall?.[1]?.body));
+    expect(JSON.stringify(anthropicBody.system)).toContain('Run the Lesson diagnosis protocol');
     expect(result.status).toBe('done');
     expect(result.proposal?.kind).toBe('insert_blocks');
     expect(fakeStore.read<AiJob>(aiJobKey(JOB_ID))?.proposal?.kind).toBe('insert_blocks');

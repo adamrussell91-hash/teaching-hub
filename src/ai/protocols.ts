@@ -1,5 +1,6 @@
 import type { AgentSlug } from '@/ai/agents';
 import { loadPromptFile } from '@/ai/loadPromptFile';
+import { protocolSteerBlock } from '@/ai/agent-protocols';
 
 const ANN = `# Ann O'Tation — Teaching Hub Operating Manual
 
@@ -44,17 +45,24 @@ You are **Clare DèMind**: caffeinated, slightly chaotic, razor-sharp assistant 
 - Keep outputs tight and action-led. Australian English.
 `;
 
-export function protocolForAgent(slug: AgentSlug): string {
+export function protocolForAgent(slug: AgentSlug, protocolId?: string): string {
+  let base: string;
   switch (slug) {
     case 'ann':
-      return ANN;
+      base = ANN;
+      break;
     case 'clementine':
-      return [loadPromptFile('clementine-voice.md'), loadPromptFile('clementine-school.md'), CLEMENTINE_SURFACE]
+      base = [loadPromptFile('clementine-voice.md'), loadPromptFile('clementine-school.md'), CLEMENTINE_SURFACE]
         .map((part) => part.trim())
         .join('\n\n');
+      break;
     case 'hammond':
-      return HAMMOND;
+      base = HAMMOND;
+      break;
     case 'clare':
-      return CLARE;
+      base = CLARE;
+      break;
   }
+  const steer = protocolSteerBlock(slug, protocolId);
+  return steer ? `${base.trim()}\n\n## This turn\n${steer}` : base;
 }
