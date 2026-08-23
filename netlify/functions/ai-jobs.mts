@@ -110,6 +110,7 @@ export default async function handler(request: Request): Promise<Response> {
     message: body.message,
     scope: body.scope,
     selected_block_id: body.selected_block_id,
+    protocol_id: body.protocol_id,
     action: body.action,
     history: body.history,
     phase: 'queued',

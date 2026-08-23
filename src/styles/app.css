@@ -805,6 +805,52 @@ a:hover {
   min-width: 0;
 }
 
+.agent-protocol-pills {
+  overflow: visible;
+}
+
+.agent-protocol-pills__eyebrow {
+  margin: 0 0 var(--space-2);
+}
+
+.agent-protocol-pills .hub-pills {
+  display: flex;
+  flex-wrap: wrap;
+  overflow: visible;
+}
+
+.agent-protocol-pills .hub-pills__btn {
+  position: relative;
+}
+
+.agent-protocol-pills__tip {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 0.5rem);
+  z-index: 30;
+  width: max-content;
+  max-width: 16rem;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  box-shadow: var(--elev-4);
+  color: var(--ink);
+  font-size: var(--text-sm);
+  line-height: 1.35;
+  text-align: left;
+  white-space: normal;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.agent-protocol-pills .hub-pills__btn:hover .agent-protocol-pills__tip,
+.agent-protocol-pills .hub-pills__btn:focus-visible .agent-protocol-pills__tip {
+  opacity: 1;
+  visibility: visible;
+}
+
 .ai-panel__agent {
   width: 2.4rem;
   height: 2.4rem;

@@ -3423,6 +3423,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
         message: req.message,
         scope: req.scope,
         selected_block_id: req.selected_block_id,
+        protocol_id: req.protocol_id,
         action: req.action,
         history: req.history,
         phase: 'queued',

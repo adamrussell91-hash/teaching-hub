@@ -14,6 +14,7 @@ import {
   type KernelOutcome
 } from '../../../src/ai/jobs.ts';
 import { protocolForAgent } from '../../../src/ai/protocols.ts';
+import { protocolSteerBlock } from '../../../src/ai/agent-protocols.ts';
 import { AI_TOOLS, parseToolProposal, type AiProposal } from '../../../src/ai/proposals.ts';
 import { resolveSelection } from '../../../src/ai/selection.ts';
 import { validateMutatingProposal } from '../../../src/ai/validate-proposal.ts';
@@ -127,7 +128,7 @@ async function completeFastAgentJob(
   });
   const system = buildAiSystemPrompt({
     agentName: agent.name,
-    protocol: protocolForAgent(job.agent),
+    protocol: protocolForAgent(job.agent, job.protocol_id),
     lesson,
     scope: selection.scope,
     selectedBlockId: selection.selectedBlockId,
@@ -283,12 +284,15 @@ export async function completeWorkingAiJob(
     })
   ]);
   const nextJob = archive?.archiveFailed ? { ...job, archiveFailed: true } : job;
+  const protocolSteer = protocolSteerBlock(job.agent, job.protocol_id);
 
   const outcome = await tryKernelProposal({
     url: env.RESEARCH_KERNEL_URL,
     secret: kernelSecret,
     body: buildKernelJobPayload({
-      query: job.message,
+      query: protocolSteer
+        ? `${protocolSteer}\n\nTeacher request: ${job.message}`
+        : job.message,
       lesson,
       transcript,
       archive,

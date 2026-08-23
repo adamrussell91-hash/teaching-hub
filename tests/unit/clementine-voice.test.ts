@@ -22,6 +22,12 @@ describe('Ann protocol', () => {
     expect(protocol).not.toContain('Default to the selected block or section.');
     expect(protocol).toContain('any part of the lesson');
   });
+
+  it('adds a selected user-facing move without exposing router narration', () => {
+    const protocol = protocolForAgent('ann', 'lesson-diagnosis');
+    expect(protocol).toContain('Run the Lesson diagnosis protocol');
+    expect(protocol).not.toContain('protocol_id');
+  });
 });
 
 describe('archive kernel client', () => {

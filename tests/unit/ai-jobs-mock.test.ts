@@ -118,6 +118,7 @@ describe('mock /api/ai/jobs', () => {
         scope: 'lesson',
         lesson_snapshot_at: snapshot,
         message: 'Review this lesson',
+        protocol_id: 'make-the-call',
         action: 'review',
         history: [{ role: 'user', content: 'Keep the existing structure.' }]
       }
@@ -126,10 +127,11 @@ describe('mock /api/ai/jobs', () => {
 
     const beforeRun = await api.request('GET', `/api/ai/jobs/${id}`, { cookie });
     const before = (await beforeRun.json()) as {
-      data: { snapshot_at: string; action?: string; history?: unknown[] };
+      data: { snapshot_at: string; protocol_id?: string; action?: string; history?: unknown[] };
     };
     expect(before.data).toMatchObject({
       snapshot_at: snapshot,
+      protocol_id: 'make-the-call',
       action: 'review',
       history: [{ role: 'user', content: 'Keep the existing structure.' }]
     });
