@@ -76,6 +76,7 @@ export type MountLessonPageOptions = {
   renderLinkedPreview?: (compositionId: string) => HTMLElement;
   outcomesCatalog?: CurriculumOutcome[];
   subject?: { id: string; outcome_ids: string[] };
+  onToggleFullPage?: () => void;
 };
 
 export type LessonPageHandle = {
@@ -761,6 +762,20 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   });
   moreWrap.append(more, menu);
 
+  const fullPage = document.createElement('button');
+  fullPage.type = 'button';
+  fullPage.className = 'btn btn--ghost lesson-page__fullscreen';
+  fullPage.setAttribute('data-builder-fullscreen', '');
+  fullPage.setAttribute('aria-pressed', 'false');
+  fullPage.setAttribute('aria-label', 'Full screen');
+  fullPage.title = 'Full screen';
+  fullPage.textContent = 'Full screen';
+  if (options.onToggleFullPage) {
+    fullPage.addEventListener('click', () => options.onToggleFullPage?.());
+  } else {
+    fullPage.hidden = true;
+  }
+
   const print = document.createElement('button');
   print.type = 'button';
   print.className = 'lesson-page__print';
@@ -770,7 +785,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
 
   const chrome = document.createElement('div');
   chrome.className = 'lesson-page__chrome';
-  chrome.append(moreWrap, print);
+  chrome.append(moreWrap, fullPage, print);
 
   const coverHost = document.createElement('div');
   coverHost.className = 'lesson-page__cover';

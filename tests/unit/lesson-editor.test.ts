@@ -439,6 +439,28 @@ describe('mountLessonEditor', () => {
     expect(builder.classList.contains('lesson-builder--rail-shelved')).toBe(true);
   });
 
+  it('enters and exits full page mode from the context bar and Escape', async () => {
+    mockLessonLoad();
+    mount();
+    await tick();
+
+    const builder = refs.canvas.querySelector('.lesson-builder')!;
+    const layout = refs.root.querySelector('.teacher-layout')!;
+    expect(builder.classList.contains('lesson-builder--rail-shelved')).toBe(false);
+
+    refs.contextBar.querySelector<HTMLButtonElement>('[data-builder-fullscreen]')!.click();
+    expect(builder.classList.contains('lesson-builder--full-page')).toBe(true);
+    expect(layout.classList.contains('teacher-layout--lesson-full-page')).toBe(true);
+    expect(document.body.classList.contains('is-lesson-builder-full-page')).toBe(true);
+    expect(builder.classList.contains('lesson-builder--rail-shelved')).toBe(true);
+    expect(builder.classList.contains('lesson-builder--chat-shelved')).toBe(true);
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(builder.classList.contains('lesson-builder--full-page')).toBe(false);
+    expect(builder.classList.contains('lesson-builder--rail-shelved')).toBe(false);
+    expect(builder.classList.contains('lesson-builder--chat-shelved')).toBe(true);
+  });
+
   it('enables the student link after Publish without a canvas banner', async () => {
     mockLessonLoad();
     apiPostMock.mockResolvedValue({ student_path: '/s/lessons/lesson_001' });
