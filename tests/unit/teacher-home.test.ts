@@ -1,8 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('@/app/router', () => ({ navigate: vi.fn() }));
+vi.mock('@/teacher/create/blank-lesson', () => ({
+  openBlankLesson: vi.fn()
+}));
 
 import { navigate } from '@/app/router';
+import { openBlankLesson } from '@/teacher/create/blank-lesson';
 import { renderTeacherHome } from '@/teacher/home';
 import type { CurriculumResponse } from '@/teacher/nav';
 
@@ -235,5 +239,23 @@ describe('teacher home dashboard', () => {
     expect(() => result.dispose()).not.toThrow();
     expect(clearSpy).toHaveBeenCalled();
     clearSpy.mockRestore();
+  });
+
+  it('calendar add opens blank lesson flow instead of the home create menu', () => {
+    const onCreated = vi.fn();
+    const result = renderTeacherHome(canvas, curriculum, { onCreated });
+    dispose = result.dispose;
+
+    const addBtn = canvas.querySelector<HTMLButtonElement>(
+      '.class-calendar__week-heading .icon-plus-btn'
+    );
+    expect(addBtn).not.toBeNull();
+    addBtn?.click();
+
+    expect(openBlankLesson).toHaveBeenCalledWith({
+      curriculum,
+      onCreated
+    });
+    expect(canvas.querySelector('[data-create-menu]')).toBeNull();
   });
 });

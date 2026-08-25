@@ -41,6 +41,7 @@ export interface ClassPageOptions {
   /** Cover-only invalidation; must not remount the page or its editors. */
   onCoverMutated?: () => void | Promise<void>;
   onScheduleUnit?: () => void;
+  onCreateLesson?: () => void;
 }
 
 export function renderClassesIndex(
@@ -307,7 +308,7 @@ export function renderClassPage(
       monthDelta,
       unitTitles,
       onNavigate: navigate,
-      onScheduleLesson: () => options.onScheduleUnit?.(),
+      onScheduleLesson: () => options.onCreateLesson?.(),
       onLessonOverflow: (scheduledId, anchor) => {
         openLessonOverflow(cls, classScheduled, scheduledId, anchor, options, errorBanner);
       }

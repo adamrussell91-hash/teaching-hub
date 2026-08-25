@@ -251,6 +251,19 @@ describe('classes section', () => {
     expect(navigate).toHaveBeenCalledWith('/lessons/lesson_aotfw_008');
   });
 
+  it('calls onCreateLesson from calendar add controls', () => {
+    const onCreateLesson = vi.fn();
+    renderClassPage(canvas, curriculum, 'class_2026_12engadv1', { onCreateLesson });
+
+    canvas.querySelector<HTMLButtonElement>('[data-calendar-view="week"]')?.click();
+    const weekAdd = canvas.querySelector<HTMLButtonElement>(
+      '.class-calendar__week-heading .icon-plus-btn'
+    );
+    expect(weekAdd).not.toBeNull();
+    weekAdd?.click();
+    expect(onCreateLesson).toHaveBeenCalledTimes(1);
+  });
+
   it('shows not found for unknown class', () => {
     const handle = renderClassPage(canvas, curriculum, 'class_missing');
     expect(canvas.textContent).toMatch(/Class not found/i);
