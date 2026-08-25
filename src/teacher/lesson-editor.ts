@@ -647,6 +647,10 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       if (disposed || isTypingTarget(event.target)) return;
       if (shouldExitBuilderFullPage(event.key, fullPage)) {
         event.preventDefault();
+        if (!builder.classList.contains('lesson-builder--chat-shelved')) {
+          setChatShelved(true);
+          return;
+        }
         setFullPage(false);
         return;
       }

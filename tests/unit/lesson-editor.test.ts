@@ -454,6 +454,16 @@ describe('mountLessonEditor', () => {
     expect(document.body.classList.contains('is-lesson-builder-full-page')).toBe(true);
     expect(builder.classList.contains('lesson-builder--rail-shelved')).toBe(true);
     expect(builder.classList.contains('lesson-builder--chat-shelved')).toBe(true);
+    const fab = refs.canvas.querySelector<HTMLButtonElement>('.lesson-builder__chat-fab');
+    expect(fab?.hidden).toBe(false);
+
+    fab?.click();
+    expect(builder.classList.contains('lesson-builder--chat-shelved')).toBe(false);
+    expect(refs.canvas.querySelector('.ai-panel')).not.toBeNull();
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(builder.classList.contains('lesson-builder--full-page')).toBe(true);
+    expect(builder.classList.contains('lesson-builder--chat-shelved')).toBe(true);
 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(builder.classList.contains('lesson-builder--full-page')).toBe(false);

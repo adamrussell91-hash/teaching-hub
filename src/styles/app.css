@@ -7470,9 +7470,25 @@ input.scope-timeline__note-title:focus-visible {
   background: var(--paper);
 }
 
-.lesson-builder--full-page .lesson-builder__chat,
-.lesson-builder--full-page .lesson-builder__chat-fab {
+.lesson-builder--full-page.lesson-builder--chat-shelved .lesson-builder__chat {
   display: none;
+}
+
+.lesson-builder--full-page:not(.lesson-builder--chat-shelved) .lesson-builder__chat {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  width: 22rem;
+  max-width: min(22rem, 90vw);
+  margin: 0;
+  padding: var(--space-5);
+  overflow: auto;
+  background: var(--paper);
+  box-shadow: var(--elev-4);
 }
 
 .lesson-builder--full-page .lesson-page {
