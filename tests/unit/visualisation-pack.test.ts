@@ -547,14 +547,17 @@ describe('visualisation renderers', () => {
     );
   });
 
-  it('renders mind_map and concept_map svg', () => {
-    expect(renderBlock(createBlock('mind_map', 'm1'), 'student').querySelector('svg')).toBeTruthy();
-    expect(
-      renderBlock(createBlock('concept_map', 'cm1'), 'student').querySelector('svg')
-    ).toBeTruthy();
+  it('renders mind_map and concept_map canvases', () => {
+    const mind = renderBlock(createBlock('mind_map', 'm1'), 'student');
+    expect(mind.querySelector('.block-mind-map__canvas .block-graph-maker')).toBeTruthy();
+    expect(mind.querySelector('.node')).toBeTruthy();
+
+    const concept = renderBlock(createBlock('concept_map', 'cm1'), 'student');
+    expect(concept.querySelector('.block-concept-map__canvas .block-graph-maker')).toBeTruthy();
+    expect(concept.querySelector('.graph-edge')).toBeTruthy();
   });
 
-  it('keeps the mind map title in HTML and spreads labels outside the nodes', () => {
+  it('keeps the mind map title in HTML and renders labelled nodes on the canvas', () => {
     const block = createBlock('mind_map', 'm1');
     if (block.block_type !== 'mind_map') throw new Error('expected mind_map');
     block.content = {
@@ -580,18 +583,10 @@ describe('visualisation renderers', () => {
     };
     const el = renderBlock(block, 'teacher');
     expect(el.querySelector('.block-mind-map__title')?.textContent).toBe('The Spacing Effect');
-    const svg = el.querySelector('svg');
-    expect(svg?.innerHTML).not.toContain('The Spacing Effect');
-    const viewBox = (svg?.getAttribute('viewBox') ?? '').split(' ').map(Number);
-    expect(viewBox[2]).toBeGreaterThan(400);
-    expect(viewBox[3]).toBeGreaterThan(240);
-    const circle = el.querySelector('circle');
-    const label = [...el.querySelectorAll('text')].find((node) =>
-      (node.textContent ?? '').includes('Why it works')
-    );
-    expect(circle).not.toBeNull();
-    expect(label).not.toBeNull();
-    expect(label?.getAttribute('y')).not.toBe(circle?.getAttribute('cy'));
+    expect(el.querySelector('.block-mind-map__canvas .node')).not.toBeNull();
+    const labels = [...el.querySelectorAll('.node__text')].map((node) => node.textContent ?? '');
+    expect(labels.some((text) => text.includes('Why it works'))).toBe(true);
+    expect(labels.some((text) => text.includes('Spacing Effect'))).toBe(true);
   });
 });
 
@@ -699,7 +694,7 @@ describe('visualisation editors', () => {
   });
 
   describe('createMindMapEditor', () => {
-    it('mounts nodes and updates labels on input', () => {
+    it('mounts the interactive graph canvas', () => {
       const block = createBlock('mind_map', 'm1');
       if (block.block_type !== 'mind_map') throw new Error('expected mind_map');
       let latest = block;
@@ -707,13 +702,8 @@ describe('visualisation editors', () => {
         latest = next;
       });
 
-      expect(el.querySelectorAll('.block-editor__mind-map-node').length).toBe(3);
-      expect(el.querySelector('.block-editor__mind-map-preview svg')).not.toBeNull();
-
-      const label = el.querySelector('.block-editor__mind-map-label') as HTMLInputElement;
-      label.value = 'Root idea';
-      label.dispatchEvent(new Event('input'));
-      expect(latest.content.nodes[0]!.label).toBe('Root idea');
+      expect(el.querySelector('.block-editor__mind-map-title')).not.toBeNull();
+      expect(el.querySelector('.block-graph-maker-host .block-graph-maker')).not.toBeNull();
 
       const title = el.querySelector('.block-editor__mind-map-title') as HTMLInputElement;
       title.value = 'Unit map';
@@ -723,7 +713,7 @@ describe('visualisation editors', () => {
   });
 
   describe('createConceptMapEditor', () => {
-    it('mounts nodes/edges and updates content on input', () => {
+    it('mounts the interactive graph canvas', () => {
       const block = createBlock('concept_map', 'cm1');
       if (block.block_type !== 'concept_map') throw new Error('expected concept_map');
       let latest = block;
@@ -731,23 +721,9 @@ describe('visualisation editors', () => {
         latest = next;
       });
 
-      expect(el.querySelectorAll('.block-editor__concept-map-node').length).toBe(2);
-      expect(el.querySelectorAll('.block-editor__concept-map-edge').length).toBe(1);
-      expect(el.querySelector('.block-editor__concept-map-preview svg')).not.toBeNull();
-
-      const nodeLabel = el.querySelector(
-        '.block-editor__concept-map-node-label'
-      ) as HTMLInputElement;
-      nodeLabel.value = 'Photosynthesis';
-      nodeLabel.dispatchEvent(new Event('input'));
-      expect(latest.content.nodes[0]!.label).toBe('Photosynthesis');
-
-      const edgeLabel = el.querySelector(
-        '.block-editor__concept-map-edge-label'
-      ) as HTMLInputElement;
-      edgeLabel.value = 'produces';
-      edgeLabel.dispatchEvent(new Event('input'));
-      expect(latest.content.edges[0]!.label).toBe('produces');
+      expect(el.querySelector('.block-editor__concept-map-title')).not.toBeNull();
+      expect(el.querySelector('.block-graph-maker-host .block-graph-maker')).not.toBeNull();
+      expect(el.querySelector('.block-graph-maker .graph-edge')).not.toBeNull();
     });
   });
 

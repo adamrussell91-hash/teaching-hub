@@ -2,7 +2,7 @@ import { FAILURE } from '@/app/failure';
 import katex from 'katex';
 import { getApiBaseUrl } from '@/api/config';
 import { buildChartSvg, buildChartTableRows } from '@/blocks/chart-svg';
-import { buildConceptMapSvg, buildMindMapSvg } from '@/blocks/graph-svg';
+import { mountGraphMaker } from '@/blocks/graph-maker/mount';
 import type { CollectionLink } from '@/blocks/collection-resolve';
 import { buildHtmlAppSrcdoc } from '@/blocks/html-app-srcdoc';
 import { sanitizeRichTextHtml } from '@/blocks/sanitize';
@@ -1919,8 +1919,12 @@ export function renderMindMapBlock(
   }
 
   const wrap = document.createElement('div');
-  wrap.className = 'block-mind-map__svg';
-  wrap.innerHTML = buildMindMapSvg(block.content);
+  wrap.className = 'block-mind-map__canvas';
+  mountGraphMaker(wrap, {
+    mode: 'mindmap',
+    content: block.content,
+    readOnly: true
+  });
   root.append(wrap);
 
   return wrapBlock(root, block, mode);
@@ -1941,8 +1945,12 @@ export function renderConceptMapBlock(
   }
 
   const wrap = document.createElement('div');
-  wrap.className = 'block-concept-map__svg';
-  wrap.innerHTML = buildConceptMapSvg(block.content);
+  wrap.className = 'block-concept-map__canvas';
+  mountGraphMaker(wrap, {
+    mode: 'conceptmap',
+    content: block.content,
+    readOnly: true
+  });
   root.append(wrap);
 
   return wrapBlock(root, block, mode);

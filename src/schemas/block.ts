@@ -518,7 +518,10 @@ export const DiagramBlockSchema = z.object({
 export const GraphNodeSchema = z.object({
   id: z.string().min(1),
   label: z.string(),
-  parent_id: z.string().nullable().optional()
+  parent_id: z.string().nullable().optional(),
+  color: z.string().optional(),
+  x: z.number().optional(),
+  y: z.number().optional()
 });
 
 export const GraphEdgeSchema = z.object({

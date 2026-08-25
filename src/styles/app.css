@@ -6777,9 +6777,161 @@ input.scope-timeline__note-title:focus-visible {
   color: var(--ink);
 }
 
-.block-chart__svg,
-.block-mind-map__svg,
-.block-concept-map__svg {
+.block-graph-maker {
+  position: relative;
+  min-height: 20rem;
+}
+
+.block-graph-maker-host {
+  margin-top: var(--space-3);
+}
+
+.block-graph-maker .canvas-wrap,
+.block-mind-map__canvas .canvas-wrap,
+.block-concept-map__canvas .canvas-wrap {
+  position: relative;
+  min-height: 18rem;
+  margin: 0;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: var(--elev-1);
+  overflow: hidden;
+  touch-action: none;
+  cursor: grab;
+}
+
+.block-graph-maker .canvas-wrap.is-panning,
+.block-mind-map__canvas .canvas-wrap.is-panning,
+.block-concept-map__canvas .canvas-wrap.is-panning {
+  cursor: grabbing;
+}
+
+.block-graph-maker .canvas-wrap::before,
+.block-mind-map__canvas .canvas-wrap::before,
+.block-concept-map__canvas .canvas-wrap::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(23, 55, 94, 0.1) 1px, transparent 1px);
+  background-size: 22px 22px;
+  pointer-events: none;
+  opacity: 0.55;
+}
+
+.block-graph-maker #world,
+.block-mind-map__canvas #world,
+.block-concept-map__canvas #world {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+}
+
+.block-graph-maker #edges,
+.block-mind-map__canvas #edges,
+.block-concept-map__canvas #edges {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.block-graph-maker #edges.concept-edges,
+.block-mind-map__canvas #edges.concept-edges,
+.block-concept-map__canvas #edges.concept-edges {
+  pointer-events: visiblePainted;
+}
+
+.block-graph-maker #nodesLayer,
+.block-mind-map__canvas #nodesLayer,
+.block-concept-map__canvas #nodesLayer {
+  position: absolute;
+  inset: 0;
+}
+
+.block-graph-maker .node,
+.block-mind-map__canvas .node,
+.block-concept-map__canvas .node {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: inline-flex;
+}
+
+.block-graph-maker .node__card,
+.block-mind-map__canvas .node__card,
+.block-concept-map__canvas .node__card {
+  display: inline-flex;
+  align-items: center;
+  min-width: 3.5rem;
+  max-width: 15rem;
+  padding: 0.55rem 0.95rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: var(--elev-2);
+  font-size: var(--text-base);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.block-graph-maker .node--root .node__card,
+.block-mind-map__canvas .node--root .node__card {
+  border-radius: var(--radius-md);
+  padding: 0.85rem 1.4rem;
+  font-size: var(--text-md);
+  font-weight: 700;
+}
+
+.block-graph-maker .graph-edge__label,
+.block-concept-map__canvas .graph-edge__label {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  fill: var(--ink);
+}
+
+.block-graph-maker .zoom-controls,
+.block-mind-map__canvas .zoom-controls,
+.block-concept-map__canvas .zoom-controls {
+  position: absolute;
+  left: var(--space-3);
+  bottom: var(--space-3);
+  z-index: 5;
+}
+
+.block-graph-maker .hint-bar,
+.block-mind-map__canvas .hint-bar,
+.block-concept-map__canvas .hint-bar {
+  position: absolute;
+  left: 50%;
+  top: var(--space-2);
+  transform: translateX(-50%);
+  z-index: 5;
+  font-size: var(--text-xs);
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid var(--line);
+  padding: 0.35rem 0.8rem;
+  border-radius: var(--radius-full);
+}
+
+.block-graph-maker.graph-maker--readonly .node__btn,
+.block-graph-maker.graph-maker--readonly .fab,
+.block-graph-maker.graph-maker--readonly .hint-bar,
+.block-mind-map__canvas .graph-maker--readonly .node__btn,
+.block-concept-map__canvas .graph-maker--readonly .node__btn {
+  display: none !important;
+}
+
+.block-graph-maker.graph-maker--readonly .node__card,
+.block-mind-map__canvas .graph-maker--readonly .node__card,
+.block-concept-map__canvas .graph-maker--readonly .node__card {
+  pointer-events: none;
+  cursor: default;
+}
+
+.block-mind-map__canvas,
+.block-concept-map__canvas {
   overflow: visible;
 }
 
