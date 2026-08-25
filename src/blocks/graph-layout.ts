@@ -2,6 +2,9 @@ export type GraphNode = {
   id: string;
   label: string;
   parent_id?: string | null;
+  color?: string;
+  x?: number;
+  y?: number;
 };
 
 export type GraphEdge = {
