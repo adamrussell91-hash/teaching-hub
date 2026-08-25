@@ -43,8 +43,16 @@ import {
 import { lessonPaletteFamilies } from '@/teacher/lesson-canvas/palette-catalog';
 import {
   readBuilderChromePrefs,
-  writeBuilderChromePrefs
+  writeBuilderChromePrefs,
+  type ShelfState
 } from '@/teacher/lesson-canvas/prefs';
+import {
+  applyBuilderFullPageState,
+  bindBuilderFullPage,
+  fullPageExitHtml,
+  fullPageToggleHtml,
+  shouldExitBuilderFullPage
+} from '@/teacher/lesson-canvas/builderFullPage';
 import { insertAt, nextBlockIdFactory } from '@/teacher/lesson-canvas/drop';
 import { replaceBlockInTree } from '@/ai/block-tree';
 import { openNameModal } from '@/teacher/create/name-modal';
@@ -114,6 +122,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
   let palette: LessonPaletteHandle | null = null;
   let removeChromeKeys: (() => void) | null = null;
   let printLesson: (() => void) | null = null;
+  let exitFullPageMode: (() => void) | null = null;
 
   renderStatus(refs.canvas, 'Loading lesson…');
 
@@ -180,6 +189,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     pageCol.append(publishPanel, pageHost, compositionStatus);
     chatCol.append(aiHost, labHost);
     builder.append(railHost, pageCol, chatCol, chatFab);
+    builder.insertAdjacentHTML('beforeend', fullPageExitHtml(false));
     refs.canvas.append(builder);
 
     function paintChatFab(slug: AgentSlug): void {
@@ -234,6 +244,45 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     }
 
     let columnMode: 'chat' | 'lab' = 'chat';
+    let fullPage = false;
+    let shelfBeforeFullPage: { rail: ShelfState; chat: ShelfState } | null = null;
+    const layout = refs.root.querySelector<HTMLElement>('.teacher-layout') ?? refs.root;
+
+    function readShelfStates(): { rail: ShelfState; chat: ShelfState } {
+      return {
+        rail: builder.classList.contains('lesson-builder--rail-shelved') ? 'shelved' : 'open',
+        chat: builder.classList.contains('lesson-builder--chat-shelved') ? 'shelved' : 'open'
+      };
+    }
+
+    function applyFullPageState(): void {
+      applyBuilderFullPageState(builder, layout, document.body, fullPage);
+    }
+
+    function setFullPage(on: boolean): void {
+      if (on === fullPage) return;
+      if (on) {
+        shelfBeforeFullPage = readShelfStates();
+        setRailShelved(true);
+        setChatShelved(true);
+        fullPage = true;
+      } else {
+        fullPage = false;
+        const restore = shelfBeforeFullPage;
+        shelfBeforeFullPage = null;
+        if (restore) {
+          setRailShelved(restore.rail === 'shelved');
+          setChatShelved(restore.chat === 'shelved');
+        }
+      }
+      applyFullPageState();
+    }
+
+    function toggleFullPage(): void {
+      setFullPage(!fullPage);
+    }
+
+    exitFullPageMode = () => setFullPage(false);
 
     function selectedQuery(): { text: string; hasSelection: boolean } {
       const selected = selectedBlockId ? findBlockById(lesson.blocks, selectedBlockId) : null;
@@ -542,7 +591,8 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         palette?.showCompositionConfirm(id);
       },
       renderLinkedPreview: (compositionId) =>
-        buildLinkedPreview(compositionId, compositionCache, queueCompositionFetch)
+        buildLinkedPreview(compositionId, compositionCache, queueCompositionFetch),
+      onToggleFullPage: toggleFullPage
     });
 
     printLesson = () => openPrintLesson(lesson);
@@ -595,6 +645,15 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
 
     function onWindowKeydown(event: KeyboardEvent): void {
       if (disposed || isTypingTarget(event.target)) return;
+      if (shouldExitBuilderFullPage(event.key, fullPage)) {
+        event.preventDefault();
+        if (!builder.classList.contains('lesson-builder--chat-shelved')) {
+          setChatShelved(true);
+          return;
+        }
+        setFullPage(false);
+        return;
+      }
       if (event.key === '[') {
         event.preventDefault();
         setRailShelved(!builder.classList.contains('lesson-builder--rail-shelved'));
@@ -751,6 +810,8 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     labBtn.className = 'btn btn--ghost context-bar__alchemy-lab';
     labBtn.textContent = 'Alchemy Lab';
     labBtn.addEventListener('click', () => openAlchemyLab());
+    const fullPageHost = document.createElement('div');
+    fullPageHost.innerHTML = fullPageToggleHtml(false);
     const previewLink = document.createElement('a');
     previewLink.className = 'btn btn--ghost context-bar__preview';
     previewLink.textContent = 'Student preview';
@@ -770,11 +831,19 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     syncPreviewLink();
 
     if (actions) {
-      actions.prepend(labBtn, previewLink);
+      actions.prepend(labBtn, fullPageHost.firstElementChild!, previewLink);
       actions.append(publicLinkHost, historyHost);
     } else {
-      refs.contextBar.append(labBtn, previewLink, publicLinkHost, historyHost);
+      refs.contextBar.append(labBtn, fullPageHost.firstElementChild!, previewLink, publicLinkHost, historyHost);
     }
+    bindBuilderFullPage(refs.contextBar, {
+      getActive: () => fullPage,
+      setActive: setFullPage
+    });
+    bindBuilderFullPage(builder, {
+      getActive: () => fullPage,
+      setActive: setFullPage
+    });
     refreshPublicLink();
     syncPreviewLink();
 
@@ -803,6 +872,8 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     },
     dispose() {
       disposed = true;
+      exitFullPageMode?.();
+      exitFullPageMode = null;
       removeChromeKeys?.();
       removeChromeKeys = null;
       closeEditSourceModal?.();

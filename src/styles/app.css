@@ -7454,6 +7454,86 @@ input.scope-timeline__note-title:focus-visible {
   display: none;
 }
 
+.lesson-builder--full-page {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr);
+  gap: 0;
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  margin: 0;
+  padding: var(--space-5) clamp(var(--space-4), 3vw, var(--space-8));
+  overflow: auto;
+  background: var(--paper);
+}
+
+.lesson-builder--full-page.lesson-builder--chat-shelved .lesson-builder__chat {
+  display: none;
+}
+
+.lesson-builder--full-page:not(.lesson-builder--chat-shelved) .lesson-builder__chat {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  width: 22rem;
+  max-width: min(22rem, 90vw);
+  margin: 0;
+  padding: var(--space-5);
+  overflow: auto;
+  background: var(--paper);
+  box-shadow: var(--elev-4);
+}
+
+.lesson-builder--full-page .lesson-page {
+  max-width: none;
+}
+
+.lesson-builder__exit {
+  position: fixed;
+  z-index: 25;
+  top: var(--space-4);
+  right: var(--space-4);
+}
+
+.lesson-builder__exit[hidden] {
+  display: none;
+}
+
+body.is-lesson-builder-full-page {
+  overflow: hidden;
+}
+
+body.is-lesson-builder-full-page .teacher-layout__rail,
+body.is-lesson-builder-full-page .teacher-layout__context-bar,
+body.is-lesson-builder-full-page .teacher-layout__utilities,
+body.is-lesson-builder-full-page .hub-utilities {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.teacher-layout--lesson-full-page {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.teacher-layout--lesson-full-page .teacher-layout__main {
+  grid-column: 1 / -1;
+}
+
+.teacher-layout--lesson-full-page .teacher-layout__canvas {
+  padding: 0;
+}
+
+.lesson-page__fullscreen {
+  font-size: var(--text-sm);
+}
+
 .alchemy-lab {
   display: flex;
   flex-direction: column;
