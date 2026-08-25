@@ -111,4 +111,28 @@ describe('teacher shell', () => {
       collapsed: false
     });
   });
+
+  it('keeps the curriculum rail expanded on mobile viewports even when prefs say collapsed', () => {
+    localStorage.setItem(TEACHER_RAIL_PREFS_KEY, JSON.stringify({ collapsed: true }));
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn().mockImplementation((query: string) => ({
+        matches: query === '(max-width: 768px)',
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+        onchange: null
+      }))
+    );
+
+    renderTeacherShell(root);
+    const layout = root.querySelector('.teacher-layout')!;
+    const toggle = root.querySelector<HTMLButtonElement>('.teacher-layout__rail-toggle')!;
+
+    expect(layout.classList.contains('teacher-layout--rail-collapsed')).toBe(false);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+  });
 });

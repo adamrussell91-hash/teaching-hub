@@ -271,7 +271,9 @@ export function renderClassPage(
 
   let selectedDate = today;
   let viewMonth = yearMonthFromDate(today);
-  let calendarView: ScheduleCalendarView = 'month';
+  let calendarView: ScheduleCalendarView = window.matchMedia('(max-width: 768px)').matches
+    ? 'week'
+    : 'month';
   let monthDelta = 0;
 
   const errorBanner = document.createElement('p');

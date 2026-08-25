@@ -6440,10 +6440,70 @@ input.scope-timeline__note-title:focus-visible {
 /* ── Responsive teacher rail ──────────────────────────────────────────── */
 
 @media (max-width: 768px) {
+  /* design-kit/rail.css hides .hub-rail at 720px — Teaching keeps a compact strip. */
+  .teacher-layout__rail.hub-rail {
+    display: flex !important;
+  }
+
   /* minmax(0, 1fr), not 1fr: a 1fr track has an implicit min-width:auto and
      would be widened by the horizontally-scrolling nav row below. */
   .teacher-layout {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .teacher-layout__main {
+    padding-top: var(--space-10);
+  }
+
+  .teacher-layout__utilities {
+    top: var(--space-2);
+    right: var(--space-3);
+  }
+
+  .teacher-layout__canvas {
+    padding: var(--space-4) var(--space-3) var(--space-8);
+  }
+
+  .teacher-layout__context-bar {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--space-2);
+    margin-inline: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    min-height: 0;
+  }
+
+  .teacher-layout__context-bar--editor {
+    padding-right: var(--space-3);
+  }
+
+  .teacher-layout__context-bar-left {
+    min-width: 0;
+    flex: 1 1 12rem;
+  }
+
+  .context-bar__actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .teacher-layout__context-bar--editor .context-bar__actions {
+    width: auto;
+    margin-left: auto;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+  }
+
+  .page-header__actions {
+    flex-wrap: wrap;
+    justify-content: flex-start;
   }
 
   /* Was: flex-wrap: wrap — which piled the whole nav into a 555px navy slab,
@@ -6452,6 +6512,10 @@ input.scope-timeline__note-title:focus-visible {
     flex-direction: column;
     gap: var(--space-2);
     padding: var(--space-2) var(--space-3);
+  }
+
+  .teacher-layout__rail-toggle {
+    display: none;
   }
 
   /* The rail is a column flex container: its flex line takes the cross size of
@@ -6474,6 +6538,7 @@ input.scope-timeline__note-title:focus-visible {
   }
 
   .teacher-layout__rail-nav {
+    display: flex !important;
     overflow: visible;
   }
 
@@ -6503,20 +6568,182 @@ input.scope-timeline__note-title:focus-visible {
     white-space: nowrap;
   }
 
+  .teacher-layout--rail-collapsed {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .teacher-layout--rail-collapsed .teacher-layout__rail-nav,
+  .teacher-layout--rail-collapsed .teacher-layout__tree-host {
+    display: flex !important;
+  }
+
+  .teacher-layout--rail-collapsed .teacher-layout__rail-brand {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+    clip: auto;
+    white-space: nowrap;
+  }
+
+  .teacher-layout--rail-collapsed .primary-nav__label,
+  .teacher-layout--rail-collapsed .rail-search__label,
+  .teacher-layout--rail-collapsed .rail-classes__label {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+    clip: auto;
+    white-space: nowrap;
+  }
+
+  .teacher-layout--rail-collapsed .primary-nav__link {
+    justify-content: flex-start;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .teacher-layout--rail-collapsed .rail-search {
+    display: flex;
+    width: auto;
+    min-height: 0;
+    padding: var(--space-2) var(--space-3);
+    margin-inline: 0;
+  }
+
   .rail-classes__label {
-    display: none;
+    display: inline;
   }
 
   .rail-search {
     margin-bottom: 0;
   }
 
-  .teacher-layout--rail-collapsed {
+  .home-dashboard__toolbar {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .home-dashboard__hero-time {
+    font-size: var(--font-size-page);
+  }
+
+  .home-dashboard__create {
+    margin-left: auto;
+  }
+
+  .class-calendar {
+    padding: var(--space-3);
+  }
+
+  .class-calendar__nav {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .class-calendar__paging {
+    width: 100%;
+  }
+
+  .calendar-view-tabs {
+    width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .calendar-view-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .class-calendar__week {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .teacher-layout--rail-collapsed .teacher-layout__rail-nav {
+  .class-calendar__day .event-chip,
+  .class-calendar__day .event-chip-more {
     display: none;
+  }
+
+  .class-calendar__day {
+    min-height: var(--space-12);
+    padding: var(--space-1);
+  }
+
+  .class-page__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .seq__lesson-link {
+    grid-template-columns: var(--space-6) minmax(0, 1fr);
+  }
+
+  .seq__lesson-date,
+  .seq__lesson-status {
+    display: none;
+  }
+
+  .create-control__menu {
+    position: fixed;
+    left: var(--space-3);
+    right: var(--space-3);
+    bottom: max(var(--space-4), env(safe-area-inset-bottom, 0px));
+    top: auto;
+    margin-top: 0;
+    min-width: 0;
+    z-index: 50;
+  }
+
+  .scope-overview__row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+
+  .scope-overview__terms {
+    margin-left: 0;
+    height: auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+  }
+
+  .scope-overview__term {
+    position: static;
+    flex: 1 1 auto;
+    min-width: 4rem;
+    border-right: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+  }
+
+  .scope-overview__track {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .lessons-lib .list-row-actions {
+    flex-wrap: wrap;
+  }
+
+  .lessons-table {
+    min-width: 44rem;
+  }
+
+  .search-palette {
+    top: max(var(--space-4), env(safe-area-inset-top, 0px));
+    max-height: calc(100dvh - var(--space-8));
+    width: calc(100vw - var(--space-4));
+  }
+
+  .search-palette__row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-1);
+  }
+
+  .search-palette__meta {
+    justify-self: start;
   }
 }
 
@@ -6571,6 +6798,28 @@ input.scope-timeline__note-title:focus-visible {
   padding: var(--space-2);
   display: grid;
   gap: var(--space-1);
+}
+
+.create-control__menu-item {
+  appearance: none;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  text-align: left;
+  cursor: pointer;
+}
+
+.create-control__menu-item:hover,
+.create-control__menu-item:focus-visible {
+  background: color-mix(in srgb, var(--wave) 10%, transparent);
+  outline: none;
 }
 
 .create-modal-backdrop {
