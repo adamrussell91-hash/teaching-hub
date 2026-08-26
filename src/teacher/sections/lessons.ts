@@ -3,6 +3,7 @@ import type { EntityCreatedHandler } from '@/teacher/create/types';
 import type { CurriculumResponse } from '@/teacher/nav';
 import { promptLessonFromTemplate } from '@/teacher/lessons-library/from-template';
 import { renderLessonsLibrary } from '@/teacher/lessons-library/render';
+import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
 import { renderPageHeader } from '@/teacher/page-header';
 
 export interface LessonsIndexOptions {
@@ -23,20 +24,26 @@ export function renderLessonsIndex(
   createHost.className = 'lessons-index__create create-control';
   createHost.dataset.createHost = '';
 
-  const templateBtn = document.createElement('button');
-  templateBtn.type = 'button';
-  templateBtn.className = 'btn btn--ghost';
-  templateBtn.textContent = 'From template';
-  templateBtn.addEventListener('click', () => {
-    void promptLessonFromTemplate(curriculum).then((id) => {
-      if (id) void options.onCreated?.('lesson', id);
-    });
-  });
+  const templateMenu = mountPageOptionsMenu(
+    [
+      {
+        label: 'From template',
+        className: 'lessons-index__from-template',
+        onSelect: () => {
+          void promptLessonFromTemplate(curriculum).then((id) => {
+            if (id) void options.onCreated?.('lesson', id);
+          });
+        }
+      }
+    ],
+    { label: 'Lesson options' }
+  );
+  disposers.push(templateMenu.dispose);
 
   renderPageHeader(canvas, {
     eyebrow: 'Workspace',
     title: 'Lessons',
-    actions: [templateBtn, createHost]
+    actions: [templateMenu.el, createHost]
   });
 
   const createControl = mountCreateControl(createHost, {

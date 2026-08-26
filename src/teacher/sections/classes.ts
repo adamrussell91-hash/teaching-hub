@@ -193,29 +193,30 @@ export function renderClassPage(
   }
   const pageClass: Class = cls;
 
-  const viewAsStudent = document.createElement('a');
-  viewAsStudent.className = 'btn btn--ghost class-page__view-as-student';
-  viewAsStudent.href = `/s/classes/${cls.id}`;
-  viewAsStudent.target = '_blank';
-  viewAsStudent.rel = 'noopener noreferrer';
-  viewAsStudent.textContent = 'View as student';
-  viewAsStudent.addEventListener('click', (event) => {
-    event.preventDefault();
-    window.open(viewAsStudent.href, '_blank', 'noopener,noreferrer');
-  });
-
-  const editButton = document.createElement('button');
-  editButton.type = 'button';
-  editButton.className = 'btn btn--secondary class-page__edit-homepage';
-  editButton.textContent = 'Edit page';
-
   const yearsById = new Map(curriculum.years.map((year) => [year.id, year]));
   const subjectsById = new Map(curriculum.subjects.map((subject) => [subject.id, subject]));
   const unitsById = new Map(curriculum.units.map((unit) => [unit.id, unit]));
   const classTitle = classDisplayTitle(pageClass, yearsById, subjectsById);
+  const studentPath = `/s/classes/${cls.id}`;
 
   const optionsMenu = mountPageOptionsMenu(
     [
+      {
+        label: 'View as student',
+        className: 'class-page__view-as-student',
+        href: studentPath,
+        target: '_blank',
+        onSelect: () => {
+          window.open(studentPath, '_blank', 'noopener,noreferrer');
+        }
+      },
+      {
+        label: 'Edit page',
+        className: 'class-page__edit-homepage',
+        onSelect: () => {
+          showEditMode();
+        }
+      },
       {
         label: 'Archive',
         onSelect: () => {
@@ -256,7 +257,7 @@ export function renderClassPage(
   disposers.push(optionsMenu.dispose);
 
   renderPageHeader(canvas, {
-    actions: [viewAsStudent, editButton, optionsMenu.el]
+    actions: [optionsMenu.el]
   });
 
   const today = resolveScheduleToday(curriculum.schedule_anchor_date);
@@ -401,7 +402,6 @@ export function renderClassPage(
   function showViewMode(): void {
     editorHandle?.destroy();
     editorHandle = null;
-    editButton.hidden = false;
     renderHomepageRegionsView(
       sideHost,
       normalizeHomepage(pageClass.homepage),
@@ -444,7 +444,6 @@ export function renderClassPage(
   }
 
   function showEditMode(): void {
-    editButton.hidden = true;
     editorHandle?.destroy();
     editorHandle = mountHomepageEditor(sideHost, normalizeHomepage(pageClass.homepage), {
       classId: pageClass.id,
@@ -462,9 +461,6 @@ export function renderClassPage(
     });
   }
 
-  editButton.addEventListener('click', () => {
-    showEditMode();
-  });
   showViewMode();
   disposers.push(() => {
     editorHandle?.destroy();

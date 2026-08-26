@@ -50,7 +50,6 @@ import {
   applyBuilderFullPageState,
   bindBuilderFullPage,
   fullPageExitHtml,
-  fullPageToggleHtml,
   shouldExitBuilderFullPage
 } from '@/teacher/lesson-canvas/builderFullPage';
 import { insertAt, nextBlockIdFactory } from '@/teacher/lesson-canvas/drop';
@@ -61,6 +60,7 @@ import { fetchCurriculum } from '@/teacher/nav';
 import { renderContextBar, type TeacherShellRefs } from '@/teacher/shell';
 import { mountSavePublishControls, SaveController, type SavePublishHandle } from '@/teacher/save-publish';
 import { confirmAndTrash } from '@/teacher/lifecycle-api';
+import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
 
 export interface LessonEditorHandle {
   /**
@@ -123,6 +123,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
   let removeChromeKeys: (() => void) | null = null;
   let printLesson: (() => void) | null = null;
   let exitFullPageMode: (() => void) | null = null;
+  let pageOptionsDispose: (() => void) | null = null;
 
   renderStatus(refs.canvas, 'Loading lesson…');
 
@@ -805,41 +806,68 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     const historyHost = document.createElement('div');
     historyHost.className = 'history-panel-host context-bar__history';
     const actions = refs.contextBar.querySelector('.context-bar__actions');
-    const labBtn = document.createElement('button');
-    labBtn.type = 'button';
-    labBtn.className = 'btn btn--ghost context-bar__alchemy-lab';
-    labBtn.textContent = 'Alchemy Lab';
-    labBtn.addEventListener('click', () => openAlchemyLab());
-    const fullPageHost = document.createElement('div');
-    fullPageHost.innerHTML = fullPageToggleHtml(false);
-    const previewLink = document.createElement('a');
-    previewLink.className = 'btn btn--ghost context-bar__preview';
-    previewLink.textContent = 'Student preview';
-    previewLink.target = '_blank';
-    previewLink.rel = 'noopener noreferrer';
+    const studentPath = publicStudentPath('lesson', lesson.id);
+    const optionsMenu = mountPageOptionsMenu(
+      [
+        {
+          label: 'Alchemy Lab',
+          className: 'context-bar__alchemy-lab',
+          onSelect: () => {
+            openAlchemyLab();
+          }
+        },
+        {
+          label: 'Full screen',
+          className: 'context-bar__fullscreen',
+          dataset: { builderFullscreen: '' },
+          onSelect: () => {
+            setFullPage(!fullPage);
+          }
+        },
+        {
+          label: 'Student preview',
+          className: 'context-bar__preview',
+          href: studentPath,
+          target: '_blank',
+          onSelect: () => {
+            if (!lesson.published_at) return;
+            window.open(publicStudentPath('lesson', lesson.id), '_blank', 'noopener,noreferrer');
+          }
+        },
+        {
+          label: 'Share',
+          className: 'context-bar__share',
+          onSelect: () => {
+            publicLinkHost.querySelector<HTMLButtonElement>('.public-link__trigger')?.click();
+          }
+        },
+        {
+          label: 'History',
+          className: 'context-bar__history-item',
+          onSelect: () => {
+            historyPanel?.open();
+          }
+        }
+      ],
+      { label: 'Lesson options' }
+    );
+    pageOptionsDispose = optionsMenu.dispose;
 
     function syncPreviewLink(): void {
-      previewLink.href = publicStudentPath('lesson', lesson.id);
+      const preview = optionsMenu.el.querySelector<HTMLAnchorElement>('.context-bar__preview');
+      if (!preview) return;
+      preview.href = publicStudentPath('lesson', lesson.id);
       const published = Boolean(lesson.published_at);
-      previewLink.setAttribute('aria-disabled', published ? 'false' : 'true');
-      previewLink.tabIndex = published ? 0 : -1;
-      previewLink.classList.toggle('is-disabled', !published);
+      preview.setAttribute('aria-disabled', published ? 'false' : 'true');
+      preview.classList.toggle('is-disabled', !published);
     }
-    previewLink.addEventListener('click', (event) => {
-      if (!lesson.published_at) event.preventDefault();
-    });
     syncPreviewLink();
 
     if (actions) {
-      actions.prepend(labBtn, fullPageHost.firstElementChild!, previewLink);
-      actions.append(publicLinkHost, historyHost);
+      actions.append(optionsMenu.el, publicLinkHost, historyHost);
     } else {
-      refs.contextBar.append(labBtn, fullPageHost.firstElementChild!, previewLink, publicLinkHost, historyHost);
+      refs.contextBar.append(optionsMenu.el, publicLinkHost, historyHost);
     }
-    bindBuilderFullPage(refs.contextBar, {
-      getActive: () => fullPage,
-      setActive: setFullPage
-    });
     bindBuilderFullPage(builder, {
       getActive: () => fullPage,
       setActive: setFullPage
@@ -860,6 +888,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       kind: 'lesson',
       parentId: lesson.id,
       host: historyHost,
+      hideToggle: true,
       onRestored: (live) => {
         applyRestoredLesson(live as Lesson);
       }
@@ -884,6 +913,8 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       palette = null;
       historyPanel?.dispose();
       historyPanel = null;
+      pageOptionsDispose?.();
+      pageOptionsDispose = null;
       publicLinkDispose?.();
       publicLinkDispose = null;
       aiPanel?.dispose();

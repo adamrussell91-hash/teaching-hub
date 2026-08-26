@@ -71,17 +71,16 @@ export function renderLessonList(
     actions.className = 'list-row-actions';
 
     const path = `/lessons/${lesson.id}`;
-    const open = document.createElement('a');
-    open.className = 'btn btn--secondary lesson-list__open';
-    open.href = path;
-    open.textContent = 'Open';
-    open.addEventListener('click', (event) => {
-      event.preventDefault();
-      navigate(path);
-    });
-
     const menu = mountPageOptionsMenu(
       [
+        {
+          label: 'Open',
+          className: 'lesson-list__open',
+          href: path,
+          onSelect: () => {
+            navigate(path);
+          }
+        },
         {
           label: 'Archive',
           onSelect: () => {
@@ -113,7 +112,7 @@ export function renderLessonList(
       { label: `Options for ${lesson.title}` }
     );
 
-    actions.append(open, menu.el);
+    actions.append(menu.el);
     item.append(info, actions);
     list.append(item);
   }

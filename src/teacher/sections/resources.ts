@@ -249,18 +249,19 @@ export function renderResourcesIndex(
     actions.className = 'resources-row-actions';
 
     const url = openUrlForMedia(entry);
-    if (url) {
-      const open = document.createElement('a');
-      open.className = 'btn btn--secondary lesson-list__open';
-      open.href = url;
-      open.textContent = 'Open';
-      open.target = '_blank';
-      open.rel = 'noopener noreferrer';
-      actions.append(open);
-    }
-
     const menu = mountPageOptionsMenu(
       [
+        ...(url
+          ? [
+              {
+                label: 'Open',
+                className: 'lesson-list__open',
+                href: url,
+                target: '_blank',
+                rel: 'noopener noreferrer'
+              }
+            ]
+          : []),
         {
           label: 'Archive',
           onSelect: () => {

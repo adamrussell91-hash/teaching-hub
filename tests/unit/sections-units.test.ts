@@ -8,7 +8,9 @@ vi.mock('@/teacher/history-panel', async (importOriginal) => {
     ...actual,
     mountHistoryPanel: vi.fn(() => ({
       dispose: vi.fn(),
-      refresh: vi.fn(async () => undefined)
+      refresh: vi.fn(async () => undefined),
+      open: vi.fn(),
+      close: vi.fn()
     }))
   };
 });

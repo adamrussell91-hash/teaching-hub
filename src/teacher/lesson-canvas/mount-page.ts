@@ -23,6 +23,7 @@ import {
   type PedagogicalMode
 } from '@/curriculum/pedagogical-mode';
 import { renderEntityBanner, type EntityBannerHandle } from '@/teacher/entity-banner';
+import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
 import {
   deleteBlocksById,
   findBlockLocation,
@@ -182,15 +183,6 @@ function trashIcon(): SVGSVGElement {
   svg.setAttribute('aria-hidden', 'true');
   svg.innerHTML =
     '<path fill="currentColor" d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 6h2v9h-2V9zm4 0h2v9h-2V9zM8 9h2v9H8V9z"/>';
-  return svg;
-}
-
-function printIcon(): SVGSVGElement {
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', '0 0 24 24');
-  svg.setAttribute('aria-hidden', 'true');
-  svg.innerHTML =
-    '<path fill="currentColor" d="M7 3h10v4H7V3zm12 6H5a3 3 0 0 0-3 3v5h4v4h12v-4h4v-5a3 3 0 0 0-3-3zm-3 10H8v-4h8v4z"/>';
   return svg;
 }
 
@@ -715,77 +707,59 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     options.onChange(next);
   }
 
-  const moreWrap = document.createElement('div');
-  moreWrap.className = 'lesson-page__more';
-
-  const more = document.createElement('button');
-  more.type = 'button';
-  more.className = 'btn btn--ghost lesson-page__more-btn';
-  more.setAttribute('aria-label', 'Page menu');
-  more.textContent = '⋯';
-
-  const menu = document.createElement('div');
-  menu.className = 'lesson-page__menu';
-  menu.hidden = true;
-
-  const save = document.createElement('button');
-  save.type = 'button';
-  save.className = 'btn btn--ghost';
-  save.textContent = 'Save as lesson template';
-  save.addEventListener('click', () => {
-    options.onSaveTemplate?.();
-  });
-
-  const exportBtn = document.createElement('button');
-  exportBtn.type = 'button';
-  exportBtn.className = 'btn btn--ghost';
-  exportBtn.textContent = 'Export JSON';
-  exportBtn.addEventListener('click', () => {
-    options.onExport?.();
-  });
-  menu.append(exportBtn, save);
-
-  if (options.onTrash) {
-    const trash = document.createElement('button');
-    trash.type = 'button';
-    trash.className = 'btn btn--ghost lesson-page__trash';
-    trash.textContent = 'Move to trash';
-    trash.addEventListener('click', () => {
-      menu.hidden = true;
-      options.onTrash?.();
-    });
-    menu.append(trash);
-  }
-
-  more.addEventListener('click', () => {
-    menu.hidden = !menu.hidden;
-  });
-  moreWrap.append(more, menu);
-
-  const fullPage = document.createElement('button');
-  fullPage.type = 'button';
-  fullPage.className = 'btn btn--ghost lesson-page__fullscreen';
-  fullPage.setAttribute('data-builder-fullscreen', '');
-  fullPage.setAttribute('aria-pressed', 'false');
-  fullPage.setAttribute('aria-label', 'Full screen');
-  fullPage.title = 'Full screen';
-  fullPage.textContent = 'Full screen';
-  if (options.onToggleFullPage) {
-    fullPage.addEventListener('click', () => options.onToggleFullPage?.());
-  } else {
-    fullPage.hidden = true;
-  }
-
-  const print = document.createElement('button');
-  print.type = 'button';
-  print.className = 'lesson-page__print';
-  print.setAttribute('aria-label', 'Print');
-  print.append(printIcon());
-  print.addEventListener('click', () => options.onPrint());
+  const optionsMenu = mountPageOptionsMenu(
+    [
+      {
+        label: 'Export JSON',
+        onSelect: () => {
+          options.onExport?.();
+        }
+      },
+      {
+        label: 'Save as lesson template',
+        onSelect: () => {
+          options.onSaveTemplate?.();
+        }
+      },
+      ...(options.onToggleFullPage
+        ? [
+            {
+              label: 'Full screen',
+              className: 'lesson-page__fullscreen',
+              dataset: { builderFullscreen: '' },
+              onSelect: () => {
+                options.onToggleFullPage?.();
+              }
+            }
+          ]
+        : []),
+      {
+        label: 'Print',
+        className: 'lesson-page__print',
+        ariaLabel: 'Print',
+        onSelect: () => {
+          options.onPrint();
+        }
+      },
+      ...(options.onTrash
+        ? [
+            {
+              label: 'Move to trash',
+              danger: true,
+              className: 'lesson-page__trash',
+              onSelect: () => {
+                options.onTrash?.();
+              }
+            }
+          ]
+        : [])
+    ],
+    { label: 'Page menu', className: 'lesson-page__more', triggerClassName: 'lesson-page__more-btn' }
+  );
 
   const chrome = document.createElement('div');
   chrome.className = 'lesson-page__chrome';
-  chrome.append(moreWrap, fullPage, print);
+  chrome.append(optionsMenu.el);
 
   const coverHost = document.createElement('div');
   coverHost.className = 'lesson-page__cover';
@@ -911,6 +885,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       canvas.dispose();
       strip?.dispose();
       banner.dispose();
+      optionsMenu.dispose();
       root.remove();
     }
   };

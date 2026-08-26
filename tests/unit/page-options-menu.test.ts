@@ -36,4 +36,33 @@ describe('mountPageOptionsMenu', () => {
 
     menu.dispose();
   });
+
+  it('renders link items with href and target', () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const onSelect = vi.fn();
+    const menu = mountPageOptionsMenu(
+      [
+        {
+          label: 'View as student',
+          className: 'class-page__view-as-student',
+          href: '/s/classes/class_1',
+          target: '_blank',
+          onSelect
+        }
+      ],
+      { label: 'Options for Class' }
+    );
+    host.append(menu.el);
+
+    const link = menu.el.querySelector<HTMLAnchorElement>('.class-page__view-as-student');
+    expect(link?.getAttribute('href')).toBe('/s/classes/class_1');
+    expect(link?.getAttribute('target')).toBe('_blank');
+    expect(link?.rel).toContain('noopener');
+
+    link?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    expect(onSelect).toHaveBeenCalledOnce();
+
+    menu.dispose();
+  });
 });

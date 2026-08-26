@@ -8,8 +8,20 @@ const KEBAB_ICON = `
 
 export interface PageOptionsItem {
   label: string;
-  onSelect: () => void;
+  onSelect?: () => void;
   danger?: boolean;
+  className?: string;
+  href?: string;
+  target?: string;
+  rel?: string;
+  dataset?: Record<string, string>;
+  ariaLabel?: string;
+}
+
+export interface PageOptionsMenuOptions {
+  label?: string;
+  className?: string;
+  triggerClassName?: string;
 }
 
 export interface PageOptionsMenuHandle {
@@ -21,17 +33,19 @@ let activeClose: (() => void) | null = null;
 
 export function mountPageOptionsMenu(
   items: PageOptionsItem[],
-  options: { label?: string } = {}
+  options: PageOptionsMenuOptions = {}
 ): PageOptionsMenuHandle {
   const label = options.label ?? 'More options';
   const visible = items.filter((item) => item.label.trim().length > 0);
 
   const root = document.createElement('div');
-  root.className = 'page-options';
+  root.className = ['page-options', options.className].filter(Boolean).join(' ');
 
   const trigger = document.createElement('button');
   trigger.type = 'button';
-  trigger.className = 'hub-icon-btn page-options__trigger';
+  trigger.className = ['hub-icon-btn', 'page-options__trigger', options.triggerClassName]
+    .filter(Boolean)
+    .join(' ');
   trigger.setAttribute('aria-haspopup', 'menu');
   trigger.setAttribute('aria-expanded', 'false');
   trigger.setAttribute('aria-label', label);
@@ -44,20 +58,39 @@ export function mountPageOptionsMenu(
   menu.hidden = true;
 
   for (const item of visible) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = item.danger
-      ? 'page-options__item page-options__item--danger'
-      : 'page-options__item';
-    button.setAttribute('role', 'menuitem');
-    button.textContent = item.label;
-    button.addEventListener('click', (event) => {
-      event.preventDefault();
+    const isLink = Boolean(item.href);
+    const entry = isLink ? document.createElement('a') : document.createElement('button');
+    if (!isLink) (entry as HTMLButtonElement).type = 'button';
+    entry.className = [
+      'page-options__item',
+      item.danger ? 'page-options__item--danger' : '',
+      item.className ?? ''
+    ]
+      .filter(Boolean)
+      .join(' ');
+    entry.setAttribute('role', 'menuitem');
+    entry.textContent = item.label;
+    if (item.ariaLabel) entry.setAttribute('aria-label', item.ariaLabel);
+    if (isLink) {
+      const link = entry as HTMLAnchorElement;
+      link.href = item.href!;
+      if (item.target) link.target = item.target;
+      link.rel = item.rel ?? (item.target === '_blank' ? 'noopener noreferrer' : '');
+    }
+    if (item.dataset) {
+      for (const [key, value] of Object.entries(item.dataset)) {
+        entry.dataset[key] = value;
+      }
+    }
+    entry.addEventListener('click', (event) => {
       event.stopPropagation();
       setOpen(false);
-      item.onSelect();
+      if (item.onSelect) {
+        event.preventDefault();
+        item.onSelect();
+      }
     });
-    menu.append(button);
+    menu.append(entry);
   }
 
   function setOpen(open: boolean): void {

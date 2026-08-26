@@ -6,7 +6,7 @@ import { mountCreateControl } from '@/teacher/create/control';
 import type { EntityCreatedHandler } from '@/teacher/create/types';
 import type { CurriculumResponse } from '@/teacher/nav';
 import { createUnitTemplate } from '@/teacher/template-api';
-import { mountHistoryPanel } from '@/teacher/history-panel';
+import { mountHistoryPanel, type HistoryPanelHandle } from '@/teacher/history-panel';
 import type { Subject, Unit, Year } from '@/schemas';
 import { patchUnit } from '@/teacher/unit-api';
 import { ApiClientError } from '@/api/client';
@@ -360,9 +360,17 @@ export function renderUnitPage(
 
   const historyHost = document.createElement('div');
   historyHost.className = 'history-panel-host unit-stub__history';
+  let historyPanel: HistoryPanelHandle;
+  const rowDisposers: Array<() => void> = [];
 
   const optionsMenu = mountPageOptionsMenu(
     [
+      {
+        label: 'History',
+        onSelect: () => {
+          historyPanel.open();
+        }
+      },
       {
         label: 'Export JSON',
         onSelect: () => {
@@ -489,10 +497,11 @@ export function renderUnitPage(
   lessonsHeading.textContent = 'Lessons';
   lessonsSection.append(lessonsHeading);
 
-  const historyPanel = mountHistoryPanel({
+  historyPanel = mountHistoryPanel({
     kind: 'unit',
     parentId: unitId,
     host: historyHost,
+    hideToggle: true,
     onRestored: (live) => {
       const restored = live as Unit;
       Object.assign(unit, restored);
@@ -535,16 +544,22 @@ export function renderUnitPage(
       info.append(title, meta);
 
       const path = `/lessons/${lesson.id}`;
-      const open = document.createElement('a');
-      open.className = 'btn btn--secondary lesson-list__open';
-      open.href = path;
-      open.textContent = 'Open';
-      open.addEventListener('click', (event) => {
-        event.preventDefault();
-        navigate(path);
-      });
+      const rowMenu = mountPageOptionsMenu(
+        [
+          {
+            label: 'Open',
+            className: 'lesson-list__open',
+            href: path,
+            onSelect: () => {
+              navigate(path);
+            }
+          }
+        ],
+        { label: `Options for ${lesson.title}` }
+      );
+      rowDisposers.push(rowMenu.dispose);
 
-      item.append(info, open);
+      item.append(info, rowMenu.el);
       list.append(item);
     }
 
@@ -556,6 +571,7 @@ export function renderUnitPage(
 
   return {
     dispose: () => {
+      for (const dispose of rowDisposers.splice(0).reverse()) dispose();
       optionsMenu.dispose();
       historyPanel.dispose();
       banner.dispose();

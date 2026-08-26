@@ -64,6 +64,7 @@ export function renderTemplatesPage(
   let lessonRows: LessonTemplateSummary[] = [];
   let unitRows: UnitTemplateSummary[] = [];
   let statusText = '';
+  const rowDisposers: Array<() => void> = [];
 
   const root = document.createElement('div');
   root.className = 'templates-page';
@@ -110,6 +111,7 @@ export function renderTemplatesPage(
   }
 
   function renderList(): void {
+    for (const dispose of rowDisposers.splice(0)) dispose();
     list.replaceChildren();
     const rows = tab === 'lessons' ? lessonRows : unitRows;
     if (rows.length === 0) {
@@ -137,45 +139,44 @@ export function renderTemplatesPage(
       const actions = document.createElement('div');
       actions.className = 'templates-page__actions';
 
-      const useBtn = document.createElement('button');
-      useBtn.type = 'button';
-      useBtn.className = 'btn btn--primary';
-      useBtn.textContent = 'Use';
-      useBtn.addEventListener('click', () => {
-        void (async () => {
-          try {
-            setStatus('Creating…');
-            if (tab === 'lessons') {
-              const unitId = pickUnitId(curriculum);
-              if (!unitId) {
-                setStatus('');
-                return;
-              }
-              const lesson = await useLessonTemplate({ templateId: row.id, unitId });
-              await options.onCreated?.();
-              navigate(`/lessons/${lesson.id}`);
-            } else {
-              const parent = pickSubject(curriculum);
-              if (!parent) {
-                setStatus('');
-                return;
-              }
-              const unit = await useUnitTemplate({
-                templateId: row.id,
-                yearId: parent.yearId,
-                subjectId: parent.subjectId
-              });
-              await options.onCreated?.();
-              navigate(`/units/${unit.id}`);
-            }
-          } catch {
-            setStatus('Unable to create from template.');
-          }
-        })();
-      });
-
       const menu = mountPageOptionsMenu(
         [
+          {
+            label: 'Use',
+            className: 'templates-page__use',
+            onSelect: () => {
+              void (async () => {
+                try {
+                  setStatus('Creating…');
+                  if (tab === 'lessons') {
+                    const unitId = pickUnitId(curriculum);
+                    if (!unitId) {
+                      setStatus('');
+                      return;
+                    }
+                    const lesson = await useLessonTemplate({ templateId: row.id, unitId });
+                    await options.onCreated?.();
+                    navigate(`/lessons/${lesson.id}`);
+                  } else {
+                    const parent = pickSubject(curriculum);
+                    if (!parent) {
+                      setStatus('');
+                      return;
+                    }
+                    const unit = await useUnitTemplate({
+                      templateId: row.id,
+                      yearId: parent.yearId,
+                      subjectId: parent.subjectId
+                    });
+                    await options.onCreated?.();
+                    navigate(`/units/${unit.id}`);
+                  }
+                } catch {
+                  setStatus('Unable to create from template.');
+                }
+              })();
+            }
+          },
           {
             label: 'Rename',
             onSelect: () => {
@@ -229,8 +230,9 @@ export function renderTemplatesPage(
         ],
         { label: `Options for ${row.title}` }
       );
+      rowDisposers.push(menu.dispose);
 
-      actions.append(useBtn, menu.el);
+      actions.append(menu.el);
       item.append(info, actions);
       list.append(item);
     }
@@ -263,5 +265,9 @@ export function renderTemplatesPage(
   void reload();
   if (statusText) setStatus(statusText);
 
-  return { dispose: () => undefined };
+  return {
+    dispose: () => {
+      for (const dispose of rowDisposers.splice(0)) dispose();
+    }
+  };
 }
