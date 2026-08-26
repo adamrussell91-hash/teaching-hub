@@ -136,17 +136,17 @@ describe('resources section', () => {
     expect(canvas.querySelector('[data-drive-pick]')?.textContent).toBe('Add from Drive');
   });
 
-  it('shows Archive and Trash buttons for each active item', () => {
+  it('shows Archive and Trash in a kebab for each active item', () => {
     renderResourcesIndex(canvas, curriculum);
 
     const archiveButtons = [...canvas.querySelectorAll('[data-resources-archive]')];
     expect(archiveButtons).toHaveLength(2);
     expect(archiveButtons.every((btn) => btn.textContent === 'Archive')).toBe(true);
-    expect(archiveButtons.every((btn) => btn.classList.contains('btn--ghost'))).toBe(true);
 
     const trashButtons = [...canvas.querySelectorAll('[data-resources-trash]')];
     expect(trashButtons).toHaveLength(2);
-    expect(trashButtons.every((btn) => btn.textContent === 'Trash')).toBe(true);
+    expect(trashButtons.every((btn) => btn.textContent === 'Move to trash')).toBe(true);
+    expect(canvas.querySelectorAll('.page-options__trigger')).toHaveLength(2);
   });
 
   it('shows empty copy with toolbar when no active media', () => {

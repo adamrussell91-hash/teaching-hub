@@ -104,7 +104,12 @@ describe('lessons index', () => {
     expect(info?.querySelector('.lesson-list__title')?.textContent).toBe('Introduction');
     expect(info?.querySelector('.lesson-list__meta')?.textContent).toMatch(/Artist of the Floating World/);
     expect(info?.querySelector('.lesson-list__meta')?.textContent).toMatch(/Draft/);
-    expect(actions?.querySelector('.lessons-lib__icon-btn[aria-label="Duplicate"]')).toBeTruthy();
+    expect(actions?.querySelector('.page-options__trigger')?.getAttribute('aria-label')).toMatch(
+      /Options for Introduction/
+    );
+    expect(
+      [...(actions?.querySelectorAll('.page-options__item') ?? [])].map((item) => item.textContent)
+    ).toEqual(['Duplicate', 'Archive', 'Move to trash']);
     expect([...card.children].map((node) => node.className.split(' ')[0])).toEqual([
       'lessons-lib__lead',
       'lesson-list__info',

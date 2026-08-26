@@ -148,7 +148,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     let draftAt = lesson.updated_at;
 
     renderContextBar(refs, {
-      title: lesson.title || 'Untitled lesson',
+      title: 'Lesson',
       variant: 'editor'
     });
     refs.canvas.replaceChildren();
@@ -554,7 +554,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         assignLesson(next);
         markDirty();
         const titleEl = refs.contextBar.querySelector('.teacher-layout__context-bar-title');
-        if (titleEl) titleEl.textContent = next.title || 'Untitled lesson';
+        if (titleEl) titleEl.textContent = 'Lesson';
       },
       onPrint: () => openPrintLesson(lesson),
       onSelect: (blockId) => {
@@ -608,7 +608,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         bumpDraftClock();
         page?.update(lesson);
         const titleEl = refs.contextBar.querySelector('.teacher-layout__context-bar-title');
-        if (titleEl) titleEl.textContent = lesson.title || 'Untitled lesson';
+        if (titleEl) titleEl.textContent = 'Lesson';
         void saveController?.saveNow({ checkpointReason: 'ai_accepted' });
         return { ok: true };
       },
@@ -853,7 +853,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       bumpDraftClock();
       page?.update(lesson);
       const titleEl = refs.contextBar.querySelector('.teacher-layout__context-bar-title');
-      if (titleEl) titleEl.textContent = lesson.title || 'Untitled lesson';
+      if (titleEl) titleEl.textContent = 'Lesson';
     }
 
     historyPanel = mountHistoryPanel({

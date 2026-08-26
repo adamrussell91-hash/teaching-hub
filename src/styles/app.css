@@ -127,6 +127,93 @@ a:hover {
   flex-shrink: 0;
 }
 
+.page-header--actions-only {
+  justify-content: flex-end;
+  align-items: center;
+  margin-bottom: var(--space-4);
+}
+
+/* Leftover site tile — favicon only. Never show it on the canvas. */
+.hub-mark,
+.sign-in__mark {
+  display: none !important;
+}
+
+.page-options {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.page-options__menu {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  z-index: 40;
+  min-width: 12rem;
+  padding: var(--space-1);
+  margin: 0;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elev-4);
+}
+
+.page-options__item {
+  display: block;
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.page-options__item:hover,
+.page-options__item:focus-visible {
+  background: var(--cotton);
+}
+
+.page-options__item--danger {
+  color: var(--danger);
+}
+
+.entity-cover-tile-wrap,
+.classes-index__card,
+.units-index__card {
+  position: relative;
+}
+
+.entity-cover-tile-wrap .page-options,
+.classes-index__card .page-options,
+.units-index__card .page-options {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  z-index: 3;
+}
+
+.entity-cover-tile-wrap .page-options__trigger,
+.classes-index__card .page-options__trigger,
+.units-index__card .page-options__trigger {
+  color: var(--on-dark, #fff);
+  background: color-mix(in srgb, var(--depth) 55%, transparent);
+}
+
+.entity-cover-tile-wrap .page-options__trigger:hover:not(:disabled),
+.entity-cover-tile-wrap .page-options__trigger:focus-visible,
+.classes-index__card .page-options__trigger:hover:not(:disabled),
+.classes-index__card .page-options__trigger:focus-visible,
+.units-index__card .page-options__trigger:hover:not(:disabled),
+.units-index__card .page-options__trigger:focus-visible {
+  color: #fff;
+  background: color-mix(in srgb, var(--depth) 75%, transparent);
+}
+
 /* Sign-in lives in design-kit/sign-in.css */
 
 /* ── Teacher workspace grid ───────────────────────────────────────────── */
@@ -7533,14 +7620,10 @@ input.scope-timeline__note-title:focus-visible {
   backdrop-filter: blur(var(--hub-glass-blur)) saturate(115%);
 }
 
-.classes-index__card {
-  display: grid;
-  gap: var(--space-2);
-}
-
-.classes-index__actions {
-  justify-content: flex-end;
-  padding: 0 var(--space-px);
+.classes-index__card,
+.units-index__card {
+  position: relative;
+  display: block;
 }
 
 .trash-page {

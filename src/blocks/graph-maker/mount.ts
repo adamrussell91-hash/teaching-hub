@@ -32,6 +32,7 @@ type GraphMakerBootConfig = {
     emptyHint?: string;
     canvasLabel?: string;
   };
+  domOverride?: Record<string, HTMLElement | SVGElement | null>;
 };
 
 type GraphMakerController = {

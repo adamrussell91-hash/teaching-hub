@@ -182,8 +182,10 @@ describe('classes section', () => {
       'a.home-class-tile[href="/classes/class_2026_12engadv1"]'
     );
     expect(tile).not.toBeNull();
-    expect(canvas.textContent).toMatch(/Archive/);
-    expect(canvas.textContent).toMatch(/Trash/);
+    expect(canvas.querySelector('.page-options__trigger')).not.toBeNull();
+    expect(
+      [...canvas.querySelectorAll('.page-options__item')].map((item) => item.textContent)
+    ).toEqual(['Archive', 'Move to trash']);
     tile?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     expect(navigate).toHaveBeenCalledWith('/classes/class_2026_12engadv1');
   });
@@ -201,9 +203,11 @@ describe('classes section', () => {
       'Year 12 English Advanced'
     );
     expect(canvas.querySelector('.entity-banner__eyebrow')?.textContent).toBe('12ENGADV1');
-    expect(canvas.querySelector('.page-header__eyebrow')?.textContent).toBe('Classes');
-    expect(canvas.querySelector('.page-header__title')?.textContent).toBe(
-      'Year 12 English Advanced'
+    expect(canvas.querySelector('.page-header__eyebrow')).toBeNull();
+    expect(canvas.querySelector('.page-header__title')).toBeNull();
+    expect(canvas.querySelector('.page-header--actions-only')).not.toBeNull();
+    expect(canvas.querySelector('.page-options__trigger')?.getAttribute('aria-label')).toMatch(
+      /Options for Year 12 English Advanced/
     );
     // Class code once in the banner eyebrow — not the main display name.
     const codeMatches = canvas.textContent?.match(/12ENGADV1/g) ?? [];

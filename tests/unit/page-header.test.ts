@@ -25,4 +25,18 @@ describe('renderPageHeader', () => {
     renderPageHeader(host, { eyebrow: 'Library', title: 'Lessons' });
     expect(host.querySelector('.page-header__supporting')).toBeNull();
   });
+
+  it('can render actions only when the banner already names the page', () => {
+    const host = document.createElement('div');
+    const more = document.createElement('button');
+    more.type = 'button';
+    more.textContent = 'More';
+    renderPageHeader(host, { actions: [more] });
+    expect(host.querySelector('.page-header__title')).toBeNull();
+    expect(host.querySelector('.page-header__eyebrow')).toBeNull();
+    expect(host.querySelector('.page-header')?.classList.contains('page-header--actions-only')).toBe(
+      true
+    );
+    expect(host.querySelector('.page-header__actions')?.contains(more)).toBe(true);
+  });
 });

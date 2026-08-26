@@ -28,6 +28,7 @@ import {
   confirmAndTrash,
   entityPath
 } from '@/teacher/lifecycle-api';
+import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
 import { renderUnitSequence } from '@/teacher/unit-sequence';
 import { renderPageHeader } from '@/teacher/page-header';
 
@@ -121,44 +122,43 @@ export function renderClassesIndex(
       body.append(eyebrow, title);
       tile.append(body);
 
-      const actions = document.createElement('div');
-      actions.className = 'list-row-actions classes-index__actions';
-
-      const archive = document.createElement('button');
-      archive.type = 'button';
-      archive.className = 'btn btn--ghost';
-      archive.textContent = 'Archive';
-      archive.addEventListener('click', () => {
-        void (async () => {
-          try {
-            const ok = await confirmAndArchive(
-              entityPath('class', cls.id),
-              cls.code || cls.title
-            );
-            if (ok) await options.onMutated?.();
-          } catch {
-            window.alert('Unable to archive class.');
+      const menu = mountPageOptionsMenu(
+        [
+          {
+            label: 'Archive',
+            onSelect: () => {
+              void (async () => {
+                try {
+                  const ok = await confirmAndArchive(
+                    entityPath('class', cls.id),
+                    cls.code || cls.title
+                  );
+                  if (ok) await options.onMutated?.();
+                } catch {
+                  window.alert('Unable to archive class.');
+                }
+              })();
+            }
+          },
+          {
+            label: 'Move to trash',
+            danger: true,
+            onSelect: () => {
+              void (async () => {
+                try {
+                  const ok = await confirmAndTrash('class', cls.id, cls.code || cls.title);
+                  if (ok) await options.onMutated?.();
+                } catch {
+                  window.alert('Unable to move class to trash.');
+                }
+              })();
+            }
           }
-        })();
-      });
-
-      const trash = document.createElement('button');
-      trash.type = 'button';
-      trash.className = 'btn btn--ghost';
-      trash.textContent = 'Trash';
-      trash.addEventListener('click', () => {
-        void (async () => {
-          try {
-            const ok = await confirmAndTrash('class', cls.id, cls.code || cls.title);
-            if (ok) await options.onMutated?.();
-          } catch {
-            window.alert('Unable to move class to trash.');
-          }
-        })();
-      });
-
-      actions.append(archive, trash);
-      card.append(tile, actions);
+        ],
+        { label: `Options for ${cls.code || cls.title}` }
+      );
+      disposers.push(menu.dispose);
+      card.append(tile, menu.el);
       grid.append(card);
     }
   }
@@ -214,10 +214,49 @@ export function renderClassPage(
   const unitsById = new Map(curriculum.units.map((unit) => [unit.id, unit]));
   const classTitle = classDisplayTitle(pageClass, yearsById, subjectsById);
 
+  const optionsMenu = mountPageOptionsMenu(
+    [
+      {
+        label: 'Archive',
+        onSelect: () => {
+          void (async () => {
+            try {
+              const ok = await confirmAndArchive(
+                entityPath('class', pageClass.id),
+                pageClass.code || pageClass.title
+              );
+              if (ok) navigate('/classes');
+            } catch {
+              window.alert('Unable to archive class.');
+            }
+          })();
+        }
+      },
+      {
+        label: 'Move to trash',
+        danger: true,
+        onSelect: () => {
+          void (async () => {
+            try {
+              const ok = await confirmAndTrash(
+                'class',
+                pageClass.id,
+                pageClass.code || pageClass.title
+              );
+              if (ok) navigate('/classes');
+            } catch {
+              window.alert('Unable to move class to trash.');
+            }
+          })();
+        }
+      }
+    ],
+    { label: `Options for ${classTitle}` }
+  );
+  disposers.push(optionsMenu.dispose);
+
   renderPageHeader(canvas, {
-    eyebrow: 'Classes',
-    title: classTitle,
-    actions: [viewAsStudent, editButton]
+    actions: [viewAsStudent, editButton, optionsMenu.el]
   });
 
   const today = resolveScheduleToday(curriculum.schedule_anchor_date);

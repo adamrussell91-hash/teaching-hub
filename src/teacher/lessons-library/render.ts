@@ -17,6 +17,7 @@ import type { CurriculumResponse } from '@/teacher/nav';
 import { fetchContentSearch } from '@/teacher/search/api';
 import { readRecent } from '@/teacher/search/recent';
 import { mountPublicLinkControl } from '@/teacher/public-link';
+import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
 import { createHubFilter } from '../../../design-kit/js/hub-filter-menu.js';
 import { duplicateLesson, patchLessonLibrary } from './api';
 import { duplicateIdSet, findNearDuplicates } from './duplicates';
@@ -488,14 +489,6 @@ export function renderLessonsLibrary(
     }
   }
 
-  function iconButton(label: string, glyph: string): HTMLButtonElement {
-    const btn = el('button', 'lessons-lib__icon-btn', glyph);
-    btn.type = 'button';
-    btn.setAttribute('aria-label', label);
-    btn.title = label;
-    return btn;
-  }
-
   function renderCard(row: LessonLibraryRow, compact: boolean): HTMLElement {
     const item = el('li', compact ? 'lesson-list__item lesson-list__item--compact' : 'lesson-list__item');
     item.classList.add('lesson-list__item--openable');
@@ -577,35 +570,48 @@ export function renderLessonsLibrary(
     });
     disposers.push(linkControl.dispose);
 
-    const dup = iconButton('Duplicate', '⧉');
-    dup.addEventListener('click', () => {
-      void duplicateLesson(row.id)
-        .then(() => options.onMutated?.())
-        .catch(() => window.alert('Unable to duplicate lesson.'));
-    });
-    const archive = iconButton('Archive', '▣');
-    archive.addEventListener('click', () => {
-      void (async () => {
-        try {
-          const ok = await confirmAndArchive(entityPath('lesson', row.id), row.title);
-          if (ok) await options.onMutated?.();
-        } catch {
-          window.alert('Unable to archive lesson.');
+    const menu = mountPageOptionsMenu(
+      [
+        {
+          label: 'Duplicate',
+          onSelect: () => {
+            void duplicateLesson(row.id)
+              .then(() => options.onMutated?.())
+              .catch(() => window.alert('Unable to duplicate lesson.'));
+          }
+        },
+        {
+          label: 'Archive',
+          onSelect: () => {
+            void (async () => {
+              try {
+                const ok = await confirmAndArchive(entityPath('lesson', row.id), row.title);
+                if (ok) await options.onMutated?.();
+              } catch {
+                window.alert('Unable to archive lesson.');
+              }
+            })();
+          }
+        },
+        {
+          label: 'Move to trash',
+          danger: true,
+          onSelect: () => {
+            void (async () => {
+              try {
+                const ok = await confirmAndTrash('lesson', row.id, row.title);
+                if (ok) await options.onMutated?.();
+              } catch {
+                window.alert('Unable to move lesson to trash.');
+              }
+            })();
+          }
         }
-      })();
-    });
-    const trash = iconButton('Trash', '⌫');
-    trash.addEventListener('click', () => {
-      void (async () => {
-        try {
-          const ok = await confirmAndTrash('lesson', row.id, row.title);
-          if (ok) await options.onMutated?.();
-        } catch {
-          window.alert('Unable to move lesson to trash.');
-        }
-      })();
-    });
-    actions.append(linkHost, dup, archive, trash);
+      ],
+      { label: `Options for ${row.title}` }
+    );
+    disposers.push(menu.dispose);
+    actions.append(linkHost, menu.el);
     const lead = el('div', 'lessons-lib__lead');
     lead.append(check, pin);
     item.append(lead, info, actions);

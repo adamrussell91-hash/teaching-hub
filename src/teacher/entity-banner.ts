@@ -123,7 +123,7 @@ export function renderEntityBanner(
       scrim.append(eyebrow);
     }
 
-    const title = document.createElement('p');
+    const title = document.createElement(options.size === 'hero' ? 'p' : 'h1');
     title.className = 'entity-banner__title';
     title.textContent = titleText;
     if (options.size === 'hero') title.setAttribute('aria-hidden', 'true');

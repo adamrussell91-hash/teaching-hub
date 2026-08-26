@@ -217,10 +217,17 @@ describe('units', () => {
     expect(othelloCard.querySelector('.entity-cover-tile__media img')).toBeNull();
   });
 
-  it('does not show archive or trash on the units index', () => {
+  it('puts archive and trash in a kebab on each unit card', () => {
     renderUnitsIndex(canvas, curriculum);
-    expect(canvas.textContent).not.toMatch(/Archive/);
-    expect(canvas.textContent).not.toMatch(/Trash/);
+    const card = canvas.querySelector('.units-index__card');
+    expect(card?.querySelector('.page-options__trigger')?.getAttribute('aria-label')).toMatch(
+      /Options for/
+    );
+    expect(card?.querySelector('.btn--ghost')).toBeNull();
+    const labels = [...(card?.querySelectorAll('.page-options__item') ?? [])].map(
+      (item) => item.textContent
+    );
+    expect(labels).toEqual(['Archive', 'Move to trash']);
   });
 
   it('groups units by subject by default', () => {
@@ -263,7 +270,8 @@ describe('units', () => {
 
   it('lists unit lessons in sequence and opens the editor', () => {
     renderUnitStub(canvas, curriculum, 'unit_aotfw');
-    expect(canvas.querySelector('.page-header__title')?.textContent).toBe(
+    expect(canvas.querySelector('.page-header__title')).toBeNull();
+    expect(canvas.querySelector('.entity-banner__title')?.textContent).toBe(
       'Artist of the Floating World'
     );
     expect(canvas.querySelector('[data-export="unit"]')?.textContent).toMatch(/Export JSON/);
@@ -349,7 +357,7 @@ describe('units', () => {
     expect(canvas.querySelector('.entity-banner__title')?.textContent).toBe(
       'Restored unit title'
     );
-    expect(canvas.querySelector('.page-header__title')?.textContent).toBe('Restored unit title');
+    expect(canvas.querySelector('.page-header__title')).toBeNull();
     expect(canvas.querySelector('.entity-banner__image')).toBeNull();
     expect(isolated.units.find((entry) => entry.id === unit.id)?.cover).toBeUndefined();
 
