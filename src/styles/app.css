@@ -133,6 +133,21 @@ a:hover {
   margin-bottom: var(--space-4);
 }
 
+/* Keep header actions off the absolutely positioned sign-out control. */
+.teacher-layout__canvas .page-header {
+  padding-right: 2.75rem;
+}
+
+.page-header .page-options__trigger {
+  color: var(--muted);
+}
+
+.page-header .page-options__trigger:hover:not(:disabled),
+.page-header .page-options__trigger:focus-visible {
+  color: var(--navy);
+  background: var(--cotton);
+}
+
 /* Leftover site tile — favicon only. Never show it on the canvas. */
 .hub-mark,
 .sign-in__mark {
