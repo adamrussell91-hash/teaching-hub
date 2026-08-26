@@ -41,6 +41,7 @@ export interface ClassPageOptions {
   /** Cover-only invalidation; must not remount the page or its editors. */
   onCoverMutated?: () => void | Promise<void>;
   onScheduleUnit?: () => void;
+  onCreateLesson?: () => void;
 }
 
 export function renderClassesIndex(
@@ -270,7 +271,9 @@ export function renderClassPage(
 
   let selectedDate = today;
   let viewMonth = yearMonthFromDate(today);
-  let calendarView: ScheduleCalendarView = 'month';
+  let calendarView: ScheduleCalendarView = window.matchMedia('(max-width: 768px)').matches
+    ? 'week'
+    : 'month';
   let monthDelta = 0;
 
   const errorBanner = document.createElement('p');
@@ -307,7 +310,7 @@ export function renderClassPage(
       monthDelta,
       unitTitles,
       onNavigate: navigate,
-      onScheduleLesson: () => options.onScheduleUnit?.(),
+      onScheduleLesson: () => options.onCreateLesson?.(),
       onLessonOverflow: (scheduledId, anchor) => {
         openLessonOverflow(cls, classScheduled, scheduledId, anchor, options, errorBanner);
       }

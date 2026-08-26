@@ -35,17 +35,24 @@ const CHEVRON_RIGHT_ICON = `
   </svg>
 `.trim();
 
+const MOBILE_RAIL_QUERY = '(max-width: 768px)';
+
+function isMobileRailViewport(): boolean {
+  return window.matchMedia(MOBILE_RAIL_QUERY).matches;
+}
+
 function applyRailCollapsed(
   layout: HTMLElement,
   toggle: HTMLButtonElement,
   collapsed: boolean
 ): void {
-  layout.classList.toggle('teacher-layout--rail-collapsed', collapsed);
-  toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-  const label = collapsed ? 'Show navigation' : 'Hide navigation';
+  const effectiveCollapsed = isMobileRailViewport() ? false : collapsed;
+  layout.classList.toggle('teacher-layout--rail-collapsed', effectiveCollapsed);
+  toggle.setAttribute('aria-expanded', effectiveCollapsed ? 'false' : 'true');
+  const label = effectiveCollapsed ? 'Show navigation' : 'Hide navigation';
   toggle.setAttribute('aria-label', label);
   toggle.title = label;
-  toggle.innerHTML = collapsed ? CHEVRON_RIGHT_ICON : CHEVRON_LEFT_ICON;
+  toggle.innerHTML = effectiveCollapsed ? CHEVRON_RIGHT_ICON : CHEVRON_LEFT_ICON;
 }
 
 /**

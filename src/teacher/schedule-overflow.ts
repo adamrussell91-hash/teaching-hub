@@ -78,8 +78,18 @@ export function openScheduleOverflow(
   openMenu = menu;
 
   const rect = anchor.getBoundingClientRect();
-  menu.style.top = `${rect.bottom + 4 + window.scrollY}px`;
-  menu.style.left = `${Math.max(8, rect.right - menu.offsetWidth + window.scrollX)}px`;
+  const margin = 8;
+  const menuWidth = menu.offsetWidth;
+  const menuHeight = menu.offsetHeight;
+  let left = rect.right - menuWidth;
+  left = Math.min(Math.max(margin, left), window.innerWidth - menuWidth - margin);
+  let top = rect.bottom + 4;
+  if (top + menuHeight > window.innerHeight - margin) {
+    top = Math.max(margin, rect.top - menuHeight - 4);
+  }
+  menu.style.position = 'fixed';
+  menu.style.left = `${left}px`;
+  menu.style.top = `${top}px`;
 
   onDocPointer = (event: PointerEvent) => {
     const target = event.target;

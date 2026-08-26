@@ -10,6 +10,7 @@ import {
 import { fetchCurriculum, type CurriculumResponse } from '@/teacher/nav';
 import { renderTeacherRail } from '@/teacher/rail';
 import { renderTeacherHome as renderHomeCanvas } from '@/teacher/home';
+import { openBlankLesson } from '@/teacher/create/blank-lesson';
 import { openCreateModal } from '@/teacher/create/modal';
 import type { CreateKind, CreatedRecord } from '@/teacher/create/types';
 import { mountLessonEditor, type LessonEditorHandle } from '@/teacher/lesson-editor';
@@ -489,6 +490,15 @@ function renderTeacherClassRoute(classId: string, token: number): void {
         curriculum: currentCurriculum,
         classId,
         onSuccess: refreshAfterScheduleMutation
+      });
+    },
+    onCreateLesson: () => {
+      if (!currentCurriculum) return;
+      const cls = currentCurriculum.classes.find((entry) => entry.id === classId);
+      openBlankLesson({
+        curriculum: currentCurriculum,
+        unitId: cls?.current_unit_id ?? cls?.active_unit_ids[0],
+        onCreated: (kind, id, entity) => handleEntityCreated(refs, kind, id, entity)
       });
     }
   };

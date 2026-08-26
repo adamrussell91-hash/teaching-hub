@@ -11,6 +11,7 @@ import {
   renderClassCalendar,
   type ScheduleCalendarView
 } from '@/teacher/class-calendar';
+import { openBlankLesson } from '@/teacher/create/blank-lesson';
 import { mountCreateControl } from '@/teacher/create/control';
 import { openCreateModal } from '@/teacher/create/modal';
 import type { EntityCreatedHandler } from '@/teacher/create/types';
@@ -120,7 +121,10 @@ export function renderTeacherHome(
       monthDelta,
       onNavigate: navigate,
       onScheduleLesson: () => {
-        createHost.querySelector<HTMLButtonElement>('[data-create-trigger]')?.click();
+        openBlankLesson({
+          curriculum,
+          onCreated: options.onCreated ?? (() => undefined)
+        });
       },
       chipMeta: (lesson) => {
         const cls = lesson.classId ? classesById.get(lesson.classId) : undefined;
