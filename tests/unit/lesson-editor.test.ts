@@ -37,7 +37,7 @@ const historyHarness: { onRestored?: (live: unknown) => void } = {};
 vi.mock('@/teacher/history-panel', () => ({
   mountHistoryPanel: (options: { onRestored: (live: unknown) => void }) => {
     historyHarness.onRestored = options.onRestored;
-    return { dispose: vi.fn(), refresh: vi.fn() };
+    return { dispose: vi.fn(), refresh: vi.fn(), open: vi.fn(), close: vi.fn() };
   }
 }));
 

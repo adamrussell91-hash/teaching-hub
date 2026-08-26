@@ -5,6 +5,7 @@ import {
   confirmAndTrash,
   entityPath
 } from '@/teacher/lifecycle-api';
+import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
 
 export interface LessonListOptions {
   heading: string | null;
@@ -70,46 +71,48 @@ export function renderLessonList(
     actions.className = 'list-row-actions';
 
     const path = `/lessons/${lesson.id}`;
-    const open = document.createElement('a');
-    open.className = 'btn btn--secondary lesson-list__open';
-    open.href = path;
-    open.textContent = 'Open';
-    open.addEventListener('click', (event) => {
-      event.preventDefault();
-      navigate(path);
-    });
-
-    const archive = document.createElement('button');
-    archive.type = 'button';
-    archive.className = 'btn btn--ghost';
-    archive.textContent = 'Archive';
-    archive.addEventListener('click', () => {
-      void (async () => {
-        try {
-          const ok = await confirmAndArchive(entityPath('lesson', lesson.id), lesson.title);
-          if (ok) await options.onMutated?.();
-        } catch {
-          window.alert('Unable to archive lesson.');
+    const menu = mountPageOptionsMenu(
+      [
+        {
+          label: 'Open',
+          className: 'lesson-list__open',
+          href: path,
+          onSelect: () => {
+            navigate(path);
+          }
+        },
+        {
+          label: 'Archive',
+          onSelect: () => {
+            void (async () => {
+              try {
+                const ok = await confirmAndArchive(entityPath('lesson', lesson.id), lesson.title);
+                if (ok) await options.onMutated?.();
+              } catch {
+                window.alert('Unable to archive lesson.');
+              }
+            })();
+          }
+        },
+        {
+          label: 'Move to trash',
+          danger: true,
+          onSelect: () => {
+            void (async () => {
+              try {
+                const ok = await confirmAndTrash('lesson', lesson.id, lesson.title);
+                if (ok) await options.onMutated?.();
+              } catch {
+                window.alert('Unable to move lesson to trash.');
+              }
+            })();
+          }
         }
-      })();
-    });
+      ],
+      { label: `Options for ${lesson.title}` }
+    );
 
-    const trash = document.createElement('button');
-    trash.type = 'button';
-    trash.className = 'btn btn--ghost';
-    trash.textContent = 'Trash';
-    trash.addEventListener('click', () => {
-      void (async () => {
-        try {
-          const ok = await confirmAndTrash('lesson', lesson.id, lesson.title);
-          if (ok) await options.onMutated?.();
-        } catch {
-          window.alert('Unable to move lesson to trash.');
-        }
-      })();
-    });
-
-    actions.append(open, archive, trash);
+    actions.append(menu.el);
     item.append(info, actions);
     list.append(item);
   }

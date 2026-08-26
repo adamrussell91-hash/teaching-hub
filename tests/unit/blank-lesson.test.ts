@@ -8,6 +8,7 @@ vi.mock('@/teacher/create/modal', () => ({
   openCreateModal: vi.fn()
 }));
 
+import type { Lesson } from '@/schemas';
 import { postLesson } from '@/teacher/create/api';
 import { openBlankLesson } from '@/teacher/create/blank-lesson';
 import { openCreateModal } from '@/teacher/create/modal';
@@ -23,7 +24,7 @@ const curriculum = {
   scope_sequences: [],
   media: [],
   schedule_anchor_date: '2026-08-12'
-} as CurriculumResponse;
+} as unknown as CurriculumResponse;
 
 describe('openBlankLesson', () => {
   beforeEach(() => {
@@ -58,7 +59,7 @@ describe('openBlankLesson', () => {
       published: false,
       updated_at: '2026-08-25T00:00:00.000Z'
     };
-    vi.mocked(postLesson).mockResolvedValue(created);
+    vi.mocked(postLesson).mockResolvedValue(created as unknown as Lesson);
     const onCreated = vi.fn().mockResolvedValue(undefined);
 
     openBlankLesson({ curriculum, onCreated, unitId: 'unit_a' });

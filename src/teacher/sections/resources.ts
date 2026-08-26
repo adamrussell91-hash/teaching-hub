@@ -4,6 +4,7 @@ import { isHttpUrl } from '@/blocks/url-safety';
 import { createMedia, patchMedia, uploadMediaFile } from '@/teacher/media-api';
 import { ApiClientError } from '@/api/client';
 import { confirmAndTrash } from '@/teacher/lifecycle-api';
+import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
 import { renderPageHeader } from '@/teacher/page-header';
 
 export function openUrlForMedia(media: Media): string | undefined {
@@ -248,59 +249,66 @@ export function renderResourcesIndex(
     actions.className = 'resources-row-actions';
 
     const url = openUrlForMedia(entry);
-    if (url) {
-      const open = document.createElement('a');
-      open.className = 'btn btn--secondary lesson-list__open';
-      open.href = url;
-      open.textContent = 'Open';
-      open.target = '_blank';
-      open.rel = 'noopener noreferrer';
-      actions.append(open);
-    }
-
-    const archive = document.createElement('button');
-    archive.type = 'button';
-    archive.className = 'btn btn--ghost';
-    archive.dataset.resourcesArchive = entry.id;
-    archive.textContent = 'Archive';
-    archive.addEventListener('click', () => {
-      void (async () => {
-        setBusy(true);
-        setStatus(null);
-        try {
-          await patchMedia(entry.id, { status: 'archived' });
-          await options?.refresh?.();
-        } catch (error) {
-          setStatus(errorMessage(error), true);
-          setBusy(false);
-        }
-      })();
-    });
-
-    const trash = document.createElement('button');
-    trash.type = 'button';
-    trash.className = 'btn btn--ghost';
-    trash.dataset.resourcesTrash = entry.id;
-    trash.textContent = 'Trash';
-    trash.addEventListener('click', () => {
-      void (async () => {
-        setBusy(true);
-        setStatus(null);
-        try {
-          const ok = await confirmAndTrash('media', entry.id, entry.title);
-          if (!ok) {
-            setBusy(false);
-            return;
+    const menu = mountPageOptionsMenu(
+      [
+        ...(url
+          ? [
+              {
+                label: 'Open',
+                className: 'lesson-list__open',
+                href: url,
+                target: '_blank',
+                rel: 'noopener noreferrer'
+              }
+            ]
+          : []),
+        {
+          label: 'Archive',
+          onSelect: () => {
+            void (async () => {
+              setBusy(true);
+              setStatus(null);
+              try {
+                await patchMedia(entry.id, { status: 'archived' });
+                await options?.refresh?.();
+              } catch (error) {
+                setStatus(errorMessage(error), true);
+                setBusy(false);
+              }
+            })();
           }
-          await options?.refresh?.();
-        } catch (error) {
-          setStatus(errorMessage(error), true);
-          setBusy(false);
+        },
+        {
+          label: 'Move to trash',
+          danger: true,
+          onSelect: () => {
+            void (async () => {
+              setBusy(true);
+              setStatus(null);
+              try {
+                const ok = await confirmAndTrash('media', entry.id, entry.title);
+                if (!ok) {
+                  setBusy(false);
+                  return;
+                }
+                await options?.refresh?.();
+              } catch (error) {
+                setStatus(errorMessage(error), true);
+                setBusy(false);
+              }
+            })();
+          }
         }
-      })();
-    });
+      ],
+      { label: `Options for ${entry.title}` }
+    );
+    const items = [...menu.el.querySelectorAll<HTMLButtonElement>('.page-options__item')];
+    const archiveItem = items.find((item) => item.textContent === 'Archive');
+    const trashItem = items.find((item) => item.textContent === 'Move to trash');
+    if (archiveItem) archiveItem.dataset.resourcesArchive = entry.id;
+    if (trashItem) trashItem.dataset.resourcesTrash = entry.id;
 
-    actions.append(archive, trash);
+    actions.append(menu.el);
 
     item.append(actions);
     list.append(item);

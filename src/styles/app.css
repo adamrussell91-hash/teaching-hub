@@ -127,6 +127,115 @@ a:hover {
   flex-shrink: 0;
 }
 
+.page-header--actions-only {
+  justify-content: flex-end;
+  align-items: center;
+  margin-bottom: var(--space-4);
+}
+
+/* Keep header actions off the absolutely positioned sign-out control. */
+.teacher-layout__canvas .page-header {
+  padding-right: 2.75rem;
+}
+
+.page-header .page-options__trigger {
+  color: var(--muted);
+}
+
+.page-header .page-options__trigger:hover:not(:disabled),
+.page-header .page-options__trigger:focus-visible {
+  color: var(--navy);
+  background: var(--cotton);
+}
+
+/* Leftover site tile — favicon only. Never show it on the canvas. */
+.hub-mark,
+.sign-in__mark {
+  display: none !important;
+}
+
+.page-options {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.page-options__menu {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  z-index: 40;
+  min-width: 12rem;
+  padding: var(--space-1);
+  margin: 0;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elev-4);
+}
+
+.page-options__item {
+  display: block;
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--ink);
+  text-align: left;
+  text-decoration: none;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+.page-options__item:hover,
+.page-options__item:focus-visible {
+  background: var(--cotton);
+}
+
+.page-options__item--danger {
+  color: var(--danger);
+}
+
+.page-options__item.is-disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.entity-cover-tile-wrap,
+.classes-index__card,
+.units-index__card {
+  position: relative;
+}
+
+.entity-cover-tile-wrap .page-options,
+.classes-index__card .page-options,
+.units-index__card .page-options {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  z-index: 3;
+}
+
+.entity-cover-tile-wrap .page-options__trigger,
+.classes-index__card .page-options__trigger,
+.units-index__card .page-options__trigger {
+  color: var(--on-dark, #fff);
+  background: color-mix(in srgb, var(--depth) 55%, transparent);
+}
+
+.entity-cover-tile-wrap .page-options__trigger:hover:not(:disabled),
+.entity-cover-tile-wrap .page-options__trigger:focus-visible,
+.classes-index__card .page-options__trigger:hover:not(:disabled),
+.classes-index__card .page-options__trigger:focus-visible,
+.units-index__card .page-options__trigger:hover:not(:disabled),
+.units-index__card .page-options__trigger:focus-visible {
+  color: #fff;
+  background: color-mix(in srgb, var(--depth) 75%, transparent);
+}
+
 /* Sign-in lives in design-kit/sign-in.css */
 
 /* ── Teacher workspace grid ───────────────────────────────────────────── */
@@ -458,6 +567,16 @@ a:hover {
   align-items: center;
   gap: var(--space-2);
   flex-shrink: 0;
+}
+
+.context-bar__actions .page-options__trigger {
+  color: var(--muted);
+}
+
+.context-bar__actions .page-options__trigger:hover:not(:disabled),
+.context-bar__actions .page-options__trigger:focus-visible {
+  color: var(--navy);
+  background: var(--cotton);
 }
 
 /* ── Lesson editor ────────────────────────────────────────────────────── */
@@ -7509,8 +7628,24 @@ input.scope-timeline__note-title:focus-visible {
 }
 
 .lesson-editor__public-link {
+  position: relative;
   display: inline-flex;
   align-items: center;
+  width: 0;
+  height: 0;
+  overflow: visible;
+}
+
+.lesson-editor__public-link .public-link__trigger {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .lesson-editor__public-link .public-link__trigger--labelled {
@@ -7533,14 +7668,10 @@ input.scope-timeline__note-title:focus-visible {
   backdrop-filter: blur(var(--hub-glass-blur)) saturate(115%);
 }
 
-.classes-index__card {
-  display: grid;
-  gap: var(--space-2);
-}
-
-.classes-index__actions {
-  justify-content: flex-end;
-  padding: 0 var(--space-px);
+.classes-index__card,
+.units-index__card {
+  position: relative;
+  display: block;
 }
 
 .trash-page {
@@ -7607,6 +7738,16 @@ input.scope-timeline__note-title:focus-visible {
   display: inline-flex;
   flex-direction: column;
   align-items: flex-start;
+}
+
+.history-panel--chromeless {
+  width: 0;
+  height: 0;
+  overflow: visible;
+}
+
+.history-panel--chromeless .history-panel__toggle {
+  display: none;
 }
 
 .history-panel__body {
@@ -8261,24 +8402,14 @@ body.is-lesson-builder-full-page .hub-utilities {
   text-align: left;
 }
 
-.lesson-page__print {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  min-height: 2rem;
-  padding: 0;
-  color: var(--marine);
-  background: var(--cotton);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-
-.lesson-page__print svg {
-  width: 1.1rem;
-  height: 1.1rem;
+.lesson-page__chrome .page-options__item.lesson-page__print {
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  padding: 0.45rem 0.55rem;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
 }
 
 .lesson-page__title {

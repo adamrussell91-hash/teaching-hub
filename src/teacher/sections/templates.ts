@@ -10,6 +10,7 @@ import {
 import type { LessonTemplateSummary, UnitTemplateSummary } from '@/schemas';
 import { navigate } from '@/app/router';
 import { confirmAndTrash, entityPath, patchStatus } from '@/teacher/lifecycle-api';
+import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
 import { renderPageHeader } from '@/teacher/page-header';
 
 type Tab = 'lessons' | 'units';
@@ -63,6 +64,7 @@ export function renderTemplatesPage(
   let lessonRows: LessonTemplateSummary[] = [];
   let unitRows: UnitTemplateSummary[] = [];
   let statusText = '';
+  const rowDisposers: Array<() => void> = [];
 
   const root = document.createElement('div');
   root.className = 'templates-page';
@@ -109,6 +111,7 @@ export function renderTemplatesPage(
   }
 
   function renderList(): void {
+    for (const dispose of rowDisposers.splice(0)) dispose();
     list.replaceChildren();
     const rows = tab === 'lessons' ? lessonRows : unitRows;
     if (rows.length === 0) {
@@ -136,99 +139,100 @@ export function renderTemplatesPage(
       const actions = document.createElement('div');
       actions.className = 'templates-page__actions';
 
-      const useBtn = document.createElement('button');
-      useBtn.type = 'button';
-      useBtn.className = 'btn btn--primary';
-      useBtn.textContent = 'Use';
-      useBtn.addEventListener('click', () => {
-        void (async () => {
-          try {
-            setStatus('Creating…');
-            if (tab === 'lessons') {
-              const unitId = pickUnitId(curriculum);
-              if (!unitId) {
-                setStatus('');
-                return;
-              }
-              const lesson = await useLessonTemplate({ templateId: row.id, unitId });
-              await options.onCreated?.();
-              navigate(`/lessons/${lesson.id}`);
-            } else {
-              const parent = pickSubject(curriculum);
-              if (!parent) {
-                setStatus('');
-                return;
-              }
-              const unit = await useUnitTemplate({
-                templateId: row.id,
-                yearId: parent.yearId,
-                subjectId: parent.subjectId
-              });
-              await options.onCreated?.();
-              navigate(`/units/${unit.id}`);
+      const menu = mountPageOptionsMenu(
+        [
+          {
+            label: 'Use',
+            className: 'templates-page__use',
+            onSelect: () => {
+              void (async () => {
+                try {
+                  setStatus('Creating…');
+                  if (tab === 'lessons') {
+                    const unitId = pickUnitId(curriculum);
+                    if (!unitId) {
+                      setStatus('');
+                      return;
+                    }
+                    const lesson = await useLessonTemplate({ templateId: row.id, unitId });
+                    await options.onCreated?.();
+                    navigate(`/lessons/${lesson.id}`);
+                  } else {
+                    const parent = pickSubject(curriculum);
+                    if (!parent) {
+                      setStatus('');
+                      return;
+                    }
+                    const unit = await useUnitTemplate({
+                      templateId: row.id,
+                      yearId: parent.yearId,
+                      subjectId: parent.subjectId
+                    });
+                    await options.onCreated?.();
+                    navigate(`/units/${unit.id}`);
+                  }
+                } catch {
+                  setStatus('Unable to create from template.');
+                }
+              })();
             }
-          } catch {
-            setStatus('Unable to create from template.');
+          },
+          {
+            label: 'Rename',
+            onSelect: () => {
+              void (async () => {
+                const next = window.prompt('New title', row.title);
+                if (!next?.trim()) return;
+                try {
+                  if (tab === 'lessons') await patchLessonTemplate(row.id, { title: next.trim() });
+                  else await patchUnitTemplate(row.id, { title: next.trim() });
+                  await reload();
+                  setStatus('Renamed.');
+                } catch {
+                  setStatus('Unable to rename.');
+                }
+              })();
+            }
+          },
+          {
+            label: 'Archive',
+            onSelect: () => {
+              void (async () => {
+                if (!window.confirm(`Archive “${row.title}”?`)) return;
+                try {
+                  const type = tab === 'lessons' ? 'lesson_template' : 'unit_template';
+                  await patchStatus(entityPath(type, row.id), 'archived');
+                  await reload();
+                  setStatus('Archived.');
+                } catch {
+                  setStatus('Unable to archive.');
+                }
+              })();
+            }
+          },
+          {
+            label: 'Move to trash',
+            danger: true,
+            onSelect: () => {
+              void (async () => {
+                try {
+                  const type = tab === 'lessons' ? 'lesson_template' : 'unit_template';
+                  const ok = await confirmAndTrash(type, row.id, row.title);
+                  if (!ok) return;
+                  await reload();
+                  setStatus('Moved to trash.');
+                } catch {
+                  setStatus('Unable to move to trash.');
+                }
+              })();
+            }
           }
-        })();
-      });
+        ],
+        { label: `Options for ${row.title}` }
+      );
+      rowDisposers.push(menu.dispose);
 
-      const renameBtn = document.createElement('button');
-      renameBtn.type = 'button';
-      renameBtn.className = 'btn btn--secondary';
-      renameBtn.textContent = 'Rename';
-      renameBtn.addEventListener('click', () => {
-        void (async () => {
-          const next = window.prompt('New title', row.title);
-          if (!next?.trim()) return;
-          try {
-            if (tab === 'lessons') await patchLessonTemplate(row.id, { title: next.trim() });
-            else await patchUnitTemplate(row.id, { title: next.trim() });
-            await reload();
-            setStatus('Renamed.');
-          } catch {
-            setStatus('Unable to rename.');
-          }
-        })();
-      });
-
-      const archiveBtn = document.createElement('button');
-      archiveBtn.type = 'button';
-      archiveBtn.className = 'btn btn--ghost';
-      archiveBtn.textContent = 'Archive';
-      archiveBtn.addEventListener('click', () => {
-        void (async () => {
-          if (!window.confirm(`Archive “${row.title}”?`)) return;
-          try {
-            const type = tab === 'lessons' ? 'lesson_template' : 'unit_template';
-            await patchStatus(entityPath(type, row.id), 'archived');
-            await reload();
-            setStatus('Archived.');
-          } catch {
-            setStatus('Unable to archive.');
-          }
-        })();
-      });
-
-      const trashBtn = document.createElement('button');
-      trashBtn.type = 'button';
-      trashBtn.className = 'btn btn--ghost';
-      trashBtn.textContent = 'Trash';
-      trashBtn.addEventListener('click', () => {
-        void (async () => {
-          try {
-            const type = tab === 'lessons' ? 'lesson_template' : 'unit_template';
-            const ok = await confirmAndTrash(type, row.id, row.title);
-            if (!ok) return;
-            await reload();
-            setStatus('Moved to trash.');
-          } catch {
-            setStatus('Unable to move to trash.');
-          }
-        })();
-      });
-
-      actions.append(useBtn, renameBtn, archiveBtn, trashBtn);
+      actions.append(menu.el);
       item.append(info, actions);
       list.append(item);
     }
@@ -261,5 +265,9 @@ export function renderTemplatesPage(
   void reload();
   if (statusText) setStatus(statusText);
 
-  return { dispose: () => undefined };
+  return {
+    dispose: () => {
+      for (const dispose of rowDisposers.splice(0)) dispose();
+    }
+  };
 }

@@ -26,11 +26,15 @@ export interface HistoryPanelOptions {
   onRestored: (live: unknown) => void;
   /** Host element that receives the History toggle + expandable panel. */
   host: HTMLElement;
+  /** Hide the History pill so a kebab (or other chrome) can open the panel. */
+  hideToggle?: boolean;
 }
 
 export interface HistoryPanelHandle {
   dispose(): void;
   refresh(): Promise<void>;
+  open(): void;
+  close(): void;
 }
 
 export function formatReasonLabel(reason: VersionReason): string {
@@ -134,6 +138,10 @@ export function mountHistoryPanel(options: HistoryPanelOptions): HistoryPanelHan
   toggle.className = 'btn btn--secondary history-panel__toggle';
   toggle.textContent = 'History';
   toggle.setAttribute('aria-expanded', 'false');
+  if (options.hideToggle) {
+    toggle.hidden = true;
+    root.classList.add('history-panel--chromeless');
+  }
 
   const panel = document.createElement('div');
   panel.className = 'history-panel__body glass-panel';
@@ -327,12 +335,16 @@ export function mountHistoryPanel(options: HistoryPanelOptions): HistoryPanelHan
     }
   }
 
-  toggle.addEventListener('click', () => {
-    open = !open;
+  function setOpen(next: boolean): void {
+    open = next;
     panel.hidden = !open;
     toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
     toggle.classList.toggle('history-panel__toggle--open', open);
     if (open) void refresh();
+  }
+
+  toggle.addEventListener('click', () => {
+    setOpen(!open);
   });
 
   checkpointButton.addEventListener('click', () => {
@@ -362,6 +374,12 @@ export function mountHistoryPanel(options: HistoryPanelOptions): HistoryPanelHan
       disposed = true;
       root.remove();
     },
-    refresh
+    refresh,
+    open() {
+      if (!disposed) setOpen(true);
+    },
+    close() {
+      if (!disposed) setOpen(false);
+    }
   };
 }

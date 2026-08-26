@@ -485,7 +485,7 @@ describe('mountLessonPage', () => {
       btn.textContent?.includes('Save as lesson template')
     );
     expect(save).toBeTruthy();
-    const menu = save!.closest<HTMLElement>('.lesson-page__menu');
+    const menu = save!.closest<HTMLElement>('.page-options__menu');
     expect(menu?.hidden).toBe(true);
 
     host.querySelector<HTMLButtonElement>('[aria-label="Page menu"]')!.click();

@@ -6,13 +6,19 @@ import { mountCreateControl } from '@/teacher/create/control';
 import type { EntityCreatedHandler } from '@/teacher/create/types';
 import type { CurriculumResponse } from '@/teacher/nav';
 import { createUnitTemplate } from '@/teacher/template-api';
-import { mountHistoryPanel } from '@/teacher/history-panel';
+import { mountHistoryPanel, type HistoryPanelHandle } from '@/teacher/history-panel';
 import type { Subject, Unit, Year } from '@/schemas';
 import { patchUnit } from '@/teacher/unit-api';
 import { ApiClientError } from '@/api/client';
 import { renderPageHeader } from '@/teacher/page-header';
 import { downloadPortableExport } from '@/teacher/export-api';
 import { gradientForEntityId, renderEntityBanner } from '@/teacher/entity-banner';
+import {
+  confirmAndArchive,
+  confirmAndTrash,
+  entityPath
+} from '@/teacher/lifecycle-api';
+import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
 import {
   mountBlockCanvas,
   type BlockCanvasHandle
@@ -128,6 +134,10 @@ export function renderUnitsIndex(
   const listHost = document.createElement('div');
   listHost.className = 'units-index__list';
   root.append(listHost);
+  const cardDisposers: Array<() => void> = [];
+  disposers.push(() => {
+    for (const dispose of cardDisposers.splice(0).reverse()) dispose();
+  });
 
   function syncGroupButtons(): void {
     subjectBtn.setAttribute('aria-pressed', groupBy === 'subject' ? 'true' : 'false');
@@ -137,6 +147,7 @@ export function renderUnitsIndex(
   }
 
   function renderGroupedList(): void {
+    for (const dispose of cardDisposers.splice(0).reverse()) dispose();
     listHost.replaceChildren();
     const groups = groupUnits(units, groupBy, yearsById, subjectsById);
     for (const group of groups) {
@@ -151,7 +162,11 @@ export function renderUnitsIndex(
       grid.className = 'home-classes units-index__grid';
 
       for (const unit of group.units) {
-        grid.append(renderUnitTile(unit, yearsById, subjectsById, curriculum.media));
+        const card = renderUnitCard(unit, yearsById, subjectsById, curriculum.media, {
+          onMutated: options.onMutated
+        });
+        cardDisposers.push(card.dispose);
+        grid.append(card.el);
       }
 
       section.append(heading, grid);
@@ -231,15 +246,19 @@ function groupUnits(
   return ordered;
 }
 
-function renderUnitTile(
+function renderUnitCard(
   unit: Unit,
   yearsById: Map<string, Year>,
   subjectsById: Map<string, Subject>,
-  media: CurriculumResponse['media']
-): HTMLAnchorElement {
+  media: CurriculumResponse['media'],
+  options: { onMutated?: () => void | Promise<void> }
+): { el: HTMLElement; dispose: () => void } {
   const subject = subjectsById.get(unit.subject_id);
   const year = yearsById.get(unit.year_id);
   const path = `/units/${unit.id}`;
+
+  const card = document.createElement('div');
+  card.className = 'units-index__card';
 
   const tile = document.createElement('a');
   tile.className = 'glass-tile home-class-tile entity-cover-tile units-index__tile';
@@ -274,7 +293,42 @@ function renderUnitTile(
 
   body.append(title, meta);
   tile.append(mediaEl, body);
-  return tile;
+
+  const menu = mountPageOptionsMenu(
+    [
+      {
+        label: 'Archive',
+        onSelect: () => {
+          void (async () => {
+            try {
+              const ok = await confirmAndArchive(entityPath('unit', unit.id), unit.title);
+              if (ok) await options.onMutated?.();
+            } catch {
+              window.alert('Unable to archive unit.');
+            }
+          })();
+        }
+      },
+      {
+        label: 'Move to trash',
+        danger: true,
+        onSelect: () => {
+          void (async () => {
+            try {
+              const ok = await confirmAndTrash('unit', unit.id, unit.title);
+              if (ok) await options.onMutated?.();
+            } catch {
+              window.alert('Unable to move unit to trash.');
+            }
+          })();
+        }
+      }
+    ],
+    { label: `Options for ${unit.title}` }
+  );
+
+  card.append(tile, menu.el);
+  return { el: card, dispose: menu.dispose };
 }
 
 /** @deprecated Prefer renderUnitPage */
@@ -304,23 +358,71 @@ export function renderUnitPage(
     return { dispose: () => undefined };
   }
 
-  const exportBtn = document.createElement('button');
-  exportBtn.type = 'button';
-  exportBtn.className = 'btn btn--secondary';
-  exportBtn.dataset.export = 'unit';
-  exportBtn.textContent = 'Export JSON';
-  exportBtn.addEventListener('click', () => {
-    void downloadPortableExport('unit', unit.id, unit.slug).catch(() => {
-      window.alert('Unable to export this unit.');
-    });
-  });
+  const historyHost = document.createElement('div');
+  historyHost.className = 'history-panel-host unit-stub__history';
+  let historyPanel: HistoryPanelHandle;
+  const rowDisposers: Array<() => void> = [];
+
+  const optionsMenu = mountPageOptionsMenu(
+    [
+      {
+        label: 'History',
+        onSelect: () => {
+          historyPanel.open();
+        }
+      },
+      {
+        label: 'Export JSON',
+        onSelect: () => {
+          void downloadPortableExport('unit', unit.id, unit.slug).catch(() => {
+            window.alert('Unable to export this unit.');
+          });
+        }
+      },
+      {
+        label: 'Save as unit template',
+        onSelect: () => {
+          void saveUnitAsTemplate(unit);
+        }
+      },
+      {
+        label: 'Archive',
+        onSelect: () => {
+          void (async () => {
+            try {
+              const ok = await confirmAndArchive(entityPath('unit', unit.id), unit.title);
+              if (ok) navigate('/units');
+            } catch {
+              window.alert('Unable to archive unit.');
+            }
+          })();
+        }
+      },
+      {
+        label: 'Move to trash',
+        danger: true,
+        onSelect: () => {
+          void (async () => {
+            try {
+              const ok = await confirmAndTrash('unit', unit.id, unit.title);
+              if (ok) navigate('/units');
+            } catch {
+              window.alert('Unable to move unit to trash.');
+            }
+          })();
+        }
+      }
+    ],
+    { label: `Options for ${unit.title}` }
+  );
+  const exportItem = [...optionsMenu.el.querySelectorAll<HTMLButtonElement>('.page-options__item')].find(
+    (item) => item.textContent === 'Export JSON'
+  );
+  if (exportItem) exportItem.dataset.export = 'unit';
 
   const pageHeader = renderPageHeader(canvas, {
-    eyebrow: 'Units',
-    title: unit.title,
-    actions: [exportBtn]
+    actions: [historyHost, optionsMenu.el]
   });
-  const heading = pageHeader.querySelector('.page-header__title');
 
   const root = document.createElement('div');
   root.className = 'unit-page';
@@ -395,44 +497,11 @@ export function renderUnitPage(
   lessonsHeading.textContent = 'Lessons';
   lessonsSection.append(lessonsHeading);
 
-  const tools = document.createElement('div');
-  tools.className = 'unit-stub__tools';
-
-  const saveTemplate = document.createElement('button');
-  saveTemplate.type = 'button';
-  saveTemplate.className = 'btn btn--secondary';
-  saveTemplate.textContent = 'Save as unit template';
-  saveTemplate.addEventListener('click', () => {
-    void (async () => {
-      const suggested = unit.title.trim() || 'Unit template';
-      const title = window.prompt('Unit template name', suggested);
-      if (title === null) return;
-      const trimmed = title.trim();
-      if (!trimmed) {
-        window.alert('Unit template name is required.');
-        return;
-      }
-      try {
-        await createUnitTemplate({
-          title: trimmed,
-          description: unit.description,
-          blocks: unit.blocks ? cloneBlocksWithNewIds(unit.blocks) : undefined
-        });
-        window.alert(`Saved “${trimmed}” as a unit template.`);
-      } catch {
-        window.alert('Unable to save unit template.');
-      }
-    })();
-  });
-
-  const historyHost = document.createElement('div');
-  historyHost.className = 'history-panel-host unit-stub__history';
-
-  tools.append(saveTemplate, historyHost);
-  const historyPanel = mountHistoryPanel({
+  historyPanel = mountHistoryPanel({
     kind: 'unit',
     parentId: unitId,
     host: historyHost,
+    hideToggle: true,
     onRestored: (live) => {
       const restored = live as Unit;
       Object.assign(unit, restored);
@@ -440,7 +509,6 @@ export function renderUnitPage(
       // which would otherwise leave a phantom cover behind.
       if (restored.cover) unit.cover = restored.cover;
       else delete unit.cover;
-      if (heading) heading.textContent = unit.title;
       banner.update({ title: unit.title, cover: unit.cover ?? null });
     }
   });
@@ -476,33 +544,62 @@ export function renderUnitPage(
       info.append(title, meta);
 
       const path = `/lessons/${lesson.id}`;
-      const open = document.createElement('a');
-      open.className = 'btn btn--secondary lesson-list__open';
-      open.href = path;
-      open.textContent = 'Open';
-      open.addEventListener('click', (event) => {
-        event.preventDefault();
-        navigate(path);
-      });
+      const rowMenu = mountPageOptionsMenu(
+        [
+          {
+            label: 'Open',
+            className: 'lesson-list__open',
+            href: path,
+            onSelect: () => {
+              navigate(path);
+            }
+          }
+        ],
+        { label: `Options for ${lesson.title}` }
+      );
+      rowDisposers.push(rowMenu.dispose);
 
-      item.append(info, open);
+      item.append(info, rowMenu.el);
       list.append(item);
     }
 
     lessonsSection.append(list);
   }
 
-  root.append(coverHost, tools, planSection, lessonsSection);
+  root.append(coverHost, planSection, lessonsSection);
   canvas.append(root);
 
   return {
     dispose: () => {
+      for (const dispose of rowDisposers.splice(0).reverse()) dispose();
+      optionsMenu.dispose();
       historyPanel.dispose();
       banner.dispose();
       planEditor.dispose();
       outcomeStrip?.dispose();
     }
   };
+}
+
+async function saveUnitAsTemplate(unit: Unit): Promise<void> {
+  const suggested = unit.title.trim() || 'Unit template';
+  const title = window.prompt('Unit template name', suggested);
+  if (title === null) return;
+  const trimmed = title.trim();
+  if (!trimmed) {
+    window.alert('Unit template name is required.');
+    return;
+  }
+  try {
+    await createUnitTemplate({
+      title: trimmed,
+      description: unit.description,
+      blocks: unit.blocks ? cloneBlocksWithNewIds(unit.blocks) : undefined
+    });
+    window.alert(`Saved “${trimmed}” as a unit template.`);
+  } catch {
+    window.alert('Unable to save unit template.');
+  }
 }
 
 function mountUnitPlanEditor(

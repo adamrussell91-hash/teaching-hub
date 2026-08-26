@@ -15,6 +15,7 @@ import {
   mountHistoryPanel,
   type HistoryPanelHandle
 } from '@/teacher/history-panel';
+import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
 import {
   mountBlockCanvas,
   type BlockCanvasHandle
@@ -195,7 +196,20 @@ export function mountHomepageEditor(
   const historyHost = document.createElement('div');
   historyHost.className = 'history-panel-host homepage-editor__history';
 
-  toolbar.append(saveButton, cancelButton, historyHost);
+  const optionsMenu = mountPageOptionsMenu(
+    [
+      {
+        label: 'History',
+        className: 'homepage-editor__history-item',
+        onSelect: () => {
+          historyPanel?.open();
+        }
+      }
+    ],
+    { label: 'Homepage options' }
+  );
+
+  toolbar.append(saveButton, cancelButton, optionsMenu.el, historyHost);
 
   const regionsContainer = document.createElement('div');
   regionsContainer.className = 'homepage-editor__regions';
@@ -301,6 +315,7 @@ export function mountHomepageEditor(
     kind: 'class_homepage',
     parentId: options.classId,
     host: historyHost,
+    hideToggle: true,
     onRestored: (live) => {
       const restoredClass = live as Class;
       const next = normalizeHomepage(restoredClass.homepage);
@@ -322,6 +337,7 @@ export function mountHomepageEditor(
       canvases.clear();
       historyPanel?.dispose();
       historyPanel = null;
+      optionsMenu.dispose();
       container.replaceChildren();
     }
   };
