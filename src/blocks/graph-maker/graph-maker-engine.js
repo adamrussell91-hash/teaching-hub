@@ -47,7 +47,10 @@
       var prevTransition = el.style.transition;
       el.style.transition = "none";
       var r = card.getBoundingClientRect();
-      sizes[id] = { w: r.width / safeZoom, h: r.height / safeZoom };
+      sizes[id] = {
+        w: r.width > 1 ? r.width / safeZoom : 120,
+        h: r.height > 1 ? r.height / safeZoom : 44
+      };
       el.style.transition = prevTransition;
     });
   }
@@ -992,14 +995,20 @@
     var resizeTimer = null;
     function onResize() {
       clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(function () { pz.fitView(currentPositions, sizes); }, 150);
+      resizeTimer = setTimeout(function () {
+        render();
+        pz.fitView(currentPositions, sizes);
+      }, 150);
     }
     window.addEventListener("resize", onResize);
     teardown.push(function () { window.removeEventListener("resize", onResize); });
 
     pz.centerView();
     render();
-    requestAnimationFrame(function () { pz.fitView(currentPositions, sizes); });
+    requestAnimationFrame(function () {
+      render();
+      pz.fitView(currentPositions, sizes);
+    });
 
     return {
       destroy: function () {
@@ -1394,6 +1403,8 @@
       bg.setAttribute("class", "graph-edge__label-bg");
       bg.setAttribute("rx", "4");
       bg.setAttribute("ry", "4");
+      bg.setAttribute("fill", "#fbf8f2");
+      bg.setAttribute("stroke", "rgba(23, 55, 94, 0.10)");
       var label = document.createElementNS("http://www.w3.org/2000/svg", "text");
       label.setAttribute("class", "graph-edge__label");
       label.setAttribute("text-anchor", "middle");
@@ -1914,14 +1925,20 @@
     var resizeTimer = null;
     function onResize() {
       clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(function () { pz.fitView(currentPositions, sizes); }, 150);
+      resizeTimer = setTimeout(function () {
+        render();
+        pz.fitView(currentPositions, sizes);
+      }, 150);
     }
     window.addEventListener("resize", onResize);
     teardown.push(function () { window.removeEventListener("resize", onResize); });
 
     pz.centerView();
     render();
-    requestAnimationFrame(function () { pz.fitView(currentPositions, sizes); });
+    requestAnimationFrame(function () {
+      render();
+      pz.fitView(currentPositions, sizes);
+    });
 
     return {
       destroy: function () {

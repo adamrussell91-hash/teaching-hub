@@ -7325,6 +7325,18 @@ input.scope-timeline__note-title:focus-visible {
   transform: translateY(-50%);
 }
 
+.block-graph-maker .graph-edge__label-bg,
+.block-concept-map__canvas .graph-edge__label-bg {
+  fill: var(--paper);
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.block-graph-maker .graph-edge.is-selected .graph-edge__label-bg,
+.block-concept-map__canvas .graph-edge.is-selected .graph-edge__label-bg {
+  stroke: var(--wave);
+}
+
 .block-graph-maker .graph-edge__label,
 .block-concept-map__canvas .graph-edge__label {
   font-family: var(--font-ui);

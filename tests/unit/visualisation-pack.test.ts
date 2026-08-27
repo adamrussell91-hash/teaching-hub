@@ -737,6 +737,9 @@ describe('visualisation editors', () => {
         expect(line.getAttribute('fill')).toBe('none');
         expect(line.getAttribute('stroke-width')).toBe('2');
       }
+      const labelBg = el.querySelector('.graph-edge__label-bg');
+      expect(labelBg).not.toBeNull();
+      expect(labelBg?.getAttribute('fill')).toBe('#fbf8f2');
     });
   });
 
