@@ -3,7 +3,7 @@ import { createBlock } from '@/blocks/create-block';
 import type { Block } from '@/schemas/block';
 import type { Lesson } from '@/schemas/lesson';
 import type { Media } from '@/schemas/media';
-import { isTextLike } from '@/teacher/lesson-canvas/kinds';
+import { isCanvasLike, isInlineEditor, isTextLike } from '@/teacher/lesson-canvas/kinds';
 import { mountBlockCanvas, mountLessonPage } from '@/teacher/lesson-canvas/mount-page';
 
 const MIME = 'application/x-teaching-hub-block';
@@ -83,7 +83,21 @@ describe('isTextLike', () => {
     expect(isTextLike('definition')).toBe(true);
     expect(isTextLike('code')).toBe(true);
     expect(isTextLike('concept_map')).toBe(false);
+    expect(isTextLike('mind_map')).toBe(false);
     expect(isTextLike('image')).toBe(false);
+  });
+});
+
+describe('isCanvasLike', () => {
+  it('treats mind maps and concept maps as inline canvases', () => {
+    expect(isCanvasLike('mind_map')).toBe(true);
+    expect(isCanvasLike('concept_map')).toBe(true);
+    expect(isCanvasLike('chart')).toBe(false);
+    expect(isCanvasLike('heading')).toBe(false);
+    expect(isInlineEditor('mind_map')).toBe(true);
+    expect(isInlineEditor('concept_map')).toBe(true);
+    expect(isInlineEditor('heading')).toBe(true);
+    expect(isInlineEditor('chart')).toBe(false);
   });
 });
 
@@ -264,15 +278,15 @@ describe('mountLessonPage', () => {
   });
 
   it('refreshes a heavy block preview while its editor stays put', () => {
-    mount();
-    host.querySelector<HTMLElement>('[data-block-id="cm1"]')!.click();
+    mount(makeLesson({ blocks: [createBlock('heading', 'h1'), createBlock('chart', 'ch1')] }));
+    host.querySelector<HTMLElement>('[data-block-id="ch1"]')!.click();
 
     const editor = host.querySelector<HTMLElement>('.lesson-page__inspector .block-editor')!;
     const captionField = editor.querySelector<HTMLInputElement>('input, textarea');
     expect(captionField).not.toBeNull();
 
     captionField!.focus();
-    captionField!.value = 'Ideas map';
+    captionField!.value = 'Enrolments';
     captionField!.dispatchEvent(new Event('input', { bubbles: true }));
 
     expect(editor.isConnected).toBe(true);
@@ -280,12 +294,12 @@ describe('mountLessonPage', () => {
   });
 
   it('keeps a heavy block editor inside the block it belongs to', () => {
-    mount();
-    host.querySelector<HTMLElement>('[data-block-id="cm1"]')!.click();
+    mount(makeLesson({ blocks: [createBlock('heading', 'h1'), createBlock('chart', 'ch1')] }));
+    host.querySelector<HTMLElement>('[data-block-id="ch1"]')!.click();
 
     const inspector = host.querySelector('.lesson-page__inspector');
     expect(inspector).not.toBeNull();
-    expect(inspector!.closest('[data-block-id]')?.getAttribute('data-block-id')).toBe('cm1');
+    expect(inspector!.closest('[data-block-id]')?.getAttribute('data-block-id')).toBe('ch1');
     expect(inspector!.querySelector('.block-editor')).not.toBeNull();
   });
 
@@ -351,13 +365,15 @@ describe('mountLessonPage', () => {
   });
 
   it('renders heavy blocks and shows inspector plus toolbar on select', () => {
-    const { onSelect } = mount();
-    const map = host.querySelector<HTMLElement>('[data-block-id="cm1"]');
-    expect(map).not.toBeNull();
-    expect(host.querySelector('.block-concept-map, .block[data-block-type="concept_map"]')).not.toBeNull();
+    const { onSelect } = mount(
+      makeLesson({ blocks: [createBlock('heading', 'h1'), createBlock('chart', 'ch1')] })
+    );
+    const chart = host.querySelector<HTMLElement>('[data-block-id="ch1"]');
+    expect(chart).not.toBeNull();
+    expect(host.querySelector('.block-chart, .block[data-block-type="chart"]')).not.toBeNull();
 
-    map!.click();
-    expect(onSelect).toHaveBeenCalledWith('cm1');
+    chart!.click();
+    expect(onSelect).toHaveBeenCalledWith('ch1');
     expect(host.querySelector('.lesson-page__inspector')).not.toBeNull();
     expect(host.querySelector('.lesson-page__inspector .block-editor')).not.toBeNull();
 
@@ -368,6 +384,34 @@ describe('mountLessonPage', () => {
       host.querySelector('.block-editor__visibility, [aria-label="Visibility"], select')
     ).not.toBeNull();
     expect(host.querySelector('.block-editor__move-up')).toBeNull();
+  });
+
+  it('edits mind maps on one canvas instead of stacking preview and inspector', () => {
+    const { onSelect } = mount(
+      makeLesson({ blocks: [createBlock('heading', 'h1'), createBlock('mind_map', 'mm1')] })
+    );
+    const row = host.querySelector<HTMLElement>('[data-block-id="mm1"]');
+    expect(row).not.toBeNull();
+    expect(host.querySelector('.block-mind-map')).not.toBeNull();
+    expect(host.querySelector('.lesson-page__inspector')).toBeNull();
+
+    row!.click();
+    expect(onSelect).toHaveBeenCalledWith('mm1');
+    expect(host.querySelector('.lesson-page__preview')).toBeNull();
+    expect(host.querySelector('.lesson-page__inspector')).toBeNull();
+    expect(host.querySelector('.block-graph-maker-host .block-graph-maker')).not.toBeNull();
+    expect(host.querySelectorAll('.block-graph-maker')).toHaveLength(1);
+    expect(host.querySelector('.lesson-page__toolbar')).not.toBeNull();
+  });
+
+  it('edits concept maps on one canvas instead of stacking preview and inspector', () => {
+    mount();
+    host.querySelector<HTMLElement>('[data-block-id="cm1"]')!.click();
+
+    expect(host.querySelector('.lesson-page__preview')).toBeNull();
+    expect(host.querySelector('.lesson-page__inspector')).toBeNull();
+    expect(host.querySelector('.block-graph-maker-host .block-graph-maker')).not.toBeNull();
+    expect(host.querySelectorAll('.block-graph-maker')).toHaveLength(1);
   });
 
   it('deletes a video block from the gutter without selecting it first', () => {

@@ -7154,6 +7154,10 @@ input.scope-timeline__note-title:focus-visible {
   margin-top: var(--space-3);
 }
 
+.lesson-page__block--selected .block-graph-maker-host {
+  margin-top: var(--space-2);
+}
+
 .block-graph-maker .canvas-wrap,
 .block-mind-map__canvas .canvas-wrap,
 .block-concept-map__canvas .canvas-wrap {
@@ -7187,32 +7191,45 @@ input.scope-timeline__note-title:focus-visible {
   opacity: 0.55;
 }
 
-.block-graph-maker #world,
-.block-mind-map__canvas #world,
-.block-concept-map__canvas #world {
+.block-graph-maker .graph-maker__world,
+.block-mind-map__canvas .graph-maker__world,
+.block-concept-map__canvas .graph-maker__world {
   position: absolute;
   inset: 0;
   transform-origin: 0 0;
 }
 
-.block-graph-maker #edges,
-.block-mind-map__canvas #edges,
-.block-concept-map__canvas #edges {
+.block-graph-maker .graph-maker__edges,
+.block-mind-map__canvas .graph-maker__edges,
+.block-concept-map__canvas .graph-maker__edges {
   position: absolute;
   inset: 0;
   overflow: visible;
   pointer-events: none;
 }
 
-.block-graph-maker #edges.concept-edges,
-.block-mind-map__canvas #edges.concept-edges,
-.block-concept-map__canvas #edges.concept-edges {
+.block-graph-maker .graph-maker__edges path,
+.block-mind-map__canvas .graph-maker__edges path,
+.block-graph-maker .graph-maker__edges line,
+.block-mind-map__canvas .graph-maker__edges line,
+.block-concept-map__canvas .graph-maker__edges path,
+.block-concept-map__canvas .graph-maker__edges line {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.block-graph-maker .graph-maker__edges.concept-edges,
+.block-mind-map__canvas .graph-maker__edges.concept-edges,
+.block-concept-map__canvas .graph-maker__edges.concept-edges {
   pointer-events: visiblePainted;
 }
 
-.block-graph-maker #nodesLayer,
-.block-mind-map__canvas #nodesLayer,
-.block-concept-map__canvas #nodesLayer {
+.block-graph-maker .graph-maker__nodes,
+.block-mind-map__canvas .graph-maker__nodes,
+.block-concept-map__canvas .graph-maker__nodes {
   position: absolute;
   inset: 0;
 }
@@ -7223,7 +7240,7 @@ input.scope-timeline__note-title:focus-visible {
   position: absolute;
   left: 0;
   top: 0;
-  display: inline-flex;
+  display: block;
 }
 
 .block-graph-maker .node__card,
@@ -7233,7 +7250,7 @@ input.scope-timeline__note-title:focus-visible {
   align-items: center;
   min-width: 3.5rem;
   max-width: 15rem;
-  padding: 0.55rem 0.95rem;
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
   border: 1px solid rgba(255, 255, 255, 0.85);
   box-shadow: var(--elev-2);
@@ -7245,15 +7262,73 @@ input.scope-timeline__note-title:focus-visible {
 .block-graph-maker .node--root .node__card,
 .block-mind-map__canvas .node--root .node__card {
   border-radius: var(--radius-md);
-  padding: 0.85rem 1.4rem;
+  padding: var(--space-3) var(--space-4);
   font-size: var(--text-md);
   font-weight: 700;
+}
+
+.block-graph-maker .node__btn,
+.block-mind-map__canvas .node__btn,
+.block-concept-map__canvas .node__btn {
+  position: absolute;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-5);
+  height: var(--space-5);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: var(--paper);
+  color: var(--navy);
+  box-shadow: var(--elev-1);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.block-graph-maker .node__add,
+.block-mind-map__canvas .node__add {
+  top: 50%;
+  right: calc(var(--space-3) * -1);
+  transform: translateY(-50%);
+}
+
+.block-graph-maker .node--left .node__add,
+.block-mind-map__canvas .node--left .node__add {
+  right: auto;
+  left: calc(var(--space-3) * -1);
+}
+
+.block-graph-maker .node__color,
+.block-mind-map__canvas .node__color,
+.block-concept-map__canvas .node__color {
+  top: calc(var(--space-3) * -1);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.block-graph-maker .node__delete,
+.block-mind-map__canvas .node__delete,
+.block-concept-map__canvas .node__delete {
+  top: calc(var(--space-3) * -1);
+  right: calc(var(--space-2) * -1);
+}
+
+.block-graph-maker .node__link,
+.block-concept-map__canvas .node__link {
+  top: 50%;
+  right: calc(var(--space-3) * -1);
+  transform: translateY(-50%);
 }
 
 .block-graph-maker .graph-edge__label,
 .block-concept-map__canvas .graph-edge__label {
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: var(--text-2xs);
   font-weight: 600;
   fill: var(--ink);
 }
@@ -7279,19 +7354,19 @@ input.scope-timeline__note-title:focus-visible {
   color: var(--muted);
   background: rgba(255, 255, 255, 0.78);
   border: 1px solid var(--line);
-  padding: 0.35rem 0.8rem;
+  padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-full);
 }
 
-.block-graph-maker.graph-maker--readonly .node__btn,
-.block-graph-maker.graph-maker--readonly .fab,
-.block-graph-maker.graph-maker--readonly .hint-bar,
+.block-graph-maker .graph-maker--readonly .node__btn,
+.block-graph-maker .graph-maker--readonly .fab,
+.block-graph-maker .graph-maker--readonly .hint-bar,
 .block-mind-map__canvas .graph-maker--readonly .node__btn,
 .block-concept-map__canvas .graph-maker--readonly .node__btn {
   display: none !important;
 }
 
-.block-graph-maker.graph-maker--readonly .node__card,
+.block-graph-maker .graph-maker--readonly .node__card,
 .block-mind-map__canvas .graph-maker--readonly .node__card,
 .block-concept-map__canvas .graph-maker--readonly .node__card {
   pointer-events: none;

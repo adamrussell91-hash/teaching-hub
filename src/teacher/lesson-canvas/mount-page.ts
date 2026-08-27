@@ -32,7 +32,7 @@ import {
   moveBlockTo,
   type DropRootMode
 } from '@/teacher/lesson-canvas/drop';
-import { isTextLike } from '@/teacher/lesson-canvas/kinds';
+import { isInlineEditor } from '@/teacher/lesson-canvas/kinds';
 
 const DND_MIME = 'application/x-teaching-hub-block';
 
@@ -580,7 +580,7 @@ export function mountBlockCanvas(
           selectedId = block.id;
           options.onSelect?.(block.id);
         });
-      } else if (isTextLike(block.block_type)) {
+      } else if (isInlineEditor(block.block_type)) {
         if (selectedId === block.id) {
           const editor = createBlockEditor(block, onBlockChange, latestBlock(block.id, block), editorCtx());
           editor.querySelectorAll('.block-editor__move-up, .block-editor__move-down').forEach((el) => el.remove());
