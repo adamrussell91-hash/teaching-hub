@@ -30,8 +30,8 @@ export function renderLessonsIndex(
         label: 'From template',
         className: 'lessons-index__from-template',
         onSelect: () => {
-          void promptLessonFromTemplate(curriculum).then((id) => {
-            if (id) void options.onCreated?.('lesson', id);
+          void promptLessonFromTemplate(curriculum).then((created) => {
+            if (created) void options.onCreated?.('lesson', created.id, created);
           });
         }
       }

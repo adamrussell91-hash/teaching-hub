@@ -51,6 +51,21 @@ describe('createCurriculumCache', () => {
     expect(fetchCurriculum).toHaveBeenCalledTimes(2);
   });
 
+  it('peek returns the current snapshot without waiting', async () => {
+    const fetchCurriculum = vi.fn().mockResolvedValue(emptyCurriculum({ classes: [{ id: 'a' } as never] }));
+    const cache = createCurriculumCache(fetchCurriculum);
+
+    expect(cache.peek()).toBeUndefined();
+    await cache.get();
+    expect(cache.peek()?.classes).toEqual([{ id: 'a' }]);
+
+    cache.replace(emptyCurriculum({ classes: [{ id: 'b' } as never] }));
+    expect(cache.peek()?.classes).toEqual([{ id: 'b' }]);
+
+    cache.invalidate();
+    expect(cache.peek()).toBeUndefined();
+  });
+
   it('replace seeds a snapshot so the next get does not wait on a stale list', async () => {
     const fetchCurriculum = vi.fn().mockResolvedValue(emptyCurriculum());
     const cache = createCurriculumCache(fetchCurriculum);

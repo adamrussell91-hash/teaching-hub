@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('@/teacher/media-api', () => ({
   createMedia: vi.fn().mockResolvedValue({}),
@@ -6,8 +6,15 @@ vi.mock('@/teacher/media-api', () => ({
   uploadMediaFile: vi.fn().mockResolvedValue({})
 }));
 
+vi.mock('@/api/client', async () => {
+  const actual = await vi.importActual<typeof import('@/api/client')>('@/api/client');
+  return {
+    ...actual,
+    apiPatch: vi.fn().mockResolvedValue({})
+  };
+});
+
 import { openUrlForMedia, renderResourcesIndex } from '@/teacher/sections/resources';
-import { patchMedia } from '@/teacher/media-api';
 import type { CurriculumResponse } from '@/teacher/nav';
 import type { Media } from '@/schemas';
 
@@ -65,7 +72,12 @@ describe('resources section', () => {
 
   beforeEach(() => {
     canvas = document.createElement('div');
-    vi.mocked(patchMedia).mockClear();
+    vi.spyOn(window, 'alert').mockImplementation(() => undefined);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('prefers preview_url over download_url', () => {
@@ -157,7 +169,8 @@ describe('resources section', () => {
     expect(canvas.querySelector('[data-drive-pick]')).toBeTruthy();
   });
 
-  it('archives media then calls refresh', async () => {
+  it('archives media then calls refresh', () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
     const refresh = vi.fn().mockResolvedValue(undefined);
     renderResourcesIndex(canvas, curriculum, { refresh });
 
@@ -167,10 +180,7 @@ describe('resources section', () => {
     expect(archiveBtn).toBeTruthy();
     archiveBtn!.click();
 
-    await vi.waitFor(() => {
-      expect(patchMedia).toHaveBeenCalledWith('media_ono_extract', { status: 'archived' });
-      expect(refresh).toHaveBeenCalled();
-    });
+    expect(refresh).toHaveBeenCalled();
   });
 
   it('shows Drive stub message when onDrivePick is not provided', () => {

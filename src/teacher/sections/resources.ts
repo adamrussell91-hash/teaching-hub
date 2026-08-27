@@ -1,9 +1,10 @@
 import type { Media } from '@/schemas';
 import type { CurriculumResponse } from '@/teacher/nav';
 import { isHttpUrl } from '@/blocks/url-safety';
-import { createMedia, patchMedia, uploadMediaFile } from '@/teacher/media-api';
+import { applyCreatedMedia } from '@/app/curriculum-state';
+import { createMedia, uploadMediaFile } from '@/teacher/media-api';
 import { ApiClientError } from '@/api/client';
-import { confirmAndTrash } from '@/teacher/lifecycle-api';
+import { confirmAndArchive, confirmAndTrash } from '@/teacher/lifecycle-api';
 import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
 import { renderPageHeader } from '@/teacher/page-header';
 
@@ -147,7 +148,8 @@ export function renderResourcesIndex(
       setBusy(true);
       setStatus(null);
       try {
-        await uploadMediaFile(file, { title: file.name });
+        const created = await uploadMediaFile(file, { title: file.name });
+        applyCreatedMedia(created);
         await options?.refresh?.();
       } catch (error) {
         setStatus(errorMessage(error), true);
@@ -178,12 +180,13 @@ export function renderResourcesIndex(
       setBusy(true);
       setStatus(null);
       try {
-        await createMedia({
+        const created = await createMedia({
           title,
           provider: 'external',
           media_type: inferMediaTypeFromUrl(preview_url),
           preview_url
         });
+        applyCreatedMedia(created);
         await options?.refresh?.();
       } catch (error) {
         setStatus(errorMessage(error), true);
@@ -265,38 +268,20 @@ export function renderResourcesIndex(
         {
           label: 'Archive',
           onSelect: () => {
-            void (async () => {
-              setBusy(true);
-              setStatus(null);
-              try {
-                await patchMedia(entry.id, { status: 'archived' });
-                await options?.refresh?.();
-              } catch (error) {
-                setStatus(errorMessage(error), true);
-                setBusy(false);
-              }
-            })();
+            setStatus(null);
+            confirmAndArchive('media', entry.id, entry.title, () => {
+              void options?.refresh?.();
+            });
           }
         },
         {
           label: 'Move to trash',
           danger: true,
           onSelect: () => {
-            void (async () => {
-              setBusy(true);
-              setStatus(null);
-              try {
-                const ok = await confirmAndTrash('media', entry.id, entry.title);
-                if (!ok) {
-                  setBusy(false);
-                  return;
-                }
-                await options?.refresh?.();
-              } catch (error) {
-                setStatus(errorMessage(error), true);
-                setBusy(false);
-              }
-            })();
+            setStatus(null);
+            confirmAndTrash('media', entry.id, entry.title, () => {
+              void options?.refresh?.();
+            });
           }
         }
       ],

@@ -1,10 +1,6 @@
 import { navigate } from '@/app/router';
 import type { CurriculumResponse } from '@/teacher/nav';
-import {
-  confirmAndArchive,
-  confirmAndTrash,
-  entityPath
-} from '@/teacher/lifecycle-api';
+import { confirmAndArchive, confirmAndTrash } from '@/teacher/lifecycle-api';
 import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
 
 export interface LessonListOptions {
@@ -84,28 +80,18 @@ export function renderLessonList(
         {
           label: 'Archive',
           onSelect: () => {
-            void (async () => {
-              try {
-                const ok = await confirmAndArchive(entityPath('lesson', lesson.id), lesson.title);
-                if (ok) await options.onMutated?.();
-              } catch {
-                window.alert('Unable to archive lesson.');
-              }
-            })();
+            confirmAndArchive('lesson', lesson.id, lesson.title, () => {
+              void options.onMutated?.();
+            });
           }
         },
         {
           label: 'Move to trash',
           danger: true,
           onSelect: () => {
-            void (async () => {
-              try {
-                const ok = await confirmAndTrash('lesson', lesson.id, lesson.title);
-                if (ok) await options.onMutated?.();
-              } catch {
-                window.alert('Unable to move lesson to trash.');
-              }
-            })();
+            confirmAndTrash('lesson', lesson.id, lesson.title, () => {
+              void options.onMutated?.();
+            });
           }
         }
       ],

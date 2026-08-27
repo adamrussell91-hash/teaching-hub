@@ -1,3 +1,4 @@
+import { applyCreatedEntity } from '@/app/curriculum-state';
 import type { CurriculumResponse } from '@/teacher/nav';
 import {
   listLessonTemplates,
@@ -9,7 +10,7 @@ import {
 } from '@/teacher/template-api';
 import type { LessonTemplateSummary, UnitTemplateSummary } from '@/schemas';
 import { navigate } from '@/app/router';
-import { confirmAndTrash, entityPath, patchStatus } from '@/teacher/lifecycle-api';
+import { confirmAndArchive, confirmAndTrash } from '@/teacher/lifecycle-api';
 import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
 import { renderPageHeader } from '@/teacher/page-header';
 
@@ -155,8 +156,9 @@ export function renderTemplatesPage(
                       return;
                     }
                     const lesson = await useLessonTemplate({ templateId: row.id, unitId });
-                    await options.onCreated?.();
+                    applyCreatedEntity('lesson', lesson);
                     navigate(`/lessons/${lesson.id}`);
+                    void options.onCreated?.();
                   } else {
                     const parent = pickSubject(curriculum);
                     if (!parent) {
@@ -168,8 +170,9 @@ export function renderTemplatesPage(
                       yearId: parent.yearId,
                       subjectId: parent.subjectId
                     });
-                    await options.onCreated?.();
+                    applyCreatedEntity('unit', unit);
                     navigate(`/units/${unit.id}`);
+                    void options.onCreated?.();
                   }
                 } catch {
                   setStatus('Unable to create from template.');
@@ -197,34 +200,32 @@ export function renderTemplatesPage(
           {
             label: 'Archive',
             onSelect: () => {
-              void (async () => {
-                if (!window.confirm(`Archive “${row.title}”?`)) return;
-                try {
-                  const type = tab === 'lessons' ? 'lesson_template' : 'unit_template';
-                  await patchStatus(entityPath(type, row.id), 'archived');
-                  await reload();
-                  setStatus('Archived.');
-                } catch {
-                  setStatus('Unable to archive.');
+              const type = tab === 'lessons' ? 'lesson_template' : 'unit_template';
+              confirmAndArchive(type, row.id, row.title, () => {
+                if (tab === 'lessons') {
+                  lessonRows = lessonRows.filter((entry) => entry.id !== row.id);
+                } else {
+                  unitRows = unitRows.filter((entry) => entry.id !== row.id);
                 }
-              })();
+                renderList();
+                setStatus('Archived.');
+              });
             }
           },
           {
             label: 'Move to trash',
             danger: true,
             onSelect: () => {
-              void (async () => {
-                try {
-                  const type = tab === 'lessons' ? 'lesson_template' : 'unit_template';
-                  const ok = await confirmAndTrash(type, row.id, row.title);
-                  if (!ok) return;
-                  await reload();
-                  setStatus('Moved to trash.');
-                } catch {
-                  setStatus('Unable to move to trash.');
+              const type = tab === 'lessons' ? 'lesson_template' : 'unit_template';
+              confirmAndTrash(type, row.id, row.title, () => {
+                if (tab === 'lessons') {
+                  lessonRows = lessonRows.filter((entry) => entry.id !== row.id);
+                } else {
+                  unitRows = unitRows.filter((entry) => entry.id !== row.id);
                 }
-              })();
+                renderList();
+                setStatus('Moved to trash.');
+              });
             }
           }
         ],

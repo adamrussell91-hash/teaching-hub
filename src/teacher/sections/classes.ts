@@ -23,11 +23,7 @@ import {
 } from '@/teacher/sections/homepage-editor';
 import { patchClass, patchScheduledLesson } from '@/teacher/schedule-api';
 import { openScheduleOverflow } from '@/teacher/schedule-overflow';
-import {
-  confirmAndArchive,
-  confirmAndTrash,
-  entityPath
-} from '@/teacher/lifecycle-api';
+import { confirmAndArchive, confirmAndTrash } from '@/teacher/lifecycle-api';
 import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
 import { renderUnitSequence } from '@/teacher/unit-sequence';
 import { renderPageHeader } from '@/teacher/page-header';
@@ -127,31 +123,18 @@ export function renderClassesIndex(
           {
             label: 'Archive',
             onSelect: () => {
-              void (async () => {
-                try {
-                  const ok = await confirmAndArchive(
-                    entityPath('class', cls.id),
-                    cls.code || cls.title
-                  );
-                  if (ok) await options.onMutated?.();
-                } catch {
-                  window.alert('Unable to archive class.');
-                }
-              })();
+              confirmAndArchive('class', cls.id, cls.code || cls.title, () => {
+                void options.onMutated?.();
+              });
             }
           },
           {
             label: 'Move to trash',
             danger: true,
             onSelect: () => {
-              void (async () => {
-                try {
-                  const ok = await confirmAndTrash('class', cls.id, cls.code || cls.title);
-                  if (ok) await options.onMutated?.();
-                } catch {
-                  window.alert('Unable to move class to trash.');
-                }
-              })();
+              confirmAndTrash('class', cls.id, cls.code || cls.title, () => {
+                void options.onMutated?.();
+              });
             }
           }
         ],
@@ -220,35 +203,18 @@ export function renderClassPage(
       {
         label: 'Archive',
         onSelect: () => {
-          void (async () => {
-            try {
-              const ok = await confirmAndArchive(
-                entityPath('class', pageClass.id),
-                pageClass.code || pageClass.title
-              );
-              if (ok) navigate('/classes');
-            } catch {
-              window.alert('Unable to archive class.');
-            }
-          })();
+          confirmAndArchive('class', pageClass.id, pageClass.code || pageClass.title, () => {
+            navigate('/classes');
+          });
         }
       },
       {
         label: 'Move to trash',
         danger: true,
         onSelect: () => {
-          void (async () => {
-            try {
-              const ok = await confirmAndTrash(
-                'class',
-                pageClass.id,
-                pageClass.code || pageClass.title
-              );
-              if (ok) navigate('/classes');
-            } catch {
-              window.alert('Unable to move class to trash.');
-            }
-          })();
+          confirmAndTrash('class', pageClass.id, pageClass.code || pageClass.title, () => {
+            navigate('/classes');
+          });
         }
       }
     ],

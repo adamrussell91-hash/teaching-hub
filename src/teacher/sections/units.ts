@@ -13,11 +13,7 @@ import { ApiClientError } from '@/api/client';
 import { renderPageHeader } from '@/teacher/page-header';
 import { downloadPortableExport } from '@/teacher/export-api';
 import { gradientForEntityId, renderEntityBanner } from '@/teacher/entity-banner';
-import {
-  confirmAndArchive,
-  confirmAndTrash,
-  entityPath
-} from '@/teacher/lifecycle-api';
+import { confirmAndArchive, confirmAndTrash } from '@/teacher/lifecycle-api';
 import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
 import {
   mountBlockCanvas,
@@ -299,28 +295,18 @@ function renderUnitCard(
       {
         label: 'Archive',
         onSelect: () => {
-          void (async () => {
-            try {
-              const ok = await confirmAndArchive(entityPath('unit', unit.id), unit.title);
-              if (ok) await options.onMutated?.();
-            } catch {
-              window.alert('Unable to archive unit.');
-            }
-          })();
+          confirmAndArchive('unit', unit.id, unit.title, () => {
+            void options.onMutated?.();
+          });
         }
       },
       {
         label: 'Move to trash',
         danger: true,
         onSelect: () => {
-          void (async () => {
-            try {
-              const ok = await confirmAndTrash('unit', unit.id, unit.title);
-              if (ok) await options.onMutated?.();
-            } catch {
-              window.alert('Unable to move unit to trash.');
-            }
-          })();
+          confirmAndTrash('unit', unit.id, unit.title, () => {
+            void options.onMutated?.();
+          });
         }
       }
     ],
@@ -388,28 +374,18 @@ export function renderUnitPage(
       {
         label: 'Archive',
         onSelect: () => {
-          void (async () => {
-            try {
-              const ok = await confirmAndArchive(entityPath('unit', unit.id), unit.title);
-              if (ok) navigate('/units');
-            } catch {
-              window.alert('Unable to archive unit.');
-            }
-          })();
+          confirmAndArchive('unit', unit.id, unit.title, () => {
+            navigate('/units');
+          });
         }
       },
       {
         label: 'Move to trash',
         danger: true,
         onSelect: () => {
-          void (async () => {
-            try {
-              const ok = await confirmAndTrash('unit', unit.id, unit.title);
-              if (ok) navigate('/units');
-            } catch {
-              window.alert('Unable to move unit to trash.');
-            }
-          })();
+          confirmAndTrash('unit', unit.id, unit.title, () => {
+            navigate('/units');
+          });
         }
       }
     ],

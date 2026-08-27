@@ -571,15 +571,10 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
           window.alert('Unable to export this lesson.');
         });
       },
-      onTrash: () => {
-        void (async () => {
-          try {
-            const ok = await confirmAndTrash('lesson', lesson.id, lesson.title);
-            if (ok) navigate('/lessons');
-          } catch {
-            window.alert('Unable to move lesson to trash.');
-          }
-        })();
+          onTrash: () => {
+        confirmAndTrash('lesson', lesson.id, lesson.title, () => {
+          navigate('/lessons');
+        });
       },
       onSaveComposition: (blockId) => {
         void saveBlockAsComposition(blockId);

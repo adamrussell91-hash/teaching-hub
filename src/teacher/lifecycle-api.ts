@@ -1,4 +1,9 @@
 import { apiDelete, apiGet, apiPatch, apiPost, ApiClientError } from '@/api/client';
+import {
+  applyEntityStatus,
+  readEntityStatus
+} from '@/app/curriculum-state';
+import type { CurriculumEntityType } from '@/curriculum/with-entity-status';
 import type { DependencyHit } from '@/recovery/dependencies';
 import type { EntityStatus } from '@/recovery/lifecycle';
 
@@ -85,38 +90,89 @@ export function dependenciesFromError(error: unknown): DependencyHit[] {
   return Array.isArray(deps) ? (deps as DependencyHit[]) : [];
 }
 
-/** Preflight dependencies, confirm, then trash. Returns true if trashed. */
-export async function confirmAndTrash(
+function isCurriculumEntityType(type: LifecycleEntityType): type is CurriculumEntityType {
+  return type === 'lesson' || type === 'unit' || type === 'class' || type === 'media';
+}
+
+function persistErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiClientError) return error.message;
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
+}
+
+function persistStatusInBackground(
   type: LifecycleEntityType,
   id: string,
-  title: string
-): Promise<boolean> {
-  let dependencies: DependencyHit[] = [];
-  try {
-    const result = await getDependencies(type, id);
-    dependencies = result.dependencies;
-  } catch {
-    // Still allow trash if dependency preflight fails.
-  }
+  status: EntityStatus,
+  previous: EntityStatus | undefined,
+  onApplied: (() => void) | undefined,
+  fallback: string
+): void {
+  void Promise.resolve(patchStatus(entityPath(type, id), status)).catch((error: unknown) => {
+    if (isCurriculumEntityType(type) && previous) {
+      applyEntityStatus(type, id, previous);
+    }
+    onApplied?.();
+    if (typeof window.alert === 'function') {
+      window.alert(persistErrorMessage(error, fallback));
+    }
+  });
+}
 
-  const quoted = `“${title}”`;
-  if (dependencies.length > 0) {
-    const ok = window.confirm(
-      `${quoted} is still referenced by:\n${formatDependencyList(dependencies)}\n\nMove to trash anyway?`
-    );
-    if (!ok) return false;
-  } else {
-    const ok = window.confirm(`Move ${quoted} to trash?`);
-    if (!ok) return false;
-  }
+/**
+ * Confirm, paint the change immediately, then persist in the background.
+ * Returns true if the teacher confirmed.
+ */
+export function confirmAndTrash(
+  type: LifecycleEntityType,
+  id: string,
+  title: string,
+  onApplied?: () => void
+): boolean {
+  const ok = window.confirm(`Move “${title}” to trash?`);
+  if (!ok) return false;
 
-  await patchStatus(entityPath(type, id), 'trashed');
+  const previous = isCurriculumEntityType(type) ? readEntityStatus(type, id) : undefined;
+  if (isCurriculumEntityType(type)) {
+    applyEntityStatus(type, id, 'trashed');
+  }
+  onApplied?.();
+  persistStatusInBackground(
+    type,
+    id,
+    'trashed',
+    previous ?? 'active',
+    onApplied,
+    'Unable to move to trash.'
+  );
   return true;
 }
 
-export async function confirmAndArchive(path: string, title: string): Promise<boolean> {
+/**
+ * Confirm, paint the change immediately, then persist in the background.
+ * Returns true if the teacher confirmed.
+ */
+export function confirmAndArchive(
+  type: LifecycleEntityType,
+  id: string,
+  title: string,
+  onApplied?: () => void
+): boolean {
   const ok = window.confirm(`Archive “${title}”?`);
   if (!ok) return false;
-  await patchStatus(path, 'archived');
+
+  const previous = isCurriculumEntityType(type) ? readEntityStatus(type, id) : undefined;
+  if (isCurriculumEntityType(type)) {
+    applyEntityStatus(type, id, 'archived');
+  }
+  onApplied?.();
+  persistStatusInBackground(
+    type,
+    id,
+    'archived',
+    previous ?? 'active',
+    onApplied,
+    'Unable to archive.'
+  );
   return true;
 }

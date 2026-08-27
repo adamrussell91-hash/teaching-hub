@@ -1,6 +1,6 @@
 import { ApiClientError } from '@/api/client';
 import type { CurriculumResponse } from '@/teacher/nav';
-import type { LessonTemplateSummary, Unit } from '@/schemas';
+import type { Lesson, LessonTemplateSummary, Unit } from '@/schemas';
 import { listLessonTemplates, useLessonTemplate } from '@/teacher/template-api';
 
 function labeledSelect(
@@ -41,8 +41,8 @@ function labeledSelect(
 
 function openFromTemplateDialog(options: {
   body: HTMLElement;
-  confirm?: { label: string; onConfirm: () => Promise<string> };
-}): Promise<string | null> {
+  confirm?: { label: string; onConfirm: () => Promise<Lesson> };
+}): Promise<Lesson | null> {
   return new Promise((resolve) => {
     let settled = false;
 
@@ -91,12 +91,12 @@ function openFromTemplateDialog(options: {
     backdrop.append(dialog);
     document.body.append(backdrop);
 
-    const finish = (id: string | null): void => {
+    const finish = (lesson: Lesson | null): void => {
       if (settled) return;
       settled = true;
       document.removeEventListener('keydown', onKeyDown);
       backdrop.remove();
-      resolve(id);
+      resolve(lesson);
     };
 
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -119,8 +119,8 @@ function openFromTemplateDialog(options: {
         errorBanner.hidden = true;
         errorBanner.textContent = '';
         try {
-          const id = await options.confirm.onConfirm();
-          finish(id);
+          const created = await options.confirm.onConfirm();
+          finish(created);
         } catch (error) {
           const message =
             error instanceof ApiClientError
@@ -137,7 +137,7 @@ function openFromTemplateDialog(options: {
   });
 }
 
-function openFromTemplateMessage(message: string): Promise<string | null> {
+function openFromTemplateMessage(message: string): Promise<Lesson | null> {
   const body = document.createElement('p');
   body.className = 'create-modal__message';
   body.textContent = message;
@@ -147,7 +147,7 @@ function openFromTemplateMessage(message: string): Promise<string | null> {
 function openFromTemplatePicker(
   templates: LessonTemplateSummary[],
   units: Unit[]
-): Promise<string | null> {
+): Promise<Lesson | null> {
   const fields = document.createElement('div');
   fields.className = 'create-modal__fields';
   fields.append(
@@ -177,8 +177,7 @@ function openFromTemplatePicker(
         if (!templateId || !unitId) {
           throw new Error('Please fill in all required fields.');
         }
-        const created = await useLessonTemplate({ templateId, unitId });
-        return created.id;
+        return useLessonTemplate({ templateId, unitId });
       }
     }
   });
@@ -186,7 +185,7 @@ function openFromTemplatePicker(
 
 export async function promptLessonFromTemplate(
   curriculum: CurriculumResponse
-): Promise<string | null> {
+): Promise<Lesson | null> {
   const units = curriculum.units.filter((unit) => unit.status === 'active');
   if (units.length === 0) {
     return openFromTemplateMessage('Create a unit before using a lesson template.');
