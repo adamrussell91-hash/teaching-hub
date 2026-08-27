@@ -800,6 +800,7 @@
       animCtx.animHandle = animHandle;
       animateTo(animCtx, target);
       animHandle = animCtx.animHandle;
+      updateEdges();
       dom.emptyHint.style.display = node(state.rootId).childIds.length === 0 ? "flex" : "none";
       Object.keys(elements).forEach(function (id) {
         elements[id].classList.toggle("is-selected", id === selectedId);
