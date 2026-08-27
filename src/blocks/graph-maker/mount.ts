@@ -61,64 +61,70 @@ function createCanvasDom(readOnly: boolean): {
   const root = document.createElement('div');
   root.className = 'block-graph-maker';
 
+  const instanceId = Math.random().toString(36).slice(2, 8);
   const canvasWrap = document.createElement('div');
   canvasWrap.className = 'canvas-wrap block-graph-maker__canvas';
-  canvasWrap.id = `graph-canvas-${Math.random().toString(36).slice(2, 8)}`;
+  canvasWrap.id = `graph-canvas-${instanceId}`;
 
   const world = document.createElement('div');
-  world.id = 'world';
+  world.className = 'graph-maker__world';
+  world.id = `graph-world-${instanceId}`;
 
   const edges = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  edges.id = 'edges';
+  edges.classList.add('graph-maker__edges');
+  edges.id = `graph-edges-${instanceId}`;
+  edges.setAttribute('overflow', 'visible');
+  edges.setAttribute('aria-hidden', 'true');
 
   const nodesLayer = document.createElement('div');
-  nodesLayer.id = 'nodesLayer';
+  nodesLayer.className = 'graph-maker__nodes';
+  nodesLayer.id = `graph-nodes-${instanceId}`;
 
   world.append(edges, nodesLayer);
   canvasWrap.append(world);
 
   const hintBar = document.createElement('p');
   hintBar.className = 'hint-bar';
-  hintBar.id = 'hintBar';
+  hintBar.id = `hintBar-${instanceId}`;
   hintBar.hidden = readOnly;
 
   const emptyHint = document.createElement('div');
   emptyHint.className = 'empty-hint';
-  emptyHint.id = 'emptyHint';
+  emptyHint.id = `emptyHint-${instanceId}`;
   emptyHint.hidden = true;
   emptyHint.innerHTML = '<p></p>';
 
   const zoomControls = document.createElement('div');
   zoomControls.className = 'zoom-controls block-graph-maker__zoom';
   zoomControls.innerHTML = `
-    <button type="button" id="zoomOut" aria-label="Zoom out" title="Zoom out">−</button>
-    <span class="zoom-controls__pct" id="zoomPct">100%</span>
-    <button type="button" id="zoomIn" aria-label="Zoom in" title="Zoom in">+</button>
-    <button type="button" id="zoomReset" aria-label="Reset zoom" title="Reset zoom">⟳</button>
+    <button type="button" id="zoomOut-${instanceId}" aria-label="Zoom out" title="Zoom out">−</button>
+    <span class="zoom-controls__pct" id="zoomPct-${instanceId}">100%</span>
+    <button type="button" id="zoomIn-${instanceId}" aria-label="Zoom in" title="Zoom in">+</button>
+    <button type="button" id="zoomReset-${instanceId}" aria-label="Reset zoom" title="Reset zoom">⟳</button>
   `;
 
   const fabAdd = document.createElement('button');
   fabAdd.className = 'fab block-graph-maker__fab';
-  fabAdd.id = 'fabAdd';
+  fabAdd.id = `fabAdd-${instanceId}`;
   fabAdd.type = 'button';
   fabAdd.hidden = readOnly;
 
   const colorPopover = document.createElement('div');
   colorPopover.className = 'color-popover';
-  colorPopover.id = 'colorPopover';
+  colorPopover.id = `colorPopover-${instanceId}`;
   colorPopover.setAttribute('role', 'dialog');
   colorPopover.setAttribute('aria-label', 'Choose colour');
 
   const linkBanner = document.createElement('p');
   linkBanner.className = 'link-banner';
-  linkBanner.id = 'linkBanner';
+  linkBanner.id = `linkBanner-${instanceId}`;
   linkBanner.hidden = true;
   linkBanner.textContent = 'Drag to another concept to connect — Esc to cancel';
 
   const edgeLabelEditor = document.createElement('input');
   edgeLabelEditor.type = 'text';
   edgeLabelEditor.className = 'edge-label-editor';
-  edgeLabelEditor.id = 'edgeLabelEditor';
+  edgeLabelEditor.id = `edgeLabelEditor-${instanceId}`;
   edgeLabelEditor.setAttribute('aria-label', 'Relationship label');
   edgeLabelEditor.hidden = true;
 
@@ -128,17 +134,17 @@ function createCanvasDom(readOnly: boolean): {
   const hiddenChrome = document.createElement('div');
   hiddenChrome.hidden = true;
   hiddenChrome.innerHTML = `
-    <button type="button" id="btnNew"></button>
-    <button type="button" id="btnImport"></button>
-    <button type="button" id="btnExport"></button>
-    <button type="button" id="btnFit"></button>
-    <input type="file" id="fileInput" />
+    <button type="button" id="btnNew-${instanceId}"></button>
+    <button type="button" id="btnImport-${instanceId}"></button>
+    <button type="button" id="btnExport-${instanceId}"></button>
+    <button type="button" id="btnFit-${instanceId}"></button>
+    <input type="file" id="fileInput-${instanceId}" />
   `;
   root.append(hiddenChrome);
 
   const pick = (id: string): HTMLElement => {
-    const el = root.querySelector(`#${id}`) as HTMLElement | null;
-    if (!el) throw new Error(`Graph maker DOM missing #${id}`);
+    const el = root.querySelector(`#${id}-${instanceId}`) as HTMLElement | null;
+    if (!el) throw new Error(`Graph maker DOM missing #${id}-${instanceId}`);
     return el;
   };
 

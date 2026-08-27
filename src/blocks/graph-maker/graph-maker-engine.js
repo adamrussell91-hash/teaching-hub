@@ -40,14 +40,29 @@
   }
 
   function measureSizes(elements, zoom, sizes) {
+    var safeZoom = zoom || 1;
     Object.keys(elements).forEach(function (id) {
       var el = elements[id];
+      var card = (el && el.querySelector && el.querySelector(".node__card")) || el;
       var prevTransition = el.style.transition;
       el.style.transition = "none";
-      var r = el.getBoundingClientRect();
-      sizes[id] = { w: r.width / zoom, h: r.height / zoom };
+      var r = card.getBoundingClientRect();
+      sizes[id] = {
+        w: r.width > 1 ? r.width / safeZoom : 120,
+        h: r.height > 1 ? r.height / safeZoom : 44
+      };
       el.style.transition = prevTransition;
     });
+  }
+
+  function styleConnector(el, color) {
+    if (!el) return;
+    el.setAttribute("fill", "none");
+    el.setAttribute("stroke", color || "#13233a");
+    el.setAttribute("stroke-width", "2");
+    el.setAttribute("stroke-linecap", "round");
+    el.setAttribute("stroke-linejoin", "round");
+    el.setAttribute("stroke-opacity", "0.85");
   }
 
   function setNodeTransform(el, x, y, scale, opacity) {
@@ -648,6 +663,8 @@
       var span = el.querySelector(".node__text");
       if (span.textContent !== n.text) span.textContent = n.text;
       el.classList.toggle("node--root", isRoot(id));
+      el.classList.toggle("node--left", n.side === "left");
+      el.classList.toggle("node--right", n.side === "right");
       el.querySelector(".node__color").style.color = n.color;
     }
 
@@ -761,8 +778,7 @@
         var bend = Math.max(24, Math.abs(p2x - p1x) * 0.5);
         var c1x = p1x + sign * bend, c2x = p2x - sign * bend;
         path.setAttribute("d", "M " + p1x + "," + p1y + " C " + c1x + "," + p1y + " " + c2x + "," + p2y + " " + p2x + "," + p2y);
-        path.setAttribute("stroke", n.color);
-        path.setAttribute("stroke-opacity", "0.55");
+        styleConnector(path, "#13233a");
       });
       Object.keys(edgePaths).forEach(function (id) {
         if (!seen[id]) {
@@ -787,6 +803,7 @@
       animCtx.animHandle = animHandle;
       animateTo(animCtx, target);
       animHandle = animCtx.animHandle;
+      updateEdges();
       dom.emptyHint.style.display = node(state.rootId).childIds.length === 0 ? "flex" : "none";
       Object.keys(elements).forEach(function (id) {
         elements[id].classList.toggle("is-selected", id === selectedId);
@@ -978,14 +995,20 @@
     var resizeTimer = null;
     function onResize() {
       clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(function () { pz.fitView(currentPositions, sizes); }, 150);
+      resizeTimer = setTimeout(function () {
+        render();
+        pz.fitView(currentPositions, sizes);
+      }, 150);
     }
     window.addEventListener("resize", onResize);
     teardown.push(function () { window.removeEventListener("resize", onResize); });
 
     pz.centerView();
     render();
-    requestAnimationFrame(function () { pz.fitView(currentPositions, sizes); });
+    requestAnimationFrame(function () {
+      render();
+      pz.fitView(currentPositions, sizes);
+    });
 
     return {
       destroy: function () {
@@ -1380,6 +1403,8 @@
       bg.setAttribute("class", "graph-edge__label-bg");
       bg.setAttribute("rx", "4");
       bg.setAttribute("ry", "4");
+      bg.setAttribute("fill", "#fbf8f2");
+      bg.setAttribute("stroke", "rgba(23, 55, 94, 0.10)");
       var label = document.createElementNS("http://www.w3.org/2000/svg", "text");
       label.setAttribute("class", "graph-edge__label");
       label.setAttribute("text-anchor", "middle");
@@ -1417,14 +1442,11 @@
         var bg = g.querySelector("rect");
         var label = g.querySelector("text");
 
-        var fromNode = node(edge.from);
-        var strokeColor = fromNode ? fromNode.color : ORCA;
         line.setAttribute("x1", ep.x1);
         line.setAttribute("y1", ep.y1);
         line.setAttribute("x2", ep.x2);
         line.setAttribute("y2", ep.y2);
-        line.setAttribute("stroke", strokeColor);
-        line.setAttribute("stroke-opacity", "0.55");
+        styleConnector(line, "#13233a");
 
         label.textContent = edge.label;
         var textLen = Math.max(40, edge.label.length * 7 + 16);
@@ -1680,10 +1702,9 @@
     function ensureLinkTempLine() {
       if (linkTempLine) return linkTempLine;
       linkTempLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
-      linkTempLine.setAttribute("stroke", ORCA);
-      linkTempLine.setAttribute("stroke-opacity", "0.45");
-      linkTempLine.setAttribute("stroke-width", "2");
+      styleConnector(linkTempLine, ORCA);
       linkTempLine.setAttribute("stroke-dasharray", "6 4");
+      linkTempLine.setAttribute("stroke-opacity", "0.45");
       dom.edgesSvg.appendChild(linkTempLine);
       return linkTempLine;
     }
@@ -1904,14 +1925,20 @@
     var resizeTimer = null;
     function onResize() {
       clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(function () { pz.fitView(currentPositions, sizes); }, 150);
+      resizeTimer = setTimeout(function () {
+        render();
+        pz.fitView(currentPositions, sizes);
+      }, 150);
     }
     window.addEventListener("resize", onResize);
     teardown.push(function () { window.removeEventListener("resize", onResize); });
 
     pz.centerView();
     render();
-    requestAnimationFrame(function () { pz.fitView(currentPositions, sizes); });
+    requestAnimationFrame(function () {
+      render();
+      pz.fitView(currentPositions, sizes);
+    });
 
     return {
       destroy: function () {

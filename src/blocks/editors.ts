@@ -2733,14 +2733,7 @@ function createGraphBlockEditor<T extends Block>(
   const canvasHost = document.createElement('div');
   canvasHost.className = 'block-graph-maker-host';
 
-  const hint = document.createElement('p');
-  hint.className = 'block-editor__hint';
-  hint.textContent =
-    mode === 'mindmap'
-      ? 'Tab adds a child, Enter adds a sibling, drag onto another node to reparent.'
-      : 'Enter adds a concept, Tab adds a linked concept, drag ⟷ to connect with a labelled relationship.';
-
-  fields.append(title, hint, canvasHost);
+  fields.append(title, canvasHost);
 
   mountGraphMaker(canvasHost, {
     mode,

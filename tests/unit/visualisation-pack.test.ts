@@ -704,6 +704,13 @@ describe('visualisation editors', () => {
 
       expect(el.querySelector('.block-editor__mind-map-title')).not.toBeNull();
       expect(el.querySelector('.block-graph-maker-host .block-graph-maker')).not.toBeNull();
+      const connectors = [...el.querySelectorAll('.graph-maker__edges path')];
+      expect(connectors.length).toBeGreaterThan(0);
+      for (const path of connectors) {
+        expect(path.getAttribute('fill')).toBe('none');
+        expect(path.getAttribute('stroke-width')).toBe('2');
+        expect(path.getAttribute('d') ?? '').toMatch(/^M /);
+      }
 
       const title = el.querySelector('.block-editor__mind-map-title') as HTMLInputElement;
       title.value = 'Unit map';
@@ -724,6 +731,15 @@ describe('visualisation editors', () => {
       expect(el.querySelector('.block-editor__concept-map-title')).not.toBeNull();
       expect(el.querySelector('.block-graph-maker-host .block-graph-maker')).not.toBeNull();
       expect(el.querySelector('.block-graph-maker .graph-edge')).not.toBeNull();
+      const lines = [...el.querySelectorAll('.graph-maker__edges line')];
+      expect(lines.length).toBeGreaterThan(0);
+      for (const line of lines) {
+        expect(line.getAttribute('fill')).toBe('none');
+        expect(line.getAttribute('stroke-width')).toBe('2');
+      }
+      const labelBg = el.querySelector('.graph-edge__label-bg');
+      expect(labelBg).not.toBeNull();
+      expect(labelBg?.getAttribute('fill')).toBe('#fbf8f2');
     });
   });
 
