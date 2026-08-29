@@ -262,12 +262,16 @@ describe('units', () => {
     expect(headings).toEqual(['Year 11', 'Year 12']);
   });
 
-  it('opens the unit page route', () => {
+  it('expands unit tiles before opening the unit page', async () => {
     renderUnitsIndex(canvas, curriculum);
     canvas.querySelector<HTMLAnchorElement>('a[href="/units/unit_aotfw"]')!.dispatchEvent(
       new MouseEvent('click', { bubbles: true, cancelable: true })
     );
-    expect(navigate).toHaveBeenCalledWith('/units/unit_aotfw');
+    expect(document.querySelector('.entity-card-expand')).toBeTruthy();
+    document.querySelector<HTMLButtonElement>('.entity-card-expand__full-page')?.click();
+    await vi.waitFor(() => {
+      expect(navigate).toHaveBeenCalledWith('/units/unit_aotfw');
+    });
   });
 
   it('lists unit lessons in sequence and opens the editor', () => {

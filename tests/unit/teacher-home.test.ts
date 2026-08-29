@@ -217,7 +217,7 @@ describe('teacher home dashboard', () => {
     expect(canvas.querySelector('.class-calendar__timeline-today')?.textContent).toBe('Today');
   });
 
-  it('links class tiles with year-subject titles, not the class code as the heading', () => {
+  it('expands class tiles from the dashboard before opening the class page', async () => {
     const result = renderTeacherHome(canvas, curriculum);
     dispose = result.dispose;
 
@@ -230,7 +230,11 @@ describe('teacher home dashboard', () => {
     );
     expect(classTile?.querySelector('.home-class-tile__eyebrow')?.textContent).toBe('12ENGADV1');
     classTile?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-    expect(navigate).toHaveBeenCalledWith('/classes/class_2026_12engadv1');
+    expect(document.querySelector('.entity-card-expand')).toBeTruthy();
+    document.querySelector<HTMLButtonElement>('.entity-card-expand__full-page')?.click();
+    await vi.waitFor(() => {
+      expect(navigate).toHaveBeenCalledWith('/classes/class_2026_12engadv1');
+    });
   });
 
   it('dispose clears the clock interval without throwing', () => {
