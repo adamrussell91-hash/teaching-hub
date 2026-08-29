@@ -15,6 +15,7 @@ import { downloadPortableExport } from '@/teacher/export-api';
 import { gradientForEntityId, renderEntityBanner } from '@/teacher/entity-banner';
 import { confirmAndArchive, confirmAndTrash } from '@/teacher/lifecycle-api';
 import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
+import { wireEntityCardExpand } from '@/teacher/entity-card-expand';
 import {
   mountBlockCanvas,
   type BlockCanvasHandle
@@ -252,6 +253,7 @@ function renderUnitCard(
   const subject = subjectsById.get(unit.subject_id);
   const year = yearsById.get(unit.year_id);
   const path = `/units/${unit.id}`;
+  const metaText = [year?.title, subject?.title].filter(Boolean).join(' · ');
 
   const card = document.createElement('div');
   card.className = 'units-index__card';
@@ -259,10 +261,21 @@ function renderUnitCard(
   const tile = document.createElement('a');
   tile.className = 'glass-tile home-class-tile entity-cover-tile units-index__tile';
   tile.href = path;
-  tile.addEventListener('click', (event) => {
-    event.preventDefault();
-    navigate(path);
-  });
+  wireEntityCardExpand(
+    tile,
+    {
+      kind: 'unit',
+      id: unit.id,
+      title: unit.title,
+      eyebrow: subject?.title,
+      cover: unit.cover ?? null,
+      media,
+      fullPagePath: path,
+      metaText,
+      editableTitle: true
+    },
+    { onMutated: options.onMutated }
+  );
 
   const mediaEl = document.createElement('div');
   mediaEl.className = 'entity-cover-tile__media';
@@ -504,7 +517,27 @@ export function renderUnitPage(
 
     for (const lesson of lessons) {
       const item = document.createElement('li');
-      item.className = 'lesson-list__item';
+      item.className = 'lesson-list__item lesson-list__item--openable';
+      item.tabIndex = 0;
+      item.setAttribute('role', 'button');
+      item.setAttribute('aria-label', `Expand ${lesson.title}`);
+
+      const path = `/lessons/${lesson.id}`;
+      wireEntityCardExpand(
+        item,
+        {
+          kind: 'lesson',
+          id: lesson.id,
+          title: lesson.title,
+          eyebrow: unit.title,
+          media: curriculum.media,
+          fullPagePath: path,
+          metaText: lesson.published ? 'Published' : 'Draft',
+          previewText: lesson.excerpt,
+          editableTitle: true
+        },
+        { onMutated: options.onMutated }
+      );
 
       const info = document.createElement('div');
       info.className = 'lesson-list__info';
@@ -519,7 +552,6 @@ export function renderUnitPage(
 
       info.append(title, meta);
 
-      const path = `/lessons/${lesson.id}`;
       const rowMenu = mountPageOptionsMenu(
         [
           {

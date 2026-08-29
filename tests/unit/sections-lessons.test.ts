@@ -59,7 +59,7 @@ describe('lessons index', () => {
     history.replaceState(null, '', '/lessons');
   });
 
-  it('lists lessons and opens the editor', () => {
+  it('lists lessons and opens the expanded card', async () => {
     renderLessonsIndex(canvas, curriculum);
     expect(canvas.querySelector('.page-header__title')?.textContent).toBe('Lessons');
     expect(canvas.querySelector('[data-create-trigger]')?.getAttribute('aria-label')).toMatch(
@@ -69,7 +69,11 @@ describe('lessons index', () => {
     const card = canvas.querySelector<HTMLElement>('.lesson-list__item--openable')!;
     expect(card).toBeTruthy();
     card.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-    expect(navigate).toHaveBeenCalledWith('/lessons/lesson_001');
+    expect(document.querySelector('.entity-card-expand')).toBeTruthy();
+    document.querySelector<HTMLButtonElement>('.entity-card-expand__full-page')?.click();
+    await vi.waitFor(() => {
+      expect(navigate).toHaveBeenCalledWith('/lessons/lesson_001');
+    });
   });
 
   it('shows a no-results state for a query that matches nothing', async () => {

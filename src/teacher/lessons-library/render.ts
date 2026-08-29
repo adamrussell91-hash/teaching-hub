@@ -19,6 +19,7 @@ import { fetchContentSearch } from '@/teacher/search/api';
 import { readRecent } from '@/teacher/search/recent';
 import { mountPublicLinkControl } from '@/teacher/public-link';
 import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
+import { wireEntityCardExpand } from '@/teacher/entity-card-expand';
 import { createHubFilter } from '../../../design-kit/js/hub-filter-menu.js';
 import { duplicateLesson, patchLessonLibrary } from './api';
 import { duplicateIdSet, findNearDuplicates } from './duplicates';
@@ -502,24 +503,34 @@ export function renderLessonsLibrary(
     const item = el('li', compact ? 'lesson-list__item lesson-list__item--compact' : 'lesson-list__item');
     item.classList.add('lesson-list__item--openable');
     item.tabIndex = 0;
-    item.setAttribute('role', 'link');
-    item.setAttribute('aria-label', `Open ${row.title}`);
+    item.setAttribute('role', 'button');
+    item.setAttribute('aria-label', `Expand ${row.title}`);
 
-    const openLesson = (): void => {
-      navigate(`/lessons/${row.id}`);
-    };
-    item.addEventListener('click', (event) => {
-      const target = event.target as HTMLElement | null;
-      if (target?.closest('button, a, input, .public-link, .list-row-actions')) return;
-      openLesson();
-    });
-    item.addEventListener('keydown', (event) => {
-      if (event.key !== 'Enter' && event.key !== ' ') return;
-      const target = event.target as HTMLElement | null;
-      if (target !== item) return;
-      event.preventDefault();
-      openLesson();
-    });
+    const unit = curriculum.units.find((entry) => entry.id === row.unit_id);
+    const badge = lessonBadge(row);
+    const metaParts = [
+      unit?.title ?? row.unit_id,
+      pedagogicalModeLabel(row.pedagogical_mode),
+      badgeLabel(badge),
+      formatRelativeTime(row.updated_at, now)
+    ];
+    disposers.push(
+      wireEntityCardExpand(
+        item,
+        {
+          kind: 'lesson',
+          id: row.id,
+          title: row.title,
+          eyebrow: unit?.title,
+          media: curriculum.media,
+          fullPagePath: `/lessons/${row.id}`,
+          metaText: metaParts.join(' · '),
+          previewText: row.excerpt,
+          editableTitle: true
+        },
+        { onMutated: options.onMutated }
+      ).dispose
+    );
 
     const check = document.createElement('input');
     check.type = 'checkbox';
@@ -544,8 +555,6 @@ export function renderLessonsLibrary(
 
     const info = el('div', 'lesson-list__info');
     info.append(el('p', 'lesson-list__title', row.title));
-    const unit = curriculum.units.find((entry) => entry.id === row.unit_id);
-    const badge = lessonBadge(row);
     const meta = el('p', 'lesson-list__meta');
     const pill = el('span', `status-badge status-badge--${badge}`, badgeLabel(badge));
     const modePill = el(
