@@ -7,7 +7,7 @@ import {
   renderTeacherShell,
   type TeacherShellRefs
 } from '@/teacher/shell';
-import { fetchCurriculum, type CurriculumResponse } from '@/teacher/nav';
+import type { CurriculumResponse } from '@/teacher/nav';
 import { renderTeacherRail } from '@/teacher/rail';
 import { renderTeacherHome as renderHomeCanvas } from '@/teacher/home';
 import { openBlankLesson } from '@/teacher/create/blank-lesson';
@@ -44,9 +44,17 @@ import {
   mountStudentClassView,
   type StudentClassViewHandle
 } from '@/student/class-view';
-import { createCurriculumCache } from './curriculum-cache';
+import {
+  applyCreatedEntity,
+  applyCreatedMedia,
+  applyScheduledUnitResult,
+  getCurriculum as getCachedCurriculum,
+  invalidateCurriculum as invalidateCachedCurriculum,
+  peekCurriculum,
+  reconcileCurriculum,
+  replaceCurriculum
+} from './curriculum-state';
 import { withCreatedEntity } from '@/curriculum/with-created-entity';
-import { withScheduledUnit } from '@/curriculum/with-scheduled-unit';
 import { navigate, start, type RouteMatch } from './router';
 import { renderPageHeader } from '@/teacher/page-header';
 
@@ -62,8 +70,6 @@ let session: SessionInfo = { authenticated: false };
 // Guards against stale async work (e.g. a slow curriculum fetch) clobbering
 // the DOM after the user has already navigated to a different route.
 let renderToken = 0;
-
-const curriculumCache = createCurriculumCache(fetchCurriculum);
 
 // The lesson editor mounted for the current route, if any. Torn down (with a
 // best-effort save flush) whenever the route changes.
@@ -196,34 +202,43 @@ function pathForCreatedEntity(
   }
 }
 
-async function handleEntityCreated(
+function handleEntityCreated(
   refs: TeacherShellRefs,
   kind: CreateKind,
   id: string,
   entity?: CreatedRecord
-): Promise<void> {
-  // Always invalidate + refetch so rail/indexes see the new entity. Do not gate
-  // on renderToken — a create that finishes after a concurrent route change
-  // must still navigate to the new item with a fresh curriculum cache.
-  // Seed the POST body into the snapshot: Netlify Blobs list is eventually
-  // consistent, so curriculum GET can omit the row we just wrote.
-  curriculumCache.invalidate();
-  try {
-    const refreshed = await curriculumCache.get();
-    const next = entity ? withCreatedEntity(refreshed, kind, entity) : refreshed;
-    curriculumCache.replace(next);
-    navigate(pathForCreatedEntity(kind, id, next));
-  } catch (error) {
-    if (error instanceof ApiClientError && error.code === 'unauthorized') {
-      session = { authenticated: false };
-      navigate('/sign-in', { replace: true });
-      return;
-    }
-    renderCanvasStatus(
-      refs.canvas,
-      'Created, but unable to refresh. Please reload to open the new item.'
-    );
+): void {
+  const seeded = entity ? applyCreatedEntity(kind, entity) : peekCurriculum();
+  const snapshot = seeded ?? peekCurriculum();
+  if (snapshot) {
+    navigate(pathForCreatedEntity(kind, id, snapshot));
+    void reconcileCurriculum().catch((error) => {
+      if (error instanceof ApiClientError && error.code === 'unauthorized') {
+        session = { authenticated: false };
+        navigate('/sign-in', { replace: true });
+      }
+    });
+    return;
   }
+
+  invalidateCachedCurriculum();
+  void getCachedCurriculum()
+    .then((refreshed) => {
+      const next = entity ? withCreatedEntity(refreshed, kind, entity) : refreshed;
+      replaceCurriculum(next);
+      navigate(pathForCreatedEntity(kind, id, next));
+    })
+    .catch((error) => {
+      if (error instanceof ApiClientError && error.code === 'unauthorized') {
+        session = { authenticated: false };
+        navigate('/sign-in', { replace: true });
+        return;
+      }
+      renderCanvasStatus(
+        refs.canvas,
+        'Created, but unable to refresh. Please reload to open the new item.'
+      );
+    });
 }
 
 function railCreateClassHandler(
@@ -300,17 +315,17 @@ function openTeacherSearch(): void {
             curriculum,
             onCreated: (kind, id, entity) => {
               if (refs) {
-                void handleEntityCreated(refs, kind, id, entity);
+                handleEntityCreated(refs, kind, id, entity);
                 return;
               }
-              invalidateCurriculum();
-              void getCurriculum()
-                .then((next) => {
-                  const seeded = entity ? withCreatedEntity(next, kind, entity) : next;
-                  curriculumCache.replace(seeded);
-                  navigate(pathForCreatedEntity(kind, id, seeded));
-                })
-                .catch(() => navigate(pathForCreatedEntity(kind, id, curriculum)));
+              if (entity) applyCreatedEntity(kind, entity);
+              const seeded = peekCurriculum();
+              if (seeded) {
+                navigate(pathForCreatedEntity(kind, id, seeded));
+                void reconcileCurriculum();
+                return;
+              }
+              navigate(pathForCreatedEntity(kind, id, curriculum));
             }
           });
           return;
@@ -357,11 +372,33 @@ function mountTeacherRail(
 }
 
 function getCurriculum(): Promise<CurriculumResponse> {
-  return curriculumCache.get();
+  return getCachedCurriculum();
 }
 
 function invalidateCurriculum(): void {
-  curriculumCache.invalidate();
+  invalidateCachedCurriculum();
+}
+
+function remountFromSnapshot(
+  token: number,
+  refs: TeacherShellRefs,
+  section: TeacherSection,
+  remount: (data: CurriculumResponse) => void,
+  activeClassId?: string
+): void {
+  const next = peekCurriculum();
+  if (!next) {
+    invalidateCurriculum();
+    void getCurriculum().then((fresh) => {
+      if (token !== renderToken) return;
+      mountTeacherRail(refs, fresh, section, activeClassId);
+      remount(fresh);
+    });
+    return;
+  }
+  if (token !== renderToken) return;
+  mountTeacherRail(refs, next, section, activeClassId);
+  remount(next);
 }
 
 async function handleLogout(): Promise<void> {
@@ -431,12 +468,8 @@ function renderTeacherClassesRoute(token: number): void {
       teardownClassesIndex();
       classesIndexHandle = renderClassesIndex(refs.canvas, data, {
         onCreated: (kind, id, entity) => handleEntityCreated(refs, kind, id, entity),
-        onMutated: async () => {
-          invalidateCurriculum();
-          const next = await getCurriculum();
-          if (token !== renderToken) return;
-          mountTeacherRail(refs, next, 'classes');
-          remount(next);
+        onMutated: () => {
+          remountFromSnapshot(token, refs, 'classes', remount);
         }
       });
     };
@@ -452,13 +485,22 @@ function renderTeacherClassRoute(classId: string, token: number): void {
   let classPageOptions: ClassPageOptions;
 
   const refreshAfterScheduleMutation = async (
-    scheduled?: Parameters<typeof withScheduledUnit>[1]
+    scheduled?: { class: CurriculumResponse['classes'][number]; scheduled_lessons: CurriculumResponse['scheduled_lessons'] }
   ): Promise<void> => {
+    const seeded = scheduled ? applyScheduledUnitResult(scheduled) : peekCurriculum();
+    if (seeded) {
+      if (token !== renderToken) return;
+      currentCurriculum = seeded;
+      mountTeacherRail(refs, seeded, 'classes', classId);
+      teardownClassPage();
+      classPageHandle = renderClassPage(refs.canvas, seeded, classId, classPageOptions);
+      void reconcileCurriculum();
+      return;
+    }
+
     invalidateCurriculum();
     try {
-      const curriculum = await getCurriculum();
-      const next = scheduled ? withScheduledUnit(curriculum, scheduled) : curriculum;
-      curriculumCache.replace(next);
+      const next = await getCurriculum();
       if (token !== renderToken) return;
       currentCurriculum = next;
       mountTeacherRail(refs, next, 'classes', classId);
@@ -528,30 +570,26 @@ function renderTeacherResourcesRoute(token: number): void {
     const mount = (data: CurriculumResponse): void => {
       renderResourcesIndex(refs.canvas, data, {
         refresh: async () => {
-          invalidateCurriculum();
-          const next = await getCurriculum();
-          if (token !== renderToken) return;
-          mountTeacherRail(refs, next, 'resources');
-          mount(next);
+          remountFromSnapshot(token, refs, 'resources', mount);
         },
         onDrivePick: async () => {
           const pick = await openDrivePicker();
           if (!pick) return;
-          if (pick.kind === 'mirror') {
-            await uploadMediaFile(pick.file, {
-              title: pick.title,
-              provider_file_id: pick.provider_file_id
-            });
-          } else {
-            await createMedia({
-              title: pick.title,
-              provider: 'google_drive',
-              media_type: pick.media_type,
-              provider_file_id: pick.provider_file_id,
-              preview_url: pick.preview_url,
-              sharing: pick.sharing
-            });
-          }
+          const created =
+            pick.kind === 'mirror'
+              ? await uploadMediaFile(pick.file, {
+                  title: pick.title,
+                  provider_file_id: pick.provider_file_id
+                })
+              : await createMedia({
+                  title: pick.title,
+                  provider: 'google_drive',
+                  media_type: pick.media_type,
+                  provider_file_id: pick.provider_file_id,
+                  preview_url: pick.preview_url,
+                  sharing: pick.sharing
+                });
+          applyCreatedMedia(created);
         }
       });
     };
@@ -566,8 +604,8 @@ function renderTeacherTemplatesRoute(token: number): void {
 
   void loadNavAndHandleErrors(refs, token, 'templates', undefined, (curriculum) => {
     renderTemplatesPage(refs.canvas, curriculum, {
-      onCreated: async () => {
-        invalidateCurriculum();
+      onCreated: () => {
+        void reconcileCurriculum();
       }
     });
   });
@@ -622,12 +660,8 @@ function renderTeacherUnitsRoute(token: number): void {
       teardownUnitsIndex();
       unitsIndexHandle = renderUnitsIndex(refs.canvas, data, {
         onCreated: (kind, id, entity) => handleEntityCreated(refs, kind, id, entity),
-        onMutated: async () => {
-          invalidateCurriculum();
-          const next = await getCurriculum();
-          if (token !== renderToken) return;
-          mountTeacherRail(refs, next, 'units');
-          remount(next);
+        onMutated: () => {
+          remountFromSnapshot(token, refs, 'units', remount);
         }
       });
     };
@@ -639,28 +673,42 @@ function renderTeacherUnitRoute(unitId: string, token: number): void {
   renderRailStatus(refs.railNav, 'Loading curriculum…');
   renderCanvasStatus(refs.canvas, 'Loading…');
 
-  const refreshUnit = async (): Promise<void> => {
-    invalidateCurriculum();
-    try {
-      const curriculum = await getCurriculum();
+  const refreshUnit = (): void => {
+    const snapshot = peekCurriculum();
+    if (snapshot) {
       if (token !== renderToken) return;
       teardownUnitPage();
-      unitPageHandle = renderUnitPage(refs.canvas, curriculum, unitId, {
+      unitPageHandle = renderUnitPage(refs.canvas, snapshot, unitId, {
         onMutated: refreshUnit,
         onCoverMutated: () => {
           invalidateCurriculum();
         }
       });
-      mountTeacherRail(refs, curriculum, 'units');
-    } catch (error) {
-      if (token !== renderToken) return;
-      if (error instanceof ApiClientError && error.code === 'unauthorized') {
-        session = { authenticated: false };
-        navigate('/sign-in', { replace: true });
-        return;
-      }
-      renderCanvasStatus(refs.canvas, 'Unable to refresh unit. Please refresh to try again.');
+      mountTeacherRail(refs, snapshot, 'units');
+      return;
     }
+    invalidateCurriculum();
+    void getCurriculum()
+      .then((curriculum) => {
+        if (token !== renderToken) return;
+        teardownUnitPage();
+        unitPageHandle = renderUnitPage(refs.canvas, curriculum, unitId, {
+          onMutated: refreshUnit,
+          onCoverMutated: () => {
+            invalidateCurriculum();
+          }
+        });
+        mountTeacherRail(refs, curriculum, 'units');
+      })
+      .catch((error) => {
+        if (token !== renderToken) return;
+        if (error instanceof ApiClientError && error.code === 'unauthorized') {
+          session = { authenticated: false };
+          navigate('/sign-in', { replace: true });
+          return;
+        }
+        renderCanvasStatus(refs.canvas, 'Unable to refresh unit. Please refresh to try again.');
+      });
   };
 
   void loadNavAndHandleErrors(refs, token, 'units', undefined, (curriculum) => {
@@ -693,12 +741,8 @@ function renderTeacherLessonsRoute(token: number): void {
       teardownLessonsIndex();
       lessonsIndexHandle = renderLessonsIndex(refs.canvas, data, {
         onCreated: (kind, id, entity) => handleEntityCreated(refs, kind, id, entity),
-        onMutated: async () => {
-          invalidateCurriculum();
-          const next = await getCurriculum();
-          if (token !== renderToken) return;
-          mountTeacherRail(refs, next, 'lessons');
-          remount(next);
+        onMutated: () => {
+          remountFromSnapshot(token, refs, 'lessons', remount);
         }
       });
     };

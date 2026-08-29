@@ -33,7 +33,7 @@ async function createBlankLessonWithUnit(options: {
       unit_id: options.unitId,
       pedagogical_mode: DEFAULT_PEDAGOGICAL_MODE
     });
-    await options.onCreated('lesson', created.id, created);
+    void options.onCreated('lesson', created.id, created);
   } catch {
     openCreateModal({
       kind: 'lesson',

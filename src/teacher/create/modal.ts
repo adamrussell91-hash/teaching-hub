@@ -305,8 +305,8 @@ export function openCreateModal(options: {
 
     try {
       const { id, entity } = await submitKind(kind, fields);
-      await onCreated(kind, id, entity);
       close();
+      void onCreated(kind, id, entity);
     } catch (error) {
       const message =
         error instanceof ApiClientError

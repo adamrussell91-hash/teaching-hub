@@ -1,4 +1,6 @@
+import { applyEntityStatus } from '@/app/curriculum-state';
 import { ApiClientError } from '@/api/client';
+import type { CurriculumEntityType } from '@/curriculum/with-entity-status';
 import {
   dependenciesFromError,
   formatDependencyList,
@@ -74,6 +76,7 @@ export function renderTrashSection(canvas: HTMLElement): { dispose: () => void }
 
   const list = document.createElement('div');
   list.className = 'trash-page__list';
+  let currentRows: TrashSummary[] = [];
 
   root.append(status, list);
   canvas.append(root);
@@ -146,22 +149,30 @@ export function renderTrashSection(canvas: HTMLElement): { dispose: () => void }
       restoreBtn.className = 'btn btn--secondary';
       restoreBtn.textContent = 'Restore';
       restoreBtn.addEventListener('click', () => {
-        void (async () => {
-          setStatus(null);
-          try {
-            await restoreFromTrash(row.type, row.id);
-            setStatus(`Restored “${row.title}”.`);
-            await reload();
-          } catch (error) {
-            const message =
-              error instanceof ApiClientError
+        setStatus(null);
+        currentRows = currentRows.filter(
+          (entry) => !(entry.id === row.id && entry.type === row.type)
+        );
+        renderRows(currentRows);
+        if (
+          row.type === 'lesson' ||
+          row.type === 'unit' ||
+          row.type === 'class' ||
+          row.type === 'media'
+        ) {
+          applyEntityStatus(row.type as CurriculumEntityType, row.id, row.previous_status ?? 'active');
+        }
+        setStatus(`Restored “${row.title}”.`);
+        void restoreFromTrash(row.type, row.id).catch((error: unknown) => {
+          const message =
+            error instanceof ApiClientError
+              ? error.message
+              : error instanceof Error
                 ? error.message
-                : error instanceof Error
-                  ? error.message
-                  : 'Unable to restore.';
-            setStatus(message, true);
-          }
-        })();
+                : 'Unable to restore.';
+          setStatus(message, true);
+          void reload();
+        });
       });
 
       const deleteBtn = document.createElement('button');
@@ -169,37 +180,38 @@ export function renderTrashSection(canvas: HTMLElement): { dispose: () => void }
       deleteBtn.className = 'btn btn--ghost';
       deleteBtn.textContent = 'Delete permanently';
       deleteBtn.addEventListener('click', () => {
-        void (async () => {
-          if (
-            !window.confirm(
-              `Permanently delete “${row.title}”? This cannot be undone.`
-            )
-          ) {
+        if (
+          !window.confirm(
+            `Permanently delete “${row.title}”? This cannot be undone.`
+          )
+        ) {
+          return;
+        }
+        setStatus(null);
+        currentRows = currentRows.filter(
+          (entry) => !(entry.id === row.id && entry.type === row.type)
+        );
+        renderRows(currentRows);
+        setStatus(`Deleted “${row.title}”.`);
+        void permanentDelete(row.type, row.id).catch((error: unknown) => {
+          const deps = dependenciesFromError(error);
+          if (deps.length > 0) {
+            setStatus(
+              `Cannot delete “${row.title}” while dependencies remain:\n${formatDependencyList(deps)}`,
+              true
+            );
+            void reload();
             return;
           }
-          setStatus(null);
-          try {
-            await permanentDelete(row.type, row.id);
-            setStatus(`Deleted “${row.title}”.`);
-            await reload();
-          } catch (error) {
-            const deps = dependenciesFromError(error);
-            if (deps.length > 0) {
-              setStatus(
-                `Cannot delete “${row.title}” while dependencies remain:\n${formatDependencyList(deps)}`,
-                true
-              );
-              return;
-            }
-            const message =
-              error instanceof ApiClientError
+          const message =
+            error instanceof ApiClientError
+              ? error.message
+              : error instanceof Error
                 ? error.message
-                : error instanceof Error
-                  ? error.message
-                  : 'Unable to delete.';
-            setStatus(message, true);
-          }
-        })();
+                : 'Unable to delete.';
+          setStatus(message, true);
+          void reload();
+        });
       });
 
       actionsCell.append(restoreBtn, deleteBtn);
@@ -219,6 +231,7 @@ export function renderTrashSection(canvas: HTMLElement): { dispose: () => void }
         const bTime = b.trashed_at ?? '';
         return bTime.localeCompare(aTime);
       });
+      currentRows = sorted;
       renderRows(sorted);
     } catch (error) {
       const message =

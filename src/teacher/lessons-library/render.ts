@@ -7,6 +7,7 @@ import {
 } from '@/curriculum/pedagogical-mode';
 import { selectTodaySchedule } from '@/teacher/home-model';
 import { resolveScheduleToday } from '@/schedule/today';
+import { applyCreatedEntity, applyEntityStatus } from '@/app/curriculum-state';
 import {
   confirmAndArchive,
   confirmAndTrash,
@@ -422,20 +423,28 @@ export function renderLessonsLibrary(
     const actions: Array<{ label: string; run: () => void | Promise<void> }> = [
       {
         label: 'Archive',
-        run: async () => {
+        run: () => {
           if (!window.confirm(`Archive ${selected.size} lessons?`)) return;
-          for (const id of selected) await patchStatus(entityPath('lesson', id), 'archived');
+          const ids = [...selected];
+          for (const id of ids) applyEntityStatus('lesson', id, 'archived');
           selected = new Set();
-          await options.onMutated?.();
+          void options.onMutated?.();
+          void Promise.all(ids.map((id) => patchStatus(entityPath('lesson', id), 'archived'))).catch(
+            () => window.alert('Bulk action failed.')
+          );
         }
       },
       {
         label: 'Trash',
-        run: async () => {
+        run: () => {
           if (!window.confirm(`Move ${selected.size} lessons to trash?`)) return;
-          for (const id of selected) await patchStatus(entityPath('lesson', id), 'trashed');
+          const ids = [...selected];
+          for (const id of ids) applyEntityStatus('lesson', id, 'trashed');
           selected = new Set();
-          await options.onMutated?.();
+          void options.onMutated?.();
+          void Promise.all(ids.map((id) => patchStatus(entityPath('lesson', id), 'trashed'))).catch(
+            () => window.alert('Bulk action failed.')
+          );
         }
       },
       {
@@ -576,35 +585,28 @@ export function renderLessonsLibrary(
           label: 'Duplicate',
           onSelect: () => {
             void duplicateLesson(row.id)
-              .then(() => options.onMutated?.())
+              .then((copy) => {
+                applyCreatedEntity('lesson', copy);
+                return options.onMutated?.();
+              })
               .catch(() => window.alert('Unable to duplicate lesson.'));
           }
         },
         {
           label: 'Archive',
           onSelect: () => {
-            void (async () => {
-              try {
-                const ok = await confirmAndArchive(entityPath('lesson', row.id), row.title);
-                if (ok) await options.onMutated?.();
-              } catch {
-                window.alert('Unable to archive lesson.');
-              }
-            })();
+            confirmAndArchive('lesson', row.id, row.title, () => {
+              void options.onMutated?.();
+            });
           }
         },
         {
           label: 'Move to trash',
           danger: true,
           onSelect: () => {
-            void (async () => {
-              try {
-                const ok = await confirmAndTrash('lesson', row.id, row.title);
-                if (ok) await options.onMutated?.();
-              } catch {
-                window.alert('Unable to move lesson to trash.');
-              }
-            })();
+            confirmAndTrash('lesson', row.id, row.title, () => {
+              void options.onMutated?.();
+            });
           }
         }
       ],

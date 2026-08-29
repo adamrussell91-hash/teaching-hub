@@ -106,7 +106,7 @@ describe('promptLessonFromTemplate', () => {
 
     document.querySelector<HTMLButtonElement>('[data-from-template-action="create"]')?.click();
 
-    await expect(pending).resolves.toBe('lesson_from_tpl');
+    await expect(pending).resolves.toEqual(createdLesson);
     expect(useLessonTemplate).toHaveBeenCalledWith({
       templateId: 'tpl_1',
       unitId: 'unit_partial'
