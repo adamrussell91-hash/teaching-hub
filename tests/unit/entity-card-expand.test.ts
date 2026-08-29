@@ -87,6 +87,7 @@ describe('entity-card-expand', () => {
 
   it('hydrates lesson cover on open', async () => {
     vi.mocked(getLesson).mockResolvedValue({
+      type: 'lesson',
       id: 'lesson_001',
       title: 'Introduction',
       slug: 'introduction',
@@ -94,6 +95,7 @@ describe('entity-card-expand', () => {
       sequence: 1,
       status: 'active',
       blocks: [],
+      created_at: '2026-01-01T00:00:00.000Z',
       updated_at: '2026-01-01T00:00:00.000Z',
       schema_version: 1,
       cover: { url: 'https://cdn.example.com/cover.jpg' }
