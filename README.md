@@ -133,7 +133,7 @@ These values appear in the teacher JS bundle by design. Restrict the API key and
 
 ### 4. Point the Pages app at the API
 
-`src/api/config.ts` should use `https://teaching-api.adam-russell.com` (sibling of the Pages site under `adam-russell.com`). That URL is not a secret. Push `main` so Pages rebuilds.
+`src/api/config.ts` should use `https://api.adam-russell.com` (Life/`life-hub2`). `teaching-api.adam-russell.com` stays live as a fallback. That URL is not a secret. Push `main` so Pages rebuilds.
 
 ### 5. Seed curriculum into Blobs
 

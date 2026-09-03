@@ -8,7 +8,7 @@
  * same pattern as Life Hub (api.adam-russell.com). Sensitive values stay on
  * Netlify only: passphrase hash, session secret.
  */
-const PLACEHOLDER_API_BASE_URL = 'https://teaching-api.adam-russell.com';
+const PLACEHOLDER_API_BASE_URL = 'https://api.adam-russell.com';
 
 function readViteApiBaseUrl(): string | undefined {
   if (typeof import.meta === 'undefined') return undefined;
