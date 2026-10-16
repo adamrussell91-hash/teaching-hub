@@ -1,4 +1,5 @@
 import { FAILURE } from '@/app/failure';
+import { renderKaplanQualifiers } from '@/blocks/kaplan-view';
 import katex from 'katex';
 import { getApiBaseUrl } from '@/api/config';
 import { buildChartSvg, buildChartTableRows } from '@/blocks/chart-svg';
@@ -1956,7 +1957,7 @@ export function renderConceptMapBlock(
   return wrapBlock(root, block, mode);
 }
 
-export function renderBlock(
+function renderBlockContent(
   block: Block,
   mode: RenderMode,
   ctx: RenderContext = {}
@@ -2037,3 +2038,22 @@ export function renderBlock(
     return wrapBlock(fallback, block, mode);
   }
 }
+
+export function renderBlock(block: Block, mode: RenderMode, ctx: RenderContext = {}): HTMLElement {
+  const rendered = renderBlockContent(block, mode, ctx);
+  if (block.qualifiers?.length) {
+    const qualifiers = renderKaplanQualifiers(block.qualifiers, {
+      mode, blockId: block.id, lessonId: ctx.lessonId
+    });
+    // A question keeps its process next to its prompt, before the response space.
+    // Other blocks carry the same optional attachment beneath their content.
+    const question = block.block_type === 'question_set' && block.content.questions.length === 1
+      ? rendered.querySelector('.block-question-set__question') : null;
+    const response = question?.querySelector('.block-question-set__answer-label, .block-question-set__response-lines');
+    if (response) question!.insertBefore(qualifiers, response);
+    else if (question) question.append(qualifiers);
+    else rendered.append(qualifiers);
+  }
+  return rendered;
+}
+
