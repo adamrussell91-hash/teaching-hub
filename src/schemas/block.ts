@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { IsoDateSchema } from './common';
+import { KaplanQualifiersSchema } from './kaplan';
 
 export const VisibilitySchema = z.enum(['student_teacher', 'teacher_only']);
 export const BlockTypeSchema = z.enum([
@@ -79,6 +80,7 @@ const blockTimestamps = {
 };
 
 const blockLayout = {
+  qualifiers: KaplanQualifiersSchema.optional(),
   layout: z.record(z.unknown()).default({}),
   print: z.record(z.unknown()).default({}),
   settings: z.record(z.unknown()).default({})
@@ -788,3 +790,4 @@ export const BlockSchema = z.lazy(() =>
 );
 
 export type Block = z.infer<typeof BlockSchema>;
+

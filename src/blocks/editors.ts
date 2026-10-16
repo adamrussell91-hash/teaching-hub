@@ -1,4 +1,5 @@
 import katex from 'katex';
+import { createKaplanEditor } from '@/blocks/kaplan-editor';
 import { DEFAULT_ANTHROPIC_MODEL } from '@/ai/models';
 import type { CollectionLink } from '@/blocks/collection-resolve';
 import { buildChartSvg, CHART_SERIES_COLOR_OPTIONS } from '@/blocks/chart-svg';
@@ -142,7 +143,13 @@ export function editorShell<T extends Block>(
   shell.className = 'block-editor';
   shell.dataset.blockId = block.id;
   shell.dataset.blockType = block.block_type;
-  shell.append(createVisibilitySelect(block, onChange, getLatest), fields);
+  const visibility = createVisibilitySelect(block, onChange, getLatest);
+  shell.addEventListener('kaplan-setup-toggle', (event) => {
+    const open = (event as CustomEvent<{ open: boolean }>).detail.open;
+    fields.hidden = open;
+    visibility.hidden = open;
+  });
+  shell.append(visibility, createKaplanEditor({ getBlock: getLatest, onChange }), fields);
   return shell;
 }
 
@@ -2950,3 +2957,4 @@ export function createBlockEditor(
       return createTabsEditor(block, onChange, latest as () => Extract<Block, { block_type: 'tabs' }>);
   }
 }
+

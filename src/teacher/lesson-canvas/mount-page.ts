@@ -459,7 +459,7 @@ export function mountBlockCanvas(
     duplicate.textContent = 'Duplicate';
     duplicate.addEventListener('click', (event) => {
       event.stopPropagation();
-      const clone = cloneBlockWithNewIds(block, options.idFactory);
+      const clone = cloneBlockWithNewIds(findBlockById(blocks, block.id) ?? block, options.idFactory);
       const location = findBlockLocation(blocks, block.id);
       const parent = location?.parent ?? { kind: 'root' };
       const at = location ? location.index + 1 : blocks.length;
@@ -890,3 +890,4 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     }
   };
 }
+
